@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import Icon from './Icon';
 import logoAgrotrack from '../assets/logo_app1.png';
 
@@ -107,6 +107,8 @@ export default function Sidebar({
     'financeiro-section': true,
   });
 
+  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+
   const sections = useMemo(() => {
     return navSections.map((section) => {
       const hasActiveItem = section.items.some((item) => item.id === currentPage);
@@ -130,152 +132,212 @@ export default function Sidebar({
     }));
   }
 
+  function handleNavigate(pageId) {
+    onNavigate(pageId);
+    setIsMobileMenuOpen(false);
+  }
+
+  useEffect(() => {
+    function handleResize() {
+      if (window.innerWidth > 900) {
+        setIsMobileMenuOpen(false);
+      }
+    }
+
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
+
   return (
-    <aside className="sb">
-      <div
-        className="sb-logo"
-        style={{
-          display: 'flex',
-          justifyContent: 'center',
-          alignItems: 'center',
-          paddingBottom: 16,
-        }}
-      >
-        <img
-          src={logoAgrotrack}
-          alt="AgroTrack"
-          style={{
-            width: '150px',
-            maxWidth: '100%',
-            height: 'auto',
-            objectFit: 'contain',
-            display: 'block',
-          }}
-        />
+    <>
+      <div className="mobile-topbar">
+        <button
+          type="button"
+          className="mobile-menu-btn"
+          onClick={() => setIsMobileMenuOpen(true)}
+        >
+          ☰
+        </button>
+
+        <img src={logoAgrotrack} alt="AgroTrack" className="mobile-topbar-logo" />
+
+        <div className="mobile-topbar-user">{iniciaisUsuario}</div>
       </div>
 
-      <div className="sb-sec">
-        <div className="sb-sec-lbl">Navegação</div>
-
-        {sections.map((section) => (
-          <div key={section.id} className="nav-group">
-            <button
-              type="button"
-              className={`nav-group-toggle ${section.hasActiveItem ? 'active' : ''}`}
-              onClick={() => toggleSection(section.id)}
-            >
-              <span>{section.title}</span>
-              <span className={`nav-group-arrow ${section.isOpen ? 'open' : ''}`}>
-                ▾
-              </span>
-            </button>
-
-            {section.isOpen ? (
-              <div className="nav-sublist">
-                {section.items.map((item) => (
-                  <button
-                    key={item.id}
-                    type="button"
-                    className={`nav subnav ${currentPage === item.id ? 'on' : ''}`}
-                    onClick={() => onNavigate(item.id)}
-                  >
-                    <Icon name={item.icon} className="nav-icon" />
-                    <span>{item.label}</span>
-
-                    {item.id === 'dashboard' && alertCount > 0 ? (
-                      <span className="nav-badge">{alertCount}</span>
-                    ) : null}
-                  </button>
-                ))}
-              </div>
-            ) : null}
-          </div>
-        ))}
-      </div>
-
-      <div
-        className="sb-foot"
-        style={{
-          marginTop: 18,
-          padding: '14px 12px',
-          borderRadius: 18,
-          background:
-            'linear-gradient(180deg, rgba(20,45,26,0.92) 0%, rgba(11,28,16,0.96) 100%)',
-          border: '1px solid rgba(120, 255, 140, 0.10)',
-          boxShadow: '0 10px 30px rgba(0,0,0,0.24)',
-          display: 'flex',
-          alignItems: 'center',
-          gap: 12,
-        }}
-      >
+      {isMobileMenuOpen ? (
         <div
-          className="avatar"
+          className="mobile-overlay"
+          onClick={() => setIsMobileMenuOpen(false)}
+        />
+      ) : null}
+
+      <aside className={`sb ${isMobileMenuOpen ? 'mobile-open' : ''}`}>
+        <div className="sb-mobile-header">
+          <img
+            src={logoAgrotrack}
+            alt="AgroTrack"
+            style={{
+              width: '120px',
+              height: 'auto',
+              objectFit: 'contain',
+              display: 'block',
+            }}
+          />
+
+          <button
+            type="button"
+            className="mobile-close-btn"
+            onClick={() => setIsMobileMenuOpen(false)}
+          >
+            ✕
+          </button>
+        </div>
+
+        <div
+          className="sb-logo desktop-only"
           style={{
-            width: 46,
-            height: 46,
-            minWidth: 46,
-            borderRadius: '50%',
+            display: 'flex',
+            justifyContent: 'center',
+            alignItems: 'center',
+            paddingBottom: 16,
+          }}
+        >
+          <img
+            src={logoAgrotrack}
+            alt="AgroTrack"
+            style={{
+              width: '150px',
+              maxWidth: '100%',
+              height: 'auto',
+              objectFit: 'contain',
+              display: 'block',
+            }}
+          />
+        </div>
+
+        <div className="sb-sec">
+          <div className="sb-sec-lbl">Navegação</div>
+
+          {sections.map((section) => (
+            <div key={section.id} className="nav-group">
+              <button
+                type="button"
+                className={`nav-group-toggle ${section.hasActiveItem ? 'active' : ''}`}
+                onClick={() => toggleSection(section.id)}
+              >
+                <span>{section.title}</span>
+                <span className={`nav-group-arrow ${section.isOpen ? 'open' : ''}`}>
+                  ▾
+                </span>
+              </button>
+
+              {section.isOpen ? (
+                <div className="nav-sublist">
+                  {section.items.map((item) => (
+                    <button
+                      key={item.id}
+                      type="button"
+                      className={`nav subnav ${currentPage === item.id ? 'on' : ''}`}
+                      onClick={() => handleNavigate(item.id)}
+                    >
+                      <Icon name={item.icon} className="nav-icon" />
+                      <span>{item.label}</span>
+
+                      {item.id === 'dashboard' && alertCount > 0 ? (
+                        <span className="nav-badge">{alertCount}</span>
+                      ) : null}
+                    </button>
+                  ))}
+                </div>
+              ) : null}
+            </div>
+          ))}
+        </div>
+
+        <div
+          className="sb-foot"
+          style={{
+            marginTop: 18,
+            padding: '14px 12px',
+            borderRadius: 18,
+            background:
+              'linear-gradient(180deg, rgba(20,45,26,0.92) 0%, rgba(11,28,16,0.96) 100%)',
+            border: '1px solid rgba(120, 255, 140, 0.10)',
+            boxShadow: '0 10px 30px rgba(0,0,0,0.24)',
             display: 'flex',
             alignItems: 'center',
-            justifyContent: 'center',
-            fontSize: 16,
-            fontWeight: 800,
-            color: '#dff9cc',
-            background:
-              'linear-gradient(135deg, rgba(86, 196, 88, 0.95) 0%, rgba(38, 111, 52, 0.95) 100%)',
-            boxShadow: '0 6px 18px rgba(68, 176, 84, 0.22)',
-            border: '1px solid rgba(255,255,255,0.08)',
-            flexShrink: 0,
-          }}
-        >
-          {iniciaisUsuario}
-        </div>
-
-        <div
-          style={{
-            minWidth: 0,
-            flex: 1,
-            display: 'flex',
-            flexDirection: 'column',
-            gap: 4,
+            gap: 12,
           }}
         >
           <div
-            className="u-name"
-            title={nomeUsuario}
+            className="avatar"
             style={{
-              fontSize: 15,
+              width: 46,
+              height: 46,
+              minWidth: 46,
+              borderRadius: '50%',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              fontSize: 16,
               fontWeight: 800,
-              color: '#f1ffd8',
-              lineHeight: 1.2,
-              letterSpacing: '-0.01em',
-              textTransform: 'none',
-              overflow: 'hidden',
-              textOverflow: 'ellipsis',
-              whiteSpace: 'nowrap',
-              maxWidth: '100%',
+              color: '#dff9cc',
+              background:
+                'linear-gradient(135deg, rgba(86, 196, 88, 0.95) 0%, rgba(38, 111, 52, 0.95) 100%)',
+              boxShadow: '0 6px 18px rgba(68, 176, 84, 0.22)',
+              border: '1px solid rgba(255,255,255,0.08)',
+              flexShrink: 0,
             }}
           >
-            {nomeUsuario}
+            {iniciaisUsuario}
           </div>
 
           <div
-            className="u-role"
-            title={subtituloUsuario}
             style={{
-              overflow: 'hidden',
-              textOverflow: 'ellipsis',
-              whiteSpace: 'nowrap',
-              maxWidth: '100%',
-              fontSize: 12,
-              color: 'rgba(219, 243, 201, 0.75)',
-              fontWeight: 500,
+              minWidth: 0,
+              flex: 1,
+              display: 'flex',
+              flexDirection: 'column',
+              gap: 4,
             }}
           >
-            {subtituloUsuario}
+            <div
+              className="u-name"
+              title={nomeUsuario}
+              style={{
+                fontSize: 15,
+                fontWeight: 800,
+                color: '#f1ffd8',
+                lineHeight: 1.2,
+                letterSpacing: '-0.01em',
+                textTransform: 'none',
+                overflow: 'hidden',
+                textOverflow: 'ellipsis',
+                whiteSpace: 'nowrap',
+                maxWidth: '100%',
+              }}
+            >
+              {nomeUsuario}
+            </div>
+
+            <div
+              className="u-role"
+              title={subtituloUsuario}
+              style={{
+                overflow: 'hidden',
+                textOverflow: 'ellipsis',
+                whiteSpace: 'nowrap',
+                maxWidth: '100%',
+                fontSize: 12,
+                color: 'rgba(219, 243, 201, 0.75)',
+                fontWeight: 500,
+              }}
+            >
+              {subtituloUsuario}
+            </div>
           </div>
         </div>
-      </div>
-    </aside>
+      </aside>
+    </>
   );
 }
