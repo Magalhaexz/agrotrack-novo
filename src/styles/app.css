@@ -1633,3 +1633,163 @@ select {
     align-items: flex-start;
   }
 }
+@media (max-width: 900px) {
+  .app {
+    display: block !important;
+    min-height: 100dvh;
+    width: 100%;
+    overflow-x: hidden;
+  }
+
+  .sb {
+    position: relative !important;
+    top: auto !important;
+    left: auto !important;
+    width: 100% !important;
+    height: auto !important;
+    min-height: auto !important;
+    border-right: none !important;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+    padding: 16px 14px !important;
+    overflow: visible !important;
+  }
+
+  .sb-logo {
+    display: flex !important;
+    justify-content: center !important;
+    align-items: center !important;
+    padding-bottom: 14px !important;
+  }
+
+  .sb-logo img,
+  .brand-logo-img {
+    width: 124px !important;
+    max-width: 100%;
+    height: auto !important;
+  }
+
+  .sb-sec {
+    width: 100%;
+  }
+
+  .sb-sec-lbl {
+    font-size: 12px;
+    margin-bottom: 10px;
+  }
+
+  .nav-group {
+    margin-bottom: 10px;
+  }
+
+  .nav-group-toggle {
+    width: 100%;
+  }
+
+  .nav-sublist {
+    display: grid !important;
+    grid-template-columns: 1fr 1fr;
+    gap: 8px;
+  }
+
+  .nav.subnav {
+    width: 100%;
+    min-height: 46px;
+    justify-content: flex-start;
+  }
+
+  .sb-foot {
+    margin-top: 14px !important;
+  }
+
+  .main {
+    width: 100% !important;
+    min-width: 0;
+    padding: 14px !important;
+    overflow-x: hidden !important;
+  }
+
+  .page-wrapper {
+    width: 100%;
+    min-width: 0;
+  }
+
+  .kpi-grid {
+    display: grid !important;
+    grid-template-columns: 1fr !important;
+    gap: 12px !important;
+  }
+
+  .alerts-panel-header {
+    display: flex !important;
+    flex-direction: column !important;
+    align-items: flex-start !important;
+    gap: 8px;
+  }
+
+  .alerts-scroll {
+    overflow-x: auto;
+  }
+
+  .alerts-list {
+    width: 100%;
+  }
+
+  .alert-item {
+    align-items: flex-start;
+  }
+
+  .lote-stack {
+    display: grid !important;
+    grid-template-columns: 1fr !important;
+    gap: 12px !important;
+  }
+
+  .sec-t {
+    margin-top: 18px;
+  }
+
+  table {
+    display: block;
+    width: 100%;
+    overflow-x: auto;
+    white-space: nowrap;
+  }
+
+  input,
+  select,
+  textarea,
+  button {
+    font-size: 16px;
+  }
+}
+
+@media (max-width: 560px) {
+  .sb {
+    padding: 14px 12px !important;
+  }
+
+  .sb-logo img,
+  .brand-logo-img {
+    width: 110px !important;
+  }
+
+  .nav-sublist {
+    grid-template-columns: 1fr !important;
+  }
+
+  .main {
+    padding: 12px !important;
+  }
+
+  .sb-foot {
+    padding: 12px 10px !important;
+  }
+
+  .u-name {
+    font-size: 14px !important;
+  }
+
+  .u-role {
+    font-size: 11px !important;
+  }
+}
