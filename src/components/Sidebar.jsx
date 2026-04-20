@@ -40,6 +40,7 @@ const navSections = [
     id: 'financeiro-section',
     title: 'Financeiro',
     items: [
+      { id: 'financeiro', label: 'Financeiro por Lote', icon: 'dollar' },
       { id: 'custos', label: 'Custos Operacionais', icon: 'dollar' },
       { id: 'resultados', label: 'Resultados', icon: 'activity' },
     ],

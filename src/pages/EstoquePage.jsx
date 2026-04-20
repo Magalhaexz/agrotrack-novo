@@ -1,11 +1,28 @@
 import { useMemo, useState } from 'react';
 import EstoqueForm from '../components/EstoqueForm';
+import EntradaEstoqueModal from '../components/EntradaEstoqueModal';
+import SaidaEstoqueModal from '../components/SaidaEstoqueModal';
+import { formatarNumero, formatarData } from '../utils/formatters';
+import { gerarNovoId } from '../utils/id';
+import { TIPOS_MOVIMENTACAO_ESTOQUE } from '../utils/constantes';
 
-export default function EstoquePage({ db, setDb }) {
+export default function EstoquePage({
+  db,
+  setDb,
+  onRegistrarEntradaEstoque,
+  onRegistrarSaidaEstoque,
+  onConfirmAction,
+}) {
   const [abrirForm, setAbrirForm] = useState(false);
   const [itemEditando, setItemEditando] = useState(null);
+  const [abrirEntrada, setAbrirEntrada] = useState(false);
+  const [itemSaidaId, setItemSaidaId] = useState(null);
+  const [filtroTipoMov, setFiltroTipoMov] = useState('');
+  const [filtroItemMov, setFiltroItemMov] = useState('');
 
   const estoque = db?.estoque || [];
+  const lotes = db?.lotes || [];
+  const movimentacoesEstoque = db?.movimentacoes_estoque || [];
 
   const dadosTabela = useMemo(() => {
     return estoque.map((item) => ({
@@ -17,8 +34,30 @@ export default function EstoquePage({ db, setDb }) {
         item.data_validade,
         item.alerta_dias_antes
       ),
+      criticoHistorico: isCriticoHistorico(item, movimentacoesEstoque),
     }));
-  }, [estoque]);
+  }, [estoque, movimentacoesEstoque]);
+
+  const movimentacoesFiltradas = useMemo(() => {
+    return movimentacoesEstoque
+      .filter((mov) =>
+        filtroTipoMov ? mov.tipo === filtroTipoMov : true
+      )
+      .filter((mov) =>
+        filtroItemMov ? String(mov.item_estoque_id) === String(filtroItemMov) : true
+      )
+      .map((mov) => {
+        const item = estoque.find((e) => e.id === mov.item_estoque_id);
+        const lote = lotes.find((l) => l.id === mov.lote_id);
+        return {
+          ...mov,
+          itemNome: item?.produto || '—',
+          unidade: item?.unidade || 'un',
+          loteNome: lote?.nome || '—',
+        };
+      })
+      .sort((a, b) => new Date(b.data) - new Date(a.data));
+  }, [movimentacoesEstoque, filtroTipoMov, filtroItemMov, estoque, lotes]);
 
   const resumo = useMemo(() => {
     const valorTotal = estoque.reduce(
@@ -49,8 +88,15 @@ export default function EstoquePage({ db, setDb }) {
     setAbrirForm(true);
   }
 
-  function excluirItem(id) {
-    if (!window.confirm('Deseja excluir este item do estoque?')) return;
+  async function excluirItem(id) {
+    const confirmado = typeof onConfirmAction === 'function'
+      ? await onConfirmAction({
+          title: 'Excluir item de estoque',
+          message: 'Deseja excluir este item do estoque?',
+          tone: 'danger',
+        })
+      : window.confirm('Deseja excluir este item do estoque?');
+    if (!confirmado) return;
 
     setDb((prev) => ({
       ...prev,
@@ -59,6 +105,15 @@ export default function EstoquePage({ db, setDb }) {
   }
 
   function salvarItem(dados) {
+    if (Number(dados.quantidade_atual || 0) < 0) {
+      alert(
+        `Estoque insuficiente. Saldo disponível: ${formatarNumero(
+          Math.max(Number(itemEditando?.quantidade_atual || 0), 0)
+        )}`
+      );
+      return;
+    }
+
     if (itemEditando) {
       setDb((prev) => ({
         ...prev,
@@ -92,6 +147,9 @@ export default function EstoquePage({ db, setDb }) {
         </div>
 
         <div className="page-topbar-actions">
+          <button className="primary-btn" onClick={() => setAbrirEntrada(true)}>
+            + Entrada
+          </button>
           <button className="primary-btn" onClick={abrirNovoItem}>
             + Novo item
           </button>
@@ -164,9 +222,30 @@ export default function EstoquePage({ db, setDb }) {
                     <td>{formatarData(item.data_entrada)}</td>
                     <td>{formatarData(item.data_validade)}</td>
                     <td>{renderStatusValidade(item.statusValidade)}</td>
-                    <td>{renderStatus(item.status)}</td>
+                    <td>
+                      <div style={{ display: 'grid', gap: 6 }}>
+                        <strong
+                          style={{
+                            color: '#dff9cc',
+                            fontSize: 14,
+                          }}
+                        >
+                          {formatarNumero(item.quantidade_atual)} {item.unidade}
+                        </strong>
+                        {renderStatus(item.status)}
+                        {item.criticoHistorico ? (
+                          <span className="badge badge-r">Crítico histórico</span>
+                        ) : null}
+                      </div>
+                    </td>
                     <td>
                       <div className="row-actions">
+                        <button
+                          className="action-btn"
+                          onClick={() => setItemSaidaId(item.id)}
+                        >
+                          Saída / Consumo
+                        </button>
                         <button
                           className="action-btn"
                           onClick={() => editarItem(item)}
@@ -189,6 +268,78 @@ export default function EstoquePage({ db, setDb }) {
         </div>
       </div>
 
+      <div className="fazendas-card" style={{ marginTop: 24 }}>
+        <div className="fazendas-card-header">
+          <span className="fazendas-card-title">Movimentações</span>
+        </div>
+
+        <div className="card-body" style={{ display: 'grid', gap: 12 }}>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+            <select
+              value={filtroTipoMov}
+              onChange={(e) => setFiltroTipoMov(e.target.value)}
+              style={filtroStyle}
+            >
+              <option value="">Todos os tipos</option>
+              {Object.entries(TIPOS_MOVIMENTACAO_ESTOQUE).map(([value, label]) => (
+                <option key={value} value={value}>
+                  {label}
+                </option>
+              ))}
+            </select>
+
+            <select
+              value={filtroItemMov}
+              onChange={(e) => setFiltroItemMov(e.target.value)}
+              style={filtroStyle}
+            >
+              <option value="">Todos os itens</option>
+              {estoque.map((item) => (
+                <option key={item.id} value={item.id}>
+                  {item.produto}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          <div className="fazendas-table-wrap">
+            {movimentacoesFiltradas.length === 0 ? (
+              <div className="empty-box">
+                <strong>Nenhuma movimentação encontrada.</strong>
+                <span>Registre entradas e saídas para acompanhar o histórico.</span>
+              </div>
+            ) : (
+              <table className="data-table">
+                <thead>
+                  <tr>
+                    <th>Data</th>
+                    <th>Item</th>
+                    <th>Tipo</th>
+                    <th>Quantidade</th>
+                    <th>Lote vinculado</th>
+                    <th>Valor</th>
+                    <th>Observação</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {movimentacoesFiltradas.map((mov) => (
+                    <tr key={mov.id}>
+                      <td>{formatarData(mov.data)}</td>
+                      <td className="text-h">{mov.itemNome}</td>
+                      <td>{normalizarTipoMov(mov.tipo)}</td>
+                      <td>{formatarNumero(mov.quantidade)} {mov.unidade}</td>
+                      <td>{mov.lote_id ? mov.loteNome : '—'}</td>
+                      <td>R$ {formatarNumero(mov.valor_total || 0)}</td>
+                      <td>{mov.obs || '—'}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            )}
+          </div>
+        </div>
+      </div>
+
       {abrirForm && (
         <EstoqueForm
           initialData={itemEditando}
@@ -199,27 +350,38 @@ export default function EstoquePage({ db, setDb }) {
           }}
         />
       )}
+
+      {abrirEntrada ? (
+        <EntradaEstoqueModal
+          itens={estoque}
+          handleRegistrarEntradaEstoque={(dados) => {
+            if (typeof onRegistrarEntradaEstoque === 'function') {
+              onRegistrarEntradaEstoque(dados);
+            }
+          }}
+          onClose={() => setAbrirEntrada(false)}
+        />
+      ) : null}
+
+      {itemSaidaId ? (
+        <SaidaEstoqueModal
+          itens={estoque}
+          lotes={lotes}
+          itemInicialId={itemSaidaId}
+          handleRegistrarSaidaEstoque={(dados) => {
+            if (typeof onRegistrarSaidaEstoque === 'function') {
+              onRegistrarSaidaEstoque(dados);
+            }
+          }}
+          onClose={() => setItemSaidaId(null)}
+        />
+      ) : null}
     </div>
   );
 }
 
-function gerarNovoId(lista) {
-  if (!lista.length) return 1;
-  return Math.max(...lista.map((item) => item.id)) + 1;
-}
 
-function formatarNumero(valor) {
-  return Number(valor || 0).toLocaleString('pt-BR', {
-    minimumFractionDigits: 2,
-    maximumFractionDigits: 2,
-  });
-}
 
-function formatarData(data) {
-  if (!data) return '—';
-  const [ano, mes, dia] = String(data).split('-');
-  return `${dia}/${mes}/${ano}`;
-}
 
 function obterStatus(item) {
   const atual = Number(item.quantidade_atual || 0);
@@ -273,3 +435,31 @@ function renderStatus(status) {
 
   return <span className="badge badge-g">Normal</span>;
 }
+
+function normalizarTipoMov(tipo) {
+  return TIPOS_MOVIMENTACAO_ESTOQUE[tipo] || tipo || '—';
+}
+
+function isCriticoHistorico(item, movimentacoes) {
+  const atual = Number(item.quantidade_atual || 0);
+  const historicoItem = movimentacoes.filter(
+    (mov) => Number(mov.item_estoque_id) === Number(item.id)
+  );
+
+  const maiorHistorico = Math.max(
+    atual,
+    ...historicoItem.map((mov) => Number(mov.quantidade || 0))
+  );
+
+  if (!maiorHistorico) return false;
+  return atual < maiorHistorico * 0.1;
+}
+
+const filtroStyle = {
+  width: '100%',
+  padding: '10px 12px',
+  borderRadius: 10,
+  border: '1px solid #2e4020',
+  background: '#0f160b',
+  color: '#cce0a8',
+};

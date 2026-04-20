@@ -275,6 +275,7 @@ export default function RotinaForm({
                   <input
                     name="data"
                     type="date"
+      max={new Date().toISOString().slice(0, 10)}
                     value={form.data}
                     onChange={handleChange}
                     style={inputStyle}
@@ -315,6 +316,7 @@ export default function RotinaForm({
                     <input
                       name="data_inicio"
                       type="date"
+      max={new Date().toISOString().slice(0, 10)}
                       value={form.data_inicio}
                       onChange={handleChange}
                       style={inputStyle}
@@ -326,6 +328,7 @@ export default function RotinaForm({
                     <input
                       name="data_fim"
                       type="date"
+      max={new Date().toISOString().slice(0, 10)}
                       value={form.data_fim}
                       onChange={handleChange}
                       style={inputStyle}

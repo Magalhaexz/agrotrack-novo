@@ -1,9 +1,19 @@
 import { useMemo, useState } from 'react';
 import LoteForm from '../components/LoteForm';
+import VendaLoteModal from '../components/VendaLoteModal';
+import { formatarNumero, formatarData } from '../utils/formatters';
+import { gerarNovoId } from '../utils/id';
+import { STATUS_LOTE } from '../utils/constantes';
 
-export default function LotesPage({ db, setDb }) {
+export default function LotesPage({
+  db,
+  setDb,
+  onRegistrarSaidaAnimal,
+  onConfirmAction,
+}) {
   const [abrirForm, setAbrirForm] = useState(false);
   const [loteEditando, setLoteEditando] = useState(null);
+  const [loteSaida, setLoteSaida] = useState(null);
 
   const fazendas = db?.fazendas || [];
   const lotes = db?.lotes || [];
@@ -40,7 +50,7 @@ export default function LotesPage({ db, setDb }) {
     setAbrirForm(true);
   }
 
-  function excluirLote(id) {
+  async function excluirLote(id) {
     const temAnimais = animais.some((a) => a.lote_id === id);
     const temCustos = custos.some((c) => c.lote_id === id);
 
@@ -49,7 +59,14 @@ export default function LotesPage({ db, setDb }) {
       return;
     }
 
-    if (!window.confirm('Deseja excluir este lote?')) return;
+    const confirmado = typeof onConfirmAction === 'function'
+      ? await onConfirmAction({
+          title: 'Excluir lote',
+          message: 'Deseja excluir este lote?',
+          tone: 'danger',
+        })
+      : window.confirm('Deseja excluir este lote?');
+    if (!confirmado) return;
 
     setDb((prev) => ({
       ...prev,
@@ -80,6 +97,10 @@ export default function LotesPage({ db, setDb }) {
 
     setAbrirForm(false);
     setLoteEditando(null);
+  }
+
+  function abrirSaida(lote) {
+    setLoteSaida(lote);
   }
 
   return (
@@ -143,6 +164,7 @@ export default function LotesPage({ db, setDb }) {
                   <th>Animais</th>
                   <th>Investimento</th>
                   <th>Custo Op.</th>
+                  <th>Status</th>
                   <th>Ações</th>
                 </tr>
               </thead>
@@ -158,8 +180,22 @@ export default function LotesPage({ db, setDb }) {
                     <td>{lote.qtdAnimais} cab.</td>
                     <td>R$ {formatarNumero(lote.investimento || 0)}</td>
                     <td>R$ {formatarNumero(lote.custoOperacional || 0)}</td>
+                    <td>{renderStatusLote(lote.status)}</td>
                     <td>
                       <div className="row-actions">
+                        {lote.status === 'ativo' ? (
+                          <button
+                            className="action-btn"
+                            onClick={() => abrirSaida(lote)}
+                          >
+                            Registrar saída
+                          </button>
+                        ) : (
+                          <span className="badge badge-n">
+                            {normalizarStatus(lote.status)}
+                          </span>
+                        )}
+
                         <button
                           className="action-btn"
                           onClick={() => editarLote(lote)}
@@ -193,27 +229,25 @@ export default function LotesPage({ db, setDb }) {
           }}
         />
       )}
+
+      {loteSaida && (
+        <VendaLoteModal
+          lote={loteSaida}
+          qtdAtual={Number(loteSaida.qtdAnimais || 0)}
+          handleRegistrarSaidaAnimal={(dados) => {
+            if (typeof onRegistrarSaidaAnimal === 'function') {
+              onRegistrarSaidaAnimal(dados);
+            }
+          }}
+          onClose={() => setLoteSaida(null)}
+        />
+      )}
     </div>
   );
 }
 
-function gerarNovoId(lista) {
-  if (!lista.length) return 1;
-  return Math.max(...lista.map((item) => item.id)) + 1;
-}
 
-function formatarNumero(valor) {
-  return Number(valor || 0).toLocaleString('pt-BR', {
-    minimumFractionDigits: 2,
-    maximumFractionDigits: 2,
-  });
-}
 
-function formatarData(data) {
-  if (!data) return '—';
-  const [ano, mes, dia] = data.split('-');
-  return `${dia}/${mes}/${ano}`;
-}
 
 function normalizarTipo(tipo) {
   if (tipo === 'recria+engorda') return 'Recria + Engorda';
@@ -221,4 +255,15 @@ function normalizarTipo(tipo) {
   if (tipo === 'engorda') return 'Engorda';
   if (tipo === 'recria') return 'Recria';
   return tipo || '—';
+}
+
+function normalizarStatus(status) {
+  return STATUS_LOTE[status] || 'Sem status';
+}
+
+function renderStatusLote(status) {
+  if (status === 'ativo') return <span className="badge badge-g">Ativo</span>;
+  if (status === 'vendido') return <span className="badge b-blue">Vendido</span>;
+  if (status === 'encerrado') return <span className="badge badge-a">Encerrado</span>;
+  return <span className="badge badge-n">Sem status</span>;
 }

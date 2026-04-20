@@ -1,5 +1,6 @@
 import { useMemo, useState } from 'react';
 import PesoChart from '../components/PesoChart';
+import { formatarNumero, formatarData } from '../utils/formatters';
 
 export default function AcompanhamentoPesoPage({ db }) {
   const lotes = db?.lotes || [];
@@ -232,18 +233,7 @@ function calcularDias(dataInicial, dataFinal) {
   return dias > 0 ? dias : 0;
 }
 
-function formatarNumero(valor) {
-  return Number(valor || 0).toLocaleString('pt-BR', {
-    minimumFractionDigits: 2,
-    maximumFractionDigits: 2,
-  });
-}
 
-function formatarData(data) {
-  if (!data) return '—';
-  const [ano, mes, dia] = data.split('-');
-  return `${dia}/${mes}/${ano}`;
-}
 
 function renderVariacao(variacao) {
   if (variacao === null || variacao === undefined) return '—';

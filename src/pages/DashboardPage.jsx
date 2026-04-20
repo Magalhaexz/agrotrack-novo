@@ -7,7 +7,6 @@ import { calcLote, formatCurrency, formatNumber } from '../utils/calculations';
 
 export default function DashboardPage({
   db,
-  setDb,
   alerts = [],
   onNavigate = null,
   onResolveAlert = null,
@@ -19,7 +18,13 @@ export default function DashboardPage({
     indicators: calcLote(db, lote.id),
   }));
 
+  const lotesAtivosIds = new Set(
+    db.lotes.filter((lote) => lote.status === 'ativo').map((lote) => lote.id)
+  );
   const totalAnimais = db.animais.reduce((sum, item) => sum + item.qtd, 0);
+  const totalCabecasAtivas = db.animais
+    .filter((item) => lotesAtivosIds.has(item.lote_id))
+    .reduce((sum, item) => sum + item.qtd, 0);
   const totalCustos = db.custos.reduce((sum, item) => sum + item.val, 0);
   const totalReceita = lotes.reduce(
     (sum, item) => sum + item.indicators.receitaTotal,
@@ -42,18 +47,68 @@ export default function DashboardPage({
     ? lotes.reduce((sum, item) => sum + item.indicators.gmdMedio, 0) /
       lotes.length
     : 0;
+  const pesoMedioGeral = totalAnimais
+    ? db.animais.reduce((sum, item) => sum + item.p_at * item.qtd, 0) / totalAnimais
+    : 0;
+  const arrobaMediaEstimada = pesoMedioGeral / 15;
+  const itensEstoqueCritico = (db.estoque || []).filter((item) =>
+    isEstoqueCriticoHistorico(item, db.movimentacoes_estoque || [])
+  ).length;
+  const proximosManejos = (db.sanitario || []).filter((item) => {
+    if (!item.proxima) return false;
+    const diff = daysDiff(item.proxima);
+    return diff >= 0 && diff <= 7;
+  }).length;
+  const lotesAtivos = db.lotes.filter((lote) => lote.status === 'ativo').length;
 
   const principaisAlertas = alerts.slice(0, 5);
   const alertasOcultos = Math.max(alerts.length - 5, 0);
 
   const kpis = [
     {
-      label: 'Total de Animais',
-      value: formatNumber(totalAnimais, 0),
+      label: 'Cabeças Ativas',
+      value: formatNumber(totalCabecasAtivas, 0),
       unit: 'cab.',
-      hint: 'em todos os lotes ativos',
+      hint: 'somente lotes ativos',
       tone: 'nt',
       icon: 'animals',
+    },
+    {
+      label: 'Lotes Ativos',
+      value: lotesAtivos,
+      hint: `em ${db.fazendas.length} propriedades`,
+      tone: 'nt',
+      icon: 'lotes',
+    },
+    {
+      label: 'Peso Médio Geral',
+      value: formatNumber(pesoMedioGeral, 2),
+      unit: 'kg',
+      hint: 'média ponderada por cabeças',
+      tone: 'gn',
+      icon: 'scale',
+    },
+    {
+      label: '@ Média Estimada',
+      value: formatNumber(arrobaMediaEstimada, 2),
+      unit: '@',
+      hint: 'com base no peso médio geral',
+      tone: 'am',
+      icon: 'trend',
+    },
+    {
+      label: 'Estoque Crítico',
+      value: itensEstoqueCritico,
+      hint: 'saldo < 20% do último pico',
+      tone: itensEstoqueCritico > 0 ? 'rd' : 'gn',
+      icon: 'package',
+    },
+    {
+      label: 'Próximos Manejos',
+      value: proximosManejos,
+      hint: 'próximos 7 dias',
+      tone: proximosManejos > 0 ? 'am' : 'gn',
+      icon: 'shield',
     },
     {
       label: 'Custo Operacional',
@@ -98,13 +153,6 @@ export default function DashboardPage({
       hint: 'capital alocado nos lotes',
       tone: 'br',
       icon: 'money',
-    },
-    {
-      label: 'Lotes Ativos',
-      value: db.lotes.length,
-      hint: `em ${db.fazendas.length} propriedades`,
-      tone: 'nt',
-      icon: 'lotes',
     },
   ];
 
@@ -159,4 +207,26 @@ export default function DashboardPage({
       </div>
     </>
   );
+}
+
+function daysDiff(dateStr) {
+  if (!dateStr) return 999;
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  const target = new Date(dateStr);
+  target.setHours(0, 0, 0, 0);
+  return Math.round((target - today) / (1000 * 60 * 60 * 24));
+}
+
+function isEstoqueCriticoHistorico(item, movimentacoes) {
+  const atual = Number(item.quantidade_atual || 0);
+  const historico = movimentacoes.filter(
+    (mov) => Number(mov.item_estoque_id) === Number(item.id)
+  );
+  const pico = Math.max(
+    atual,
+    ...historico.map((mov) => Number(mov.quantidade || 0))
+  );
+  if (!pico) return false;
+  return atual < pico * 0.2;
 }

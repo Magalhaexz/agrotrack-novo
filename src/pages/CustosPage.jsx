@@ -1,7 +1,9 @@
 import { useMemo, useState } from 'react';
 import CustoForm from '../components/CustoForm';
+import { formatarNumero, formatarData } from '../utils/formatters';
+import { gerarNovoId } from '../utils/id';
 
-export default function CustosPage({ db, setDb }) {
+export default function CustosPage({ db, setDb, onConfirmAction }) {
   const [abrirForm, setAbrirForm] = useState(false);
   const [custoEditando, setCustoEditando] = useState(null);
 
@@ -49,8 +51,15 @@ export default function CustosPage({ db, setDb }) {
     setAbrirForm(true);
   }
 
-  function excluirCusto(id) {
-    if (!window.confirm('Deseja excluir este custo?')) return;
+  async function excluirCusto(id) {
+    const confirmado = typeof onConfirmAction === 'function'
+      ? await onConfirmAction({
+          title: 'Excluir custo',
+          message: 'Deseja excluir este custo?',
+          tone: 'danger',
+        })
+      : window.confirm('Deseja excluir este custo?');
+    if (!confirmado) return;
 
     setDb((prev) => ({
       ...prev,
@@ -198,23 +207,8 @@ export default function CustosPage({ db, setDb }) {
   );
 }
 
-function gerarNovoId(lista) {
-  if (!lista.length) return 1;
-  return Math.max(...lista.map((item) => item.id)) + 1;
-}
 
-function formatarNumero(valor) {
-  return Number(valor || 0).toLocaleString('pt-BR', {
-    minimumFractionDigits: 2,
-    maximumFractionDigits: 2,
-  });
-}
 
-function formatarData(data) {
-  if (!data) return '—';
-  const [ano, mes, dia] = data.split('-');
-  return `${dia}/${mes}/${ano}`;
-}
 
 function normalizarCategoria(cat) {
   if (!cat) return '—';

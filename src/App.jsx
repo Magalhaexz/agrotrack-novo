@@ -2,6 +2,8 @@ import { useEffect, useMemo, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 
 import Sidebar from './components/Sidebar';
+import Toast from './components/Toast';
+import ConfirmModal from './components/ConfirmModal';
 import DashboardPage from './pages/DashboardPage';
 import FazendasPage from './pages/FazendasPage';
 import LotesPage from './pages/LotesPage';
@@ -10,6 +12,7 @@ import SuplementacaoPage from './pages/SuplementacaoPage';
 import SanitarioPage from './pages/SanitarioPage';
 import CustosPage from './pages/CustosPage';
 import ResultadosPage from './pages/ResultadosPage';
+import FinanceiroPage from './pages/FinanceiroPage';
 import EstoquePage from './pages/EstoquePage';
 import PesagensPage from './pages/PesagensPage';
 import AcompanhamentoPesoPage from './pages/AcompanhamentoPesoPage';
@@ -20,6 +23,13 @@ import LoginPage from './pages/LoginPage';
 import { initialDb } from './data/mockData';
 import { buildAlerts } from './utils/alerts';
 import { supabase } from './lib/supabase';
+import {
+  registrarEntradaAnimal,
+  registrarEntradaEstoque,
+  registrarSaidaAnimal,
+  registrarSaidaEstoque,
+} from './services/movimentacoes';
+import { useToast } from './hooks/useToast';
 
 import './styles/app.css';
 
@@ -37,6 +47,7 @@ const pageMap = {
   acompanhamentoPeso: AcompanhamentoPesoPage,
   custos: CustosPage,
   resultados: ResultadosPage,
+  financeiro: FinanceiroPage,
 };
 
 const pageTransitionVariants = {
@@ -55,6 +66,14 @@ export default function App() {
   }));
   const [session, setSession] = useState(null);
   const [loadingAuth, setLoadingAuth] = useState(true);
+  const { toasts, showToast, removeToast } = useToast();
+  const [confirmState, setConfirmState] = useState({
+    open: false,
+    title: '',
+    message: '',
+    tone: 'danger',
+    resolver: null,
+  });
 
   useEffect(() => {
     let ativo = true;
@@ -96,6 +115,24 @@ export default function App() {
     };
   }, []);
 
+  useEffect(() => {
+    const originalAlert = window.alert;
+    window.alert = (message) => {
+      const texto = String(message || '');
+      const lower = texto.toLowerCase();
+      const tipo = lower.includes('sucesso')
+        ? 'success'
+        : lower.includes('erro') || lower.includes('insuficiente')
+          ? 'error'
+          : 'warning';
+      showToast({ type: tipo, message: texto });
+    };
+
+    return () => {
+      window.alert = originalAlert;
+    };
+  }, [showToast]);
+
   const user = session?.user ?? null;
 
   const alertasResolvidos = Array.isArray(db?.alertas_resolvidos)
@@ -120,6 +157,42 @@ export default function App() {
         new Set([...(prev?.alertas_resolvidos || []), chave])
       ),
     }));
+  }
+
+  const handleRegistrarEntradaAnimal = (dados) =>
+    setDb((prev) => registrarEntradaAnimal(prev, dados));
+
+  const handleRegistrarSaidaAnimal = (dados) =>
+    setDb((prev) => registrarSaidaAnimal(prev, dados));
+
+  const handleRegistrarEntradaEstoque = (dados) =>
+    setDb((prev) => registrarEntradaEstoque(prev, dados));
+
+  const handleRegistrarSaidaEstoque = (dados) =>
+    setDb((prev) => registrarSaidaEstoque(prev, dados));
+
+  const onConfirmAction = ({ title, message, tone = 'danger' }) =>
+    new Promise((resolve) => {
+      setConfirmState({
+        open: true,
+        title: title || 'Confirmar ação',
+        message,
+        tone,
+        resolver: resolve,
+      });
+    });
+
+  function fecharConfirmacao(resultado) {
+    if (typeof confirmState.resolver === 'function') {
+      confirmState.resolver(resultado);
+    }
+    setConfirmState({
+      open: false,
+      title: '',
+      message: '',
+      tone: 'danger',
+      resolver: null,
+    });
   }
 
   const ActivePage = pageMap[currentPage] || DashboardPage;
@@ -196,10 +269,39 @@ export default function App() {
               alerts={alerts}
               onNavigate={setCurrentPage}
               onResolveAlert={marcarAlertaComoFeito}
+              onRegistrarEntradaAnimal={handleRegistrarEntradaAnimal}
+              onRegistrarSaidaAnimal={handleRegistrarSaidaAnimal}
+              onRegistrarEntradaEstoque={handleRegistrarEntradaEstoque}
+              onRegistrarSaidaEstoque={handleRegistrarSaidaEstoque}
+              onConfirmAction={onConfirmAction}
             />
           </motion.div>
         </AnimatePresence>
       </main>
+
+      <div
+        style={{
+          position: 'fixed',
+          right: 16,
+          bottom: 16,
+          display: 'grid',
+          gap: 10,
+          zIndex: 1400,
+        }}
+      >
+        {toasts.map((toast) => (
+          <Toast key={toast.id} toast={toast} onClose={removeToast} />
+        ))}
+      </div>
+
+      <ConfirmModal
+        open={confirmState.open}
+        title={confirmState.title}
+        message={confirmState.message}
+        tone={confirmState.tone}
+        onCancel={() => fecharConfirmacao(false)}
+        onConfirm={() => fecharConfirmacao(true)}
+      />
     </div>
   );
 }

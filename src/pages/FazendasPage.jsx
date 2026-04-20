@@ -1,7 +1,8 @@
 import { useMemo, useState } from 'react';
 import FazendaForm from '../components/FazendaForm';
+import { gerarNovoId } from '../utils/id';
 
-export default function FazendasPage({ db, setDb }) {
+export default function FazendasPage({ db, setDb, onConfirmAction }) {
   const [abrirForm, setAbrirForm] = useState(false);
   const [fazendaEditando, setFazendaEditando] = useState(null);
 
@@ -25,7 +26,7 @@ export default function FazendasPage({ db, setDb }) {
     setAbrirForm(true);
   }
 
-  function excluirFazenda(id) {
+  async function excluirFazenda(id) {
     const temLotes = lotes.some((l) => l.faz_id === id);
 
     if (temLotes) {
@@ -33,7 +34,14 @@ export default function FazendasPage({ db, setDb }) {
       return;
     }
 
-    if (!window.confirm('Deseja excluir esta fazenda?')) return;
+    const confirmado = typeof onConfirmAction === 'function'
+      ? await onConfirmAction({
+          title: 'Excluir fazenda',
+          message: 'Deseja excluir esta fazenda?',
+          tone: 'danger',
+        })
+      : window.confirm('Deseja excluir esta fazenda?');
+    if (!confirmado) return;
 
     setDb((prev) => ({
       ...prev,
@@ -176,7 +184,3 @@ export default function FazendasPage({ db, setDb }) {
   );
 }
 
-function gerarNovoId(lista) {
-  if (!lista.length) return 1;
-  return Math.max(...lista.map((item) => item.id)) + 1;
-}

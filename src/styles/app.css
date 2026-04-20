@@ -506,6 +506,7 @@ select {
 
 .fazendas-table-wrap {
   padding: 12px 18px 18px;
+  overflow-x: auto;
 }
 
 /* Tabelas */
@@ -513,6 +514,7 @@ select {
 .tbl {
   width: 100%;
   border-collapse: collapse;
+  min-width: 760px;
 }
 
 .data-table th,
@@ -547,6 +549,15 @@ select {
 .text-h {
   color: #cce0a8;
   font-weight: 600;
+}
+
+@media (max-width: 768px) {
+  .kpi-grid-3,
+  .kpi-grid,
+  .grid-2,
+  .res-grid {
+    grid-template-columns: 1fr !important;
+  }
 }
 
 /* Badges */

@@ -1,12 +1,16 @@
 import { useMemo, useState } from 'react';
 import AnimalForm from '../components/AnimalForm';
+import { formatarNumero, formatarData } from '../utils/formatters';
+import { gerarNovoId } from '../utils/id';
+import { TIPOS_SAIDA_ANIMAL } from '../utils/constantes';
 
-export default function AnimaisPage({ db, setDb }) {
+export default function AnimaisPage({ db, setDb, onConfirmAction }) {
   const [abrirForm, setAbrirForm] = useState(false);
   const [animalEditando, setAnimalEditando] = useState(null);
 
   const lotes = db?.lotes || [];
   const animais = db?.animais || [];
+  const movimentacoesAnimais = db?.movimentacoes_animais || [];
 
   const dadosTabela = useMemo(() => {
     return animais.map((animal) => {
@@ -33,10 +37,13 @@ export default function AnimaisPage({ db, setDb }) {
       0
     );
 
-    const pesoAtualMedio =
-      animais.length > 0
-        ? animais.reduce((acc, item) => acc + Number(item.p_at || 0), 0) / animais.length
-        : 0;
+    const pesoAtualMedio = totalCabecas
+      ? animais.reduce(
+          (acc, item) =>
+            acc + Number(item.p_at || 0) * Number(item.qtd || 0),
+          0
+        ) / totalCabecas
+      : 0;
 
     return {
       totalCabecas,
@@ -44,6 +51,21 @@ export default function AnimaisPage({ db, setDb }) {
       pesoAtualMedio,
     };
   }, [animais]);
+
+  const historicoSaidas = useMemo(() => {
+    const tiposSaida = Object.keys(TIPOS_SAIDA_ANIMAL);
+
+    return movimentacoesAnimais
+      .filter((mov) => tiposSaida.includes(mov.tipo))
+      .map((mov) => {
+        const lote = lotes.find((l) => l.id === mov.lote_id);
+        return {
+          ...mov,
+          loteNome: lote?.nome || '—',
+        };
+      })
+      .sort((a, b) => new Date(b.data) - new Date(a.data));
+  }, [movimentacoesAnimais, lotes]);
 
   function abrirNovo() {
     setAnimalEditando(null);
@@ -55,8 +77,15 @@ export default function AnimaisPage({ db, setDb }) {
     setAbrirForm(true);
   }
 
-  function excluirAnimal(id) {
-    if (!window.confirm('Deseja excluir este registro de animais?')) return;
+  async function excluirAnimal(id) {
+    const confirmado = typeof onConfirmAction === 'function'
+      ? await onConfirmAction({
+          title: 'Excluir registro de animais',
+          message: 'Deseja excluir este registro de animais?',
+          tone: 'danger',
+        })
+      : window.confirm('Deseja excluir este registro de animais?');
+    if (!confirmado) return;
 
     setDb((prev) => ({
       ...prev,
@@ -202,18 +231,61 @@ export default function AnimaisPage({ db, setDb }) {
           }}
         />
       )}
+
+      <div className="fazendas-card" style={{ marginTop: 24 }}>
+        <div className="fazendas-card-header">
+          <span className="fazendas-card-title">Histórico de saídas</span>
+        </div>
+
+        <div className="fazendas-table-wrap">
+          {historicoSaidas.length === 0 ? (
+            <div className="empty-box">
+              <strong>Nenhuma saída registrada.</strong>
+              <span>As saídas de venda, morte, descarte e transferência aparecerão aqui.</span>
+            </div>
+          ) : (
+            <table className="data-table">
+              <thead>
+                <tr>
+                  <th>Data</th>
+                  <th>Lote</th>
+                  <th>Tipo</th>
+                  <th>Quantidade</th>
+                  <th>Peso médio</th>
+                  <th>Valor total</th>
+                  <th>Comprador/destino</th>
+                </tr>
+              </thead>
+              <tbody>
+                {historicoSaidas.map((mov) => (
+                  <tr key={mov.id}>
+                    <td>{formatarData(mov.data)}</td>
+                    <td className="text-h">{mov.loteNome}</td>
+                    <td>
+                      <span className="badge b-blue">{normalizarSaida(mov.tipo)}</span>
+                    </td>
+                    <td>{mov.qtd}</td>
+                    <td>{formatarNumero(mov.peso_medio)} kg</td>
+                    <td>
+                      {Number(mov.valor_total || 0) > 0
+                        ? `R$ ${formatarNumero(mov.valor_total)}`
+                        : '—'}
+                    </td>
+                    <td>{mov.comprador_fornecedor || '—'}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          )}
+        </div>
+      </div>
     </div>
   );
 }
 
-function gerarNovoId(lista) {
-  if (!lista.length) return 1;
-  return Math.max(...lista.map((item) => item.id)) + 1;
-}
 
-function formatarNumero(valor) {
-  return Number(valor || 0).toLocaleString('pt-BR', {
-    minimumFractionDigits: 2,
-    maximumFractionDigits: 2,
-  });
+
+
+function normalizarSaida(tipo) {
+  return TIPOS_SAIDA_ANIMAL[tipo] || tipo || '—';
 }

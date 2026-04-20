@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { UNIDADES_ESTOQUE } from '../utils/constantes';
 
 const vazio = {
   produto: '',
@@ -47,6 +48,22 @@ export default function EstoqueForm({ initialData, onSave, onCancel }) {
 
     if (!form.produto.trim()) {
       alert('Informe o nome do produto.');
+      return;
+    }
+
+    const validacoesNumericas = [
+      { campo: 'Quantidade atual', valor: form.quantidade_atual },
+      { campo: 'Quantidade mínima', valor: form.quantidade_minima },
+      { campo: 'Valor unitário', valor: form.valor_unitario },
+      { campo: 'Alerta de validade (dias)', valor: form.alerta_dias_antes },
+    ];
+
+    const campoInvalido = validacoesNumericas.find(
+      (item) => Number(item.valor || 0) <= 0
+    );
+
+    if (campoInvalido) {
+      alert(`${campoInvalido.campo} deve ser maior que zero.`);
       return;
     }
 
@@ -131,11 +148,11 @@ export default function EstoqueForm({ initialData, onSave, onCancel }) {
                   onChange={handleChange}
                   style={inputStyle}
                 >
-                  <option value="kg">kg</option>
-                  <option value="saco">saco</option>
-                  <option value="litro">litro</option>
-                  <option value="dose">dose</option>
-                  <option value="un">un</option>
+                  {UNIDADES_ESTOQUE.map((unidade) => (
+                    <option key={unidade} value={unidade === 'unidade' ? 'un' : unidade}>
+                      {unidade}
+                    </option>
+                  ))}
                 </select>
               </div>
             </div>
@@ -147,6 +164,7 @@ export default function EstoqueForm({ initialData, onSave, onCancel }) {
                   name="quantidade_atual"
                   type="number"
                   step="0.01"
+      min="0"
                   value={form.quantidade_atual}
                   onChange={handleChange}
                   style={inputStyle}
@@ -159,6 +177,7 @@ export default function EstoqueForm({ initialData, onSave, onCancel }) {
                   name="quantidade_minima"
                   type="number"
                   step="0.01"
+      min="0"
                   value={form.quantidade_minima}
                   onChange={handleChange}
                   style={inputStyle}
@@ -171,6 +190,7 @@ export default function EstoqueForm({ initialData, onSave, onCancel }) {
                   name="valor_unitario"
                   type="number"
                   step="0.01"
+      min="0"
                   value={form.valor_unitario}
                   onChange={handleChange}
                   style={inputStyle}
@@ -209,6 +229,7 @@ export default function EstoqueForm({ initialData, onSave, onCancel }) {
     <input
       name="data_validade"
       type="date"
+      max={new Date().toISOString().slice(0, 10)}
       value={form.data_validade}
       onChange={handleChange}
       style={inputStyle}
@@ -220,6 +241,7 @@ export default function EstoqueForm({ initialData, onSave, onCancel }) {
     <input
       name="alerta_dias_antes"
       type="number"
+      min="0"
       value={form.alerta_dias_antes}
       onChange={handleChange}
       placeholder="Ex: 15"
@@ -233,6 +255,7 @@ export default function EstoqueForm({ initialData, onSave, onCancel }) {
               <input
                 name="data_entrada"
                 type="date"
+      max={new Date().toISOString().slice(0, 10)}
                 value={form.data_entrada}
                 onChange={handleChange}
                 style={inputStyle}

@@ -1,4 +1,5 @@
 import { formatCurrency, formatDate, formatNumber } from '../utils/calculations';
+import { useArroba } from '../hooks/useArroba';
 
 export default function LoteCard({ lote, fazendaNome, indicators }) {
   const suplementoCritico = indicators.diasEstoque < 7;
@@ -6,6 +7,7 @@ export default function LoteCard({ lote, fazendaNome, indicators }) {
   const suplementoStatus = suplementoCritico ? 'crit' : suplementoBaixo ? 'warn' : 'ok';
   const suplementoLabel = suplementoCritico ? 'Crítico' : suplementoBaixo ? 'Baixo' : 'OK';
   const gmdProgress = lote.gmd_meta > 0 ? Math.min(100, (indicators.gmdMedio / lote.gmd_meta) * 100) : 0;
+  const { arrobaViva } = useArroba({ peso: indicators.pesoAtualMedio });
 
   return (
     <div className="lote-card">
@@ -44,6 +46,7 @@ export default function LoteCard({ lote, fazendaNome, indicators }) {
           <div className="lb-row"><span className="lb-lbl">Preço @</span><span className="lb-val am">{formatCurrency(lote.preco_arroba)}</span></div>
           <div className="lb-row"><span className="lb-lbl">Rend. carcaça</span><span className="lb-val">{formatNumber(lote.rendimento_carcaca, 0)}%</span></div>
           <div className="lb-row"><span className="lb-lbl">Arrobas carcaça</span><span className="lb-val am">{formatNumber(indicators.arrobasCarcaca)} @</span></div>
+          <div className="lb-row"><span className="lb-lbl">@ viva atual</span><span className="lb-val am">{formatNumber(arrobaViva)} @</span></div>
           <div className="lb-row"><span className="lb-lbl">Receita/cab</span><span className="lb-val am">{formatCurrency(indicators.receitaPorCabeca)}</span></div>
         </div>
 

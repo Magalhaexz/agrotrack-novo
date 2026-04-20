@@ -1,5 +1,6 @@
 import { useMemo, useState } from 'react';
 import PageHeader from '../components/PageHeader';
+import ResultadoLoteCard from '../components/ResultadoLoteCard';
 import { calcLote, formatCurrency, formatNumber } from '../utils/calculations';
 
 function ResultCard({ label, value, tone = 'nt' }) {
@@ -31,6 +32,8 @@ export default function ResultadosPage({ db }) {
 
       {lote && indicators ? (
         <>
+          <ResultadoLoteCard db={db} lote={lote} />
+
           <div className="margem-bar">
             <div className="margem-title">Estrutura de Resultado — {lote.nome}</div>
             <div className="margem-track">

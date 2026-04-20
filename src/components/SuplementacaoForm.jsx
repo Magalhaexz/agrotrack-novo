@@ -75,6 +75,22 @@ export default function SuplementacaoForm({
       return;
     }
 
+    if (
+      form.modo === 'por_cabeca' &&
+      Number(form.consumo_por_cabeca_dia || 0) <= 0
+    ) {
+      alert('Consumo por cabeça/dia deve ser maior que zero.');
+      return;
+    }
+
+    if (
+      form.modo === 'total_lote' &&
+      Number(form.consumo_total_dia || 0) <= 0
+    ) {
+      alert('Consumo total do lote/dia deve ser maior que zero.');
+      return;
+    }
+
     onSave({
       lote_id: Number(form.lote_id),
       item_estoque_id: Number(form.item_estoque_id),
@@ -171,6 +187,7 @@ export default function SuplementacaoForm({
                   name="consumo_por_cabeca_dia"
                   type="number"
                   step="0.001"
+      min="0"
                   value={form.consumo_por_cabeca_dia}
                   onChange={handleChange}
                   placeholder="Ex: 0.500"
@@ -184,6 +201,7 @@ export default function SuplementacaoForm({
                   name="consumo_total_dia"
                   type="number"
                   step="0.001"
+      min="0"
                   value={form.consumo_total_dia}
                   onChange={handleChange}
                   placeholder="Ex: 48"

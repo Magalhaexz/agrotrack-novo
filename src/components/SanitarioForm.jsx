@@ -67,6 +67,16 @@ export default function SanitarioForm({
       return;
     }
 
+    if (Number(form.qtd || 0) <= 0) {
+      alert('Quantidade atendida deve ser maior que zero.');
+      return;
+    }
+
+    if (Number(form.alerta_dias_antes || 0) <= 0) {
+      alert('Aviso de dias antes deve ser maior que zero.');
+      return;
+    }
+
     onSave({
       lote_id: Number(form.lote_id),
       tipo: form.tipo,
@@ -151,6 +161,7 @@ export default function SanitarioForm({
                 <input
                   name="qtd"
                   type="number"
+      min="0"
                   value={form.qtd}
                   onChange={handleChange}
                   placeholder="Ex: 120"
@@ -176,6 +187,7 @@ export default function SanitarioForm({
                 <input
                   name="data_aplic"
                   type="date"
+      max={new Date().toISOString().slice(0, 10)}
                   value={form.data_aplic}
                   onChange={handleChange}
                   style={inputStyle}
@@ -187,6 +199,7 @@ export default function SanitarioForm({
                 <input
                   name="proxima"
                   type="date"
+      max={new Date().toISOString().slice(0, 10)}
                   value={form.proxima}
                   onChange={handleChange}
                   style={inputStyle}
@@ -200,6 +213,7 @@ export default function SanitarioForm({
                 <input
                   name="alerta_dias_antes"
                   type="number"
+      min="0"
                   value={form.alerta_dias_antes}
                   onChange={handleChange}
                   placeholder="Ex: 15"

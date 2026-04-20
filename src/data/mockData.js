@@ -1,4 +1,5 @@
 export const initialDb = {
+  // REMOVER ANTES DE PRODUÇÃO: dados de demonstração para ambiente local.
   fazendas: [
     { id: 1, nome: 'Fazenda Santa Rita', local: 'Uberaba, MG', resp: 'João Silva' },
     { id: 2, nome: 'Rancho Bom Jesus', local: 'Uberlândia, MG', resp: 'Maria Silva' },
@@ -25,6 +26,10 @@ export const initialDb = {
       custo_fixo_mensal: 4800,
       preco_arroba: 290,
       rendimento_carcaca: 52,
+      status: 'ativo',
+      data_encerramento: null,
+      data_venda: null,
+      motivo_encerramento: '',
       supl_nome: 'Núcleo proteico 40%',
       supl_rkg: 3.2,
       supl_pv_pct: 0.5,
@@ -51,6 +56,10 @@ export const initialDb = {
       custo_fixo_mensal: 3200,
       preco_arroba: 285,
       rendimento_carcaca: 50,
+      status: 'ativo',
+      data_encerramento: null,
+      data_venda: null,
+      motivo_encerramento: '',
       supl_nome: 'Sal mineral proteinado',
       supl_rkg: 1.8,
       supl_pv_pct: 0.3,
@@ -59,6 +68,7 @@ export const initialDb = {
     },
   ],
 
+  // REMOVER ANTES DE PRODUÇÃO: massa inicial fictícia para testes de interface.
   animais: [
     { id: 1, lote_id: 1, sexo: 'macho', gen: 'Cruzado', qtd: 80, p_ini: 320, p_at: 440, dias: 120, consumo: 12.5 },
     { id: 2, lote_id: 1, sexo: 'fêmea', gen: 'Nelore PO', qtd: 40, p_ini: 260, p_at: 340, dias: 120, consumo: 9.2 },
@@ -130,6 +140,7 @@ export const initialDb = {
 },
   ],
 
+  // REMOVER ANTES DE PRODUÇÃO: itens de estoque de exemplo.
   estoque: [
   {
     id: 1,
@@ -274,7 +285,7 @@ export const initialDb = {
     obs: '',
   },
   {
-    id: 1,
+    id: 5,
     lote_id: 1,
     tipo: 'vacina',
     desc: 'Febre Aftosa',
@@ -287,7 +298,7 @@ export const initialDb = {
     rotina_automatica_id: null,
   },
   {
-    id: 2,
+    id: 6,
     lote_id: 1,
     tipo: 'vermifugo',
     desc: 'Doramectin 1%',
@@ -300,7 +311,7 @@ export const initialDb = {
     rotina_automatica_id: null,
   },
   {
-    id: 5,
+    id: 7,
     lote_id: 2,
     tipo: 'vermifugo',
     desc: 'Ivermectina 3.5%',
@@ -311,4 +322,8 @@ export const initialDb = {
     obs: '',
   },
 ],
+
+  movimentacoes_animais: [],
+  movimentacoes_estoque: [],
+  movimentacoes_financeiras: [],
 };

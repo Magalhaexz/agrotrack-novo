@@ -1,7 +1,9 @@
 import { useMemo, useState } from 'react';
 import PesagemForm from '../components/PesagemForm';
+import { formatarNumero, formatarData } from '../utils/formatters';
+import { gerarNovoId } from '../utils/id';
 
-export default function PesagensPage({ db, setDb }) {
+export default function PesagensPage({ db, setDb, onConfirmAction }) {
   const [abrirForm, setAbrirForm] = useState(false);
   const [pesagemEditando, setPesagemEditando] = useState(null);
 
@@ -66,8 +68,15 @@ export default function PesagensPage({ db, setDb }) {
     setAbrirForm(true);
   }
 
-  function excluirPesagem(id) {
-    if (!window.confirm('Deseja excluir esta pesagem?')) return;
+  async function excluirPesagem(id) {
+    const confirmado = typeof onConfirmAction === 'function'
+      ? await onConfirmAction({
+          title: 'Excluir pesagem',
+          message: 'Deseja excluir esta pesagem?',
+          tone: 'danger',
+        })
+      : window.confirm('Deseja excluir esta pesagem?');
+    if (!confirmado) return;
 
     setDb((prev) => ({
       ...prev,
@@ -209,23 +218,8 @@ export default function PesagensPage({ db, setDb }) {
   );
 }
 
-function gerarNovoId(lista) {
-  if (!lista.length) return 1;
-  return Math.max(...lista.map((item) => item.id)) + 1;
-}
 
-function formatarNumero(valor) {
-  return Number(valor || 0).toLocaleString('pt-BR', {
-    minimumFractionDigits: 2,
-    maximumFractionDigits: 2,
-  });
-}
 
-function formatarData(data) {
-  if (!data) return '—';
-  const [ano, mes, dia] = data.split('-');
-  return `${dia}/${mes}/${ano}`;
-}
 
 function renderVariacao(variacao) {
   if (variacao === null || variacao === undefined) return '—';

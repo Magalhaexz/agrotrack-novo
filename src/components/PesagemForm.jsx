@@ -1,10 +1,13 @@
 import { useEffect, useState } from 'react';
+import ArrobaPreview from './ArrobaPreview';
 
 const vazio = {
   lote_id: '',
   data: '',
   peso_medio: '',
   observacao: '',
+  rendimento_carcaca: 52,
+  preco_arroba: '',
 };
 
 export default function PesagemForm({
@@ -22,6 +25,8 @@ export default function PesagemForm({
         data: initialData.data || '',
         peso_medio: initialData.peso_medio ?? '',
         observacao: initialData.observacao || '',
+        rendimento_carcaca: initialData.rendimento_carcaca ?? 52,
+        preco_arroba: initialData.preco_arroba ?? '',
       });
     } else {
       setForm(vazio);
@@ -48,6 +53,16 @@ export default function PesagemForm({
 
     if (!form.peso_medio) {
       alert('Informe o peso médio.');
+      return;
+    }
+
+    if (Number(form.peso_medio || 0) <= 0) {
+      alert('Peso médio deve ser maior que zero.');
+      return;
+    }
+
+    if (Number(form.rendimento_carcaca || 0) <= 0) {
+      alert('Rendimento de carcaça deve ser maior que zero.');
       return;
     }
 
@@ -112,6 +127,7 @@ export default function PesagemForm({
                 <input
                   name="data"
                   type="date"
+      max={new Date().toISOString().slice(0, 10)}
                   value={form.data}
                   onChange={handleChange}
                   style={inputStyle}
@@ -124,6 +140,7 @@ export default function PesagemForm({
                   name="peso_medio"
                   type="number"
                   step="0.01"
+      min="0"
                   value={form.peso_medio}
                   onChange={handleChange}
                   placeholder="Ex: 412"
@@ -142,6 +159,40 @@ export default function PesagemForm({
                 style={inputStyle}
               />
             </div>
+
+            <div style={grid2}>
+              <div>
+                <label style={labelStyle}>Rendimento de carcaça (%)</label>
+                <input
+                  name="rendimento_carcaca"
+                  type="number"
+                  step="0.1"
+      min="0"
+                  value={form.rendimento_carcaca}
+                  onChange={handleChange}
+                  style={inputStyle}
+                />
+              </div>
+
+              <div>
+                <label style={labelStyle}>Preço por @ (opcional)</label>
+                <input
+                  name="preco_arroba"
+                  type="number"
+                  step="0.01"
+      min="0"
+                  value={form.preco_arroba}
+                  onChange={handleChange}
+                  style={inputStyle}
+                />
+              </div>
+            </div>
+
+            <ArrobaPreview
+              peso={form.peso_medio}
+              rendimento={form.rendimento_carcaca}
+              precoPorArroba={form.preco_arroba}
+            />
 
             <div
               style={{
