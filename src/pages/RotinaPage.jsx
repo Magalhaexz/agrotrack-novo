@@ -1,7 +1,9 @@
 import { useMemo, useState } from 'react';
 import RotinaForm from '../components/RotinaForm';
+import { formatarData } from '../utils/formatters';
+import { gerarNovoId } from '../utils/id';
 
-export default function RotinaPage({ db, setDb }) {
+export default function RotinaPage({ db, setDb, onConfirmAction }) {
   const [abrirForm, setAbrirForm] = useState(false);
   const [itemEditando, setItemEditando] = useState(null);
 
@@ -90,10 +92,17 @@ export default function RotinaPage({ db, setDb }) {
     setAbrirForm(true);
   }
 
-  function excluirItem(item) {
+  async function excluirItem(item) {
     const id = item._instanciaRecorrente ? item.id_base : item.id;
 
-    if (!window.confirm('Deseja excluir esta tarefa?')) return;
+    const confirmado = typeof onConfirmAction === 'function'
+      ? await onConfirmAction({
+          title: 'Excluir tarefa',
+          message: 'Deseja excluir esta tarefa?',
+          tone: 'danger',
+        })
+      : window.confirm('Deseja excluir esta tarefa?');
+    if (!confirmado) return;
 
     setDb((prev) => ({
       ...prev,
@@ -443,10 +452,6 @@ function descreverRecorrencia(item) {
   return '—';
 }
 
-function gerarNovoId(lista) {
-  if (!lista.length) return 1;
-  return Math.max(...lista.map((item) => item.id)) + 1;
-}
 
 function zerarHora(data) {
   const d = new Date(data);
@@ -461,11 +466,6 @@ function formatarDataISO(data) {
   return `${ano}-${mes}-${dia}`;
 }
 
-function formatarData(data) {
-  if (!data) return '—';
-  const [ano, mes, dia] = String(data).split('-');
-  return `${dia}/${mes}/${ano}`;
-}
 
 function renderStatus(status) {
   if (status === 'pendente') {

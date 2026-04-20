@@ -1,7 +1,8 @@
 import { useMemo, useState } from 'react';
 import FuncionarioForm from '../components/FuncionarioForm';
+import { gerarNovoId } from '../utils/id';
 
-export default function FuncionariosPage({ db, setDb }) {
+export default function FuncionariosPage({ db, setDb, onConfirmAction }) {
   const [abrirForm, setAbrirForm] = useState(false);
   const [funcionarioEditando, setFuncionarioEditando] = useState(null);
 
@@ -31,7 +32,7 @@ export default function FuncionariosPage({ db, setDb }) {
     setAbrirForm(true);
   }
 
-  function excluirFuncionario(id) {
+  async function excluirFuncionario(id) {
     const temRotinas = rotinas.some((r) => r.funcionario_id === id);
 
     if (temRotinas) {
@@ -39,7 +40,14 @@ export default function FuncionariosPage({ db, setDb }) {
       return;
     }
 
-    if (!window.confirm('Deseja excluir este funcionário?')) return;
+    const confirmado = typeof onConfirmAction === 'function'
+      ? await onConfirmAction({
+          title: 'Excluir funcionário',
+          message: 'Deseja excluir este funcionário?',
+          tone: 'danger',
+        })
+      : window.confirm('Deseja excluir este funcionário?');
+    if (!confirmado) return;
 
     setDb((prev) => ({
       ...prev,
@@ -182,7 +190,3 @@ export default function FuncionariosPage({ db, setDb }) {
   );
 }
 
-function gerarNovoId(lista) {
-  if (!lista.length) return 1;
-  return Math.max(...lista.map((item) => item.id)) + 1;
-}

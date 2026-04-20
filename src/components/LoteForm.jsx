@@ -60,6 +60,23 @@ export default function LoteForm({
       return;
     }
 
+    const validacoesNumericas = [
+      { campo: 'Meta de GMD', valor: form.gmd_meta },
+      { campo: 'Investimento', valor: form.investimento },
+      { campo: 'Custo fixo mensal', valor: form.custo_fixo_mensal },
+      { campo: 'Preço da arroba', valor: form.preco_arroba },
+      { campo: 'Rendimento de carcaça', valor: form.rendimento_carcaca },
+    ];
+
+    const campoInvalido = validacoesNumericas.find(
+      (item) => Number(item.valor || 0) <= 0
+    );
+
+    if (campoInvalido) {
+      alert(`${campoInvalido.campo} deve ser maior que zero.`);
+      return;
+    }
+
     onSave({
       nome: form.nome.trim(),
       faz_id: Number(form.faz_id),
@@ -192,6 +209,7 @@ export default function LoteForm({
                   name="gmd_meta"
                   type="number"
                   step="0.001"
+      min="0"
                   value={form.gmd_meta}
                   onChange={handleChange}
                   placeholder="Ex: 1.200"
@@ -206,6 +224,7 @@ export default function LoteForm({
                 <input
                   name="entrada"
                   type="date"
+      max={new Date().toISOString().slice(0, 10)}
                   value={form.entrada}
                   onChange={handleChange}
                   style={inputStyle}
@@ -217,6 +236,7 @@ export default function LoteForm({
                 <input
                   name="saida"
                   type="date"
+      max={new Date().toISOString().slice(0, 10)}
                   value={form.saida}
                   onChange={handleChange}
                   style={inputStyle}
@@ -231,6 +251,7 @@ export default function LoteForm({
                   name="investimento"
                   type="number"
                   step="0.01"
+      min="0"
                   value={form.investimento}
                   onChange={handleChange}
                   placeholder="0,00"
@@ -244,6 +265,7 @@ export default function LoteForm({
                   name="custo_fixo_mensal"
                   type="number"
                   step="0.01"
+      min="0"
                   value={form.custo_fixo_mensal}
                   onChange={handleChange}
                   placeholder="0,00"
@@ -257,6 +279,7 @@ export default function LoteForm({
                   name="preco_arroba"
                   type="number"
                   step="0.01"
+      min="0"
                   value={form.preco_arroba}
                   onChange={handleChange}
                   placeholder="0,00"
@@ -271,6 +294,7 @@ export default function LoteForm({
                 name="rendimento_carcaca"
                 type="number"
                 step="0.1"
+      min="0"
                 value={form.rendimento_carcaca}
                 onChange={handleChange}
                 placeholder="Ex: 52"

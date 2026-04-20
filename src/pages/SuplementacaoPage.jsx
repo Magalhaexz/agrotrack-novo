@@ -1,7 +1,9 @@
 import { useMemo, useState } from 'react';
 import SuplementacaoForm from '../components/SuplementacaoForm';
+import { formatarNumero } from '../utils/formatters';
+import { gerarNovoId } from '../utils/id';
 
-export default function SuplementacaoPage({ db, setDb }) {
+export default function SuplementacaoPage({ db, setDb, onConfirmAction }) {
   const [abrirForm, setAbrirForm] = useState(false);
   const [itemEditando, setItemEditando] = useState(null);
 
@@ -81,8 +83,15 @@ export default function SuplementacaoPage({ db, setDb }) {
     setAbrirForm(true);
   }
 
-  function excluirItem(id) {
-    if (!window.confirm('Deseja excluir esta suplementação?')) return;
+  async function excluirItem(id) {
+    const confirmado = typeof onConfirmAction === 'function'
+      ? await onConfirmAction({
+          title: 'Excluir suplementação',
+          message: 'Deseja excluir esta suplementação?',
+          tone: 'danger',
+        })
+      : window.confirm('Deseja excluir esta suplementação?');
+    if (!confirmado) return;
 
     setDb((prev) => ({
       ...prev,
@@ -241,17 +250,7 @@ export default function SuplementacaoPage({ db, setDb }) {
   );
 }
 
-function gerarNovoId(lista) {
-  if (!lista.length) return 1;
-  return Math.max(...lista.map((item) => item.id)) + 1;
-}
 
-function formatarNumero(valor) {
-  return Number(valor || 0).toLocaleString('pt-BR', {
-    minimumFractionDigits: 2,
-    maximumFractionDigits: 2,
-  });
-}
 
 function normalizarModo(modo) {
   if (modo === 'por_cabeca') return 'Por cabeça';

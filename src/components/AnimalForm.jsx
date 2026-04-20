@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import ArrobaPreview from './ArrobaPreview';
 
 const vazio = {
   lote_id: '',
@@ -9,6 +10,8 @@ const vazio = {
   p_at: '',
   dias: '',
   consumo: '',
+  rendimento_carcaca: 52,
+  preco_arroba: '',
 };
 
 export default function AnimalForm({
@@ -30,6 +33,8 @@ export default function AnimalForm({
         p_at: initialData.p_at ?? '',
         dias: initialData.dias ?? '',
         consumo: initialData.consumo ?? '',
+        rendimento_carcaca: initialData.rendimento_carcaca ?? 52,
+        preco_arroba: initialData.preco_arroba ?? '',
       });
     } else {
       setForm(vazio);
@@ -56,6 +61,24 @@ export default function AnimalForm({
 
     if (!form.qtd) {
       alert('Informe a quantidade.');
+      return;
+    }
+
+    const validacoesNumericas = [
+      { campo: 'Quantidade', valor: form.qtd },
+      { campo: 'Peso inicial', valor: form.p_ini },
+      { campo: 'Peso atual', valor: form.p_at },
+      { campo: 'Dias no lote', valor: form.dias },
+      { campo: 'Consumo', valor: form.consumo },
+      { campo: 'Rendimento de carcaça', valor: form.rendimento_carcaca },
+    ];
+
+    const campoInvalido = validacoesNumericas.find(
+      (item) => Number(item.valor || 0) <= 0
+    );
+
+    if (campoInvalido) {
+      alert(`${campoInvalido.campo} deve ser maior que zero.`);
       return;
     }
 
@@ -150,6 +173,7 @@ export default function AnimalForm({
                 <input
                   name="qtd"
                   type="number"
+      min="0"
                   value={form.qtd}
                   onChange={handleChange}
                   placeholder="Ex: 80"
@@ -165,6 +189,7 @@ export default function AnimalForm({
                   name="p_ini"
                   type="number"
                   step="0.01"
+      min="0"
                   value={form.p_ini}
                   onChange={handleChange}
                   placeholder="Ex: 320"
@@ -178,6 +203,7 @@ export default function AnimalForm({
                   name="p_at"
                   type="number"
                   step="0.01"
+      min="0"
                   value={form.p_at}
                   onChange={handleChange}
                   placeholder="Ex: 440"
@@ -192,6 +218,7 @@ export default function AnimalForm({
                 <input
                   name="dias"
                   type="number"
+      min="0"
                   value={form.dias}
                   onChange={handleChange}
                   placeholder="Ex: 120"
@@ -205,6 +232,7 @@ export default function AnimalForm({
                   name="consumo"
                   type="number"
                   step="0.01"
+      min="0"
                   value={form.consumo}
                   onChange={handleChange}
                   placeholder="Ex: 12.5"
@@ -212,6 +240,41 @@ export default function AnimalForm({
                 />
               </div>
             </div>
+
+            <div style={grid2}>
+              <div>
+                <label style={labelStyle}>Rendimento de carcaça (%)</label>
+                <input
+                  name="rendimento_carcaca"
+                  type="number"
+                  step="0.1"
+      min="0"
+                  value={form.rendimento_carcaca}
+                  onChange={handleChange}
+                  style={inputStyle}
+                />
+              </div>
+
+              <div>
+                <label style={labelStyle}>Preço por @ (opcional)</label>
+                <input
+                  name="preco_arroba"
+                  type="number"
+                  step="0.01"
+      min="0"
+                  value={form.preco_arroba}
+                  onChange={handleChange}
+                  placeholder="Ex: 290"
+                  style={inputStyle}
+                />
+              </div>
+            </div>
+
+            <ArrobaPreview
+              peso={form.p_at}
+              rendimento={form.rendimento_carcaca}
+              precoPorArroba={form.preco_arroba}
+            />
 
             <div
               style={{

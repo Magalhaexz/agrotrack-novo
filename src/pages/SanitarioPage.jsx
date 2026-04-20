@@ -1,7 +1,9 @@
 import { useMemo, useState } from 'react';
 import SanitarioForm from '../components/SanitarioForm';
+import { formatarData } from '../utils/formatters';
+import { gerarNovoId } from '../utils/id';
 
-export default function SanitarioPage({ db, setDb }) {
+export default function SanitarioPage({ db, setDb, onConfirmAction }) {
   const [abrirForm, setAbrirForm] = useState(false);
   const [itemEditando, setItemEditando] = useState(null);
 
@@ -59,8 +61,15 @@ export default function SanitarioPage({ db, setDb }) {
     setAbrirForm(true);
   }
 
-  function excluirItem(id) {
-    if (!window.confirm('Deseja excluir este manejo sanitário?')) return;
+  async function excluirItem(id) {
+    const confirmado = typeof onConfirmAction === 'function'
+      ? await onConfirmAction({
+          title: 'Excluir manejo sanitário',
+          message: 'Deseja excluir este manejo sanitário?',
+          tone: 'danger',
+        })
+      : window.confirm('Deseja excluir este manejo sanitário?');
+    if (!confirmado) return;
 
     setDb((prev) => {
       const item = prev.sanitario.find((s) => s.id === id);
@@ -294,16 +303,7 @@ function montarTarefaAutomatica(dados, sanitarioId) {
   };
 }
 
-function gerarNovoId(lista) {
-  if (!lista.length) return 1;
-  return Math.max(...lista.map((item) => item.id)) + 1;
-}
 
-function formatarData(data) {
-  if (!data) return '—';
-  const [ano, mes, dia] = String(data).split('-');
-  return `${dia}/${mes}/${ano}`;
-}
 
 function normalizarTipo(tipo) {
   const mapa = {

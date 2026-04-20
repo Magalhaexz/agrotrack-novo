@@ -58,6 +58,11 @@ export default function CustoForm({
       return;
     }
 
+    if (Number(form.val || 0) <= 0) {
+      alert('Valor deve ser maior que zero.');
+      return;
+    }
+
     onSave({
       lote_id: Number(form.lote_id),
       cat: form.cat,
@@ -138,6 +143,7 @@ export default function CustoForm({
                 <input
                   name="data"
                   type="date"
+      max={new Date().toISOString().slice(0, 10)}
                   value={form.data}
                   onChange={handleChange}
                   style={inputStyle}
@@ -162,6 +168,7 @@ export default function CustoForm({
                 name="val"
                 type="number"
                 step="0.01"
+      min="0"
                 value={form.val}
                 onChange={handleChange}
                 placeholder="0,00"
