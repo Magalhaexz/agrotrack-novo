@@ -1,10 +1,11 @@
 import { Bell, ChevronDown, Clock3, LogOut, Menu, Settings, User } from 'lucide-react';
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import Button from './ui/Button';
 
 export default function AppHeader({
   farmName = 'Fazenda Modelo',
   userName = 'Usuário',
+  userEmail = '',
   notifications = 0,
   alerts = [],
   onResolveAlert,
@@ -12,9 +13,62 @@ export default function AppHeader({
   onAlertNavigate,
   onSignOut,
   onOpenMenu,
+  onNavigateProfile,
+  onNavigateSettings,
+  onConfirmAction,
 }) {
-  const [open, setOpen] = useState(false);
+  const [openUserMenu, setOpenUserMenu] = useState(false);
   const [openNotif, setOpenNotif] = useState(false);
+  const userMenuRef = useRef(null);
+  const notifRef = useRef(null);
+
+  useEffect(() => {
+    function handleClickOutside(event) {
+      if (userMenuRef.current && !userMenuRef.current.contains(event.target)) {
+        setOpenUserMenu(false);
+      }
+      if (notifRef.current && !notifRef.current.contains(event.target)) {
+        setOpenNotif(false);
+      }
+    }
+
+    function handleEsc(event) {
+      if (event.key === 'Escape') {
+        setOpenUserMenu(false);
+        setOpenNotif(false);
+      }
+    }
+
+    document.addEventListener('mousedown', handleClickOutside);
+    document.addEventListener('keydown', handleEsc);
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+      document.removeEventListener('keydown', handleEsc);
+    };
+  }, []);
+
+  async function handleLogout() {
+    const confirmado = onConfirmAction
+      ? await onConfirmAction({
+          title: 'Sair da conta',
+          message: 'Deseja realmente sair da sua conta?',
+          tone: 'danger',
+        })
+      : window.confirm('Deseja realmente sair da sua conta?');
+
+    if (!confirmado) return;
+
+    onSignOut?.();
+    setOpenUserMenu(false);
+  }
+
+  const iniciais = userName
+    .split(' ')
+    .filter(Boolean)
+    .slice(0, 2)
+    .map((parte) => parte[0])
+    .join('')
+    .toUpperCase();
 
   return (
     <header className="top-header">
@@ -24,8 +78,9 @@ export default function AppHeader({
         </button>
         <strong>{farmName}</strong>
       </div>
+
       <div className="top-header-actions">
-        <div className="user-menu-wrap">
+        <div className="user-menu-wrap" ref={notifRef}>
           <button type="button" className="notif-btn" aria-label="Notificações" onClick={() => setOpenNotif((v) => !v)}>
             <Bell size={16} />
             {notifications > 0 ? <span className="notif-badge">{notifications}</span> : null}
@@ -47,19 +102,41 @@ export default function AppHeader({
           ) : null}
         </div>
 
-        <div className="user-menu-wrap">
-          <button type="button" className="user-menu-btn" onClick={() => setOpen((v) => !v)}>
-            <span className="avatar">{userName.slice(0, 2).toUpperCase()}</span>
+        <div className="user-menu-wrap" ref={userMenuRef}>
+          <button type="button" className="user-menu-btn" onClick={() => setOpenUserMenu((v) => !v)}>
+            <span className="avatar">{iniciais || 'US'}</span>
             <span>{userName}</span>
             <ChevronDown size={14} />
           </button>
-          {open ? (
-            <div className="user-menu-dropdown">
-              <button type="button"><User size={14} /> Perfil</button>
-              <button type="button"><Settings size={14} /> Configurações</button>
-              <Button variant="ghost" icon={<LogOut size={14} />} onClick={onSignOut}>Sair</Button>
+
+          <div className={`user-menu-dropdown user-menu-dropdown--themed ${openUserMenu ? 'open' : ''}`}>
+            <div className="user-menu-meta">
+              <strong>{userName}</strong>
+              <small>{userEmail || 'sem-email@agrotrack'}</small>
             </div>
-          ) : null}
+            <button
+              type="button"
+              onClick={() => {
+                onNavigateProfile?.();
+                setOpenUserMenu(false);
+              }}
+            >
+              <User size={14} /> Meu Perfil
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                onNavigateSettings?.();
+                setOpenUserMenu(false);
+              }}
+            >
+              <Settings size={14} /> Configurações
+            </button>
+            <div className="user-menu-divider" />
+            <button type="button" className="user-menu-logout" onClick={handleLogout}>
+              <LogOut size={14} /> Sair
+            </button>
+          </div>
         </div>
       </div>
     </header>

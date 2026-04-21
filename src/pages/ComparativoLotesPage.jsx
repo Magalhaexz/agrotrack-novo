@@ -39,7 +39,7 @@ export default function ComparativoLotesPage({ db }) {
         <input placeholder="Período" value={filtro.periodo} onChange={(e) => setFiltro((p) => ({ ...p, periodo: e.target.value }))} />
         <input placeholder="Raça" value={filtro.raca} onChange={(e) => setFiltro((p) => ({ ...p, raca: e.target.value }))} />
       </div>
-      <table className="dashboard-table"><thead><tr><th>Lote</th><th>GMD</th><th>Custo/@</th><th>Lucro/Cab</th><th>Margem</th><th>Dias</th><th>Mortalidade</th></tr></thead><tbody>{rows.map((r) => <tr key={r.id}><td>{r.nome}</td>{cols.map((c) => <td key={c} style={{ background: r[c] === extrema[c].max ? '#d8f3dc' : r[c] === extrema[c].min ? '#fed7d7' : 'transparent' }}>{formatNumber(r[c], 2)}</td>)}</tr>)}</tbody></table>
+      <table className="dashboard-table"><thead><tr><th>Lote</th><th>GMD</th><th>Custo/@</th><th>Lucro/Cab</th><th>Margem</th><th>Dias</th><th>Mortalidade</th></tr></thead><tbody>{rows.map((r) => <tr key={r.id}><td>{r.nome}</td>{cols.map((c) => <td key={c} style={{ background: r[c] === extrema[c].max ? 'var(--color-success-bg)' : r[c] === extrema[c].min ? 'var(--color-danger-bg)' : 'transparent' }}>{formatNumber(r[c], 2)}</td>)}</tr>)}</tbody></table>
     </div>
   );
 }

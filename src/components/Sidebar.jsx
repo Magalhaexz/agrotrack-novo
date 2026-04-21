@@ -6,11 +6,14 @@ import {
   LayoutDashboard,
   Menu,
   Package,
+  MapPin,
   Settings,
   ShieldPlus,
   Syringe,
+  Users,
   X,
   ClipboardList,
+  CheckSquare,
 } from 'lucide-react';
 import logoAgrotrack from '../assets/logo_app1.png';
 import { obterPerfilDoUsuario, permissoesPorPagina } from '../auth/perfis';
@@ -40,8 +43,11 @@ const navSections = [
       { id: 'suplementacao', label: 'Suplementação', icon: ShieldPlus },
       { id: 'estoque', label: 'Estoque', icon: Package },
       { id: 'financeiro', label: 'Financeiro', icon: DollarSign },
+      { id: 'tarefas', label: 'Tarefas', icon: CheckSquare },
+      { id: 'configuracoes', label: 'Configurações', icon: Settings },
       { id: 'resultados', label: 'Relatórios', icon: ClipboardList },
-      { id: 'fazendas', label: 'Configurações', icon: Settings },
+      { id: 'funcionarios', label: 'Funcionários', icon: Users },
+      { id: 'fazendas', label: 'Fazendas', icon: MapPin },
     ],
   },
 ];

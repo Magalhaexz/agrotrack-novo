@@ -11,6 +11,7 @@ import {
   Tractor,
   Users,
   Weight,
+  CheckSquare,
 } from 'lucide-react';
 import {
   CartesianGrid,
@@ -171,6 +172,29 @@ export default function DashboardPage({ db, alerts = [], onNavigate = null, onRe
     .sort((a, b) => new Date(b.data || b.created_at) - new Date(a.data || a.created_at))
     .slice(0, 6);
 
+  const tarefasUrgentes = (db.tarefas || [])
+    .map((item) => ({
+      ...item,
+      dias: daysUntil(item.data_vencimento),
+    }))
+    .filter((item) => item.status !== 'concluida')
+    .sort((a, b) => {
+      const rankDiff = prioridadeRank(b.prioridade) - prioridadeRank(a.prioridade);
+      if (rankDiff !== 0) return rankDiff;
+      return a.dias - b.dias;
+    })
+    .slice(0, 5);
+
+  const tarefasResumo = (db.tarefas || []).reduce(
+    (acc, item) => {
+      if (item.status === 'pendente') acc.pendente += 1;
+      if (item.status === 'em_andamento') acc.em_andamento += 1;
+      if (item.status === 'concluida') acc.concluida += 1;
+      return acc;
+    },
+    { pendente: 0, em_andamento: 0, concluida: 0 }
+  );
+
   return (
     <div className="dashboard-page">
       <header className="dashboard-title">
@@ -262,6 +286,32 @@ export default function DashboardPage({ db, alerts = [], onNavigate = null, onRe
       </section>
 
       <section className="dashboard-grid dashboard-grid--dual">
+        <Card title="Tarefas prioritárias" subtitle="Top 5 por urgência de vencimento">
+          <div className="alerts-list">
+            {tarefasUrgentes.length === 0 ? <p>Nenhuma tarefa pendente no momento.</p> : tarefasUrgentes.map((item) => {
+              const variant = item.dias < 0 ? 'danger' : item.dias <= 2 ? 'warning' : 'info';
+              return (
+                <div key={item.id} className="alert-item">
+                  <CheckSquare size={16} />
+                  <div>
+                    <strong>{item.titulo}</strong>
+                    <p>{item.dias < 0 ? `Atrasada há ${Math.abs(item.dias)} dia(s)` : `Vence em ${item.dias} dia(s)`}</p>
+                  </div>
+                  <Badge variant={variant}>{item.prioridade || 'media'}</Badge>
+                </div>
+              );
+            })}
+          </div>
+          <div className="dashboard-kpi-inline" style={{ marginTop: 12 }}>
+            <span>Pendentes: <strong>{tarefasResumo.pendente}</strong></span>
+            <span>Em andamento: <strong>{tarefasResumo.em_andamento}</strong></span>
+            <span>Concluídas: <strong>{tarefasResumo.concluida}</strong></span>
+          </div>
+          <div style={{ marginTop: 10 }}>
+            <Button size="sm" variant="outline" onClick={() => onNavigate?.('tarefas')}>Ver todas</Button>
+          </div>
+        </Card>
+
         <Card title="Últimas movimentações de animais">
           <div className="mov-list">
             {movimentacoesRecentes.length === 0 ? <p>Nenhuma movimentação recente.</p> : movimentacoesRecentes.map((mov) => (
@@ -332,6 +382,13 @@ function KpiPanel({ title, value, variation, icon: Icon, variant = 'neutral', co
 function getVariation(current, previous) {
   if (!previous) return 0;
   return ((current - previous) / Math.abs(previous)) * 100;
+}
+
+function prioridadeRank(valor) {
+  if (valor === 'critica') return 4;
+  if (valor === 'alta') return 3;
+  if (valor === 'media') return 2;
+  return 1;
 }
 
 function daysUntil(dateStr) {

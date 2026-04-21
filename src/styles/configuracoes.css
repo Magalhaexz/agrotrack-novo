@@ -1,0 +1,16 @@
+.config-page{display:grid;gap:12px}
+.config-page h1{margin:0}
+.config-page p{margin:4px 0 0;color:var(--color-text-secondary)}
+.config-tabs{display:flex;gap:8px;flex-wrap:wrap}
+.config-tabs button{padding:8px 12px;border:1px solid var(--color-border);border-radius:var(--radius-md);background:var(--color-surface)}
+.config-tabs button.active{background:var(--color-primary);color:var(--color-text)}
+.config-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}
+.config-grid label{display:grid;gap:4px;font-size:var(--text-sm)}
+.config-actions{display:flex;justify-content:flex-end;gap:8px;margin-top:10px}
+.config-actions-wrap{display:flex;gap:8px;flex-wrap:wrap}
+.danger-zone{margin-top:14px;border:1px solid var(--color-danger);border-radius:var(--radius-md);padding:12px;display:grid;gap:8px;background:rgba(194,67,67,0.08)}
+.danger-zone h4{display:flex;gap:6px;align-items:center;margin:0}
+.switch-row{display:flex !important;align-items:center;justify-content:space-between;gap:10px}
+@media (max-width: 900px){
+  .config-grid{grid-template-columns:1fr}
+}

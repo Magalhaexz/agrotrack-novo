@@ -1,9 +1,46 @@
 export const initialDb = {
   // REMOVER ANTES DE PRODUÇÃO: dados de demonstração para ambiente local.
   fazendas: [
-    { id: 1, nome: 'Fazenda Santa Rita', local: 'Uberaba, MG', resp: 'João Silva' },
-    { id: 2, nome: 'Rancho Bom Jesus', local: 'Uberlândia, MG', resp: 'Maria Silva' },
+    {
+      id: 1,
+      nome: 'Fazenda Santa Rita',
+      proprietario: 'João Silva',
+      cidade: 'Uberaba',
+      estado: 'MG',
+      area_total_ha: 420,
+      area_pastagem_ha: 280,
+      capacidade_ua: 320,
+      tipo_producao: 'Corte',
+      inscricao_estadual: '123456789',
+      cnpj_cpf: '12.345.678/0001-90',
+      telefone: '(34) 99999-1111',
+      email: 'contato@santarita.com',
+      endereco: 'Rodovia BR-050, Km 120',
+      status: 'ativa',
+      created_at: '2023-01-10T08:00:00.000Z',
+      observacoes: 'Foco em recria e engorda.',
+    },
+    {
+      id: 2,
+      nome: 'Rancho Bom Jesus',
+      proprietario: 'Maria Silva',
+      cidade: 'Uberlândia',
+      estado: 'MG',
+      area_total_ha: 310,
+      area_pastagem_ha: 190,
+      capacidade_ua: 220,
+      tipo_producao: 'Misto',
+      inscricao_estadual: '987654321',
+      cnpj_cpf: '987.654.321-00',
+      telefone: '(34) 98888-2222',
+      email: 'ranchobj@email.com',
+      endereco: 'Estrada Municipal 12',
+      status: 'ativa',
+      created_at: '2023-03-20T08:00:00.000Z',
+      observacoes: '',
+    },
   ],
+
 
   lotes: [
     {
@@ -86,9 +123,45 @@ export const initialDb = {
   ],
 
   funcionarios: [
-    { id: 1, nome: 'Carlos Silva', funcao: 'Vaqueiro' },
-    { id: 2, nome: 'Pedro Alves', funcao: 'Gerente' },
-    { id: 3, nome: 'Marcos Souza', funcao: 'Tratador' },
+    {
+      id: 1,
+      nome: 'Carlos Silva',
+      cpf: '123.456.789-09',
+      telefone: '(34) 99911-2200',
+      cargo: 'Vaqueiro',
+      salario: 2800,
+      data_admissao: '2024-01-15',
+      status: 'ativo',
+      fazenda_id: 1,
+      observacoes: 'Responsável pelo manejo diário dos lotes.',
+      created_at: '2024-01-15T08:00:00.000Z',
+    },
+    {
+      id: 2,
+      nome: 'Pedro Alves',
+      cpf: '987.654.321-00',
+      telefone: '(34) 99877-3344',
+      cargo: 'Gerente',
+      salario: 5200,
+      data_admissao: '2023-09-10',
+      status: 'ativo',
+      fazenda_id: 1,
+      observacoes: 'Coordena equipe e planejamento operacional.',
+      created_at: '2023-09-10T08:00:00.000Z',
+    },
+    {
+      id: 3,
+      nome: 'Marcos Souza',
+      cpf: '111.222.333-96',
+      telefone: '(34) 99766-1122',
+      cargo: 'Tratorista',
+      salario: 3100,
+      data_admissao: '2024-03-01',
+      status: 'inativo',
+      fazenda_id: 2,
+      observacoes: 'Afastado temporariamente.',
+      created_at: '2024-03-01T08:00:00.000Z',
+    },
   ],
 
   rotinas: [
@@ -138,6 +211,48 @@ export const initialDb = {
   data: '',
   status: 'pendente',
 },
+  ],
+
+  tarefas: [
+    {
+      id: 1,
+      titulo: 'Revisar cocho do Lote A',
+      descricao: 'Verificar sobra e ajustar trato da tarde.',
+      status: 'pendente',
+      prioridade: 'alta',
+      categoria: 'manejo',
+      responsavel_id: 1,
+      lote_id: 1,
+      fazenda_id: 1,
+      data_vencimento: '2026-04-22',
+      created_at: '2026-04-20T08:00:00.000Z',
+    },
+    {
+      id: 2,
+      titulo: 'Atualizar inventário sanitário',
+      descricao: 'Conferir doses restantes e validade.',
+      status: 'em_andamento',
+      prioridade: 'media',
+      categoria: 'sanitario',
+      responsavel_id: 2,
+      lote_id: null,
+      fazenda_id: 1,
+      data_vencimento: '2026-04-24',
+      created_at: '2026-04-19T14:30:00.000Z',
+    },
+    {
+      id: 3,
+      titulo: 'Fechar checklist semanal de manutenção',
+      descricao: 'Checklist de cercas e bebedouros.',
+      status: 'concluida',
+      prioridade: 'baixa',
+      categoria: 'manutencao',
+      responsavel_id: 1,
+      lote_id: 2,
+      fazenda_id: 1,
+      data_vencimento: '2026-04-18',
+      created_at: '2026-04-15T09:10:00.000Z',
+    },
   ],
 
   // REMOVER ANTES DE PRODUÇÃO: itens de estoque de exemplo.
@@ -326,6 +441,30 @@ export const initialDb = {
   movimentacoes_animais: [],
   movimentacoes_estoque: [],
   movimentacoes_financeiras: [],
+
+  configuracoes: {
+    geral: {
+      nome_sistema: 'AgroTrack Santa Rita',
+      moeda: 'BRL',
+      formato_data: 'DD/MM/AAAA',
+      unidade_peso: 'kg',
+      rendimento_carcaca_padrao: 52,
+      preco_arroba_padrao: 290,
+    },
+    notificacoes: {
+      estoque_critico: true,
+      sanitario_vencido: true,
+      pesagem_atrasada: true,
+      lote_data_saida: true,
+      dias_antecedencia: 3,
+    },
+  },
+
+  usuarios: [
+    { id: 1, nome: 'João Proprietário', email: 'proprietario@agrotrack.com', perfil: 'proprietario', status: 'ativo' },
+    { id: 2, nome: 'Paulo Gerente', email: 'gerente@agrotrack.com', perfil: 'gerente', status: 'ativo' },
+    { id: 3, nome: 'Ana Operadora', email: 'operador@agrotrack.com', perfil: 'operador', status: 'inativo' },
+  ],
 
 
   auditoria: [],

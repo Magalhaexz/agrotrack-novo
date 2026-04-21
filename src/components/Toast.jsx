@@ -1,8 +1,8 @@
 const toastStyles = {
-  success: { bg: '#1f4f28', border: '#73d17c' },
-  error: { bg: '#4f1f1f', border: '#ff8a8a' },
-  warning: { bg: '#5a4a1c', border: '#f5cf6d' },
-  info: { bg: '#1f334f', border: '#77b7ff' },
+  success: { bg: 'var(--color-success-bg)', border: 'var(--color-success)' },
+  error: { bg: 'var(--color-danger-bg)', border: 'var(--color-danger)' },
+  warning: { bg: 'var(--color-warning-bg)', border: 'var(--color-warning)' },
+  info: { bg: 'var(--color-info-bg)', border: 'var(--color-info)' },
 };
 
 export default function Toast({ toast, onClose }) {
@@ -13,11 +13,11 @@ export default function Toast({ toast, onClose }) {
       style={{
         background: style.bg,
         border: `1px solid ${style.border}`,
-        color: '#f3ffe8',
+        color: 'var(--color-text)',
         borderRadius: 10,
         padding: '10px 12px',
         minWidth: 260,
-        boxShadow: '0 8px 20px rgba(0,0,0,0.25)',
+        boxShadow: 'var(--shadow-md)',
         display: 'flex',
         justifyContent: 'space-between',
         gap: 12,
@@ -30,7 +30,7 @@ export default function Toast({ toast, onClose }) {
         style={{
           border: 'none',
           background: 'transparent',
-          color: '#efffe0',
+          color: 'var(--color-text)',
           cursor: 'pointer',
           fontWeight: 700,
         }}

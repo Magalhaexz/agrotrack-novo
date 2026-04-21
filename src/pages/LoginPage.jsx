@@ -10,9 +10,9 @@ function calcularForcaSenha(senha) {
   if (/\d/.test(senha)) pontos += 1;
   if (/[^\w\s]/.test(senha)) pontos += 1;
 
-  if (pontos <= 1) return { label: 'Fraca', color: '#ef4444' };
-  if (pontos <= 3) return { label: 'Média', color: '#f59e0b' };
-  return { label: 'Forte', color: '#22c55e' };
+  if (pontos <= 1) return { label: 'Fraca', color: 'var(--color-danger)' };
+  if (pontos <= 3) return { label: 'Média', color: 'var(--color-warning)' };
+  return { label: 'Forte', color: 'var(--color-success)' };
 }
 
 export default function LoginPage() {
@@ -250,8 +250,8 @@ export default function LoginPage() {
               onClick={loginComGoogle}
               disabled={carregando}
               style={{
-                background: '#fff',
-                color: '#111',
+                background: 'var(--color-surface-2)',
+                color: 'var(--color-text)',
                 marginTop: 10,
                 opacity: carregando ? 0.7 : 1,
               }}
@@ -323,7 +323,7 @@ export default function LoginPage() {
             style={{
               background: 'none',
               border: 'none',
-              color: '#8eea73',
+              color: 'var(--color-primary)',
               fontWeight: 700,
               cursor: 'pointer',
               padding: 0,
@@ -344,7 +344,7 @@ export default function LoginPage() {
             style={{
               background: 'none',
               border: 'none',
-              color: '#8eea73',
+              color: 'var(--color-primary)',
               fontWeight: 700,
               cursor: 'pointer',
               padding: 0,

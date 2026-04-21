@@ -112,7 +112,7 @@
 .login-btn {
   margin-top: 10px;
   background: linear-gradient(140deg, #3e7214, #6bb520);
-  color: white;
+  color: var(--color-text);
   border: none;
   border-radius: 12px;
   padding: 14px;

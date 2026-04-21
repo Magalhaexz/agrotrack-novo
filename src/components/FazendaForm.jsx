@@ -1,25 +1,34 @@
-import { useEffect, useState } from 'react';
+import { useMemo, useState } from 'react';
+import Modal from './ui/Modal';
+import Button from './ui/Button';
+import Input from './ui/Input';
+
+const TIPOS = ['Corte', 'Leite', 'Misto', 'Cria', 'Recria', 'Engorda'];
+const UFS = ['AC','AL','AP','AM','BA','CE','DF','ES','GO','MA','MT','MS','MG','PA','PB','PR','PE','PI','RJ','RN','RS','RO','RR','SC','SP','SE','TO'];
 
 const vazio = {
   nome: '',
-  local: '',
-  resp: '',
+  proprietario: '',
+  cidade: '',
+  estado: 'MG',
+  area_total_ha: '',
+  area_pastagem_ha: '',
+  capacidade_ua: '',
+  tipo_producao: 'Corte',
+  inscricao_estadual: '',
+  cnpj_cpf: '',
+  telefone: '',
+  email: '',
+  endereco: '',
+  status: 'ativa',
+  observacoes: '',
 };
 
-export default function FazendaForm({ initialData, onSave, onCancel }) {
-  const [form, setForm] = useState(vazio);
+export default function FazendaForm({ open, initialData, onSave, onCancel }) {
+  const [erro, setErro] = useState('');
+  const [form, setForm] = useState(() => ({ ...vazio, ...(initialData || {}) }));
 
-  useEffect(() => {
-    if (initialData) {
-      setForm({
-        nome: initialData.nome || '',
-        local: initialData.local || '',
-        resp: initialData.resp || '',
-      });
-    } else {
-      setForm(vazio);
-    }
-  }, [initialData]);
+  const titulo = useMemo(() => (initialData ? 'Editar fazenda' : 'Cadastrar fazenda'), [initialData]);
 
   function handleChange(e) {
     const { name, value } = e.target;
@@ -29,128 +38,103 @@ export default function FazendaForm({ initialData, onSave, onCancel }) {
   function handleSubmit(e) {
     e.preventDefault();
 
-    if (!form.nome.trim()) {
-      alert('Informe o nome da fazenda.');
+    if (!String(form.nome || '').trim()) {
+      setErro('Nome da fazenda é obrigatório.');
       return;
     }
 
-    onSave({
-      nome: form.nome.trim(),
-      local: form.local.trim(),
-      resp: form.resp.trim(),
+    if (!String(form.cidade || '').trim()) {
+      setErro('Cidade é obrigatória.');
+      return;
+    }
+
+    setErro('');
+
+    onSave?.({
+      nome: String(form.nome || '').trim(),
+      proprietario: String(form.proprietario || '').trim(),
+      cidade: String(form.cidade || '').trim(),
+      estado: form.estado || 'MG',
+      area_total_ha: form.area_total_ha === '' ? null : Number(form.area_total_ha),
+      area_pastagem_ha: form.area_pastagem_ha === '' ? null : Number(form.area_pastagem_ha),
+      capacidade_ua: form.capacidade_ua === '' ? null : Number(form.capacidade_ua),
+      tipo_producao: form.tipo_producao || 'Corte',
+      inscricao_estadual: String(form.inscricao_estadual || '').trim(),
+      cnpj_cpf: String(form.cnpj_cpf || '').trim(),
+      telefone: String(form.telefone || '').trim(),
+      email: String(form.email || '').trim(),
+      endereco: String(form.endereco || '').trim(),
+      status: form.status || 'ativa',
+      observacoes: String(form.observacoes || '').trim(),
     });
   }
 
   return (
-    <div
-      style={{
-        position: 'fixed',
-        inset: 0,
-        background: 'rgba(0,0,0,0.55)',
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'center',
-        padding: '24px',
-        zIndex: 999,
-      }}
+    <Modal
+      open={open}
+      onClose={onCancel}
+      title={titulo}
+      subtitle="Cadastro e controle de propriedades"
+      footer={(
+        <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8 }}>
+          <Button variant="ghost" onClick={onCancel}>Cancelar</Button>
+          <Button onClick={handleSubmit}>Salvar fazenda</Button>
+        </div>
+      )}
     >
-      <div
-        className="card"
-        style={{
-          width: '100%',
-          maxWidth: '520px',
-          borderRadius: '16px',
-          overflow: 'hidden',
-        }}
-      >
-        <div className="card-header">
-          <span className="card-title">
-            {initialData ? 'Editar fazenda' : 'Nova fazenda'}
-          </span>
+      <form onSubmit={handleSubmit} style={{ display: 'grid', gap: 12 }}>
+        <Input label="Nome da fazenda" name="nome" value={form.nome} onChange={handleChange} required />
+
+        <div className="grid-2">
+          <div className="ui-input-wrap">
+            <label className="ui-input-label">Tipo de produção</label>
+            <select className="ui-input" name="tipo_producao" value={form.tipo_producao} onChange={handleChange}>
+              {TIPOS.map((tipo) => <option key={tipo} value={tipo}>{tipo}</option>)}
+            </select>
+          </div>
+          <div className="ui-input-wrap">
+            <label className="ui-input-label">Status</label>
+            <select className="ui-input" name="status" value={form.status} onChange={handleChange}>
+              <option value="ativa">Ativa</option>
+              <option value="inativa">Inativa</option>
+            </select>
+          </div>
         </div>
 
-        <div className="card-body">
-          <form onSubmit={handleSubmit} style={{ display: 'grid', gap: '14px' }}>
-            <div>
-              <label style={{ display: 'block', marginBottom: 6 }}>Nome da fazenda</label>
-              <input
-                name="nome"
-                value={form.nome}
-                onChange={handleChange}
-                placeholder="Ex: Fazenda Santa Rita"
-                style={inputStyle}
-              />
-            </div>
-
-            <div>
-              <label style={{ display: 'block', marginBottom: 6 }}>Localização</label>
-              <input
-                name="local"
-                value={form.local}
-                onChange={handleChange}
-                placeholder="Ex: Uberaba, MG"
-                style={inputStyle}
-              />
-            </div>
-
-            <div>
-              <label style={{ display: 'block', marginBottom: 6 }}>Responsável</label>
-              <input
-                name="resp"
-                value={form.resp}
-                onChange={handleChange}
-                placeholder="Ex: João Silva"
-                style={inputStyle}
-              />
-            </div>
-
-            <div
-              style={{
-                display: 'flex',
-                justifyContent: 'flex-end',
-                gap: '10px',
-                marginTop: '8px',
-              }}
-            >
-              <button type="button" onClick={onCancel} style={cancelBtn}>
-                Cancelar
-              </button>
-              <button type="submit" style={saveBtn}>
-                Salvar
-              </button>
-            </div>
-          </form>
+        <Input label="Endereço / Localidade" name="endereco" value={form.endereco} onChange={handleChange} />
+        <div className="grid-2">
+          <Input label="Cidade" name="cidade" value={form.cidade} onChange={handleChange} required />
+          <div className="ui-input-wrap">
+            <label className="ui-input-label">Estado</label>
+            <select className="ui-input" name="estado" value={form.estado} onChange={handleChange}>
+              {UFS.map((uf) => <option key={uf} value={uf}>{uf}</option>)}
+            </select>
+          </div>
         </div>
-      </div>
-    </div>
+
+        <div className="grid-3">
+          <Input label="Área total (ha)" type="number" name="area_total_ha" value={form.area_total_ha} onChange={handleChange} />
+          <Input label="Área pastagem (ha)" type="number" name="area_pastagem_ha" value={form.area_pastagem_ha} onChange={handleChange} />
+          <Input label="Capacidade (UA)" type="number" name="capacidade_ua" value={form.capacidade_ua} onChange={handleChange} />
+        </div>
+
+        <div className="grid-2">
+          <Input label="CPF/CNPJ proprietário" name="cnpj_cpf" value={form.cnpj_cpf} onChange={handleChange} />
+          <Input label="Inscrição estadual" name="inscricao_estadual" value={form.inscricao_estadual} onChange={handleChange} />
+        </div>
+
+        <div className="grid-2">
+          <Input label="Telefone" name="telefone" value={form.telefone} onChange={handleChange} />
+          <Input label="E-mail" name="email" type="email" value={form.email} onChange={handleChange} />
+        </div>
+
+        <div className="ui-input-wrap">
+          <label className="ui-input-label">Observações</label>
+          <textarea className="ui-input" name="observacoes" rows={3} value={form.observacoes} onChange={handleChange} />
+        </div>
+
+        {erro ? <p style={{ color: 'var(--color-danger)', margin: 0 }}>{erro}</p> : null}
+      </form>
+    </Modal>
   );
 }
-
-const inputStyle = {
-  width: '100%',
-  padding: '12px 14px',
-  borderRadius: '10px',
-  border: '1px solid #2e4020',
-  background: '#0f160b',
-  color: '#cce0a8',
-  outline: 'none',
-};
-
-const cancelBtn = {
-  padding: '10px 14px',
-  borderRadius: '10px',
-  border: '1px solid #2e4020',
-  background: 'transparent',
-  color: '#7a9e62',
-  cursor: 'pointer',
-};
-
-const saveBtn = {
-  padding: '10px 14px',
-  borderRadius: '10px',
-  border: 'none',
-  background: '#6bb520',
-  color: '#081006',
-  fontWeight: 700,
-  cursor: 'pointer',
-};

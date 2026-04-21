@@ -45,6 +45,9 @@ const PesagensPage = lazy(() => import('./pages/PesagensPage'));
 const AcompanhamentoPesoPage = lazy(() => import('./pages/AcompanhamentoPesoPage'));
 const RotinaPage = lazy(() => import('./pages/RotinaPage'));
 const FuncionariosPage = lazy(() => import('./pages/FuncionariosPage'));
+const TarefasPage = lazy(() => import('./pages/TarefasPage'));
+const PerfilPage = lazy(() => import('./pages/PerfilPage'));
+const ConfiguracoesPage = lazy(() => import('./pages/ConfiguracoesPage'));
 const pageMap = {
   dashboard: DashboardPage,
   fazendas: FazendasPage,
@@ -53,6 +56,9 @@ const pageMap = {
   comparativoLotes: ComparativoLotesPage,
   funcionarios: FuncionariosPage,
   rotina: RotinaPage,
+  tarefas: TarefasPage,
+  perfil: PerfilPage,
+  configuracoes: ConfiguracoesPage,
   animais: AnimaisPage,
   suplementacao: SuplementacaoPage,
   sanitario: SanitarioPage,
@@ -77,6 +83,33 @@ export default function App() {
     alertas_resolvidos: Array.isArray(initialDb?.alertas_resolvidos)
       ? initialDb.alertas_resolvidos
       : [],
+    funcionarios: Array.isArray(initialDb?.funcionarios)
+      ? initialDb.funcionarios
+      : [],
+    fazendas: Array.isArray(initialDb?.fazendas)
+      ? initialDb.fazendas
+      : [],
+    tarefas: Array.isArray(initialDb?.tarefas)
+      ? initialDb.tarefas
+      : [],
+    configuracoes: initialDb?.configuracoes || {
+      geral: {
+        nome_sistema: 'AgroTrack',
+        moeda: 'BRL',
+        formato_data: 'DD/MM/AAAA',
+        unidade_peso: 'kg',
+        rendimento_carcaca_padrao: 52,
+        preco_arroba_padrao: 290,
+      },
+      notificacoes: {
+        estoque_critico: true,
+        sanitario_vencido: true,
+        pesagem_atrasada: true,
+        lote_data_saida: true,
+        dias_antecedencia: 3,
+      },
+    },
+    usuarios: Array.isArray(initialDb?.usuarios) ? initialDb.usuarios : [],
   }));
   const { toasts, showToast, removeToast } = useToast();
   const { session, user, loadingAuth, hasPermission } = useAuth();
@@ -224,7 +257,11 @@ export default function App() {
           onSnoozeAlert={(alert) => showToast({ type: 'warning', message: `Alerta adiado: ${alert.title}` })}
           onAlertNavigate={(alert) => alert?.route && setCurrentPage(alert.route)}
           onSignOut={() => supabase.auth.signOut()}
+          onNavigateProfile={() => setCurrentPage('perfil')}
+          onNavigateSettings={() => setCurrentPage('configuracoes')}
+          onConfirmAction={onConfirmAction}
           onOpenMenu={() => window.dispatchEvent(new CustomEvent('agrotrack-open-drawer'))}
+          userEmail={user?.email || ''}
         />
 
         <AnimatePresence mode="wait">

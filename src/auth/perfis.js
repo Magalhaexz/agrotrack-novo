@@ -18,6 +18,7 @@ export const permissoesPorPerfil = {
     'estoque:ver',
     'estoque:movimentar',
     'financeiro:ver',
+    'tarefas:ver',
     'resultados:ver',
     'configuracoes:ver',
     'funcionarios:ver',
@@ -30,6 +31,7 @@ export const permissoesPorPerfil = {
     'sanitario:ver',
     'estoque:ver',
     'estoque:movimentar',
+    'tarefas:ver',
     'resultados:ver',
   ],
   [PERFIS.VISUALIZADOR]: [
@@ -40,6 +42,7 @@ export const permissoesPorPerfil = {
     'estoque:ver',
     'resultados:ver',
     'financeiro:ver',
+    'tarefas:ver',
   ],
 };
 
@@ -60,6 +63,8 @@ export const permissoesPorPagina = {
   custos: 'financeiro:ver',
   resultados: 'resultados:ver',
   financeiro: 'financeiro:ver',
+  tarefas: 'tarefas:ver',
+  configuracoes: 'configuracoes:ver',
 };
 
 export function normalizarPerfil(perfil) {

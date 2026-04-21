@@ -20,7 +20,7 @@
 .chart-legend{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:8px}
 .chart-legend button{display:inline-flex;align-items:center;gap:6px;border:1px solid var(--color-border);padding:4px 8px;border-radius:999px;background:var(--color-surface)}
 .chart-legend span{width:10px;height:10px;border-radius:50%}
-.peso-tooltip{background:#fff;border:1px solid var(--color-border);padding:8px;border-radius:8px;box-shadow:var(--shadow-sm)}
+.peso-tooltip{background:var(--color-surface);border:1px solid var(--color-border);padding:8px;border-radius:8px;box-shadow:var(--shadow-sm);color:var(--color-text)}
 
 .table-responsive{overflow-x:auto}
 .dashboard-table{width:100%;min-width:900px;border-collapse:collapse}

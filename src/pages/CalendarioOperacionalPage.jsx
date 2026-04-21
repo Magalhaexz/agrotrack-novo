@@ -8,13 +8,13 @@ import { gerarNovoId } from '../utils/id';
 import { formatDate } from '../utils/calculations';
 
 const typeMap = {
-  vacina: { icon: Syringe, color: '#2b6cb0' },
-  vermifugo: { icon: Pill, color: '#7e22ce' },
-  pesagem: { icon: Scale, color: '#2d6a4f' },
-  dieta: { icon: Leaf, color: '#dd6b20' },
-  estoque: { icon: Package, color: '#c53030' },
-  saida: { icon: Truck, color: '#6b7280' },
-  livre: { icon: CheckSquare, color: '#6b7280' },
+  vacina: { icon: Syringe, color: 'var(--color-info)' },
+  vermifugo: { icon: Pill, color: 'var(--color-primary-light)' },
+  pesagem: { icon: Scale, color: 'var(--color-success)' },
+  dieta: { icon: Leaf, color: 'var(--color-warning)' },
+  estoque: { icon: Package, color: 'var(--color-danger)' },
+  saida: { icon: Truck, color: 'var(--color-text-secondary)' },
+  livre: { icon: CheckSquare, color: 'var(--color-text-secondary)' },
 };
 
 export default function CalendarioOperacionalPage({ db, setDb }) {
@@ -64,10 +64,10 @@ function SimpleCalendar({ selected, onSelect, events }) {
 
 function getDotColor(events) {
   if (!events.length) return '';
-  if (events.some((e) => e.status === 'atrasado')) return '#c53030';
-  if (events.some((e) => e.status === 'hoje')) return '#dd6b20';
-  if (events.some((e) => e.status === 'programado')) return '#2b6cb0';
-  return '#2d6a4f';
+  if (events.some((e) => e.status === 'atrasado')) return 'var(--color-danger)';
+  if (events.some((e) => e.status === 'hoje')) return 'var(--color-warning)';
+  if (events.some((e) => e.status === 'programado')) return 'var(--color-info)';
+  return 'var(--color-success)';
 }
 
 function NovoEventoModal({ db, setDb, onClose }) {

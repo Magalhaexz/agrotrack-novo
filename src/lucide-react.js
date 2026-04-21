@@ -71,3 +71,4 @@ export const Clock3 = icon([createElement('circle',{cx:12,cy:12,r:9}),createElem
 export const ArrowUpCircle = icon([createElement('circle',{cx:12,cy:12,r:9}),createElement('path',{d:'M12 16V8'}),createElement('path',{d:'m8 12 4-4 4 4'})]);
 export const ArrowDownCircle = icon([createElement('circle',{cx:12,cy:12,r:9}),createElement('path',{d:'M12 8v8'}),createElement('path',{d:'m8 12 4 4 4-4'})]);
 export const FileText = icon([createElement('path',{d:'M14 3H6a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9z'}),createElement('path',{d:'M14 3v6h6'}),createElement('path',{d:'M8 13h8M8 17h8'})]);
+export const MapPin = icon([createElement('path',{d:'M12 21s7-6.2 7-11a7 7 0 1 0-14 0c0 4.8 7 11 7 11z'}),createElement('circle',{cx:12,cy:10,r:2.5})]);

@@ -1,5 +1,12 @@
 @import url('https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,300;9..144,400;9..144,500;9..144,600&family=DM+Mono:wght@400;500&family=Outfit:wght@300;400;500;600;700&display=swap');
 
+
+html, body {
+  background-color: var(--color-bg);
+  color: var(--color-text);
+}
+
+
 :root {
   --bg: #09100a;
   --surface: #101608;
@@ -78,12 +85,12 @@ table {
 }
 
 ::-webkit-scrollbar-thumb {
-  background: #1a2512;
+  background: var(--color-border);
   border-radius: 999px;
 }
 
 ::-webkit-scrollbar-thumb:hover {
-  background: #2e4020;
+  background: var(--color-primary-dark);
 }
 /* =========================================================
    ESTRUTURA DE LAYOUT PRINCIPAL
