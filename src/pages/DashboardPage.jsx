@@ -3,8 +3,10 @@ import {
   AlertTriangle,
   ArrowDown,
   ArrowUp,
+  Bell,
   BellRing,
   CalendarClock,
+  CheckCircle2,
   DollarSign,
   Package,
   Scale,
@@ -26,6 +28,7 @@ import Card from '../components/ui/Card';
 import Badge from '../components/ui/Badge';
 import Button from '../components/ui/Button';
 import { calcLote, formatCurrency, formatDate, formatNumber } from '../utils/calculations';
+import { formatarMoeda } from '../utils/formatters';
 import '../styles/dashboard.css';
 
 const KPI_VARIANTS = {
@@ -36,7 +39,7 @@ const KPI_VARIANTS = {
   neutral: 'neutral',
 };
 
-export default function DashboardPage({ db, alerts = [], onNavigate = null, onResolveAlert = null }) {
+export default function DashboardPage({ db, alerts = [], onNavigate = null, onResolveAlert = null, tabAtiva = 'geral', setTabAtiva }) {
   const [hiddenLines, setHiddenLines] = useState({});
 
   const lotesAtivos = useMemo(() => db.lotes.filter((lote) => lote.status === 'ativo'), [db.lotes]);
@@ -71,6 +74,15 @@ export default function DashboardPage({ db, alerts = [], onNavigate = null, onRe
     })
     .filter((item) => item.critico)
     .sort((a, b) => a.ratio - b.ratio);
+
+  const itensCriticos = (db.estoque || []).filter(
+    (i) => Number(i.quantidade_atual) <= Number(i.quantidade_minima || 0)
+  ).length;
+
+  const valorTotalEstoque = (db.estoque || []).reduce(
+    (acc, i) => acc + (Number(i.preco_unitario || 0) * Number(i.quantidade_atual || 0)),
+    0
+  );
 
   const eventosCalendario = (db.sanitario || [])
     .map((item) => {
@@ -195,6 +207,19 @@ export default function DashboardPage({ db, alerts = [], onNavigate = null, onRe
     { pendente: 0, em_andamento: 0, concluida: 0 }
   );
 
+  const alertas = useMemo(
+    () =>
+      (alerts || []).map((alert, index) => ({
+        ...alert,
+        id: alert.id || alert.ackKey || `alert-${index}`,
+        titulo: alert.titulo || alert.title || 'Alerta do sistema',
+        descricao: alert.descricao || alert.description || 'Sem descrição',
+        prioridade: alert.prioridade || (urgencyVariant(alert) === 'danger' ? 'alta' : urgencyVariant(alert) === 'warning' ? 'media' : 'baixa'),
+        acao: alert.acao || { label: 'Abrir', rota: alert.route || 'dashboard' },
+      })),
+    [alerts]
+  );
+
   return (
     <div className="dashboard-page">
       <header className="dashboard-title">
@@ -202,172 +227,345 @@ export default function DashboardPage({ db, alerts = [], onNavigate = null, onRe
         <p>Visão consolidada de desempenho, riscos e operação dos lotes.</p>
       </header>
 
-      <section className="dashboard-grid dashboard-grid--kpi-main">
-        {kpisMain.map((item) => (
-          <KpiPanel key={item.title} {...item} />
-        ))}
-      </section>
+      {tabAtiva === 'geral' && (
+        <>
+          <section className="dashboard-grid dashboard-grid--kpi-main">
+            {kpisMain.map((item) => (
+              <KpiPanel key={item.title} {...item} />
+            ))}
+          </section>
 
-      <section className="dashboard-grid dashboard-grid--kpi-secondary">
-        {kpisSecondary.map((item) => (
-          <KpiPanel key={item.title} {...item} compact />
-        ))}
-      </section>
+          <section className="dashboard-grid dashboard-grid--kpi-secondary">
+            {kpisSecondary.map((item) => (
+              <KpiPanel key={item.title} {...item} compact />
+            ))}
+          </section>
 
-      <Card title="Evolução de peso por lote" subtitle="Peso médio (kg) ao longo do tempo" className="dashboard-chart-card">
-        <div className="chart-legend">
-          {Object.entries(lotesColorMap).map(([nome, cor]) => (
-            <button key={nome} type="button" onClick={() => setHiddenLines((prev) => ({ ...prev, [nome]: !prev[nome] }))}>
-              <span style={{ background: cor, opacity: hiddenLines[nome] ? 0.3 : 1 }} />
-              {nome}
-            </button>
-          ))}
-        </div>
-        <div className="chart-shell">
-          <ResponsiveContainer width="100%" height={320}>
-            <LineChart data={chartRows}>
-              <CartesianGrid strokeDasharray="3 3" />
-              <XAxis dataKey="label" />
-              <YAxis unit="kg" />
-              <Tooltip content={<PesoTooltip />} />
+          <Card title="Evolução de peso por lote" subtitle="Peso médio (kg) ao longo do tempo" className="dashboard-chart-card">
+            <div className="chart-legend">
               {Object.entries(lotesColorMap).map(([nome, cor]) => (
-                <Line key={nome} dataKey={nome} stroke={cor} strokeWidth={2} hide={!!hiddenLines[nome]} dot={{ r: 3 }} />
+                <button key={nome} type="button" onClick={() => setHiddenLines((prev) => ({ ...prev, [nome]: !prev[nome] }))}>
+                  <span style={{ background: cor, opacity: hiddenLines[nome] ? 0.3 : 1 }} />
+                  {nome}
+                </button>
               ))}
-            </LineChart>
-          </ResponsiveContainer>
-        </div>
-      </Card>
+            </div>
+            <div className="chart-shell">
+              <ResponsiveContainer width="100%" height={320}>
+                <LineChart data={chartRows}>
+                  <CartesianGrid strokeDasharray="3 3" />
+                  <XAxis dataKey="label" />
+                  <YAxis unit="kg" />
+                  <Tooltip content={<PesoTooltip />} />
+                  {Object.entries(lotesColorMap).map(([nome, cor]) => (
+                    <Line key={nome} dataKey={nome} stroke={cor} strokeWidth={2} hide={!!hiddenLines[nome]} dot={{ r: 3 }} />
+                  ))}
+                </LineChart>
+              </ResponsiveContainer>
+            </div>
+          </Card>
 
-      <section className="dashboard-grid dashboard-grid--dual">
-        <Card title="Lotes ativos" subtitle="Clique para abrir detalhes">
-          <div className="table-responsive">
-            <table className="dashboard-table">
+          <section className="dashboard-grid dashboard-grid--dual">
+            <Card title="Lotes ativos" subtitle="Clique para abrir detalhes">
+              <div className="table-responsive">
+                <table className="dashboard-table">
+                  <thead>
+                    <tr>
+                      <th>Nome</th><th>Cabeças</th><th>Peso Médio</th><th>@ Viva</th><th>GMD</th><th>Dias</th><th>Custo/Cab</th><th>Resultado</th><th>Status</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {lotesStats.map(({ lote, indicators }) => (
+                      <tr key={lote.id} onClick={() => onNavigate?.('lotes')}>
+                        <td>{lote.nome}</td>
+                        <td>{indicators.totalAnimais}</td>
+                        <td>{formatNumber(indicators.pesoAtualMedio, 1)} kg</td>
+                        <td>{formatNumber(indicators.pesoAtualMedio / 15, 2)} @</td>
+                        <td>{formatNumber(indicators.gmdMedio, 3)}</td>
+                        <td>{indicators.dias}</td>
+                        <td>{formatCurrency(indicators.custoPorCabeca)}</td>
+                        <td className={indicators.margem >= 0 ? 'positive' : 'negative'}>{formatCurrency(indicators.margem)}</td>
+                        <td><Badge variant={lote.status === 'ativo' ? 'success' : 'neutral'}>{lote.status}</Badge></td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </Card>
+
+            <Card title="Próximos eventos do calendário" subtitle="Ordenados por urgência">
+              <div className="alerts-list">
+                {eventosCalendario.map((item) => {
+                  const variant = item.dias < 0 ? 'danger' : item.dias <= 3 ? 'warning' : 'success';
+                  return (
+                    <div key={item.id} className="alert-item">
+                      <Badge variant={variant}>{item.dias < 0 ? 'Atrasado' : item.dias <= 3 ? 'Urgente' : 'Programado'}</Badge>
+                      <div>
+                        <strong>{item.desc}</strong>
+                        <p>{item.loteNome} · {formatDate(item.proxima)}</p>
+                      </div>
+                      <Button size="sm" variant="outline" icon={<CalendarClock size={14} />} onClick={() => onResolveAlert?.({ id: item.id, ackKey: `sanitario-${item.id}` })}>Resolver</Button>
+                    </div>
+                  );
+                })}
+              </div>
+            </Card>
+          </section>
+
+          <section className="dashboard-grid dashboard-grid--dual">
+            <Card title="Tarefas prioritárias" subtitle="Top 5 por urgência de vencimento">
+              <div className="alerts-list">
+                {tarefasUrgentes.length === 0 ? <p>Nenhuma tarefa pendente no momento.</p> : tarefasUrgentes.map((item) => {
+                  const variant = item.dias < 0 ? 'danger' : item.dias <= 2 ? 'warning' : 'info';
+                  return (
+                    <div key={item.id} className="alert-item">
+                      <CheckSquare size={16} />
+                      <div>
+                        <strong>{item.titulo}</strong>
+                        <p>{item.dias < 0 ? `Atrasada há ${Math.abs(item.dias)} dia(s)` : `Vence em ${item.dias} dia(s)`}</p>
+                      </div>
+                      <Badge variant={variant}>{item.prioridade || 'media'}</Badge>
+                    </div>
+                  );
+                })}
+              </div>
+              <div className="dashboard-kpi-inline" style={{ marginTop: 12 }}>
+                <span>Pendentes: <strong>{tarefasResumo.pendente}</strong></span>
+                <span>Em andamento: <strong>{tarefasResumo.em_andamento}</strong></span>
+                <span>Concluídas: <strong>{tarefasResumo.concluida}</strong></span>
+              </div>
+              <div style={{ marginTop: 10 }}>
+                <Button size="sm" variant="outline" onClick={() => onNavigate?.('tarefas')}>Ver todas</Button>
+              </div>
+            </Card>
+
+            <Card title="Últimas movimentações de animais">
+              <div className="mov-list">
+                {movimentacoesRecentes.length === 0 ? <p>Nenhuma movimentação recente.</p> : movimentacoesRecentes.map((mov) => (
+                  <div key={mov.id} className="mov-item">
+                    <Badge variant={mov.tipo === 'saida' ? 'danger' : 'info'}>{mov.tipo || 'mov'}</Badge>
+                    <div>
+                      <strong>{mov.qtd || 0} cabeças</strong>
+                      <p>{formatDate(mov.data)} · {mov.observacao || 'Movimentação registrada'}</p>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </Card>
+
+            <Card title="Estoque crítico" subtitle="Progresso versus mínimo recomendado">
+              <div className="stock-list">
+                {estoqueCritico.length === 0 ? <p>Sem itens críticos no momento.</p> : estoqueCritico.map((item) => (
+                  <div key={item.id} className="stock-item">
+                    <div className="stock-head">
+                      <span>{item.produto || item.nome}</span>
+                      <span>{formatNumber(item.ratio, 0)}%</span>
+                    </div>
+                    <div className="stock-bar"><span style={{ width: `${Math.max(item.ratio, 4)}%` }} /></div>
+                  </div>
+                ))}
+              </div>
+            </Card>
+          </section>
+
+          <section className="dashboard-alerts-panel">
+            <Card title="Alertas pendentes" subtitle="Ordenados por urgência">
+              {(alerts || []).slice().sort((a, b) => urgencyRank(a) - urgencyRank(b)).map((alert) => {
+                const variant = urgencyVariant(alert);
+                return (
+                  <div className="alert-item" key={alert.id}>
+                    <AlertTriangle size={16} />
+                    <div>
+                      <strong>{alert.title}</strong>
+                      <p>{alert.description}</p>
+                    </div>
+                    <Badge variant={variant}>{variant}</Badge>
+                    <Button size="sm" variant="ghost" onClick={() => onResolveAlert?.(alert)}>Resolver</Button>
+                  </div>
+                );
+              })}
+            </Card>
+          </section>
+        </>
+      )}
+
+      {tabAtiva === 'estoque' && (
+        <div className="dashboard-tab-content">
+          <div className="kpi-grid" style={{ gridTemplateColumns: 'repeat(3, minmax(0,1fr))', marginBottom: 24 }}>
+            <div className="kpi-card">
+              <div className="kpi-icon-wrapper">
+                <Package size={22} />
+              </div>
+              <div>
+                <p className="kpi-label">Total de itens</p>
+                <p className="kpi-value">{db.estoque?.length || 0}</p>
+                <p className="kpi-sub">no estoque</p>
+              </div>
+            </div>
+
+            <div className="kpi-card" style={{ borderColor: itensCriticos > 0 ? 'rgba(239,68,68,0.3)' : undefined }}>
+              <div className="kpi-icon-wrapper" style={{ background: itensCriticos > 0 ? 'rgba(239,68,68,0.1)' : undefined }}>
+                <AlertTriangle size={22} style={{ color: itensCriticos > 0 ? 'var(--color-danger)' : undefined }} />
+              </div>
+              <div>
+                <p className="kpi-label">Estoque crítico</p>
+                <p className="kpi-value" style={{ color: itensCriticos > 0 ? 'var(--color-danger)' : undefined }}>{itensCriticos}</p>
+                <p className="kpi-sub">itens abaixo do mínimo</p>
+              </div>
+            </div>
+
+            <div className="kpi-card">
+              <div className="kpi-icon-wrapper">
+                <DollarSign size={22} />
+              </div>
+              <div>
+                <p className="kpi-label">Valor em estoque</p>
+                <p className="kpi-value">{formatarMoeda(valorTotalEstoque)}</p>
+                <p className="kpi-sub">valor estimado</p>
+              </div>
+            </div>
+          </div>
+
+          <div className="card dashboard-stock-card">
+            <div className="card-header dashboard-tab-header">
+              <h3>Itens em Estoque</h3>
+              <button className="btn-primary btn-sm" onClick={() => onNavigate?.('estoque')} type="button">Ver tudo</button>
+            </div>
+            <table className="history-table">
               <thead>
                 <tr>
-                  <th>Nome</th><th>Cabeças</th><th>Peso Médio</th><th>@ Viva</th><th>GMD</th><th>Dias</th><th>Custo/Cab</th><th>Resultado</th><th>Status</th>
+                  <th>Item</th>
+                  <th>Categoria</th>
+                  <th>Quantidade</th>
+                  <th>Mínimo</th>
+                  <th>Status</th>
+                  <th>Valor</th>
                 </tr>
               </thead>
               <tbody>
-                {lotesStats.map(({ lote, indicators }) => (
-                  <tr key={lote.id} onClick={() => onNavigate?.('lotes')}>
-                    <td>{lote.nome}</td>
-                    <td>{indicators.totalAnimais}</td>
-                    <td>{formatNumber(indicators.pesoAtualMedio, 1)} kg</td>
-                    <td>{formatNumber(indicators.pesoAtualMedio / 15, 2)} @</td>
-                    <td>{formatNumber(indicators.gmdMedio, 3)}</td>
-                    <td>{indicators.dias}</td>
-                    <td>{formatCurrency(indicators.custoPorCabeca)}</td>
-                    <td className={indicators.margem >= 0 ? 'positive' : 'negative'}>{formatCurrency(indicators.margem)}</td>
-                    <td><Badge variant={lote.status === 'ativo' ? 'success' : 'neutral'}>{lote.status}</Badge></td>
-                  </tr>
-                ))}
+                {(db.estoque || []).map((item) => {
+                  const critico = Number(item.quantidade_atual) <= Number(item.quantidade_minima || 0);
+                  return (
+                    <tr key={item.id}>
+                      <td>{item.nome || item.produto}</td>
+                      <td>
+                        <span className="badge-categoria">{item.categoria}</span>
+                      </td>
+                      <td>{item.quantidade_atual} {item.unidade}</td>
+                      <td>{item.quantidade_minima || '-'} {item.unidade}</td>
+                      <td>
+                        <span
+                          style={{
+                            color: critico ? 'var(--color-danger)' : 'var(--color-success)',
+                            fontSize: '0.8rem',
+                            fontWeight: 600,
+                          }}
+                        >
+                          {critico ? '⚠ Crítico' : '✓ Normal'}
+                        </span>
+                      </td>
+                      <td>
+                        {item.preco_unitario
+                          ? formatarMoeda(item.preco_unitario * item.quantidade_atual)
+                          : '-'}
+                      </td>
+                    </tr>
+                  );
+                })}
               </tbody>
             </table>
+            {(!db.estoque || db.estoque.length === 0) && (
+              <div className="empty-state">
+                <p>Nenhum item no estoque.</p>
+              </div>
+            )}
           </div>
-        </Card>
+        </div>
+      )}
 
-        <Card title="Próximos eventos do calendário" subtitle="Ordenados por urgência">
-          <div className="alerts-list">
-            {eventosCalendario.map((item) => {
-              const variant = item.dias < 0 ? 'danger' : item.dias <= 3 ? 'warning' : 'success';
-              return (
-                <div key={item.id} className="alert-item">
-                  <Badge variant={variant}>{item.dias < 0 ? 'Atrasado' : item.dias <= 3 ? 'Urgente' : 'Programado'}</Badge>
-                  <div>
-                    <strong>{item.desc}</strong>
-                    <p>{item.loteNome} · {formatDate(item.proxima)}</p>
+      {tabAtiva === 'alertas' && (
+        <div className="dashboard-tab-content">
+          <div className="kpi-grid" style={{ gridTemplateColumns: 'repeat(3, minmax(0,1fr))', marginBottom: 24 }}>
+            <div className="kpi-card" style={{ borderColor: 'rgba(239,68,68,0.2)' }}>
+              <div className="kpi-icon-wrapper" style={{ background: 'rgba(239,68,68,0.1)' }}>
+                <AlertTriangle size={22} style={{ color: 'var(--color-danger)' }} />
+              </div>
+              <div>
+                <p className="kpi-label">Alta prioridade</p>
+                <p className="kpi-value" style={{ color: 'var(--color-danger)' }}>{alertas.filter((a) => a.prioridade === 'alta').length}</p>
+                <p className="kpi-sub">requer ação imediata</p>
+              </div>
+            </div>
+
+            <div className="kpi-card" style={{ borderColor: 'rgba(245,158,11,0.2)' }}>
+              <div className="kpi-icon-wrapper" style={{ background: 'rgba(245,158,11,0.1)' }}>
+                <Bell size={22} style={{ color: 'var(--color-warning)' }} />
+              </div>
+              <div>
+                <p className="kpi-label">Média prioridade</p>
+                <p className="kpi-value" style={{ color: 'var(--color-warning)' }}>{alertas.filter((a) => a.prioridade === 'media').length}</p>
+                <p className="kpi-sub">atenção recomendada</p>
+              </div>
+            </div>
+
+            <div className="kpi-card">
+              <div className="kpi-icon-wrapper">
+                <CheckCircle2 size={22} />
+              </div>
+              <div>
+                <p className="kpi-label">Total de alertas</p>
+                <p className="kpi-value">{alertas.length}</p>
+                <p className="kpi-sub">pendentes</p>
+              </div>
+            </div>
+          </div>
+
+          <div className="card dashboard-alerts-card">
+            <div className="card-header dashboard-tab-header">
+              <h3>Todos os Alertas</h3>
+              <button className="btn-primary btn-sm" onClick={() => setTabAtiva?.('geral')} type="button">Voltar ao Geral</button>
+            </div>
+
+            {alertas.length === 0 ? (
+              <div className="empty-state">
+                <div className="empty-state-icon">
+                  <CheckCircle2 size={28} />
+                </div>
+                <p className="empty-state-title">Nenhum alerta pendente</p>
+                <p className="empty-state-desc">Sua operação está em dia!</p>
+              </div>
+            ) : (
+              alertas.map((alerta) => (
+                <div key={alerta.id} className="alert-item">
+                  <div className={`alert-dot ${alerta.prioridade}`} />
+                  <div style={{ flex: 1 }}>
+                    <p className="alert-item-title">{alerta.titulo}</p>
+                    <p className="alert-item-desc">{alerta.descricao}</p>
                   </div>
-                  <Button size="sm" variant="outline" icon={<CalendarClock size={14} />} onClick={() => onResolveAlert?.({ id: item.id, ackKey: `sanitario-${item.id}` })}>Resolver</Button>
+                  <button
+                    className="alert-action-btn"
+                    onClick={() => onNavigate?.(alerta.acao?.rota || 'dashboard')}
+                    type="button"
+                  >
+                    {alerta.acao?.label || 'Abrir'} →
+                  </button>
                 </div>
-              );
-            })}
+              ))
+            )}
           </div>
-        </Card>
-      </section>
-
-      <section className="dashboard-grid dashboard-grid--dual">
-        <Card title="Tarefas prioritárias" subtitle="Top 5 por urgência de vencimento">
-          <div className="alerts-list">
-            {tarefasUrgentes.length === 0 ? <p>Nenhuma tarefa pendente no momento.</p> : tarefasUrgentes.map((item) => {
-              const variant = item.dias < 0 ? 'danger' : item.dias <= 2 ? 'warning' : 'info';
-              return (
-                <div key={item.id} className="alert-item">
-                  <CheckSquare size={16} />
-                  <div>
-                    <strong>{item.titulo}</strong>
-                    <p>{item.dias < 0 ? `Atrasada há ${Math.abs(item.dias)} dia(s)` : `Vence em ${item.dias} dia(s)`}</p>
-                  </div>
-                  <Badge variant={variant}>{item.prioridade || 'media'}</Badge>
-                </div>
-              );
-            })}
-          </div>
-          <div className="dashboard-kpi-inline" style={{ marginTop: 12 }}>
-            <span>Pendentes: <strong>{tarefasResumo.pendente}</strong></span>
-            <span>Em andamento: <strong>{tarefasResumo.em_andamento}</strong></span>
-            <span>Concluídas: <strong>{tarefasResumo.concluida}</strong></span>
-          </div>
-          <div style={{ marginTop: 10 }}>
-            <Button size="sm" variant="outline" onClick={() => onNavigate?.('tarefas')}>Ver todas</Button>
-          </div>
-        </Card>
-
-        <Card title="Últimas movimentações de animais">
-          <div className="mov-list">
-            {movimentacoesRecentes.length === 0 ? <p>Nenhuma movimentação recente.</p> : movimentacoesRecentes.map((mov) => (
-              <div key={mov.id} className="mov-item">
-                <Badge variant={mov.tipo === 'saida' ? 'danger' : 'info'}>{mov.tipo || 'mov'}</Badge>
-                <div>
-                  <strong>{mov.qtd || 0} cabeças</strong>
-                  <p>{formatDate(mov.data)} · {mov.observacao || 'Movimentação registrada'}</p>
-                </div>
-              </div>
-            ))}
-          </div>
-        </Card>
-
-        <Card title="Estoque crítico" subtitle="Progresso versus mínimo recomendado">
-          <div className="stock-list">
-            {estoqueCritico.length === 0 ? <p>Sem itens críticos no momento.</p> : estoqueCritico.map((item) => (
-              <div key={item.id} className="stock-item">
-                <div className="stock-head">
-                  <span>{item.produto}</span>
-                  <span>{formatNumber(item.ratio, 0)}%</span>
-                </div>
-                <div className="stock-bar"><span style={{ width: `${Math.max(item.ratio, 4)}%` }} /></div>
-              </div>
-            ))}
-          </div>
-        </Card>
-      </section>
-
-      <section className="dashboard-alerts-panel">
-        <Card title="Alertas pendentes" subtitle="Ordenados por urgência">
-          {(alerts || []).slice().sort((a, b) => urgencyRank(a) - urgencyRank(b)).map((alert) => {
-            const variant = urgencyVariant(alert);
-            return (
-              <div className="alert-item" key={alert.id}>
-                <AlertTriangle size={16} />
-                <div>
-                  <strong>{alert.title}</strong>
-                  <p>{alert.description}</p>
-                </div>
-                <Badge variant={variant}>{variant}</Badge>
-                <Button size="sm" variant="ghost" onClick={() => onResolveAlert?.(alert)}>Resolver</Button>
-              </div>
-            );
-          })}
-        </Card>
-      </section>
+        </div>
+      )}
     </div>
   );
 }
 
-function KpiPanel({ title, value, variation, icon: Icon, variant = 'neutral', compact = false }) {
+function KpiPanel({ title, value, variation, icon, variant = 'neutral', compact = false }) {
+  const IconComp = icon;
+
   return (
     <Card className={`kpi-panel kpi-panel--${variant} ${compact ? 'kpi-panel--compact' : ''}`}>
       <div className="kpi-panel-header">
-        <Icon size={20} />
+        <IconComp size={20} />
       </div>
       <strong>{value}</strong>
       <span>{title}</span>

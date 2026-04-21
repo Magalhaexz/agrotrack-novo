@@ -33,7 +33,7 @@ const DashboardPage = lazy(() => import('./pages/DashboardPage'));
 const FazendasPage = lazy(() => import('./pages/FazendasPage'));
 const LotesPage = lazy(() => import('./pages/LotesPage'));
 const CalendarioOperacionalPage = lazy(() => import('./pages/CalendarioOperacionalPage'));
-const ComparativoLotesPage = lazy(() => import('./pages/ComparativoLotesPage'));
+const ComparativoPage = lazy(() => import('./pages/ComparativoPage'));
 const AnimaisPage = lazy(() => import('./pages/AnimaisPage'));
 const SuplementacaoPage = lazy(() => import('./pages/SuplementacaoPage'));
 const SanitarioPage = lazy(() => import('./pages/SanitarioPage'));
@@ -53,7 +53,7 @@ const pageMap = {
   fazendas: FazendasPage,
   lotes: LotesPage,
   calendarioOperacional: CalendarioOperacionalPage,
-  comparativoLotes: ComparativoLotesPage,
+  comparativo: ComparativoPage,
   funcionarios: FuncionariosPage,
   rotina: RotinaPage,
   tarefas: TarefasPage,
@@ -121,7 +121,10 @@ export default function App() {
   }));
   const { toasts, showToast, removeToast } = useToast();
   const { session, user, loadingAuth, hasPermission } = useAuth();
+  const [usuarioLogado, setUsuarioLogado] = useState(null);
   const [menuExtraAberto, setMenuExtraAberto] = useState(false);
+  const [tabAtiva, setTabAtiva] = useState('geral');
+  const [fazendaSelecionada, setFazendaSelecionada] = useState(null);
   const [confirmState, setConfirmState] = useState({
     open: false,
     title: '',
@@ -149,6 +152,76 @@ export default function App() {
       window.alert = originalAlert;
     };
   }, [showToast]);
+
+  useEffect(() => {
+    if (!user) {
+      setUsuarioLogado(null);
+      return;
+    }
+
+    setUsuarioLogado((prev) => ({
+      id: user.id || prev?.id || null,
+      nome: prev?.nome || user?.user_metadata?.name || user?.user_metadata?.nome || user?.email?.split('@')[0] || 'Usuário',
+      email: user.email || prev?.email || '',
+      perfil: prev?.perfil || user?.user_metadata?.perfil || 'visualizador',
+      foto_url: prev?.foto_url ?? user?.user_metadata?.avatar_url ?? null,
+    }));
+  }, [user]);
+
+  useEffect(() => {
+    const fazendas = Array.isArray(db?.fazendas) ? db.fazendas : [];
+    if (!fazendas.length) {
+      setFazendaSelecionada(null);
+      return;
+    }
+
+    setFazendaSelecionada((prev) => {
+      if (prev && fazendas.some((f) => Number(f.id) === Number(prev.id))) {
+        return fazendas.find((f) => Number(f.id) === Number(prev.id));
+      }
+      return fazendas[0];
+    });
+  }, [db?.fazendas]);
+
+  const dbDashboard = useMemo(() => {
+    if (!fazendaSelecionada?.id) return db;
+
+    const loteIds = new Set((db.lotes || []).filter((l) => Number(l.faz_id) === Number(fazendaSelecionada.id)).map((l) => l.id));
+
+    return {
+      ...db,
+      lotes: (db.lotes || []).filter((l) => loteIds.has(l.id)),
+      animais: (db.animais || []).filter((a) => loteIds.has(a.lote_id)),
+      custos: (db.custos || []).filter((c) => loteIds.has(c.lote_id)),
+      pesagens: (db.pesagens || []).filter((p) => loteIds.has(p.lote_id)),
+      sanitario: (db.sanitario || []).filter((s) => loteIds.has(s.lote_id)),
+      tarefas: (db.tarefas || []).filter((t) => !t.fazenda_id || Number(t.fazenda_id) === Number(fazendaSelecionada.id) || loteIds.has(t.lote_id)),
+      movimentacoes_animais: (db.movimentacoes_animais || []).filter((m) => loteIds.has(m.lote_id)),
+    };
+  }, [db, fazendaSelecionada]);
+
+  function atualizarUsuario(dadosAtualizados) {
+    setUsuarioLogado((prev) => {
+      const base = prev || {
+        id: user?.id || null,
+        nome: user?.user_metadata?.name || user?.email?.split('@')[0] || 'Usuário',
+        email: user?.email || '',
+        perfil: user?.user_metadata?.perfil || 'visualizador',
+        foto_url: user?.user_metadata?.avatar_url || null,
+      };
+      const atualizado = { ...base, ...dadosAtualizados, foto_url: dadosAtualizados?.foto_url ?? base.foto_url ?? null };
+      localStorage.setItem('herdon_usuario', JSON.stringify(atualizado));
+      return atualizado;
+    });
+  }
+
+  async function handleLogout() {
+    setUsuarioLogado(null);
+    localStorage.removeItem('herdon_usuario');
+    localStorage.removeItem('herdon_token');
+    await supabase.auth.signOut();
+    setCurrentPage('dashboard');
+  }
 
   const alertasResolvidos = Array.isArray(db?.alertas_resolvidos)
     ? db.alertas_resolvidos
@@ -251,25 +324,30 @@ export default function App() {
           showToast({ type: 'error', message: 'Acesso não autorizado para esta área.' });
         }}
         alertCount={alerts.length}
-        user={user}
+        user={usuarioLogado}
         hasPermission={hasPermission}
+        onSignOut={handleLogout}
       />
 
       <main className="main">
         <AppHeader
-          farmName={db?.fazendas?.[0]?.nome || 'Fazenda Atual'}
-          userName={user?.user_metadata?.name || user?.email?.split('@')[0] || 'Usuário'}
+          farmName={fazendaSelecionada?.nome || db?.fazendas?.[0]?.nome || 'Fazenda Atual'}
           notifications={alerts.length}
           alerts={alerts}
           onResolveAlert={marcarAlertaComoFeito}
           onSnoozeAlert={(alert) => showToast({ type: 'warning', message: `Alerta adiado: ${alert.title}` })}
           onAlertNavigate={(alert) => alert?.route && setCurrentPage(alert.route)}
-          onSignOut={() => supabase.auth.signOut()}
+          onSignOut={handleLogout}
           onNavigateProfile={() => setCurrentPage('perfil')}
           onNavigateSettings={() => setCurrentPage('configuracoes')}
           onConfirmAction={onConfirmAction}
           onOpenMenu={() => window.dispatchEvent(new CustomEvent('agrotrack-open-drawer'))}
-          userEmail={user?.email || ''}
+          usuarioLogado={usuarioLogado}
+          fazendas={db?.fazendas || []}
+          fazendaSelecionada={fazendaSelecionada}
+          onSelectFazenda={setFazendaSelecionada}
+          tabAtiva={tabAtiva}
+          onTabChange={setTabAtiva}
         />
 
         <AnimatePresence mode="wait">
@@ -285,7 +363,7 @@ export default function App() {
             <Suspense fallback={<div className="skeleton-page"><div className="skeleton-row" /><div className="skeleton-row" /><div className="skeleton-row" /></div>}>
               <RotaProtegida permissao={permissaoPaginaAtual}>
                 <ActivePage
-                db={db}
+                db={pageKey === 'dashboard' ? dbDashboard : db}
                 setDb={setDb}
                 alerts={alerts}
                 onNavigate={setCurrentPage}
@@ -295,6 +373,10 @@ export default function App() {
                 onRegistrarEntradaEstoque={handleRegistrarEntradaEstoque}
                 onRegistrarSaidaEstoque={handleRegistrarSaidaEstoque}
                 onConfirmAction={onConfirmAction}
+                usuarioLogado={usuarioLogado}
+                atualizarUsuario={atualizarUsuario}
+                tabAtiva={tabAtiva}
+                setTabAtiva={setTabAtiva}
                 />
               </RotaProtegida>
             </Suspense>
