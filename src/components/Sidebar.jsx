@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import {
   Beef,
   ChevronDown,
+  ChevronRight,
   DollarSign,
   LayoutDashboard,
   Menu,
@@ -16,13 +17,12 @@ import {
   ClipboardList,
   CheckSquare,
 } from 'lucide-react';
-import logoAgrotrack from '../assets/logo_app1.png';
 import { obterPerfilDoUsuario, permissoesPorPagina } from '../auth/perfis';
 
 const navSections = [
   {
     id: 'main',
-    title: 'Principal',
+    title: '',
     items: [{ id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard }],
   },
   {
@@ -30,8 +30,7 @@ const navSections = [
     title: 'Rebanho',
     items: [
       { id: 'lotes', label: 'Lotes', icon: Beef },
-      { id: 'pesagens', label: 'Pesagem', icon: Scale },
-      { id: 'animais', label: 'Movimentações', icon: ClipboardList },
+      { id: 'animais', label: 'Animais', icon: ClipboardList },
       { id: 'comparativoLotes', label: 'Comparativo', icon: ClipboardList },
     ],
   },
@@ -43,22 +42,23 @@ const navSections = [
       { id: 'calendarioOperacional', label: 'Calendário', icon: ClipboardList },
       { id: 'suplementacao', label: 'Suplementação', icon: ShieldPlus },
       { id: 'estoque', label: 'Estoque', icon: Package },
-      { id: 'fazendas', label: 'Fazendas', icon: MapPin },
       { id: 'financeiro', label: 'Financeiro', icon: DollarSign },
-      { id: 'resultados', label: 'Relatórios', icon: ClipboardList },
       { id: 'tarefas', label: 'Tarefas', icon: CheckSquare },
+      { id: 'resultados', label: 'Relatórios', icon: ClipboardList },
+      { id: 'fazendas', label: 'Fazendas', icon: MapPin },
       { id: 'funcionarios', label: 'Funcionários', icon: Users },
+      { id: 'pesagens', label: 'Pesagem', icon: Scale },
       { id: 'configuracoes', label: 'Configurações', icon: Settings },
     ],
   },
 ];
 
 export default function Sidebar({ currentPage, onNavigate, alertCount = 0, user = null, hasPermission = () => true }) {
-  const [openSections, setOpenSections] = useState({ main: true, rebanho: true, gestao: true });
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+  const [openSections, setOpenSections] = useState({ main: true, rebanho: true, gestao: true });
 
-  const userName = user?.user_metadata?.name || user?.email?.split('@')[0] || 'Usuário';
-  const perfil = obterPerfilDoUsuario(user);
+  const userName = user?.user_metadata?.name || user?.email?.split('@')[0] || 'er482354';
+  const perfil = obterPerfilDoUsuario(user) || 'Visualizador';
 
   const sections = useMemo(
     () =>
@@ -73,10 +73,9 @@ export default function Sidebar({ currentPage, onNavigate, alertCount = 0, user 
         .filter((section) => section.items.length > 0)
         .map((section) => ({
           ...section,
-          hasActiveItem: section.items.some((item) => item.id === currentPage),
           isOpen: openSections[section.id] ?? true,
         })),
-    [currentPage, hasPermission, openSections]
+    [hasPermission, openSections]
   );
 
   useEffect(() => {
@@ -96,39 +95,59 @@ export default function Sidebar({ currentPage, onNavigate, alertCount = 0, user 
         <button type="button" className="mobile-menu-btn" onClick={() => setIsMobileMenuOpen(true)}>
           <Menu size={18} />
         </button>
-        <img src={logoAgrotrack} alt="AgroTrack" className="mobile-topbar-logo" loading="lazy" />
+        <div className="sidebar-logo-text">HERDON</div>
       </div>
       {isMobileMenuOpen && <div className="mobile-overlay" onClick={() => setIsMobileMenuOpen(false)} />}
 
-      <aside className={`sb ${isMobileMenuOpen ? 'mobile-open' : ''}`}>
-        <div className="sb-logo">
-          <img src={logoAgrotrack} alt="AgroTrack" style={{ width: 140 }} loading="lazy" />
-          <button type="button" className="mobile-close-btn" onClick={() => setIsMobileMenuOpen(false)}>
-            <X size={16} />
+      <aside className={`sidebar sb ${isMobileMenuOpen ? 'mobile-open' : ''}`}>
+        <div className="sidebar-logo">
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+            <div
+              style={{
+                width: 36,
+                height: 36,
+                background: 'var(--color-primary-subtle)',
+                borderRadius: 'var(--radius-md)',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                border: '1px solid rgba(34,197,94,0.2)',
+              }}
+            >
+              <span style={{ color: 'var(--color-primary)', fontWeight: 900, fontSize: '1rem' }}>H</span>
+            </div>
+            <div>
+              <div className="sidebar-logo-text">HERDON</div>
+              <div className="sidebar-logo-sub">Gestão Inteligente</div>
+            </div>
+          </div>
+          <button type="button" className="sidebar-collapse-btn mobile-close-btn" onClick={() => setIsMobileMenuOpen(false)}>
+            {isMobileMenuOpen ? <X size={14} /> : <ChevronRight size={14} style={{ transform: 'rotate(180deg)' }} />}
           </button>
         </div>
 
-        <div className="sb-sec">
+        <div className="sidebar-content sb-sec">
           {sections.map((section) => (
-            <div key={section.id} className="nav-group">
-              <button
-                type="button"
-                className={`nav-group-toggle ${section.hasActiveItem ? 'active' : ''}`}
-                onClick={() => setOpenSections((prev) => ({ ...prev, [section.id]: !prev[section.id] }))}
-              >
-                <span>{section.title}</span>
-                <ChevronDown size={14} className={`nav-group-arrow ${section.isOpen ? 'open' : ''}`} />
-              </button>
-
+            <div key={section.id}>
+              {section.title ? (
+                <button
+                  type="button"
+                  className="sidebar-group-label nav-group-toggle"
+                  onClick={() => setOpenSections((prev) => ({ ...prev, [section.id]: !prev[section.id] }))}
+                >
+                  <span>{section.title}</span>
+                  <ChevronDown size={14} className={`nav-group-arrow ${section.isOpen ? 'open' : ''}`} />
+                </button>
+              ) : null}
               {section.isOpen && (
-                <div className="nav-sublist">
+                <div className="nav-sublist" style={{ borderTop: section.title ? undefined : 'none', marginTop: 0, paddingTop: 0 }}>
                   {section.items.map((item) => {
                     const ItemIcon = item.icon;
                     return (
                       <button
                         key={item.id}
                         type="button"
-                        className={`nav subnav ${currentPage === item.id ? 'on' : ''}`}
+                        className={`sidebar-item nav subnav ${currentPage === item.id ? 'active on' : ''}`}
                         onClick={() => {
                           onNavigate(item.id);
                           setIsMobileMenuOpen(false);
@@ -136,7 +155,7 @@ export default function Sidebar({ currentPage, onNavigate, alertCount = 0, user 
                       >
                         <ItemIcon size={16} className="nav-icon" />
                         <span>{item.label}</span>
-                        {item.id === 'dashboard' && alertCount > 0 ? <span className="nav-badge">{alertCount}</span> : null}
+                        {item.id === 'dashboard' && alertCount > 0 ? <span className="sidebar-badge nav-badge">{alertCount}</span> : null}
                       </button>
                     );
                   })}
@@ -146,12 +165,13 @@ export default function Sidebar({ currentPage, onNavigate, alertCount = 0, user 
           ))}
         </div>
 
-        <div className="sb-foot">
+        <div className="sidebar-user sb-foot">
           <div className="avatar">{String(userName).slice(0, 2).toUpperCase()}</div>
-          <div>
-            <div className="u-name">{userName}</div>
-            <div className="u-role">{perfil}</div>
+          <div className="sidebar-user-info">
+            <div className="sidebar-user-name u-name">{userName}</div>
+            <div className="sidebar-user-role u-role">{perfil}</div>
           </div>
+          <ChevronDown size={14} color="var(--color-text-secondary)" />
         </div>
       </aside>
     </>

@@ -1,4 +1,5 @@
 import { useMemo, useState } from 'react';
+import { Eye, EyeOff } from 'lucide-react';
 import logoAgrotrack from '../assets/logo_app1.png';
 import { supabase } from '../lib/supabase';
 import '../styles/login.css';
@@ -25,6 +26,8 @@ export default function LoginPage() {
   const [mensagem, setMensagem] = useState('');
   const [erro, setErro] = useState('');
   const [carregando, setCarregando] = useState(false);
+  const [mostrarSenha, setMostrarSenha] = useState(false);
+  const [mostrarNovaSenha, setMostrarNovaSenha] = useState(false);
 
   const forcaSenha = useMemo(() => calcularForcaSenha(novaSenha), [novaSenha]);
 
@@ -167,37 +170,35 @@ export default function LoginPage() {
 
   return (
     <div className="login-page">
-      <div className="login-card">
-        <div
-          className="login-brand"
-          style={{
-            display: 'flex',
-            justifyContent: 'center',
-            marginBottom: 24,
-          }}
-        >
-          <img
-            src={logoAgrotrack}
-            alt="AgroTrack"
-            loading="lazy"
-            style={{
-              width: '340px',
-              maxWidth: '88%',
-              height: 'auto',
-              objectFit: 'contain',
-              display: 'block',
-            }}
-          />
+      <div className="login-brand-side">
+        <div className="login-brand-shell">
+          <div className="login-brand-mark">
+            <img src={logoAgrotrack} alt="HERDON" loading="lazy" />
+          </div>
+          <div className="login-brand-logo">HER<span>DON</span></div>
+          <div className="login-brand-sub">Gestão Inteligente. Resultados Reais.</div>
+
+          <div className="login-benefits">
+            <div className="login-benefit-card">Controle total do rebanho</div>
+            <div className="login-benefit-card">Indicadores em tempo real</div>
+            <div className="login-benefit-card">Financeiro por lote</div>
+          </div>
+        </div>
+      </div>
+
+      <div className="login-form-side">
+        <div className="login-mobile-brand">
+          <div className="login-brand-mark">
+            <img src={logoAgrotrack} alt="HERDON" loading="lazy" />
+          </div>
+          <div className="login-brand-logo">HER<span>DON</span></div>
         </div>
 
         <div className="login-header">
-          <h2>
-            {modo === 'login'
-              ? 'Entrar'
-              : modo === 'cadastro'
-              ? 'Criar conta'
-              : `Recuperar senha (etapa ${etapaRecuperacao}/3)`}
+          <h2 className="login-title">
+            {modo === 'login' ? 'Entrar' : modo === 'cadastro' ? 'Criar conta' : `Recuperar senha (etapa ${etapaRecuperacao}/3)`}
           </h2>
+          <p className="login-subtitle">Acesse a plataforma HERDON para gestão inteligente.</p>
         </div>
 
         {(modo === 'login' || modo === 'cadastro') && (
@@ -225,13 +226,18 @@ export default function LoginPage() {
             />
 
             <label htmlFor="senha">Senha</label>
-            <input
-              id="senha"
-              type="password"
-              placeholder="Sua senha"
-              value={senha}
-              onChange={(e) => setSenha(e.target.value)}
-            />
+            <div className="login-password-wrap">
+              <input
+                id="senha"
+                type={mostrarSenha ? 'text' : 'password'}
+                placeholder="Sua senha"
+                value={senha}
+                onChange={(e) => setSenha(e.target.value)}
+              />
+              <button type="button" className="login-password-toggle" onClick={() => setMostrarSenha((prev) => !prev)}>
+                {mostrarSenha ? <EyeOff size={16} /> : <Eye size={16} />}
+              </button>
+            </div>
 
             {erro ? <div className="login-error">{erro}</div> : null}
             {mensagem ? <div className="login-success">{mensagem}</div> : null}
@@ -249,12 +255,7 @@ export default function LoginPage() {
               className="login-btn"
               onClick={loginComGoogle}
               disabled={carregando}
-              style={{
-                background: 'var(--color-surface-2)',
-                color: 'var(--color-text)',
-                marginTop: 10,
-                opacity: carregando ? 0.7 : 1,
-              }}
+              style={{ background: 'var(--color-surface-2)', color: 'var(--color-text)', marginTop: 10, opacity: carregando ? 0.7 : 1 }}
             >
               Entrar com Google
             </button>
@@ -285,13 +286,18 @@ export default function LoginPage() {
                   Após abrir o link recebido no e-mail, defina a nova senha abaixo.
                 </p>
                 <label htmlFor="nova-senha">Nova senha</label>
-                <input
-                  id="nova-senha"
-                  type="password"
-                  placeholder="Digite a nova senha"
-                  value={novaSenha}
-                  onChange={(e) => setNovaSenha(e.target.value)}
-                />
+                <div className="login-password-wrap">
+                  <input
+                    id="nova-senha"
+                    type={mostrarNovaSenha ? 'text' : 'password'}
+                    placeholder="Digite a nova senha"
+                    value={novaSenha}
+                    onChange={(e) => setNovaSenha(e.target.value)}
+                  />
+                  <button type="button" className="login-password-toggle" onClick={() => setMostrarNovaSenha((prev) => !prev)}>
+                    {mostrarNovaSenha ? <EyeOff size={16} /> : <Eye size={16} />}
+                  </button>
+                </div>
                 <div style={{ fontSize: 12, color: forcaSenha.color }}>
                   Força da senha: {forcaSenha.label}
                 </div>
@@ -310,7 +316,7 @@ export default function LoginPage() {
         {erro ? <div className="login-error">{erro}</div> : null}
         {mensagem ? <div className="login-success">{mensagem}</div> : null}
 
-        <div style={{ marginTop: 18, textAlign: 'center', fontSize: 14, opacity: 0.9 }}>
+        <div className="login-links">
           {modo === 'login' ? 'Ainda não tem conta?' : 'Já tem conta?'}{' '}
           <button
             type="button"
@@ -320,14 +326,7 @@ export default function LoginPage() {
               setErro('');
               setMensagem('');
             }}
-            style={{
-              background: 'none',
-              border: 'none',
-              color: 'var(--color-primary)',
-              fontWeight: 700,
-              cursor: 'pointer',
-              padding: 0,
-            }}
+            className="login-link-btn"
           >
             {modo === 'login' ? 'Criar conta' : 'Entrar'}
           </button>
@@ -341,14 +340,7 @@ export default function LoginPage() {
               setErro('');
               setMensagem('');
             }}
-            style={{
-              background: 'none',
-              border: 'none',
-              color: 'var(--color-primary)',
-              fontWeight: 700,
-              cursor: 'pointer',
-              padding: 0,
-            }}
+            className="login-link-btn"
           >
             Esqueci minha senha
           </button>

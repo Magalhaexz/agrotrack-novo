@@ -25,7 +25,7 @@ export default function ConfiguracoesPage({ db, setDb, onConfirmAction }) {
   const configNotificacoes = db?.configuracoes?.notificacoes || {};
 
   const [geral, setGeral] = useState({
-    nome_sistema: configGeral.nome_sistema || 'AgroTrack',
+    nome_sistema: configGeral.nome_sistema || 'HERDON',
     moeda: configGeral.moeda || 'BRL',
     formato_data: configGeral.formato_data || 'DD/MM/AAAA',
     unidade_peso: configGeral.unidade_peso || 'kg',
@@ -87,7 +87,7 @@ export default function ConfiguracoesPage({ db, setDb, onConfirmAction }) {
     const url = URL.createObjectURL(blob);
     const anchor = document.createElement('a');
     anchor.href = url;
-    anchor.download = `agrotrack-backup-${new Date().toISOString().slice(0, 10)}.json`;
+    anchor.download = `herdon-backup-${new Date().toISOString().slice(0, 10)}.json`;
     anchor.click();
     URL.revokeObjectURL(url);
     window.alert('Backup exportado com sucesso.');

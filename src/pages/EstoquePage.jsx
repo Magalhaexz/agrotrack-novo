@@ -67,9 +67,9 @@ export default function EstoquePage({ db, setDb, onRegistrarSaidaEstoque }) {
       </div>
 
       <div className="dashboard-grid dashboard-grid--kpi-secondary">
-        <Card title="Total de itens">{resumo.total}</Card>
-        <Card title="Itens críticos">{resumo.criticos}</Card>
-        <Card title="Valor total em estoque">{formatCurrency(resumo.valorTotal)}</Card>
+        <Card className="kpi-card" title="Total de itens">{resumo.total}</Card>
+        <Card className="kpi-card" title="Itens críticos">{resumo.criticos}</Card>
+        <Card className="kpi-card" title="Valor total em estoque">{formatCurrency(resumo.valorTotal)}</Card>
       </div>
 
       <div className="lote-cards-grid">
@@ -77,41 +77,56 @@ export default function EstoquePage({ db, setDb, onRegistrarSaidaEstoque }) {
           const border = item.status === 'critico' ? '#c53030' : item.status === 'baixo' ? '#b7791f' : 'var(--color-border)';
           const bar = item.status === 'critico' ? '#c53030' : item.status === 'baixo' ? '#b7791f' : '#2d6a4f';
           return (
-            <Card key={item.id} className="lote-card-modern" style={{ borderColor: border }}>
-              <div className="lote-card-title">
-                <h3>{item.produto}</h3>
-                <Badge variant={item.status === 'critico' ? 'danger' : item.status === 'baixo' ? 'warning' : 'neutral'}>{item.categoria}</Badge>
+            <Card key={item.id} className="estoque-card" style={{ borderColor: border }}>
+              <div className="estoque-card-header">
+                <div>
+                  <h3 className="estoque-card-nome">{item.produto}</h3>
+                  <span className={`badge-categoria ${String(item.categoria || '').toLowerCase().includes('san') ? 'badge-sanitario' : String(item.categoria || '').toLowerCase().includes('med') ? 'badge-medicamento' : 'badge-insumo'}`}>
+                    <span className="dot" />
+                    {item.categoria}
+                  </span>
+                </div>
+                <Badge variant={item.status === 'critico' ? 'danger' : item.status === 'baixo' ? 'warning' : 'neutral'}>{item.status}</Badge>
               </div>
               {item.status === 'critico' ? <p className="negative"><AlertTriangle size={14} /> Crítico</p> : null}
-              <p><strong>{formatNumber(item.saldo, 2)} {item.unidade}</strong></p>
-              <div className="progress-line"><span style={{ width: `${Math.min(Math.max(item.ratio, 4), 100)}%`, background: bar }} /></div>
-              <p>Valor unitário: {formatCurrency(item.valor_unitario)}</p>
-              <p>Valor total: {formatCurrency(item.valorTotal)}</p>
-              <p>Consumo médio diário: {formatNumber(item.mediaConsumo, 2)} {item.unidade}</p>
-              <p>Dias restantes: {item.diasRest > 900 ? '—' : `${formatNumber(item.diasRest, 0)} dias`}</p>
-              <div className="lote-actions">
-                <Button size="sm" onClick={() => { setSelectedItem(item); setOpenEntrada(true); }}>Entrada</Button>
-                <Button size="sm" variant="outline" onClick={() => { setSelectedItem(item); setOpenSaida(true); }}>Saída/Consumo</Button>
-                <Button size="sm" variant="ghost" icon={<FileText size={12} />} onClick={() => setFilters((f) => ({ ...f, item: item.id }))}>Histórico</Button>
+              <div className="estoque-card-quantidade">{formatNumber(item.saldo, 2)} {item.unidade}</div>
+              <div className="progress-bar-container"><div className={`progress-bar-fill ${item.status === 'critico' ? 'danger' : item.status === 'baixo' ? 'warning' : ''}`} style={{ width: `${Math.min(Math.max(item.ratio, 4), 100)}%`, background: bar }} /></div>
+              <div className="progress-label">{formatNumber(item.ratio, 0)}%</div>
+              <div className="estoque-card-details">
+                <div className="estoque-detail-row"><span className="estoque-detail-label">Valor unitário</span><span className="estoque-detail-value">{formatCurrency(item.valor_unitario)}</span></div>
+                <div className="estoque-detail-row"><span className="estoque-detail-label">Valor total</span><span className="estoque-detail-value">{formatCurrency(item.valorTotal)}</span></div>
+                <div className="estoque-detail-row"><span className="estoque-detail-label">Consumo médio diário</span><span className="estoque-detail-value">{formatNumber(item.mediaConsumo, 2)} {item.unidade}</span></div>
+                <div className="estoque-detail-row"><span className="estoque-detail-label">Dias restantes</span><span className="estoque-detail-value">{item.diasRest > 900 ? '—' : `${formatNumber(item.diasRest, 0)} dias`}</span></div>
+              </div>
+              <div className="estoque-card-actions lote-actions">
+                <button type="button" className="btn-entrada" onClick={() => { setSelectedItem(item); setOpenEntrada(true); }}>Entrada</button>
+                <button type="button" className="btn-saida" onClick={() => { setSelectedItem(item); setOpenSaida(true); }}>Saída</button>
+                <button type="button" className="btn-historico" onClick={() => setFilters((f) => ({ ...f, item: item.id }))}><FileText size={12} /> Histórico</button>
               </div>
             </Card>
           );
         })}
       </div>
 
-      <Card title="Histórico de movimentações" action={<Button variant="outline" onClick={exportCsv}>Exportar CSV</Button>}>
-        <div className="rebanho-filters">
-          <select value={filters.item} onChange={(e) => setFilters((p) => ({ ...p, item: e.target.value }))}><option value="todos">Item</option>{itens.map((i) => <option key={i.id} value={i.id}>{i.produto}</option>)}</select>
-          <select value={filters.tipo} onChange={(e) => setFilters((p) => ({ ...p, tipo: e.target.value }))}><option value="todos">Tipo</option><option value="entrada">Entrada</option><option value="consumo">Consumo Diário</option><option value="tratamento">Tratamento</option><option value="ajuste">Ajuste</option><option value="perda">Perda</option></select>
-          <select value={filters.lote} onChange={(e) => setFilters((p) => ({ ...p, lote: e.target.value }))}><option value="todos">Lote</option>{(db.lotes || []).map((l) => <option key={l.id} value={l.id}>{l.nome}</option>)}</select>
+      <Card title="Histórico de movimentações" action={<button type="button" className="btn-export" onClick={exportCsv}><FileText size={14} /> Exportar CSV</button>}>
+        <div className="filter-row rebanho-filters">
+          <div className="filter-group"><label>Item</label><select className="filter-select" value={filters.item} onChange={(e) => setFilters((p) => ({ ...p, item: e.target.value }))}><option value="todos">Item</option>{itens.map((i) => <option key={i.id} value={i.id}>{i.produto}</option>)}</select></div>
+          <div className="filter-group"><label>Tipo</label><select className="filter-select" value={filters.tipo} onChange={(e) => setFilters((p) => ({ ...p, tipo: e.target.value }))}><option value="todos">Tipo</option><option value="entrada">Entrada</option><option value="consumo">Consumo Diário</option><option value="tratamento">Tratamento</option><option value="ajuste">Ajuste</option><option value="perda">Perda</option></select></div>
+          <div className="filter-group"><label>Lote</label><select className="filter-select" value={filters.lote} onChange={(e) => setFilters((p) => ({ ...p, lote: e.target.value }))}><option value="todos">Lote</option>{(db.lotes || []).map((l) => <option key={l.id} value={l.id}>{l.nome}</option>)}</select></div>
+          <div className="filter-group"><label>Período</label><select className="filter-select" value={filters.periodo} onChange={(e) => setFilters((p) => ({ ...p, periodo: e.target.value }))}><option value="todos">Todos</option></select></div>
         </div>
-        <div className="alerts-list">
-          {movs.map((m) => {
+        {movs.length > 0 ? (
+          <table className="history-table">
+            <thead><tr><th>Data</th><th>Item</th><th>Tipo</th><th>Quantidade</th><th>Lote</th><th>Valor</th></tr></thead>
+            <tbody>{movs.map((m) => {
             const itemNome = itens.find((i) => i.id === m.item_estoque_id)?.produto;
             const loteNome = (db.lotes || []).find((l) => l.id === m.lote_id)?.nome;
-            return <div key={m.id} className="alert-item"><Badge variant={m.tipo === 'entrada' ? 'info' : 'warning'}>{m.tipo}</Badge><div><strong>{itemNome}</strong><p>{formatDate(m.data)} · {formatNumber(m.quantidade, 2)} · {loteNome || 'Sem lote'} · {formatCurrency(m.valor_total || 0)}</p></div></div>;
-          })}
-        </div>
+            return <tr key={m.id}><td>{formatDate(m.data)}</td><td>{itemNome}</td><td><Badge variant={m.tipo === 'entrada' ? 'info' : 'warning'}>{m.tipo}</Badge></td><td>{formatNumber(m.quantidade, 2)}</td><td>{loteNome || 'Sem lote'}</td><td>{formatCurrency(m.valor_total || 0)}</td></tr>;
+          })}</tbody>
+          </table>
+        ) : (
+          <div className="table-empty"><AlertTriangle className="table-empty-icon" size={20} />Nenhuma movimentação encontrada para os filtros selecionados.</div>
+        )}
       </Card>
 
       {openEntrada && <EntradaModal db={db} setDb={setDb} selectedItem={selectedItem} onClose={() => { setSelectedItem(null); setOpenEntrada(false); }} />}

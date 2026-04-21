@@ -1,71 +1,76 @@
 :root {
-  /* Backgrounds */
-  --color-bg: #0f1a14;
-  --color-surface: #162011;
-  --color-surface-2: #1c2b1a;
-  --color-surface-3: #243322;
+  /* ── BRAND ── */
+  --color-primary: #22C55E;
+  --color-primary-light: #4ADE80;
+  --color-primary-dark: #16A34A;
+  --color-primary-subtle: rgba(34, 197, 94, 0.12);
+  --color-primary-glow: rgba(34, 197, 94, 0.25);
 
-  /* Bordas */
-  --color-border: #2a3d28;
-  --color-border-subtle: #1f2e1d;
+  /* ── BACKGROUNDS ── */
+  --color-bg: #0A0A0A;
+  --color-surface: #111111;
+  --color-surface-2: #1A1A1A;
+  --color-surface-3: #222222;
+  --color-surface-hover: #1F1F1F;
 
-  /* Textos */
-  --color-text: #e8f0e6;
-  --color-text-secondary: #9db89a;
-  --color-text-muted: #5c7a58;
+  /* ── BORDAS ── */
+  --color-border: #2A2A2A;
+  --color-border-subtle: #1F1F1F;
+  --color-border-focus: #22C55E;
 
-  /* Primárias */
-  --color-primary: #4ade80;
-  --color-primary-light: #22c55e;
-  --color-primary-dark: #16a34a;
-  --color-primary-lighter: #4ade80;
-  --color-primary-subtle: #14532d;
+  /* ── TEXTOS ── */
+  --color-text: #F0F0F0;
+  --color-text-secondary: #A0A0A0;
+  --color-text-muted: #555555;
 
-  /* Semânticas */
-  --color-success: #4ade80;
-  --color-success-bg: #14532d;
-  --color-warning: #fcd34d;
-  --color-warning-bg: #451a03;
-  --color-danger: #f87171;
-  --color-danger-bg: #450a0a;
-  --color-info: #60a5fa;
-  --color-info-bg: #1e3a5f;
+  /* ── SEMÂNTICAS ── */
+  --color-success: #22C55E;
+  --color-success-bg: rgba(34, 197, 94, 0.1);
+  --color-warning: #F59E0B;
+  --color-warning-bg: rgba(245, 158, 11, 0.1);
+  --color-danger: #EF4444;
+  --color-danger-bg: rgba(239, 68, 68, 0.1);
+  --color-info: #3B82F6;
+  --color-info-bg: rgba(59, 130, 246, 0.1);
 
-  /* Inputs */
-  --input-bg: #1c2b1a;
-  --input-border: #2a3d28;
-  --input-focus-border: #4ade80;
-  --input-text: #e8f0e6;
-  --input-placeholder: #5c7a58;
+  /* ── INPUTS ── */
+  --input-bg: #1A1A1A;
+  --input-border: #2A2A2A;
+  --input-focus-border: #22C55E;
+  --input-text: #F0F0F0;
+  --input-placeholder: #555555;
 
-  /* Sidebar */
-  --sidebar-bg: #0a1208;
-  --sidebar-border: #1c2b1a;
-  --sidebar-item-hover: #1c2b1a;
-  --sidebar-item-active-bg: #14532d;
-  --sidebar-item-active-text: #4ade80;
+  /* ── SIDEBAR ── */
+  --sidebar-bg: #0D0D0D;
+  --sidebar-width: 260px;
+  --sidebar-border: #1A1A1A;
+  --sidebar-item-hover: #1A1A1A;
+  --sidebar-item-active-bg: rgba(34, 197, 94, 0.12);
+  --sidebar-item-active-text: #22C55E;
+  --sidebar-item-active-border: #22C55E;
 
-  /* Header */
-  --header-bg: #0f1a14;
-  --header-border: #1c2b1a;
+  /* ── HEADER ── */
+  --header-bg: #0D0D0D;
+  --header-border: #1A1A1A;
+  --header-height: 64px;
 
-  /* Modal */
-  --modal-bg: #162011;
-  --modal-overlay: rgba(0, 0, 0, 0.75);
+  /* ── MODAL ── */
+  --modal-bg: #111111;
+  --modal-overlay: rgba(0, 0, 0, 0.85);
 
-  /* Cards */
-  --card-bg: #162011;
-  --card-border: #2a3d28;
-  --card-hover-bg: #1c2b1a;
+  /* ── CARDS ── */
+  --card-bg: #111111;
+  --card-border: #1E1E1E;
+  --card-hover-border: #2A2A2A;
 
-  /* Tabela */
-  --table-header-bg: #1c2b1a;
-  --table-row-hover: #1c2b1a;
-  --table-row-alt: #131e11;
-  --table-border: #2a3d28;
+  /* ── TABELA ── */
+  --table-header-bg: #0D0D0D;
+  --table-row-hover: #161616;
+  --table-row-alt: #0F0F0F;
+  --table-border: #1E1E1E;
 
-  /* Tipografia */
-  --font-sans: 'Inter', system-ui, sans-serif;
+  /* ── TIPOGRAFIA ── */
+  --font-sans: 'Inter', system-ui, -apple-system, sans-serif;
   --text-xs: 0.75rem;
   --text-sm: 0.875rem;
   --text-base: 1rem;
@@ -74,26 +79,45 @@
   --text-2xl: 1.5rem;
   --text-3xl: 1.875rem;
 
-  /* Espaçamentos */
-  --space-1: 4px;
-  --space-2: 8px;
-  --space-3: 12px;
-  --space-4: 16px;
-  --space-5: 20px;
-  --space-6: 24px;
-  --space-8: 32px;
-  --space-10: 40px;
+  /* ── ESPAÇAMENTOS ── */
+  --space-1: 4px;   --space-2: 8px;
+  --space-3: 12px;  --space-4: 16px;
+  --space-5: 20px;  --space-6: 24px;
+  --space-8: 32px;  --space-10: 40px;
   --space-12: 48px;
 
-  /* Bordas */
+  /* ── BORDAS ARREDONDADAS ── */
   --radius-sm: 6px;
   --radius-md: 10px;
-  --radius-lg: 16px;
-  --radius-xl: 24px;
+  --radius-lg: 14px;
+  --radius-xl: 20px;
   --radius-full: 9999px;
 
-  /* Sombras */
-  --shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.4);
-  --shadow-md: 0 4px 12px rgba(0, 0, 0, 0.5);
-  --shadow-lg: 0 8px 24px rgba(0, 0, 0, 0.6);
+  /* ── SOMBRAS ── */
+  --shadow-sm: 0 1px 3px rgba(0,0,0,0.5);
+  --shadow-md: 0 4px 16px rgba(0,0,0,0.6);
+  --shadow-lg: 0 8px 32px rgba(0,0,0,0.7);
+  --shadow-glow: 0 0 20px rgba(34, 197, 94, 0.15);
+}
+
+body, html {
+  background-color: var(--color-bg);
+  color: var(--color-text);
+  font-family: var(--font-sans);
+  -webkit-font-smoothing: antialiased;
+}
+
+/* Scrollbar */
+::-webkit-scrollbar { width: 4px; height: 4px; }
+::-webkit-scrollbar-track { background: var(--color-bg); }
+::-webkit-scrollbar-thumb {
+  background: #2A2A2A;
+  border-radius: 2px;
+}
+::-webkit-scrollbar-thumb:hover { background: #3A3A3A; }
+
+/* Seleção de texto */
+::selection {
+  background: var(--color-primary-subtle);
+  color: var(--color-primary-light);
 }
