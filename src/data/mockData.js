@@ -444,7 +444,7 @@ export const initialDb = {
 
   configuracoes: {
     geral: {
-      nome_sistema: 'AgroTrack Santa Rita',
+      nome_sistema: 'HERDON Santa Rita',
       moeda: 'BRL',
       formato_data: 'DD/MM/AAAA',
       unidade_peso: 'kg',
@@ -461,9 +461,9 @@ export const initialDb = {
   },
 
   usuarios: [
-    { id: 1, nome: 'João Proprietário', email: 'proprietario@agrotrack.com', perfil: 'proprietario', status: 'ativo' },
-    { id: 2, nome: 'Paulo Gerente', email: 'gerente@agrotrack.com', perfil: 'gerente', status: 'ativo' },
-    { id: 3, nome: 'Ana Operadora', email: 'operador@agrotrack.com', perfil: 'operador', status: 'inativo' },
+    { id: 1, nome: 'João Proprietário', email: 'proprietario@herdon.app', perfil: 'proprietario', status: 'ativo' },
+    { id: 2, nome: 'Paulo Gerente', email: 'gerente@herdon.app', perfil: 'gerente', status: 'ativo' },
+    { id: 3, nome: 'Ana Operadora', email: 'operador@herdon.app', perfil: 'operador', status: 'inativo' },
   ],
 
 

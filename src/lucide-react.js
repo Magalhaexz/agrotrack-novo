@@ -72,3 +72,5 @@ export const ArrowUpCircle = icon([createElement('circle',{cx:12,cy:12,r:9}),cre
 export const ArrowDownCircle = icon([createElement('circle',{cx:12,cy:12,r:9}),createElement('path',{d:'M12 8v8'}),createElement('path',{d:'m8 12 4 4 4-4'})]);
 export const FileText = icon([createElement('path',{d:'M14 3H6a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9z'}),createElement('path',{d:'M14 3v6h6'}),createElement('path',{d:'M8 13h8M8 17h8'})]);
 export const MapPin = icon([createElement('path',{d:'M12 21s7-6.2 7-11a7 7 0 1 0-14 0c0 4.8 7 11 7 11z'}),createElement('circle',{cx:12,cy:10,r:2.5})]);
+export const Eye = icon([createElement('path',{d:'M2 12s3.5-6 10-6 10 6 10 6-3.5 6-10 6-10-6-10-6Z'}),createElement('circle',{cx:12,cy:12,r:2.5})]);
+export const EyeOff = icon([createElement('path',{d:'M3 3l18 18'}),createElement('path',{d:'M10.6 10.6A2.5 2.5 0 0 0 12 14.5'}),createElement('path',{d:'M9.9 5.2A11 11 0 0 1 12 5c6.5 0 10 7 10 7a16 16 0 0 1-3 4.1'}),createElement('path',{d:'M6.2 6.2A16.1 16.1 0 0 0 2 12s3.5 7 10 7c1.1 0 2.1-.2 3.1-.5'})]);

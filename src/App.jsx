@@ -102,7 +102,7 @@ export default function App() {
       : [],
     configuracoes: initialDb?.configuracoes || {
       geral: {
-        nome_sistema: 'AgroTrack',
+        nome_sistema: 'HERDON',
         moeda: 'BRL',
         formato_data: 'DD/MM/AAAA',
         unidade_peso: 'kg',
