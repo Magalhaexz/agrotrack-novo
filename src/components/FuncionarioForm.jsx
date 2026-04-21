@@ -1,4 +1,8 @@
+<<<<<<< HEAD
 import { useEffect, useMemo, useState } from 'react';
+=======
+import { useMemo, useState } from 'react';
+>>>>>>> f7f6d2991c81e0a38b5e190db55c7ad82834360d
 import Modal from './ui/Modal';
 import Button from './ui/Button';
 import Input from './ui/Input';
@@ -13,7 +17,11 @@ const CARGOS = [
   'Outro',
 ];
 
+<<<<<<< HEAD
 const FORM_VAZIO = {
+=======
+const vazio = {
+>>>>>>> f7f6d2991c81e0a38b5e190db55c7ad82834360d
   nome: '',
   cpf: '',
   telefone: '',
@@ -40,6 +48,10 @@ function mascararTelefone(valor) {
       .replace(/(\d{2})(\d)/, '($1) $2')
       .replace(/(\d{4})(\d)/, '$1-$2');
   }
+<<<<<<< HEAD
+=======
+
+>>>>>>> f7f6d2991c81e0a38b5e190db55c7ad82834360d
   return nums
     .replace(/(\d{2})(\d)/, '($1) $2')
     .replace(/(\d{5})(\d)/, '$1-$2');
@@ -59,6 +71,7 @@ function validarCpf(cpf) {
   return calc(9) === Number(digits[9]) && calc(10) === Number(digits[10]);
 }
 
+<<<<<<< HEAD
 // Função para normalizar os dados iniciais
 function normalizarInitialData(data, fazendas) {
   if (!data) {
@@ -77,6 +90,8 @@ function normalizarInitialData(data, fazendas) {
   };
 }
 
+=======
+>>>>>>> f7f6d2991c81e0a38b5e190db55c7ad82834360d
 export default function FuncionarioForm({
   open,
   initialData,
@@ -85,6 +100,7 @@ export default function FuncionarioForm({
   onCancel,
 }) {
   const [erro, setErro] = useState('');
+<<<<<<< HEAD
   const [form, setForm] = useState(() => normalizarInitialData(initialData, fazendas));
 
   // Sincroniza o estado do formulário com initialData e fazendas
@@ -92,6 +108,26 @@ export default function FuncionarioForm({
     setForm(normalizarInitialData(initialData, fazendas));
     setErro(''); // Limpa erros ao carregar novos dados
   }, [initialData, fazendas]);
+=======
+
+  const [form, setForm] = useState(() => {
+    if (!initialData) {
+      return { ...vazio, fazenda_id: fazendas?.[0]?.id ? String(fazendas[0].id) : '' };
+    }
+
+    return {
+      nome: initialData.nome || '',
+      cpf: mascararCpf(initialData.cpf || ''),
+      telefone: mascararTelefone(initialData.telefone || ''),
+      cargo: initialData.cargo || 'Vaqueiro',
+      salario: initialData.salario ?? '',
+      data_admissao: initialData.data_admissao || '',
+      status: initialData.status || 'ativo',
+      fazenda_id: initialData.fazenda_id ? String(initialData.fazenda_id) : '',
+      observacoes: initialData.observacoes || '',
+    };
+  });
+>>>>>>> f7f6d2991c81e0a38b5e190db55c7ad82834360d
 
   const titulo = useMemo(
     () => (initialData ? 'Editar funcionário' : 'Cadastrar funcionário'),
@@ -135,8 +171,13 @@ export default function FuncionarioForm({
     setErro('');
     onSave?.({
       nome: form.nome.trim(),
+<<<<<<< HEAD
       cpf: form.cpf.replace(/\D/g, ''), // Salva CPF sem máscara
       telefone: form.telefone.replace(/\D/g, ''), // Salva telefone sem máscara
+=======
+      cpf: form.cpf,
+      telefone: form.telefone,
+>>>>>>> f7f6d2991c81e0a38b5e190db55c7ad82834360d
       cargo: form.cargo,
       salario: form.salario === '' ? null : Number(form.salario),
       data_admissao: form.data_admissao || null,
@@ -197,8 +238,16 @@ export default function FuncionarioForm({
           <textarea className="ui-input" name="observacoes" rows={3} value={form.observacoes} onChange={handleChange} />
         </div>
 
+<<<<<<< HEAD
         {erro && <p style={{ color: 'var(--color-danger)', margin: 0 }}>{erro}</p>}
       </form>
     </Modal>
   );
 }
+=======
+        {erro ? <p style={{ color: 'var(--color-danger)', margin: 0 }}>{erro}</p> : null}
+      </form>
+    </Modal>
+  );
+}
+>>>>>>> f7f6d2991c81e0a38b5e190db55c7ad82834360d

@@ -2,17 +2,23 @@ import { useMemo, useState } from 'react';
 import PesagemForm from '../components/PesagemForm';
 import { formatarNumero, formatarData } from '../utils/formatters';
 import { gerarNovoId } from '../utils/id';
+<<<<<<< HEAD
 import { useToast } from '../hooks/useToast'; // Assuming useToast is available
 
 export default function PesagensPage({ db, setDb, onConfirmAction }) {
   const { showToast } = useToast(); // Initialize toast hook
 
+=======
+
+export default function PesagensPage({ db, setDb, onConfirmAction }) {
+>>>>>>> f7f6d2991c81e0a38b5e190db55c7ad82834360d
   const [abrirForm, setAbrirForm] = useState(false);
   const [pesagemEditando, setPesagemEditando] = useState(null);
 
   const lotes = db?.lotes || [];
   const pesagens = db?.pesagens || [];
 
+<<<<<<< HEAD
   // Optimize lotes lookup
   const lotesMap = useMemo(() => {
     const map = new Map();
@@ -79,6 +85,51 @@ export default function PesagensPage({ db, setDb, onConfirmAction }) {
     return {
       totalPesagens,
       lotesComPesagem: lotesComPesagem.size,
+=======
+  const dadosTabela = useMemo(() => {
+    const ordenadas = [...pesagens].sort((a, b) => {
+      if (a.lote_id !== b.lote_id) return a.lote_id - b.lote_id;
+      return new Date(a.data) - new Date(b.data);
+    });
+
+    return ordenadas.map((pesagem, index) => {
+      const lote = lotes.find((l) => l.id === pesagem.lote_id);
+
+      let variacao = null;
+      for (let i = index - 1; i >= 0; i -= 1) {
+        if (ordenadas[i].lote_id === pesagem.lote_id) {
+          variacao = Number(pesagem.peso_medio) - Number(ordenadas[i].peso_medio);
+          break;
+        }
+      }
+
+      return {
+        ...pesagem,
+        loteNome: lote?.nome || '—',
+        variacao,
+      };
+    }).sort((a, b) => new Date(b.data) - new Date(a.data));
+  }, [pesagens, lotes]);
+
+  const resumo = useMemo(() => {
+    const totalPesagens = pesagens.length;
+    const lotesComPesagem = new Set(pesagens.map((p) => p.lote_id)).size;
+
+    const ultimaData = pesagens.length
+      ? [...pesagens]
+          .sort((a, b) => new Date(b.data) - new Date(a.data))[0]
+          .data
+      : '';
+
+    const pesoMedioGeral = pesagens.length
+      ? pesagens.reduce((acc, item) => acc + Number(item.peso_medio || 0), 0) /
+        pesagens.length
+      : 0;
+
+    return {
+      totalPesagens,
+      lotesComPesagem,
+>>>>>>> f7f6d2991c81e0a38b5e190db55c7ad82834360d
       ultimaData,
       pesoMedioGeral,
     };
@@ -108,6 +159,7 @@ export default function PesagensPage({ db, setDb, onConfirmAction }) {
       ...prev,
       pesagens: prev.pesagens.filter((p) => p.id !== id),
     }));
+<<<<<<< HEAD
     showToast({ type: 'success', message: 'Pesagem excluída com sucesso!' });
   }
 
@@ -124,6 +176,10 @@ export default function PesagensPage({ db, setDb, onConfirmAction }) {
     );
   };
 
+=======
+  }
+
+>>>>>>> f7f6d2991c81e0a38b5e190db55c7ad82834360d
   function salvarPesagem(dados) {
     if (pesagemEditando) {
       setDb((prev) => ({
@@ -131,16 +187,31 @@ export default function PesagensPage({ db, setDb, onConfirmAction }) {
         pesagens: prev.pesagens.map((p) =>
           p.id === pesagemEditando.id ? { ...p, ...dados } : p
         ),
+<<<<<<< HEAD
         lotes: updateLotWeightAndDate(prev.lotes, dados.lote_id, dados.peso_medio, dados.data),
       }));
       showToast({ type: 'success', message: 'Pesagem atualizada com sucesso!' });
     } else {
       const novoId = gerarNovoId(pesagens);
+=======
+        lotes: (prev.lotes || []).map((lote) =>
+          Number(lote.id) === Number(dados.lote_id)
+            ? {
+                ...lote,
+                p_at: Number(dados.peso_medio || 0),
+                ultima_pesagem: dados.data || lote.ultima_pesagem || null,
+              }
+            : lote
+        ),
+      }));
+    } else {
+>>>>>>> f7f6d2991c81e0a38b5e190db55c7ad82834360d
       setDb((prev) => ({
         ...prev,
         pesagens: [
           ...prev.pesagens,
           {
+<<<<<<< HEAD
             id: novoId,
             ...dados,
           },
@@ -148,6 +219,22 @@ export default function PesagensPage({ db, setDb, onConfirmAction }) {
         lotes: updateLotWeightAndDate(prev.lotes, dados.lote_id, dados.peso_medio, dados.data),
       }));
       showToast({ type: 'success', message: 'Pesagem registrada com sucesso!' });
+=======
+            id: gerarNovoId(prev.pesagens),
+            ...dados,
+          },
+        ],
+        lotes: (prev.lotes || []).map((lote) =>
+          Number(lote.id) === Number(dados.lote_id)
+            ? {
+                ...lote,
+                p_at: Number(dados.peso_medio || 0),
+                ultima_pesagem: dados.data || lote.ultima_pesagem || null,
+              }
+            : lote
+        ),
+      }));
+>>>>>>> f7f6d2991c81e0a38b5e190db55c7ad82834360d
     }
 
     setAbrirForm(false);
@@ -263,6 +350,12 @@ export default function PesagensPage({ db, setDb, onConfirmAction }) {
   );
 }
 
+<<<<<<< HEAD
+=======
+
+
+
+>>>>>>> f7f6d2991c81e0a38b5e190db55c7ad82834360d
 function renderVariacao(variacao) {
   if (variacao === null || variacao === undefined) return '—';
 
@@ -275,4 +368,8 @@ function renderVariacao(variacao) {
   }
 
   return <span className="badge badge-a">0,00 kg</span>;
+<<<<<<< HEAD
 }
+=======
+}
+>>>>>>> f7f6d2991c81e0a38b5e190db55c7ad82834360d

@@ -1,16 +1,20 @@
 import { gerarNovoId } from '../utils/id';
 import { TIPOS_SAIDA_ANIMAL } from '../utils/constantes';
 import { registrarAuditoria } from './auditoria';
+<<<<<<< HEAD
 
 /**
  * Converte um valor para número, tratando nulos/indefinidos como 0.
  * @param {*} value - O valor a ser convertido.
  * @returns {number} O valor numérico.
  */
+=======
+>>>>>>> f7f6d2991c81e0a38b5e190db55c7ad82834360d
 function toNumber(value) {
   return Number(value || 0);
 }
 
+<<<<<<< HEAD
 /**
  * Obtém o resumo de quantidade e peso médio atual de um lote.
  * @param {object} db - O objeto do banco de dados.
@@ -24,6 +28,12 @@ function obterResumoLote(db, loteId) {
   const animais = Array.isArray(db?.animais) ? db.animais : [];
   const registrosLote = animais.filter((item) => Number(item.lote_id) === Number(loteId));
 
+=======
+
+function obterResumoLote(db, loteId) {
+  const animais = Array.isArray(db?.animais) ? db.animais : [];
+  const registrosLote = animais.filter((item) => Number(item.lote_id) === Number(loteId));
+>>>>>>> f7f6d2991c81e0a38b5e190db55c7ad82834360d
   const qtdAtual = registrosLote.reduce((acc, item) => acc + toNumber(item.qtd), 0);
   const pesoMedioAtual = qtdAtual
     ? registrosLote.reduce(
@@ -35,6 +45,7 @@ function obterResumoLote(db, loteId) {
   return { qtdAtual, pesoMedioAtual };
 }
 
+<<<<<<< HEAD
 /**
  * Atualiza um objeto de lote com nova quantidade e peso médio.
  * @param {object} lote - O objeto do lote original.
@@ -42,6 +53,8 @@ function obterResumoLote(db, loteId) {
  * @param {number} pesoMedioAtual - O novo peso médio dos animais.
  * @returns {object} Um novo objeto de lote atualizado.
  */
+=======
+>>>>>>> f7f6d2991c81e0a38b5e190db55c7ad82834360d
 function atualizarLoteComResumo(lote, qtdAtual, pesoMedioAtual) {
   return {
     ...lote,
@@ -50,6 +63,7 @@ function atualizarLoteComResumo(lote, qtdAtual, pesoMedioAtual) {
   };
 }
 
+<<<<<<< HEAD
 /**
  * Registra a entrada de animais em um lote.
  *
@@ -58,6 +72,8 @@ function atualizarLoteComResumo(lote, qtdAtual, pesoMedioAtual) {
  * @param {object} [userContext={}] - Contexto do usuário para auditoria.
  * @returns {object} Um novo objeto de banco de dados com a entrada registrada.
  */
+=======
+>>>>>>> f7f6d2991c81e0a38b5e190db55c7ad82834360d
 export function registrarEntradaAnimal(
   db,
   { loteId, qtd, pesoMedio, valorTotal, data, fornecedor, obs },
@@ -65,19 +81,27 @@ export function registrarEntradaAnimal(
 ) {
   const lotes = Array.isArray(db?.lotes) ? db.lotes : [];
   const loteExiste = lotes.some((item) => Number(item.id) === Number(loteId));
+<<<<<<< HEAD
   if (!loteExiste) {
     console.warn(`Lote com ID ${loteId} não encontrado para entrada de animais.`);
     return db; // Retorna o DB original se o lote não existe
   }
+=======
+  if (!loteExiste) return db;
+>>>>>>> f7f6d2991c81e0a38b5e190db55c7ad82834360d
 
   const quantidade = toNumber(qtd);
   const peso = toNumber(pesoMedio);
   const valor = toNumber(valorTotal);
+<<<<<<< HEAD
 
   if (quantidade <= 0 || peso <= 0 || valor < 0) {
     console.warn('Dados de entrada de animais inválidos (quantidade, peso ou valor).');
     return db; // Retorna o DB original se os dados são inválidos
   }
+=======
+  if (quantidade <= 0 || peso <= 0 || valor < 0) return db;
+>>>>>>> f7f6d2991c81e0a38b5e190db55c7ad82834360d
 
   const movimentosAnimais = Array.isArray(db?.movimentacoes_animais)
     ? db.movimentacoes_animais
@@ -86,7 +110,10 @@ export function registrarEntradaAnimal(
     ? db.movimentacoes_financeiras
     : [];
 
+<<<<<<< HEAD
   // Obtém o resumo atual do lote para calcular o novo peso médio ponderado
+=======
+>>>>>>> f7f6d2991c81e0a38b5e190db55c7ad82834360d
   const { qtdAtual, pesoMedioAtual } = obterResumoLote(db, loteId);
   const novaQtd = qtdAtual + quantidade;
   const novoPesoMedio = novaQtd
@@ -103,7 +130,11 @@ export function registrarEntradaAnimal(
       {
         id: novoMovAnimalId,
         lote_id: Number(loteId),
+<<<<<<< HEAD
         tipo: 'compra', // Tipo de movimentação de animal
+=======
+        tipo: 'compra',
+>>>>>>> f7f6d2991c81e0a38b5e190db55c7ad82834360d
         qtd: quantidade,
         peso_medio: peso,
         valor_total: valor,
@@ -127,7 +158,11 @@ export function registrarEntradaAnimal(
         lote_id: Number(loteId),
         valor,
         data,
+<<<<<<< HEAD
         descricao: `Compra de ${quantidade} animal(is) para o lote ${loteId}`,
+=======
+        descricao: `Compra de ${quantidade} animal(is)`,
+>>>>>>> f7f6d2991c81e0a38b5e190db55c7ad82834360d
         origem_tipo: 'movimentacao_animal',
         origem_id: novoMovAnimalId,
       },
@@ -141,6 +176,7 @@ export function registrarEntradaAnimal(
     descricao: `Entrada de ${quantidade} animal(is) no lote ${Number(loteId)}`,
     ator_id: userContext?.id || null,
     ator_email: userContext?.email || '',
+<<<<<<< HEAD
     criticidade: 'media',
   });
 }
@@ -163,17 +199,39 @@ export function registrarSaidaAnimal(
   const lote = lotes.find((item) => Number(item.id) === Number(loteId));
   if (!lote) {
     console.warn(`Lote com ID ${loteId} não encontrado para saída de animais.`);
+=======
+    criticidade: 'alta',
+  });
+}
+
+export function registrarSaidaAnimal(
+  db,
+  { loteId, qtd, pesoMedio, valorTotal, data, comprador, tipo, obs },
+  userContext = {}
+) {
+  const tiposValidos = Object.keys(TIPOS_SAIDA_ANIMAL);
+  if (!tiposValidos.includes(tipo)) return db;
+
+  const lotes = Array.isArray(db?.lotes) ? db.lotes : [];
+  const lote = lotes.find((item) => Number(item.id) === Number(loteId));
+  if (!lote) return db;
+  if (['encerrado', 'vendido'].includes(String(lote.status || '').toLowerCase())) {
+>>>>>>> f7f6d2991c81e0a38b5e190db55c7ad82834360d
     return db;
   }
 
   const quantidade = toNumber(qtd);
   const peso = toNumber(pesoMedio);
   const valor = toNumber(valorTotal);
+<<<<<<< HEAD
 
   if (quantidade <= 0 || peso <= 0) {
     console.warn('Dados de saída de animais inválidos (quantidade ou peso).');
     return db;
   }
+=======
+  if (quantidade <= 0 || peso <= 0 || valor < 0) return db;
+>>>>>>> f7f6d2991c81e0a38b5e190db55c7ad82834360d
 
   const movimentosAnimais = Array.isArray(db?.movimentacoes_animais)
     ? db.movimentacoes_animais
@@ -183,6 +241,7 @@ export function registrarSaidaAnimal(
     : [];
 
   const { qtdAtual, pesoMedioAtual } = obterResumoLote(db, loteId);
+<<<<<<< HEAD
   if (quantidade > qtdAtual) {
     throw new Error(
       `Quantidade de saída (${quantidade}) excede a quantidade atual no lote (${qtdAtual}).`
@@ -194,10 +253,38 @@ export function registrarSaidaAnimal(
   const novoPesoMedio = novaQtd
     ? (qtdAtual * pesoMedioAtual - quantidade * peso) / novaQtd
     : 0;
+=======
+  if (qtdAtual < quantidade) return db;
+
+  const novaQtd = qtdAtual - quantidade;
+  const novoPesoMedio =
+    novaQtd > 0 ? ((qtdAtual * pesoMedioAtual) - (quantidade * peso)) / novaQtd : 0;
+>>>>>>> f7f6d2991c81e0a38b5e190db55c7ad82834360d
 
   const novoMovAnimalId = gerarNovoId(movimentosAnimais);
   const novoMovFinanceiroId = gerarNovoId(movimentosFinanceiros);
 
+<<<<<<< HEAD
+=======
+  const movimentacoesFinanceirasAtualizadas =
+    tipo === 'venda'
+      ? [
+          ...movimentosFinanceiros,
+          {
+            id: novoMovFinanceiroId,
+            tipo: 'receita',
+            categoria: 'venda_animal',
+            lote_id: Number(loteId),
+            valor,
+            data,
+            descricao: `Venda de ${quantidade} animal(is)`,
+            origem_tipo: 'movimentacao_animal',
+            origem_id: novoMovAnimalId,
+          },
+        ]
+      : movimentosFinanceiros;
+
+>>>>>>> f7f6d2991c81e0a38b5e190db55c7ad82834360d
   const baseAtualizada = {
     ...db,
     movimentacoes_animais: [
@@ -205,17 +292,25 @@ export function registrarSaidaAnimal(
       {
         id: novoMovAnimalId,
         lote_id: Number(loteId),
+<<<<<<< HEAD
         tipo: tipoSaida,
         qtd: quantidade,
         peso_medio: peso,
         valor_total: valor,
         // Para saída, custo_por_cabeca pode ser o preço de venda ou o custo de abate/descarte
+=======
+        tipo,
+        qtd: quantidade,
+        peso_medio: peso,
+        valor_total: valor,
+>>>>>>> f7f6d2991c81e0a38b5e190db55c7ad82834360d
         custo_por_cabeca: quantidade > 0 ? valor / quantidade : 0,
         data,
         comprador_fornecedor: comprador || '',
         obs: obs || '',
       },
     ],
+<<<<<<< HEAD
     lotes: lotes.map((l) =>
       Number(l.id) === Number(loteId)
         ? atualizarLoteComResumo(l, novaQtd, novoPesoMedio)
@@ -240,12 +335,32 @@ export function registrarSaidaAnimal(
           ]
         : []),
     ],
+=======
+    lotes: lotes.map((item) => {
+      if (Number(item.id) !== Number(loteId)) return item;
+
+      const loteAtualizado = atualizarLoteComResumo(item, novaQtd, novoPesoMedio);
+      if (novaQtd > 0) return loteAtualizado;
+
+      return {
+        ...loteAtualizado,
+        status: tipo === 'venda' ? 'vendido' : 'encerrado',
+        data_encerramento: data || loteAtualizado.data_encerramento || null,
+        data_venda:
+          tipo === 'venda'
+            ? (data || loteAtualizado.data_venda || null)
+            : loteAtualizado.data_venda || null,
+      };
+    }),
+    movimentacoes_financeiras: movimentacoesFinanceirasAtualizadas,
+>>>>>>> f7f6d2991c81e0a38b5e190db55c7ad82834360d
   };
 
   return registrarAuditoria(baseAtualizada, {
     acao: 'saida_animal',
     entidade: 'movimentacoes_animais',
     entidade_id: novoMovAnimalId,
+<<<<<<< HEAD
     descricao: `Saída (${tipoSaida}) de ${quantidade} animal(is) do lote ${Number(loteId)}`,
     ator_id: userContext?.id || null,
     ator_email: userContext?.email || '',
@@ -268,10 +383,23 @@ export function registrarSaidaAnimal(
 export function registrarEntradaEstoque(
   db,
   { itemId, qtd, custo, data, fornecedor, obs },
+=======
+    descricao: `Saída (${tipo}) de ${quantidade} animal(is) do lote ${Number(loteId)}`,
+    ator_id: userContext?.id || null,
+    ator_email: userContext?.email || '',
+    criticidade: tipo === 'venda' ? 'alta' : 'media',
+  });
+}
+
+export function registrarEntradaEstoque(
+  db,
+  { itemId, quantidade, custoUnit, data, fornecedor, obs },
+>>>>>>> f7f6d2991c81e0a38b5e190db55c7ad82834360d
   userContext = {}
 ) {
   const estoque = Array.isArray(db?.estoque) ? db.estoque : [];
   const item = estoque.find((entry) => Number(entry.id) === Number(itemId));
+<<<<<<< HEAD
   if (!item) {
     console.warn(`Item de estoque com ID ${itemId} não encontrado para entrada.`);
     return db;
@@ -284,6 +412,15 @@ export function registrarEntradaEstoque(
     console.warn('Dados de entrada de estoque inválidos (quantidade ou custo).');
     return db;
   }
+=======
+  if (!item) return db;
+
+  const qtd = toNumber(quantidade);
+  const custo = toNumber(custoUnit);
+  if (qtd <= 0 || custo <= 0) return db;
+
+  const valorTotal = qtd * custo;
+>>>>>>> f7f6d2991c81e0a38b5e190db55c7ad82834360d
 
   const movimentosEstoque = Array.isArray(db?.movimentacoes_estoque)
     ? db.movimentacoes_estoque
@@ -294,7 +431,10 @@ export function registrarEntradaEstoque(
 
   const novoMovEstoqueId = gerarNovoId(movimentosEstoque);
   const novoMovFinanceiroId = gerarNovoId(movimentosFinanceiros);
+<<<<<<< HEAD
   const valorTotal = quantidade * custoUnitario;
+=======
+>>>>>>> f7f6d2991c81e0a38b5e190db55c7ad82834360d
 
   const baseAtualizada = {
     ...db,
@@ -303,10 +443,17 @@ export function registrarEntradaEstoque(
       {
         id: novoMovEstoqueId,
         item_estoque_id: Number(itemId),
+<<<<<<< HEAD
         lote_id: null, // Entrada de estoque geralmente não tem lote associado diretamente
         tipo: 'entrada',
         quantidade: quantidade,
         custo_unit: custoUnitario,
+=======
+        lote_id: '',
+        tipo: 'entrada',
+        quantidade: qtd,
+        custo_unit: custo,
+>>>>>>> f7f6d2991c81e0a38b5e190db55c7ad82834360d
         valor_total: valorTotal,
         data,
         obs: [fornecedor ? `Fornecedor: ${fornecedor}` : '', obs || '']
@@ -318,10 +465,15 @@ export function registrarEntradaEstoque(
       Number(entry.id) === Number(itemId)
         ? {
             ...entry,
+<<<<<<< HEAD
             quantidade_atual: toNumber(entry.quantidade_atual) + quantidade,
             // Atualiza o valor unitário com o custo da última entrada.
             // Para um sistema mais robusto, considerar custo médio ponderado.
             valor_unitario: custoUnitario,
+=======
+            quantidade_atual: toNumber(entry.quantidade_atual) + qtd,
+            valor_unitario: custo,
+>>>>>>> f7f6d2991c81e0a38b5e190db55c7ad82834360d
           }
         : entry
     ),
@@ -331,10 +483,17 @@ export function registrarEntradaEstoque(
         id: novoMovFinanceiroId,
         tipo: 'despesa',
         categoria: 'compra_estoque',
+<<<<<<< HEAD
         lote_id: null, // Entrada de estoque geralmente não tem lote associado diretamente
         valor: valorTotal,
         data,
         descricao: `Entrada de estoque: ${item.produto || 'Item'} (${quantidade})`,
+=======
+        lote_id: '',
+        valor: valorTotal,
+        data,
+        descricao: `Entrada de estoque: ${item.produto || 'Item'}`,
+>>>>>>> f7f6d2991c81e0a38b5e190db55c7ad82834360d
         origem_tipo: 'movimentacao_estoque',
         origem_id: novoMovEstoqueId,
       },
@@ -345,13 +504,18 @@ export function registrarEntradaEstoque(
     acao: 'entrada_estoque',
     entidade: 'movimentacoes_estoque',
     entidade_id: novoMovEstoqueId,
+<<<<<<< HEAD
     descricao: `Entrada de estoque do item ${item.produto || 'Item'} (${quantidade})`,
+=======
+    descricao: `Entrada de estoque do item ${item.produto || 'Item'} (${qtd})`,
+>>>>>>> f7f6d2991c81e0a38b5e190db55c7ad82834360d
     ator_id: userContext?.id || null,
     ator_email: userContext?.email || '',
     criticidade: 'media',
   });
 }
 
+<<<<<<< HEAD
 /**
  * Registra a saída de itens do estoque.
  *
@@ -361,11 +525,14 @@ export function registrarEntradaEstoque(
  * @returns {object} Um novo objeto de banco de dados com a saída registrada.
  * @throws {Error} Se a quantidade de saída excede o saldo disponível.
  */
+=======
+>>>>>>> f7f6d2991c81e0a38b5e190db55c7ad82834360d
 export function registrarSaidaEstoque(
   db,
   { itemId, loteId, quantidade, tipo = 'consumo', data, obs },
   userContext = {}
 ) {
+<<<<<<< HEAD
   const tiposValidos = ['consumo', 'ajuste', 'perda', 'venda']; // Adicionado 'venda' como tipo válido
   if (!tiposValidos.includes(tipo)) {
     console.warn(`Tipo de saída de estoque inválido: ${tipo}.`);
@@ -384,6 +551,17 @@ export function registrarSaidaEstoque(
     console.warn('Quantidade de saída de estoque inválida (deve ser maior que zero).');
     return db;
   }
+=======
+  const tiposValidos = ['consumo', 'ajuste', 'perda'];
+  if (!tiposValidos.includes(tipo)) return db;
+
+  const estoque = Array.isArray(db?.estoque) ? db.estoque : [];
+  const item = estoque.find((entry) => Number(entry.id) === Number(itemId));
+  if (!item) return db;
+
+  const qtd = toNumber(quantidade);
+  if (qtd <= 0) return db;
+>>>>>>> f7f6d2991c81e0a38b5e190db55c7ad82834360d
 
   const saldoAtual = toNumber(item.quantidade_atual);
   if (qtd > saldoAtual) {
@@ -395,6 +573,7 @@ export function registrarSaidaEstoque(
   const movimentosEstoque = Array.isArray(db?.movimentacoes_estoque)
     ? db.movimentacoes_estoque
     : [];
+<<<<<<< HEAD
   const movimentosFinanceiros = Array.isArray(db?.movimentacoes_financeiras)
     ? db.movimentacoes_financeiras
     : [];
@@ -402,6 +581,10 @@ export function registrarSaidaEstoque(
   const novoMovEstoqueId = gerarNovoId(movimentosEstoque);
   const custoUnit = toNumber(item.valor_unitario); // Custo unitário do item no estoque
   const valorTotalSaida = qtd * custoUnit;
+=======
+  const novoMovEstoqueId = gerarNovoId(movimentosEstoque);
+  const custoUnit = toNumber(item.valor_unitario);
+>>>>>>> f7f6d2991c81e0a38b5e190db55c7ad82834360d
 
   const baseAtualizada = {
     ...db,
@@ -410,11 +593,19 @@ export function registrarSaidaEstoque(
       {
         id: novoMovEstoqueId,
         item_estoque_id: Number(itemId),
+<<<<<<< HEAD
         lote_id: loteId ? Number(loteId) : null, // Lote associado, se houver
         tipo,
         quantidade: qtd,
         custo_unit: custoUnit,
         valor_total: valorTotalSaida,
+=======
+        lote_id: loteId ? Number(loteId) : '',
+        tipo,
+        quantidade: qtd,
+        custo_unit: custoUnit,
+        valor_total: qtd * custoUnit,
+>>>>>>> f7f6d2991c81e0a38b5e190db55c7ad82834360d
         data,
         obs: obs || '',
       },
@@ -424,6 +615,7 @@ export function registrarSaidaEstoque(
         ? { ...entry, quantidade_atual: saldoAtual - qtd }
         : entry
     ),
+<<<<<<< HEAD
     movimentacoes_financeiras: [
       ...movimentosFinanceiros,
       // Adiciona movimentação financeira se for consumo ou venda
@@ -458,6 +650,8 @@ export function registrarSaidaEstoque(
           ]
         : []),
     ],
+=======
+>>>>>>> f7f6d2991c81e0a38b5e190db55c7ad82834360d
   };
 
   return registrarAuditoria(baseAtualizada, {
@@ -469,4 +663,8 @@ export function registrarSaidaEstoque(
     ator_email: userContext?.email || '',
     criticidade: tipo === 'perda' ? 'alta' : 'media',
   });
+<<<<<<< HEAD
 }
+=======
+}
+>>>>>>> f7f6d2991c81e0a38b5e190db55c7ad82834360d

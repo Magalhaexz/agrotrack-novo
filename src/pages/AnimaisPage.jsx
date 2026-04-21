@@ -4,6 +4,7 @@ import { formatarNumero, formatarData } from '../utils/formatters';
 import { gerarNovoId } from '../utils/id';
 import { TIPOS_SAIDA_ANIMAL } from '../utils/constantes';
 
+<<<<<<< HEAD
 /**
  * Componente para a página de gestão de animais.
  * Exibe a lista de grupos de animais, um resumo de KPIs e o histórico de saídas.
@@ -14,6 +15,8 @@ import { TIPOS_SAIDA_ANIMAL } from '../utils/constantes';
  * @param {function} props.setDb - Função para atualizar o banco de dados.
  * @param {function} [props.onConfirmAction] - Função para exibir um modal de confirmação customizado.
  */
+=======
+>>>>>>> f7f6d2991c81e0a38b5e190db55c7ad82834360d
 export default function AnimaisPage({ db, setDb, onConfirmAction }) {
   const [abrirForm, setAbrirForm] = useState(false);
   const [animalEditando, setAnimalEditando] = useState(null);
@@ -22,6 +25,7 @@ export default function AnimaisPage({ db, setDb, onConfirmAction }) {
   const animais = db?.animais || [];
   const movimentacoesAnimais = db?.movimentacoes_animais || [];
 
+<<<<<<< HEAD
   // Cria um mapa de lotes para buscas eficientes por ID
   const lotesMap = useMemo(() => {
     return new Map(lotes.map(lote => [lote.id, lote]));
@@ -30,6 +34,12 @@ export default function AnimaisPage({ db, setDb, onConfirmAction }) {
   const dadosTabela = useMemo(() => {
     return animais.map((animal) => {
       const lote = lotesMap.get(animal.lote_id); // Busca otimizada
+=======
+  const dadosTabela = useMemo(() => {
+    return animais.map((animal) => {
+      const lote = lotes.find((l) => l.id === animal.lote_id);
+
+>>>>>>> f7f6d2991c81e0a38b5e190db55c7ad82834360d
       const gmd =
         Number(animal.dias || 0) > 0
           ? (Number(animal.p_at || 0) - Number(animal.p_ini || 0)) / Number(animal.dias || 1)
@@ -41,7 +51,11 @@ export default function AnimaisPage({ db, setDb, onConfirmAction }) {
         gmd,
       };
     });
+<<<<<<< HEAD
   }, [animais, lotesMap]); // Depende de lotesMap
+=======
+  }, [animais, lotes]);
+>>>>>>> f7f6d2991c81e0a38b5e190db55c7ad82834360d
 
   const resumo = useMemo(() => {
     const totalCabecas = animais.reduce((acc, item) => acc + Number(item.qtd || 0), 0);
@@ -72,14 +86,23 @@ export default function AnimaisPage({ db, setDb, onConfirmAction }) {
     return movimentacoesAnimais
       .filter((mov) => tiposSaida.includes(mov.tipo))
       .map((mov) => {
+<<<<<<< HEAD
         const lote = lotesMap.get(mov.lote_id); // Busca otimizada
+=======
+        const lote = lotes.find((l) => l.id === mov.lote_id);
+>>>>>>> f7f6d2991c81e0a38b5e190db55c7ad82834360d
         return {
           ...mov,
           loteNome: lote?.nome || '—',
         };
       })
+<<<<<<< HEAD
       .sort((a, b) => new Date(b.data).getTime() - new Date(a.data).getTime()); // Usar getTime() para comparação robusta
   }, [movimentacoesAnimais, lotesMap]); // Depende de lotesMap
+=======
+      .sort((a, b) => new Date(b.data) - new Date(a.data));
+  }, [movimentacoesAnimais, lotes]);
+>>>>>>> f7f6d2991c81e0a38b5e190db55c7ad82834360d
 
   function abrirNovo() {
     setAnimalEditando(null);
@@ -297,6 +320,7 @@ export default function AnimaisPage({ db, setDb, onConfirmAction }) {
   );
 }
 
+<<<<<<< HEAD
 /**
  * Normaliza o tipo de saída de animal para uma string mais legível.
  * @param {string} tipo - O tipo de saída (ex: 'venda', 'morte').
@@ -305,3 +329,11 @@ export default function AnimaisPage({ db, setDb, onConfirmAction }) {
 function normalizarSaida(tipo) {
   return TIPOS_SAIDA_ANIMAL[tipo] || tipo || '—';
 }
+=======
+
+
+
+function normalizarSaida(tipo) {
+  return TIPOS_SAIDA_ANIMAL[tipo] || tipo || '—';
+}
+>>>>>>> f7f6d2991c81e0a38b5e190db55c7ad82834360d

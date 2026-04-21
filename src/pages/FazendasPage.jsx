@@ -4,6 +4,7 @@ import PageHeader from '../components/PageHeader';
 import FazendaCard from '../components/fazendas/FazendaCard';
 import FazendaModal from '../components/fazendas/FazendaModal';
 import { gerarNovoId } from '../utils/id';
+<<<<<<< HEAD
 // Assuming useToast is available
 // import { useToast } from '../hooks/useToast';
 
@@ -18,12 +19,17 @@ import { gerarNovoId } from '../utils/id';
 export default function FazendasPage({ db, setDb, onConfirmAction }) {
   // const { showToast } = useToast(); // Se usar useToast
 
+=======
+
+export default function FazendasPage({ db, setDb }) {
+>>>>>>> f7f6d2991c81e0a38b5e190db55c7ad82834360d
   const [openModal, setOpenModal] = useState(false);
   const [editando, setEditando] = useState(null);
 
   const fazendas = Array.isArray(db?.fazendas) ? db.fazendas : [];
   const lotes = Array.isArray(db?.lotes) ? db.lotes : [];
 
+<<<<<<< HEAD
   // Pré-indexar lotes por fazenda_id para busca eficiente
   const lotesByFazendaMap = useMemo(() => {
     const map = new Map();
@@ -50,10 +56,21 @@ export default function FazendasPage({ db, setDb, onConfirmAction }) {
    * Salva uma nova fazenda ou atualiza uma existente.
    * @param {object} payload - Os dados da fazenda a serem salvos.
    */
+=======
+  const cards = useMemo(
+    () => fazendas.map((fazenda) => ({
+      ...fazenda,
+      lotesVinculados: lotes.filter((l) => Number(l.faz_id) === Number(fazenda.id)).length,
+    })),
+    [fazendas, lotes]
+  );
+
+>>>>>>> f7f6d2991c81e0a38b5e190db55c7ad82834360d
   function salvarFazenda(payload) {
     if (editando) {
       setDb((prev) => ({
         ...prev,
+<<<<<<< HEAD
         fazendas: prev.fazendas.map((f) =>
           f.id === editando.id ? { ...f, ...payload } : f
         ),
@@ -71,11 +88,21 @@ export default function FazendasPage({ db, setDb, onConfirmAction }) {
         ],
       }));
       // showToast({ type: 'success', message: 'Fazenda adicionada com sucesso!' });
+=======
+        fazendas: (prev.fazendas || []).map((f) => Number(f.id) === Number(editando.id) ? { ...f, ...payload } : f),
+      }));
+    } else {
+      setDb((prev) => ({
+        ...prev,
+        fazendas: [...(prev.fazendas || []), { id: gerarNovoId(prev.fazendas || []), ...payload }],
+      }));
+>>>>>>> f7f6d2991c81e0a38b5e190db55c7ad82834360d
     }
     setOpenModal(false);
     setEditando(null);
   }
 
+<<<<<<< HEAD
   /**
    * Exclui uma fazenda após confirmação.
    * @param {number} id - O ID da fazenda a ser excluída.
@@ -107,6 +134,8 @@ export default function FazendasPage({ db, setDb, onConfirmAction }) {
     // showToast({ type: 'success', message: 'Fazenda excluída com sucesso!' });
   }
 
+=======
+>>>>>>> f7f6d2991c81e0a38b5e190db55c7ad82834360d
   return (
     <div className="page">
       <PageHeader
@@ -116,6 +145,7 @@ export default function FazendasPage({ db, setDb, onConfirmAction }) {
       />
 
       {cards.length === 0 ? (
+<<<<<<< HEAD
         <div className="ui-card empty-state"> {/* Adicionada classe empty-state para estilo */}
           <strong>Nenhuma fazenda cadastrada.</strong>
           <span>Use o botão "Nova Fazenda" para começar.</span> {/* Adicionada uma descrição */}
@@ -130,6 +160,13 @@ export default function FazendasPage({ db, setDb, onConfirmAction }) {
               onClick={() => { setEditando(fazenda); setOpenModal(true); }}
               onDelete={() => excluirFazenda(fazenda.id)} // Passa a função de exclusão
             />
+=======
+        <div className="ui-card"><strong>Nenhuma fazenda cadastrada.</strong></div>
+      ) : (
+        <div className="grid-3">
+          {cards.map((fazenda) => (
+            <FazendaCard key={fazenda.id} fazenda={fazenda} lotesVinculados={fazenda.lotesVinculados} onClick={() => { setEditando(fazenda); setOpenModal(true); }} />
+>>>>>>> f7f6d2991c81e0a38b5e190db55c7ad82834360d
           ))}
         </div>
       )}
@@ -142,4 +179,8 @@ export default function FazendasPage({ db, setDb, onConfirmAction }) {
       />
     </div>
   );
+<<<<<<< HEAD
 }
+=======
+}
+>>>>>>> f7f6d2991c81e0a38b5e190db55c7ad82834360d

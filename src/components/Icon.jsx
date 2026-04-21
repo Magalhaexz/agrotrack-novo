@@ -14,7 +14,11 @@ import {
   Weight,
 } from 'lucide-react';
 
+<<<<<<< HEAD
 const ICON_MAP = {
+=======
+const map = {
+>>>>>>> f7f6d2991c81e0a38b5e190db55c7ad82834360d
   grid: Grid2x2,
   home: Home,
   checklist: ClipboardCheck,
@@ -23,6 +27,7 @@ const ICON_MAP = {
   chart: TrendingUp,
   scale: Weight,
   briefcase: Briefcase,
+<<<<<<< HEAD
   users: Users, // Changed from Beef to Users for more generic "users" icon
   flask: Users, // Assuming 'flask' might be a typo or intended to be a generic user icon
   shield: ShieldPlus,
@@ -39,3 +44,16 @@ export default function Icon({ name, className = '', size = 16, label }) {
 
   return <Cmp size={size} className={className} {...ariaProps} />;
 }
+=======
+  users: Beef,
+  flask: Users,
+  shield: ShieldPlus,
+  dollar: DollarSign,
+  activity: Activity,
+};
+
+export default function Icon({ name, className = '' }) {
+  const Cmp = map[name] || Grid2x2;
+  return <Cmp size={16} className={className} aria-hidden="true" />;
+}
+>>>>>>> f7f6d2991c81e0a38b5e190db55c7ad82834360d

@@ -1,3 +1,4 @@
+<<<<<<< HEAD
 import { formatDate } from '../utils/calculations'; // Assuming this function is robust
 
 // Constants for clarity and easy modification
@@ -13,6 +14,15 @@ function daysUntil(dateStr) {
   const now = new Date(); now.setHours(0, 0, 0, 0);
   const dt = new Date(dateStr); dt.setHours(0, 0, 0, 0);
   return Math.round((dt - now) / MS_PER_DAY);
+=======
+import { formatDate } from '../utils/calculations';
+
+function daysUntil(dateStr) {
+  if (!dateStr) return Infinity;
+  const now = new Date(); now.setHours(0,0,0,0);
+  const dt = new Date(dateStr); dt.setHours(0,0,0,0);
+  return Math.round((dt - now) / 86400000);
+>>>>>>> f7f6d2991c81e0a38b5e190db55c7ad82834360d
 }
 
 function urgenciaFromDays(days) {
@@ -23,6 +33,7 @@ function urgenciaFromDays(days) {
 
 export function gerarAlertasEstoque(db) {
   const movs = db.movimentacoes_estoque || [];
+<<<<<<< HEAD
   // Pre-index movements for efficiency
   const movsByItemId = new Map();
   movs.forEach(m => {
@@ -44,13 +55,26 @@ export function gerarAlertasEstoque(db) {
     // Alert if current quantity is less than CRITICAL_STOCK_THRESHOLD_PERCENT of the peak
     if (!pico || atual >= pico * CRITICAL_STOCK_THRESHOLD_PERCENT) return [];
 
+=======
+  return (db.estoque || []).flatMap((item) => {
+    const historico = movs.filter((m) => Number(m.item_estoque_id) === Number(item.id));
+    const pico = Math.max(Number(item.quantidade_atual || 0), ...historico.map((m) => Number(m.quantidade || 0)));
+    const atual = Number(item.quantidade_atual || 0);
+    if (!pico || atual >= pico * 0.2) return [];
+>>>>>>> f7f6d2991c81e0a38b5e190db55c7ad82834360d
     return [{
       id: `estoque-${item.id}`,
       ackKey: `estoque-${item.id}`,
       origem: 'estoque',
+<<<<<<< HEAD
       urgencia: 'critico', // Changed urgency to 'critico' for better semantic meaning
       title: `Estoque crítico: ${item.produto}`,
       description: `Saldo atual ${atual} ${item.unidade || ''} (${formatDate(new Date().toISOString().slice(0, 10))})`,
+=======
+      urgencia: 'vencido',
+      title: `Estoque crítico: ${item.produto}`,
+      description: `Saldo atual ${atual} ${item.unidade || ''} (${formatDate(new Date().toISOString().slice(0,10))})`,
+>>>>>>> f7f6d2991c81e0a38b5e190db55c7ad82834360d
       action: 'Ver estoque',
       route: 'estoque',
     }];
@@ -58,6 +82,7 @@ export function gerarAlertasEstoque(db) {
 }
 
 export function gerarAlertasCalendario(db) {
+<<<<<<< HEAD
   // Combine all potential event sources
   const allEvents = [
     ...(db.eventos_operacionais || []),
@@ -72,22 +97,36 @@ export function gerarAlertasCalendario(db) {
     const days = daysUntil(data);
     const responsibleName = ev.funcionario_responsavel_id ? funcionariosMap.get(ev.funcionario_responsavel_id) : (ev.responsavel || 'Sem responsável');
 
+=======
+  return (db.eventos_operacionais || db.sanitario || []).map((ev) => {
+    const data = ev.data || ev.proxima;
+    const days = daysUntil(data);
+>>>>>>> f7f6d2991c81e0a38b5e190db55c7ad82834360d
     return {
       id: `cal-${ev.id}`,
       ackKey: `cal-${ev.id}`,
       origem: 'calendario',
       urgencia: urgenciaFromDays(days),
       title: ev.titulo || ev.desc || 'Evento operacional',
+<<<<<<< HEAD
       description: `${formatDate(data)} · ${responsibleName}`,
+=======
+      description: `${formatDate(data)} · ${ev.responsavel || 'Sem responsável'}`,
+>>>>>>> f7f6d2991c81e0a38b5e190db55c7ad82834360d
       action: 'Abrir evento',
       route: 'calendarioOperacional',
       days,
     };
+<<<<<<< HEAD
   }).filter((a) => Number.isFinite(a.days) && a.days <= CALENDAR_ALERT_DAYS_THRESHOLD);
+=======
+  }).filter((a) => Number.isFinite(a.days) && a.days <= 7);
+>>>>>>> f7f6d2991c81e0a38b5e190db55c7ad82834360d
 }
 
 export function gerarAlertasPesagem(db) {
   const pesagens = db.pesagens || [];
+<<<<<<< HEAD
   // Pre-process pesagens to find the latest for each lot
   const latestPesagensByLoteId = new Map();
   pesagens.sort((a, b) => new Date(b.data) - new Date(a.data)); // Sort once descending
@@ -126,12 +165,21 @@ export function gerarAlertasPesagem(db) {
       action: 'Registrar pesagem',
       route: 'pesagens'
     }];
+=======
+  return (db.lotes || []).filter((l) => l.status === 'ativo').flatMap((l) => {
+    const ultima = pesagens.filter((p) => p.lote_id === l.id).sort((a,b)=>new Date(b.data)-new Date(a.data))[0];
+    if (!ultima) return [{ id:`pes-${l.id}`, ackKey:`pes-${l.id}`, origem:'pesagem', urgencia:'vencido', title:`Lote ${l.nome} sem pesagem`, description:'Registrar primeira pesagem', action:'Registrar pesagem', route:'pesagens'}];
+    const days = daysUntil(ultima.data) * -1;
+    if (days <= 30) return [];
+    return [{ id:`pes-${l.id}`, ackKey:`pes-${l.id}`, origem:'pesagem', urgencia: days > 45 ? 'vencido' : 'proximo', title:`Pesagem atrasada: ${l.nome}`, description:`Última pesagem há ${days} dias`, action:'Registrar pesagem', route:'pesagens' }];
+>>>>>>> f7f6d2991c81e0a38b5e190db55c7ad82834360d
   });
 }
 
 export function gerarAlertasLote(db) {
   return (db.lotes || []).filter((l) => l.status === 'ativo' && l.saida).flatMap((l) => {
     const days = daysUntil(l.saida);
+<<<<<<< HEAD
     if (days > LOTE_SAIDA_ALERT_DAYS_THRESHOLD) return []; // Only alert if exit is within threshold or overdue
 
     return [{
@@ -145,11 +193,21 @@ export function gerarAlertasLote(db) {
       route: 'lotes',
       days
     }];
+=======
+    if (days > 7) return [];
+    return [{ id:`lote-${l.id}`, ackKey:`lote-${l.id}`, origem:'lote', urgencia:urgenciaFromDays(days), title:`Saída prevista: ${l.nome}`, description:`Prevista para ${formatDate(l.saida)}`, action:'Ver lote', route:'lotes', days }];
+>>>>>>> f7f6d2991c81e0a38b5e190db55c7ad82834360d
   });
 }
 
 export function ordenarAlertas(alerts = []) {
+<<<<<<< HEAD
   // Updated rank to include 'critico'
   const rank = { vencido: 0, hoje: 1, critico: 2, proximo: 3 };
   return alerts.slice().sort((a, b) => (rank[a.urgencia] ?? 9) - (rank[b.urgencia] ?? 9));
 }
+=======
+  const rank = { vencido: 0, hoje: 1, proximo: 2 };
+  return alerts.slice().sort((a,b)=> (rank[a.urgencia] ?? 9) - (rank[b.urgencia] ?? 9));
+}
+>>>>>>> f7f6d2991c81e0a38b5e190db55c7ad82834360d

@@ -1,3 +1,4 @@
+<<<<<<< HEAD
 /**
  * Gera um novo ID único para um item em uma lista.
  * O ID gerado é o maior ID existente na lista + 1.
@@ -18,3 +19,9 @@ export const gerarNovoId = (lista) => {
   // Encontra o maior ID na lista e adiciona 1 para obter o próximo ID.
   return Math.max(...ids) + 1;
 };
+=======
+export const gerarNovoId = (lista) => {
+  if (!lista || lista.length === 0) return 1;
+  return Math.max(...lista.map((item) => Number(item.id) || 0)) + 1;
+};
+>>>>>>> f7f6d2991c81e0a38b5e190db55c7ad82834360d

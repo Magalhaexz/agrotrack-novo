@@ -66,7 +66,11 @@ export const initialDb = {
       status: 'ativo',
       data_encerramento: null,
       data_venda: null,
+<<<<<<< HEAD
       motivo_encerramento: null, // Alterado de '' para null
+=======
+      motivo_encerramento: '',
+>>>>>>> f7f6d2991c81e0a38b5e190db55c7ad82834360d
       supl_nome: 'Núcleo proteico 40%',
       supl_rkg: 3.2,
       supl_pv_pct: 0.5,
@@ -96,7 +100,11 @@ export const initialDb = {
       status: 'ativo',
       data_encerramento: null,
       data_venda: null,
+<<<<<<< HEAD
       motivo_encerramento: null, // Alterado de '' para null
+=======
+      motivo_encerramento: '',
+>>>>>>> f7f6d2991c81e0a38b5e190db55c7ad82834360d
       supl_nome: 'Sal mineral proteinado',
       supl_rkg: 1.8,
       supl_pv_pct: 0.3,
@@ -188,7 +196,11 @@ export const initialDb = {
     {
       id: 3,
       funcionario_id: 3,
+<<<<<<< HEAD
       lote_id: null, // Alterado de '' para null
+=======
+      lote_id: '',
+>>>>>>> f7f6d2991c81e0a38b5e190db55c7ad82834360d
       data: '2025-04-16',
       tarefa: 'Organizar estoque de insumos',
       setor: 'Estoque',
@@ -196,6 +208,7 @@ export const initialDb = {
       obs: '',
     },
     {
+<<<<<<< HEAD
       id: 99,
       funcionario_id: 1,
       lote_id: 1,
@@ -211,6 +224,23 @@ export const initialDb = {
       data: null, // Alterado de '' para null
       status: null, // Alterado de 'pendente' para null
     },
+=======
+  id: 99,
+  funcionario_id: 1,
+  lote_id: 1,
+  tarefa: 'Vacinar lote A',
+  setor: 'Sanitário',
+  obs: 'Aplicar reforço conforme protocolo',
+  recorrente: true,
+  recorrencia_tipo: 'semanal',
+  dias_semana: [1, 4],
+  data_inicio: '2026-04-01',
+  data_fim: '',
+  concluido_datas: [],
+  data: '',
+  status: 'pendente',
+},
+>>>>>>> f7f6d2991c81e0a38b5e190db55c7ad82834360d
   ],
 
   tarefas: [
@@ -257,6 +287,7 @@ export const initialDb = {
 
   // REMOVER ANTES DE PRODUÇÃO: itens de estoque de exemplo.
   estoque: [
+<<<<<<< HEAD
     {
       id: 1,
       produto: 'Núcleo proteico 40%',
@@ -300,6 +331,51 @@ export const initialDb = {
       alerta_dias_antes: 30,
     },
   ],
+=======
+  {
+    id: 1,
+    produto: 'Núcleo proteico 40%',
+    categoria: 'insumo',
+    unidade: 'kg',
+    quantidade_atual: 2400,
+    quantidade_minima: 500,
+    valor_unitario: 3.2,
+    origem: 'NF-e',
+    numero_nf: '12345',
+    data_entrada: '2025-02-15',
+    data_validade: '2026-02-15',
+    alerta_dias_antes: 15,
+  },
+  {
+    id: 2,
+    produto: 'Sal mineral proteinado',
+    categoria: 'insumo',
+    unidade: 'kg',
+    quantidade_atual: 380,
+    quantidade_minima: 150,
+    valor_unitario: 1.8,
+    origem: 'NF-e',
+    numero_nf: '12346',
+    data_entrada: '2025-02-10',
+    data_validade: '2026-01-10',
+    alerta_dias_antes: 20,
+  },
+  {
+    id: 3,
+    produto: 'Vacina contra aftosa',
+    categoria: 'sanitário',
+    unidade: 'dose',
+    quantidade_atual: 90,
+    quantidade_minima: 40,
+    valor_unitario: 6.5,
+    origem: 'manual',
+    numero_nf: '',
+    data_entrada: '2025-01-12',
+    data_validade: '2025-12-12',
+    alerta_dias_antes: 30,
+  },
+],
+>>>>>>> f7f6d2991c81e0a38b5e190db55c7ad82834360d
 
   suplementacao: [
     {
@@ -354,6 +430,7 @@ export const initialDb = {
   ],
 
   sanitario: [
+<<<<<<< HEAD
     {
       id: 1,
       lote_id: 1,
@@ -437,6 +514,91 @@ export const initialDb = {
       obs: null, // Alterado de '' para null
     },
   ],
+=======
+  {
+    id: 1,
+    lote_id: 1,
+    tipo: 'vacina',
+    desc: 'Febre Aftosa',
+    data_aplic: '2025-01-12',
+    proxima: '2025-07-12',
+    alerta_dias_antes: 30,
+    qtd: 120,
+    obs: 'Dose única anual',
+  },
+  {
+    id: 2,
+    lote_id: 1,
+    tipo: 'vermifugo',
+    desc: 'Doramectin 1%',
+    data_aplic: '2025-01-14',
+    proxima: '2025-04-14',
+    alerta_dias_antes: 15,
+    qtd: 120,
+    obs: 'Via subcutânea',
+  },
+  
+  {
+    id: 3,
+    lote_id: 1,
+    tipo: 'vacina',
+    desc: 'Raiva',
+    data_aplic: '2025-01-12',
+    proxima: '2025-01-12',
+    alerta_dias_antes: 20,
+    qtd: 120,
+    obs: 'Próxima dose em atraso',
+  },
+  {
+    id: 4,
+    lote_id: 2,
+    tipo: 'vacina',
+    desc: 'Febre Aftosa',
+    data_aplic: '2025-02-03',
+    proxima: '2025-08-03',
+    alerta_dias_antes: 30,
+    qtd: 95,
+    obs: '',
+  },
+  {
+    id: 5,
+    lote_id: 1,
+    tipo: 'vacina',
+    desc: 'Febre Aftosa',
+    data_aplic: '2025-01-12',
+    proxima: '2025-07-12',
+    alerta_dias_antes: 30,
+    qtd: 120,
+    obs: 'Dose única anual',
+    funcionario_responsavel_id: 1,
+    rotina_automatica_id: null,
+  },
+  {
+    id: 6,
+    lote_id: 1,
+    tipo: 'vermifugo',
+    desc: 'Doramectin 1%',
+    data_aplic: '2025-01-14',
+    proxima: '2025-04-14',
+    alerta_dias_antes: 15,
+    qtd: 120,
+    obs: 'Via subcutânea',
+    funcionario_responsavel_id: 2,
+    rotina_automatica_id: null,
+  },
+  {
+    id: 7,
+    lote_id: 2,
+    tipo: 'vermifugo',
+    desc: 'Ivermectina 3.5%',
+    data_aplic: '2025-02-05',
+    proxima: '2025-05-05',
+    alerta_dias_antes: 10,
+    qtd: 95,
+    obs: '',
+  },
+],
+>>>>>>> f7f6d2991c81e0a38b5e190db55c7ad82834360d
 
   movimentacoes_animais: [],
   movimentacoes_estoque: [],
@@ -468,4 +630,8 @@ export const initialDb = {
 
 
   auditoria: [],
+<<<<<<< HEAD
 };
+=======
+};
+>>>>>>> f7f6d2991c81e0a38b5e190db55c7ad82834360d

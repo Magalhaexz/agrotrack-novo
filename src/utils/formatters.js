@@ -1,3 +1,4 @@
+<<<<<<< HEAD
 /**
  * Formata um valor numérico como moeda brasileira (BRL).
  * Retorna "R$ 0,00" se o valor for nulo, indefinido ou 0.
@@ -38,3 +39,18 @@ export const formatarData = (data) => {
  */
 export const formatarArroba = (valor) =>
   `${formatarNumero(valor)} @`;
+=======
+export const formatarMoeda = (valor) =>
+  new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(valor || 0);
+
+export const formatarNumero = (valor, casas = 2) =>
+  Number(valor || 0).toFixed(casas);
+
+export const formatarData = (data) => {
+  if (!data) return '-';
+  return new Date(`${data}T00:00:00`).toLocaleDateString('pt-BR');
+};
+
+export const formatarArroba = (valor) =>
+  `${formatarNumero(valor)} @`;
+>>>>>>> f7f6d2991c81e0a38b5e190db55c7ad82834360d

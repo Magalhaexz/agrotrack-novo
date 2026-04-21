@@ -1,3 +1,4 @@
+<<<<<<< HEAD
 css
 Copiar
 
@@ -147,3 +148,24 @@ Copiar
     justify-items: center; /* Center avatar box content */
   }
 }
+=======
+.perfil-page{display:grid;gap:12px}
+.perfil-page h1{margin:0}
+.perfil-page p{margin:4px 0 0;color:var(--color-text-secondary)}
+.perfil-grid{display:grid;grid-template-columns:220px 1fr;gap:12px}
+.perfil-avatar-box{display:grid;gap:8px;justify-items:center;align-content:start}
+.perfil-avatar-img,.perfil-avatar-fallback{width:110px;height:110px;border-radius:999px;object-fit:cover;border:1px solid var(--color-border)}
+.perfil-avatar-fallback{display:grid;place-items:center;background:var(--color-primary);font-weight:700}
+.perfil-upload-btn{display:flex;align-items:center;gap:6px;padding:8px 10px;border:1px solid var(--color-border);border-radius:var(--radius-md);cursor:pointer}
+.perfil-form-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}
+.perfil-form-grid label{display:grid;gap:4px;font-size:var(--text-sm)}
+.password-meter{display:grid;gap:6px;margin-top:8px}
+.password-meter-track{height:8px;border-radius:999px;background:var(--color-surface-2);overflow:hidden}
+.password-meter-track span{display:block;height:100%;border-radius:999px;transition:all .2s ease}
+.perfil-actions{display:flex;justify-content:flex-end;margin-top:10px}
+.switch-row{display:flex !important;align-items:center;justify-content:space-between;gap:10px}
+@media (max-width: 900px){
+  .perfil-grid{grid-template-columns:1fr}
+  .perfil-form-grid{grid-template-columns:1fr}
+}
+>>>>>>> f7f6d2991c81e0a38b5e190db55c7ad82834360d

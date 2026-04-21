@@ -1,5 +1,6 @@
 import { gerarNovoId } from '../utils/id';
 
+<<<<<<< HEAD
 /**
  * Registra um evento de auditoria no banco de dados.
  *
@@ -23,3 +24,20 @@ export function registrarAuditoria(db, evento) {
     ],
   };
 }
+=======
+export function registrarAuditoria(db, evento) {
+  const auditoria = Array.isArray(db?.auditoria) ? db.auditoria : [];
+
+  return {
+    ...db,
+    auditoria: [
+      ...auditoria,
+      {
+        id: gerarNovoId(auditoria),
+        data_hora: new Date().toISOString(),
+        ...evento,
+      },
+    ],
+  };
+}
+>>>>>>> f7f6d2991c81e0a38b5e190db55c7ad82834360d

@@ -1,12 +1,22 @@
+<<<<<<< HEAD
 import { useEffect, useMemo, useState } from 'react';
+=======
+import { useMemo, useState } from 'react';
+>>>>>>> f7f6d2991c81e0a38b5e190db55c7ad82834360d
 import Modal from './ui/Modal';
 import Button from './ui/Button';
 import Input from './ui/Input';
 
 const TIPOS = ['Corte', 'Leite', 'Misto', 'Cria', 'Recria', 'Engorda'];
+<<<<<<< HEAD
 const UFS = ['AC', 'AL', 'AP', 'AM', 'BA', 'CE', 'DF', 'ES', 'GO', 'MA', 'MT', 'MS', 'MG', 'PA', 'PB', 'PR', 'PE', 'PI', 'RJ', 'RN', 'RS', 'RO', 'RR', 'SC', 'SP', 'SE', 'TO'];
 
 const FORM_VAZIO = {
+=======
+const UFS = ['AC','AL','AP','AM','BA','CE','DF','ES','GO','MA','MT','MS','MG','PA','PB','PR','PE','PI','RJ','RN','RS','RO','RR','SC','SP','SE','TO'];
+
+const vazio = {
+>>>>>>> f7f6d2991c81e0a38b5e190db55c7ad82834360d
   nome: '',
   proprietario: '',
   cidade: '',
@@ -24,6 +34,7 @@ const FORM_VAZIO = {
   observacoes: '',
 };
 
+<<<<<<< HEAD
 // Função para normalizar os dados iniciais
 function normalizarInitialData(data) {
   return {
@@ -54,6 +65,11 @@ export default function FazendaForm({ open, initialData, onSave, onCancel }) {
     setForm(normalizarInitialData(initialData));
     setErro(''); // Limpa erros ao carregar novos dados
   }, [initialData]);
+=======
+export default function FazendaForm({ open, initialData, onSave, onCancel }) {
+  const [erro, setErro] = useState('');
+  const [form, setForm] = useState(() => ({ ...vazio, ...(initialData || {}) }));
+>>>>>>> f7f6d2991c81e0a38b5e190db55c7ad82834360d
 
   const titulo = useMemo(() => (initialData ? 'Editar fazenda' : 'Cadastrar fazenda'), [initialData]);
 
@@ -75,7 +91,11 @@ export default function FazendaForm({ open, initialData, onSave, onCancel }) {
       return;
     }
 
+<<<<<<< HEAD
     setErro(''); // Limpa erros se a validação passar
+=======
+    setErro('');
+>>>>>>> f7f6d2991c81e0a38b5e190db55c7ad82834360d
 
     onSave?.({
       nome: String(form.nome || '').trim(),
@@ -160,8 +180,16 @@ export default function FazendaForm({ open, initialData, onSave, onCancel }) {
           <textarea className="ui-input" name="observacoes" rows={3} value={form.observacoes} onChange={handleChange} />
         </div>
 
+<<<<<<< HEAD
         {erro && <p style={{ color: 'var(--color-danger)', margin: 0 }}>{erro}</p>}
       </form>
     </Modal>
   );
 }
+=======
+        {erro ? <p style={{ color: 'var(--color-danger)', margin: 0 }}>{erro}</p> : null}
+      </form>
+    </Modal>
+  );
+}
+>>>>>>> f7f6d2991c81e0a38b5e190db55c7ad82834360d

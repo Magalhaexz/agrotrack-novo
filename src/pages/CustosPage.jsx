@@ -1,6 +1,7 @@
 import { useMemo, useState } from 'react';
 import CustoForm from '../components/CustoForm';
 import { formatarNumero, formatarData } from '../utils/formatters';
+<<<<<<< HEAD
 import { gerarNovoId } from '../utils/id'; // Importa a função de gerar ID
 
 /**
@@ -13,6 +14,10 @@ import { gerarNovoId } from '../utils/id'; // Importa a função de gerar ID
  * @param {function} props.setDb - Função para atualizar o banco de dados.
  * @param {function} [props.onConfirmAction] - Função para exibir um modal de confirmação customizado.
  */
+=======
+import { gerarNovoId } from '../utils/id';
+
+>>>>>>> f7f6d2991c81e0a38b5e190db55c7ad82834360d
 export default function CustosPage({ db, setDb, onConfirmAction }) {
   const [abrirForm, setAbrirForm] = useState(false);
   const [custoEditando, setCustoEditando] = useState(null);
@@ -20,6 +25,7 @@ export default function CustosPage({ db, setDb, onConfirmAction }) {
   const lotes = db?.lotes || [];
   const custos = db?.custos || [];
 
+<<<<<<< HEAD
   // Otimização: Criar um mapa de lotes para busca eficiente (O(1))
   const lotesMap = useMemo(() => {
     return new Map(lotes.map((l) => [l.id, l]));
@@ -29,13 +35,23 @@ export default function CustosPage({ db, setDb, onConfirmAction }) {
     return [...custos]
       .map((custo) => {
         const lote = lotesMap.get(custo.lote_id); // Usar o mapa para buscar o lote
+=======
+  const dadosTabela = useMemo(() => {
+    return [...custos]
+      .map((custo) => {
+        const lote = lotes.find((l) => l.id === custo.lote_id);
+>>>>>>> f7f6d2991c81e0a38b5e190db55c7ad82834360d
         return {
           ...custo,
           loteNome: lote?.nome || '—',
         };
       })
       .sort((a, b) => new Date(b.data) - new Date(a.data));
+<<<<<<< HEAD
   }, [custos, lotesMap]); // Depende de custos e do mapa de lotes
+=======
+  }, [custos, lotes]);
+>>>>>>> f7f6d2991c81e0a38b5e190db55c7ad82834360d
 
   const resumo = useMemo(() => {
     const total = custos.reduce((acc, item) => acc + Number(item.val || 0), 0);
@@ -46,7 +62,10 @@ export default function CustosPage({ db, setDb, onConfirmAction }) {
       return acc;
     }, {});
 
+<<<<<<< HEAD
     // Retorna a categoria com maior valor, ou null se não houver custos
+=======
+>>>>>>> f7f6d2991c81e0a38b5e190db55c7ad82834360d
     const categoriaTop =
       Object.entries(porCategoria).sort((a, b) => b[1] - a[1])[0] || null;
 
@@ -57,27 +76,36 @@ export default function CustosPage({ db, setDb, onConfirmAction }) {
     };
   }, [custos]);
 
+<<<<<<< HEAD
   /**
    * Abre o formulário para adicionar um novo custo.
    */
+=======
+>>>>>>> f7f6d2991c81e0a38b5e190db55c7ad82834360d
   function abrirNovo() {
     setCustoEditando(null);
     setAbrirForm(true);
   }
 
+<<<<<<< HEAD
   /**
    * Abre o formulário para editar um custo existente.
    * @param {object} custo - O objeto do custo a ser editado.
    */
+=======
+>>>>>>> f7f6d2991c81e0a38b5e190db55c7ad82834360d
   function editarCusto(custo) {
     setCustoEditando(custo);
     setAbrirForm(true);
   }
 
+<<<<<<< HEAD
   /**
    * Exclui um custo após confirmação.
    * @param {number} id - O ID do custo a ser excluído.
    */
+=======
+>>>>>>> f7f6d2991c81e0a38b5e190db55c7ad82834360d
   async function excluirCusto(id) {
     const confirmado = typeof onConfirmAction === 'function'
       ? await onConfirmAction({
@@ -94,10 +122,13 @@ export default function CustosPage({ db, setDb, onConfirmAction }) {
     }));
   }
 
+<<<<<<< HEAD
   /**
    * Salva um novo custo ou atualiza um existente.
    * @param {object} dados - Os dados do custo a serem salvos.
    */
+=======
+>>>>>>> f7f6d2991c81e0a38b5e190db55c7ad82834360d
   function salvarCusto(dados) {
     if (custoEditando) {
       setDb((prev) => ({
@@ -112,7 +143,11 @@ export default function CustosPage({ db, setDb, onConfirmAction }) {
         custos: [
           ...prev.custos,
           {
+<<<<<<< HEAD
             id: gerarNovoId(prev.custos), // Usa a função gerarNovoId
+=======
+            id: gerarNovoId(prev.custos),
+>>>>>>> f7f6d2991c81e0a38b5e190db55c7ad82834360d
             ...dados,
           },
         ],
@@ -153,7 +188,11 @@ export default function CustosPage({ db, setDb, onConfirmAction }) {
 
         <div className="kpi-card">
           <div className="kpi-label">Maior categoria</div>
+<<<<<<< HEAD
           <div className="kpi-value kpi-value--large"> {/* Adicionada classe para o tamanho da fonte */}
+=======
+          <div className="kpi-value" style={{ fontSize: 24 }}>
+>>>>>>> f7f6d2991c81e0a38b5e190db55c7ad82834360d
             {resumo.categoriaTop ? normalizarCategoria(resumo.categoriaTop[0]) : '—'}
           </div>
           <div className="kpi-sub">
@@ -238,16 +277,26 @@ export default function CustosPage({ db, setDb, onConfirmAction }) {
   );
 }
 
+<<<<<<< HEAD
 /**
  * Normaliza o nome da categoria para exibição.
  * @param {string} cat - A categoria do custo.
  * @returns {string} O nome da categoria formatado.
  */
+=======
+
+
+
+>>>>>>> f7f6d2991c81e0a38b5e190db55c7ad82834360d
 function normalizarCategoria(cat) {
   if (!cat) return '—';
 
   const mapa = {
+<<<<<<< HEAD
     alimentacao: 'Alimentação',
+=======
+    alimentação: 'Alimentação',
+>>>>>>> f7f6d2991c81e0a38b5e190db55c7ad82834360d
     sanitário: 'Sanitário',
     'mão de obra': 'Mão de obra',
     combustível: 'Combustível',
@@ -256,6 +305,11 @@ function normalizarCategoria(cat) {
     outros: 'Outros',
   };
 
+<<<<<<< HEAD
   // Retorna o valor mapeado ou o próprio valor se não encontrado
   return mapa[cat] || cat.charAt(0).toUpperCase() + cat.slice(1); // Capitaliza se não mapeado
 }
+=======
+  return mapa[cat] || cat;
+}
+>>>>>>> f7f6d2991c81e0a38b5e190db55c7ad82834360d

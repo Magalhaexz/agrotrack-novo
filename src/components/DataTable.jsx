@@ -1,6 +1,7 @@
 import Table from './ui/Table';
 
 export default function DataTable({ columns, rows, emptyTitle, emptySubtitle }) {
+<<<<<<< HEAD
   // Se o componente Table interno suporta emptyTitle e emptySubtitle separadamente,
   // podemos passá-los diretamente. Caso contrário, a lógica original é boa.
   // Por exemplo, se Table aceita: <Table emptyTitle="Título" emptySubtitle="Subtítulo" />
@@ -20,3 +21,8 @@ export default function DataTable({ columns, rows, emptyTitle, emptySubtitle }) 
     />
   );
 }
+=======
+  const message = emptyTitle || emptySubtitle || 'Nenhum registro encontrado';
+  return <Table columns={columns} rows={rows} emptyMessage={message} />;
+}
+>>>>>>> f7f6d2991c81e0a38b5e190db55c7ad82834360d

@@ -1,3 +1,4 @@
+<<<<<<< HEAD
 /* --- Tarefas Page --- */
 .tarefas-page {
   display: grid;
@@ -197,3 +198,34 @@
     grid-template-columns: 1fr; /* Stack filters and form fields vertically */
   }
 }
+=======
+.tarefas-page{display:grid;gap:12px}
+.tarefas-header{display:flex;justify-content:space-between;align-items:flex-start;gap:12px}
+.tarefas-header h1{margin:0}
+.tarefas-header p{margin:4px 0 0;color:var(--color-text-secondary)}
+.tarefas-filtros{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:8px}
+.tarefas-filtros select{width:100%}
+.tarefas-board{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px}
+.tarefas-column{display:grid;gap:8px}
+.tarefa-card{border:1px solid var(--color-border);border-radius:var(--radius-md);padding:10px;display:grid;gap:8px;background:var(--color-surface)}
+.tarefa-card-top{display:flex;justify-content:space-between;gap:8px;align-items:flex-start}
+.tarefa-card-top h3{margin:0;font-size:var(--text-md)}
+.tarefa-badges{display:flex;gap:4px;flex-wrap:wrap}
+.tarefa-meta{display:grid;gap:4px;font-size:var(--text-sm);color:var(--color-text-secondary)}
+.tarefa-meta .late{color:var(--color-danger)}
+.tarefa-actions{display:flex;gap:6px;flex-wrap:wrap}
+.tarefas-empty{margin:0;color:var(--color-text-secondary)}
+.task-form{display:grid;gap:10px}
+.task-form label{display:grid;gap:4px;font-size:var(--text-sm)}
+.task-form-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}
+.task-form-actions{display:flex;justify-content:flex-end;gap:8px}
+.tarefas-footer-link{display:flex;justify-content:flex-end}
+@media (max-width: 1100px){
+  .tarefas-board{grid-template-columns:1fr}
+  .tarefas-filtros{grid-template-columns:1fr 1fr}
+}
+@media (max-width: 700px){
+  .tarefas-header{flex-direction:column}
+  .tarefas-filtros,.task-form-grid{grid-template-columns:1fr}
+}
+>>>>>>> f7f6d2991c81e0a38b5e190db55c7ad82834360d

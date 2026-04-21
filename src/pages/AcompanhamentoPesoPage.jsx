@@ -1,6 +1,7 @@
 import { useMemo, useState } from 'react';
 import PesoChart from '../components/PesoChart';
 import { formatarNumero, formatarData } from '../utils/formatters';
+<<<<<<< HEAD
 import { calcularDias } from '../utils/calculations'; // Importado de utils
 
 /**
@@ -10,20 +11,30 @@ import { calcularDias } from '../utils/calculations'; // Importado de utils
  * @param {object} props - As propriedades do componente.
  * @param {object} props.db - O objeto do banco de dados contendo lotes e pesagens.
  */
+=======
+
+>>>>>>> f7f6d2991c81e0a38b5e190db55c7ad82834360d
 export default function AcompanhamentoPesoPage({ db }) {
   const lotes = db?.lotes || [];
   const pesagens = db?.pesagens || [];
 
+<<<<<<< HEAD
   // Estado para o lote atualmente selecionado no filtro
+=======
+>>>>>>> f7f6d2991c81e0a38b5e190db55c7ad82834360d
   const [loteSelecionado, setLoteSelecionado] = useState(
     lotes.length ? String(lotes[0].id) : ''
   );
 
+<<<<<<< HEAD
   // Memoriza o objeto do lote selecionado
+=======
+>>>>>>> f7f6d2991c81e0a38b5e190db55c7ad82834360d
   const loteAtual = useMemo(() => {
     return lotes.find((item) => String(item.id) === String(loteSelecionado));
   }, [lotes, loteSelecionado]);
 
+<<<<<<< HEAD
   // Memoriza as pesagens filtradas para o lote selecionado e as ordena por data
   const pesagensLote = useMemo(() => {
     return pesagens
@@ -32,6 +43,14 @@ export default function AcompanhamentoPesoPage({ db }) {
   }, [pesagens, loteSelecionado]);
 
   // Memoriza o resumo dos dados de pesagem (primeira, última, ganho total, GMD)
+=======
+  const pesagensLote = useMemo(() => {
+    return pesagens
+      .filter((item) => String(item.lote_id) === String(loteSelecionado))
+      .sort((a, b) => new Date(a.data) - new Date(b.data));
+  }, [pesagens, loteSelecionado]);
+
+>>>>>>> f7f6d2991c81e0a38b5e190db55c7ad82834360d
   const resumo = useMemo(() => {
     if (!pesagensLote.length) {
       return {
@@ -234,11 +253,27 @@ export default function AcompanhamentoPesoPage({ db }) {
   );
 }
 
+<<<<<<< HEAD
 /**
  * Renderiza a variação de peso com um badge colorido.
  * @param {number|null|undefined} variacao - A variação de peso.
  * @returns {JSX.Element|string} Um elemento span com badge ou um traço.
  */
+=======
+function calcularDias(dataInicial, dataFinal) {
+  if (!dataInicial || !dataFinal) return 0;
+
+  const inicio = new Date(dataInicial);
+  const fim = new Date(dataFinal);
+  const diferencaMs = fim - inicio;
+  const dias = Math.round(diferencaMs / (1000 * 60 * 60 * 24));
+
+  return dias > 0 ? dias : 0;
+}
+
+
+
+>>>>>>> f7f6d2991c81e0a38b5e190db55c7ad82834360d
 function renderVariacao(variacao) {
   if (variacao === null || variacao === undefined) return '—';
 
@@ -259,4 +294,8 @@ function renderVariacao(variacao) {
   }
 
   return <span className="badge badge-a">0,00 kg</span>;
+<<<<<<< HEAD
 }
+=======
+}
+>>>>>>> f7f6d2991c81e0a38b5e190db55c7ad82834360d

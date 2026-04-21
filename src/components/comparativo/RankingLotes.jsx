@@ -1,3 +1,4 @@
+<<<<<<< HEAD
 const MEDALHAS = ['🥇', '🥈', '🥉'];
 
 function IconeRanking({ index }) {
@@ -25,6 +26,14 @@ export default function RankingLotes({ ranking = [] }) {
       {ranking.map((item, index) => (
         <div className="ranking-item" key={`${item.metric}-${index}`}>
           <IconeRanking index={index} />
+=======
+export default function RankingLotes({ ranking = [] }) {
+  return (
+    <div className="ranking-card">
+      <h3 style={{ margin: '0 0 8px' }}>🏆 Ranking de Lotes</h3>
+      {ranking.map((item) => (
+        <div className="ranking-item" key={item.metric}>
+>>>>>>> f7f6d2991c81e0a38b5e190db55c7ad82834360d
           <span className="ranking-metric">{item.metric}</span>
           <span className="ranking-lote">{item.lote}</span>
           <span className="ranking-valor">{item.valor}</span>
@@ -32,4 +41,8 @@ export default function RankingLotes({ ranking = [] }) {
       ))}
     </div>
   );
+<<<<<<< HEAD
 }
+=======
+}
+>>>>>>> f7f6d2991c81e0a38b5e190db55c7ad82834360d
