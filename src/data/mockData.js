@@ -326,4 +326,7 @@ export const initialDb = {
   movimentacoes_animais: [],
   movimentacoes_estoque: [],
   movimentacoes_financeiras: [],
+
+
+  auditoria: [],
 };
