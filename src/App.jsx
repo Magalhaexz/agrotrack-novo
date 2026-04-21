@@ -86,6 +86,14 @@ export default function App() {
     funcionarios: Array.isArray(initialDb?.funcionarios)
       ? initialDb.funcionarios
       : [],
+    lotes: Array.isArray(initialDb?.lotes)
+      ? initialDb.lotes.map((lote) => ({
+          ...lote,
+          status: lote?.status || 'ativo',
+          data_encerramento: lote?.data_encerramento || null,
+          data_venda: lote?.data_venda || null,
+        }))
+      : [],
     fazendas: Array.isArray(initialDb?.fazendas)
       ? initialDb.fazendas
       : [],

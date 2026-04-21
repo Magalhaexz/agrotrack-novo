@@ -8,7 +8,7 @@ import Input from '../components/ui/Input';
 import { formatCurrency, formatDate, formatNumber } from '../utils/calculations';
 import { gerarNovoId } from '../utils/id';
 
-export default function EstoquePage({ db, setDb }) {
+export default function EstoquePage({ db, setDb, onRegistrarSaidaEstoque }) {
   const [showOnlyCrit, setShowOnlyCrit] = useState(false);
   const [openEntrada, setOpenEntrada] = useState(false);
   const [openSaida, setOpenSaida] = useState(false);
@@ -115,7 +115,15 @@ export default function EstoquePage({ db, setDb }) {
       </Card>
 
       {openEntrada && <EntradaModal db={db} setDb={setDb} selectedItem={selectedItem} onClose={() => { setSelectedItem(null); setOpenEntrada(false); }} />}
-      {openSaida && <SaidaModal db={db} setDb={setDb} selectedItem={selectedItem} onClose={() => { setSelectedItem(null); setOpenSaida(false); }} />}
+      {openSaida && (
+        <SaidaModal
+          db={db}
+          setDb={setDb}
+          selectedItem={selectedItem}
+          onRegistrarSaidaEstoque={onRegistrarSaidaEstoque}
+          onClose={() => { setSelectedItem(null); setOpenSaida(false); }}
+        />
+      )}
     </div>
   );
 }
@@ -138,7 +146,7 @@ function EntradaModal({ db, setDb, selectedItem, onClose }) {
   return <Modal open onClose={onClose} title="Entrada de estoque" footer={<Button onClick={submit}>Confirmar entrada</Button>}><div className="form-grid two"><label>Item<select value={form.item_id} onChange={(e) => setForm((p) => ({ ...p, item_id: e.target.value }))}><option value="">Selecione</option>{(db.estoque || []).map((i) => <option key={i.id} value={i.id}>{i.produto}</option>)}</select></label><Input label="Quantidade" type="number" value={form.qtd} onChange={(e) => setForm((p) => ({ ...p, qtd: e.target.value }))} /><Input label="Unidade" value={item?.unidade || ''} readOnly /><Input label="Custo unitário" type="number" value={form.custo} onChange={(e) => setForm((p) => ({ ...p, custo: e.target.value }))} /><Input label="Valor total" value={formatCurrency(total)} readOnly /><Input label="Validade" type="date" value={form.validade} onChange={(e) => setForm((p) => ({ ...p, validade: e.target.value }))} /><Input label="Fornecedor" value={form.fornecedor} onChange={(e) => setForm((p) => ({ ...p, fornecedor: e.target.value }))} /><Input label="Nota fiscal" value={form.nf} onChange={(e) => setForm((p) => ({ ...p, nf: e.target.value }))} /><Input label="Data" type="date" value={form.data} onChange={(e) => setForm((p) => ({ ...p, data: e.target.value }))} /><Input label="Observações" value={form.obs} onChange={(e) => setForm((p) => ({ ...p, obs: e.target.value }))} /></div></Modal>;
 }
 
-function SaidaModal({ db, setDb, selectedItem, onClose }) {
+function SaidaModal({ db, setDb, selectedItem, onRegistrarSaidaEstoque, onClose }) {
   const [form, setForm] = useState({ item_id: selectedItem?.id || '', tipo: 'consumo', lote_id: '', qtd: '', data: '', obs: '' });
   const item = (db.estoque || []).find((i) => Number(i.id) === Number(form.item_id));
   const saldo = Number(item?.quantidade_atual || 0);
@@ -152,6 +160,22 @@ function SaidaModal({ db, setDb, selectedItem, onClose }) {
   function submit() {
     const qtd = Number(form.qtd || 0);
     if (!form.data || !form.item_id || qtd <= 0 || qtd > saldo) return;
+    if (typeof onRegistrarSaidaEstoque === 'function') {
+      try {
+        onRegistrarSaidaEstoque({
+          itemId: Number(form.item_id),
+          loteId: form.lote_id ? Number(form.lote_id) : '',
+          quantidade: qtd,
+          tipo: form.tipo,
+          data: form.data,
+          obs: form.obs.trim(),
+        });
+        onClose();
+      } catch (error) {
+        alert(error?.message || 'Erro ao registrar saída de estoque.');
+      }
+      return;
+    }
     const valor = qtd * Number(item?.valor_unitario || 0);
     setDb((prev) => ({
       ...prev,
