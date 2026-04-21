@@ -63,6 +63,9 @@ YAxis.displayName = 'YAxis';
 export function Tooltip() { return null; }
 Tooltip.displayName = 'Tooltip';
 
+export function ReferenceLine() { return null; }
+ReferenceLine.displayName = 'ReferenceLine';
+
 
 export function PieChart({ children }) { return <div style={{ width: '100%', height: '100%' }}><svg viewBox="0 0 300 220" width="100%" height="100%">{children}</svg></div>; }
 PieChart.displayName='PieChart';
