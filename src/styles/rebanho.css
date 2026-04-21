@@ -1,0 +1,250 @@
+/* --- Rebanho Page --- */
+.rebanho-page {
+  display: grid;
+  gap: 16px;
+}
+
+.rebanho-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 12px;
+}
+
+.rebanho-filters {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.rebanho-filters select,
+.form-grid select,
+.form-grid textarea,
+label textarea {
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  padding: 10px;
+  background: var(--color-surface);
+  color: var(--color-text); /* Ensure text color is set */
+  font-size: 0.9rem; /* Consistent font size */
+}
+
+/* --- Lote Cards Grid --- */
+.lote-cards-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.lote-card {
+  background: var(--card-bg);
+  border: 1px solid var(--card-border);
+  border-radius: var(--radius-lg);
+  padding: 16px; /* Consistent padding */
+  display: grid;
+  gap: 10px;
+}
+
+.lote-card-title {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.lote-card-title h3 {
+  margin: 0;
+  font-size: var(--text-base);
+  color: var(--color-text);
+}
+
+.lote-metrics p {
+  margin: 4px 0;
+  color: var(--color-text-secondary);
+  font-size: var(--text-sm);
+}
+
+.progress-line {
+  height: 8px;
+  background: var(--color-surface-2);
+  border-radius: 999px;
+  overflow: hidden;
+  margin: 8px 0;
+}
+
+.progress-line span {
+  display: block;
+  height: 100%;
+  background: var(--color-primary);
+}
+
+.lote-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 8px;
+}
+
+/* --- Tabs --- */
+.tabs-row {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-bottom: 16px; /* Added margin for separation */
+}
+
+.tabs-row button {
+  padding: 8px 12px;
+  border-radius: var(--radius-md);
+  border: 1px solid var(--color-border);
+  background: var(--color-surface);
+  color: var(--color-text-secondary);
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.tabs-row button:hover {
+  background: var(--color-surface-2);
+  color: var(--color-text);
+}
+
+.tabs-row button.active {
+  background: var(--color-primary-subtle);
+  border-color: var(--color-primary);
+  color: var(--color-primary);
+}
+
+/* --- Timeline & Metrics --- */
+.timeline,
+.metrics-2col {
+  display: grid;
+  gap: 8px;
+}
+
+.timeline-item {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  padding: 8px;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  background: var(--color-surface);
+}
+
+/* --- Form Grid --- */
+.form-grid {
+  display: grid;
+  gap: 10px;
+}
+
+.form-grid.two {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.form-grid .full {
+  grid-column: 1 / -1;
+}
+
+.err {
+  color: var(--color-danger);
+  font-size: 0.8rem; /* Consistent error message font size */
+  margin-top: 4px;
+}
+
+/* --- Calendar Grid --- */
+.calendar-grid {
+  display: grid;
+  grid-template-columns: repeat(7, minmax(0, 1fr));
+  gap: 6px;
+}
+
+.cal-day {
+  position: relative;
+  min-height: 44px;
+  border: 1px solid var(--color-border);
+  border-radius: 8px;
+  background: var(--color-surface);
+}
+
+.cal-day.active {
+  outline: 2px solid var(--color-primary);
+  outline-offset: -2px; /* Prevent outline from expanding outside border */
+}
+
+.cal-dot {
+  position: absolute;
+  bottom: 4px;
+  right: 4px;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--color-primary); /* Example dot color */
+}
+
+/* --- Notification Dropdown --- */
+.notif-dropdown {
+  position: absolute;
+  right: 0;
+  top: calc(100% + 6px);
+  width: 320px;
+  max-height: 360px;
+  overflow-y: auto; /* Changed to auto for better scroll behavior */
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  padding: 8px;
+  display: grid;
+  gap: 8px;
+  box-shadow: var(--shadow-md);
+  z-index: 100; /* Ensure it's above other content */
+}
+
+.notif-item {
+  display: grid;
+  gap: 4px;
+  border: 1px solid var(--color-border);
+  border-radius: 8px;
+  padding: 8px;
+  background: var(--color-surface-2); /* Slightly different background for items */
+}
+
+.notif-actions {
+  display: flex;
+  gap: 6px;
+  margin-top: 8px; /* Space for actions */
+}
+
+/* --- Indicadores Painel --- */
+.indicadores-painel {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.indicador-card {
+  border: 1px solid var(--color-border);
+  border-radius: 10px;
+  padding: 10px;
+  display: grid;
+  gap: 6px;
+  background: var(--card-bg); /* Consistent card background */
+}
+
+/* --- Responsive Design --- */
+@media (max-width: 1024px) {
+  .lote-cards-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr)); /* 2 columns on medium screens */
+  }
+}
+
+@media (max-width: 767px) {
+  .lote-cards-grid,
+  .rebanho-filters,
+  .form-grid.two,
+  .indicadores-painel { /* Added indicadores-painel for mobile responsiveness */
+    grid-template-columns: 1fr; /* Stack columns on small screens */
+  }
+  .rebanho-header {
+    flex-direction: column; /* Stack header items vertically */
+    align-items: flex-start;
+  }
+}

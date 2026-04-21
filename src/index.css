@@ -1,0 +1,322 @@
+@import url('https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,300;9..144,400;9..144,500;9..144,600&family=DM+Mono:wght@400;500&family=Outfit:wght@300;400;500;600;700&display=swap');
+
+/* --- Root Variables --- */
+:root {
+  --bg: #09100a;
+  --surface: #101608;
+  --surface-2: #121a0c;
+  --border: #1a2512;
+  --border-strong: #2e4020;
+  --text: #7a9e62;
+  --text-strong: #cce0a8;
+  --text-soft: #4e6e38;
+  --text-faint: #3a5428;
+  --green: #6bb520;
+  --amber: #cc8f00;
+  --red: #c4503c;
+  --blue: #4487c8;
+
+  /* Re-mapping for consistency with previous CSS files */
+  --color-bg: var(--bg);
+  --color-surface: var(--surface);
+  --color-surface-2: var(--surface-2);
+  --color-border: var(--border);
+  --color-border-focus: var(--border-strong); /* Assuming border-strong is for focus */
+  --color-text: var(--text-strong); /* Main text color */
+  --color-text-secondary: var(--text); /* Secondary text color */
+  --color-text-muted: var(--text-soft); /* Muted text color */
+
+  --color-primary: var(--green);
+  --color-primary-light: #87d03a; /* Slightly lighter green */
+  --color-primary-dark: #5a9e1a; /* Slightly darker green */
+  --color-primary-subtle: rgba(107, 181, 32, 0.15); /* Subtle green background */
+  --color-primary-glow: rgba(107, 181, 32, 0.25); /* Green glow effect */
+
+  --color-success: var(--green);
+  --color-success-bg: rgba(107, 181, 32, 0.1);
+  --color-warning: var(--amber);
+  --color-warning-bg: rgba(204, 143, 0, 0.1);
+  --color-danger: var(--red);
+  --color-danger-bg: rgba(196, 80, 60, 0.1);
+  --color-info: var(--blue);
+  --color-info-bg: rgba(68, 135, 200, 0.1);
+
+  /* Input variables (re-mapping to new theme) */
+  --input-bg: var(--surface-2);
+  --input-border: var(--border);
+  --input-focus-border: var(--border-strong);
+  --input-text: var(--text-strong);
+  --input-placeholder: var(--text-soft);
+
+  /* Card variables (re-mapping to new theme) */
+  --card-bg: var(--surface);
+  --card-border: var(--border);
+  --card-hover-border: var(--border-strong);
+
+  /* Table variables (re-mapping to new theme) */
+  --table-header-bg: var(--surface-2);
+  --table-row-hover: var(--surface-2);
+  --table-row-alt: var(--surface);
+  --table-border: var(--border);
+
+  /* Shadow variables (adjusting to new theme's aesthetic) */
+  --shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.3);
+  --shadow-md: 0 4px 16px rgba(0, 0, 0, 0.4);
+  --shadow-lg: 0 8px 32px rgba(0, 0, 0, 0.5);
+  --shadow-glow: 0 0 20px rgba(107, 181, 32, 0.15);
+
+  /* Radius variables (keeping previous values) */
+  --radius-sm: 6px;
+  --radius-md: 10px;
+  --radius-lg: 14px;
+  --radius-xl: 20px;
+  --radius-full: 9999px;
+
+  /* Typography variables (keeping previous values, but mapping to new fonts) */
+  --font-sans: 'Outfit', system-ui, sans-serif;
+  --text-xs: 0.75rem;
+  --text-sm: 0.875rem;
+  --text-base: 1rem;
+  --text-lg: 1.125rem;
+  --text-xl: 1.25rem;
+  --text-2xl: 1.5rem;
+  --text-3xl: 1.875rem;
+}
+
+/* --- Global Resets --- */
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+html,
+body,
+#root {
+  min-height: 100%;
+  width: 100%;
+}
+
+body {
+  background: var(--bg);
+  color: var(--text);
+  font-family: 'Outfit', system-ui, sans-serif;
+  line-height: 1.5;
+  -webkit-font-smoothing: antialiased; /* Better font rendering */
+}
+
+button,
+input,
+select,
+textarea {
+  font: inherit;
+  color: inherit; /* Inherit text color */
+}
+
+button {
+  background: none;
+  border: none;
+  cursor: pointer; /* Indicate interactivity */
+}
+
+a {
+  color: inherit;
+  text-decoration: none;
+}
+
+img,
+svg,
+video {
+  display: block;
+  max-width: 100%;
+  height: auto; /* Maintain aspect ratio */
+}
+
+table {
+  border-collapse: collapse;
+  border-spacing: 0;
+}
+
+/* --- Scrollbar Styling --- */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--color-border);
+  border-radius: 999px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: var(--color-primary-dark);
+}
+
+/* =========================================================
+   MAIN LAYOUT STRUCTURE
+   ========================================================= */
+.app-container {
+  display: flex;
+  height: 100vh;
+  width: 100vw;
+  overflow: hidden;
+}
+
+.sidebar {
+  width: 260px;
+  background: var(--surface-2);
+  border-right: 1px solid var(--border);
+  display: flex;
+  flex-direction: column;
+  padding: 24px;
+  gap: 32px;
+  z-index: 10;
+  flex-shrink: 0; /* Prevent sidebar from shrinking */
+}
+
+.main-content {
+  flex: 1;
+  overflow-y: auto;
+  padding: 48px;
+  background: var(--bg);
+  position: relative;
+}
+
+/* =========================================================
+   ADVANCED TYPOGRAPHY
+   ========================================================= */
+.title-brand {
+  font-family: 'Fraunces', serif;
+  font-size: 24px;
+  font-weight: 500;
+  color: var(--text-strong);
+  letter-spacing: -0.02em;
+}
+
+.title-page {
+  font-family: 'Fraunces', serif;
+  font-size: 36px;
+  font-weight: 500;
+  color: var(--text-strong);
+  margin-bottom: 8px;
+  line-height: 1.1;
+}
+
+.text-mono {
+  font-family: 'DM Mono', monospace;
+}
+
+.subtitle {
+  color: var(--text-soft);
+  font-size: 15px;
+  font-weight: 300;
+}
+
+/* =========================================================
+   UI COMPONENTS (Cards, Grids, and Buttons)
+   ========================================================= */
+.dashboard-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  gap: 24px;
+  margin-top: 32px;
+}
+
+.card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  padding: 24px;
+  transition: all 0.3s ease;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.15);
+}
+
+.card:hover {
+  border-color: var(--border-strong);
+  transform: translateY(-2px);
+  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.25);
+}
+
+.kpi-label {
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.15em;
+  color: var(--text-soft);
+  font-weight: 600;
+  margin-bottom: 16px;
+}
+
+.kpi-value {
+  font-family: 'DM Mono', monospace;
+  font-size: 36px;
+  color: var(--text-strong);
+  font-weight: 500;
+  line-height: 1;
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+}
+
+.kpi-unit {
+  font-family: 'Outfit', sans-serif;
+  font-size: 16px;
+  color: var(--text-soft);
+  font-weight: 400;
+}
+
+/* =========================================================
+   NAVIGATION (Menu)
+   ========================================================= */
+.nav-menu {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.nav-link {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 16px;
+  border-radius: 10px;
+  color: var(--text);
+  font-weight: 500;
+  font-size: 15px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  border: 1px solid transparent;
+}
+
+.nav-link:hover {
+  background: var(--surface);
+  color: var(--text-strong);
+}
+
+.nav-link.active {
+  background: rgba(107, 181, 32, 0.1);
+  color: var(--green);
+  border-color: rgba(107, 181, 32, 0.2);
+}
+
+/* =========================================================
+   BADGES AND STATUS
+   ========================================================= */
+.badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 4px 10px;
+  border-radius: 99px;
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.05em;
+}
+
+.badge.green { background: rgba(107, 181, 32, 0.15); color: var(--green); border: 1px solid rgba(107, 181, 32, 0.3); }
+.badge.amber { background: rgba(204, 143, 0, 0.15); color: var(--amber); border: 1px solid rgba(204, 143, 0, 0.3); }
+.badge.red   { background: rgba(196, 80, 60, 0.15); color: var(--red); border: 1px solid rgba(196, 80, 60, 0.3); }

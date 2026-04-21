@@ -1,0 +1,121 @@
+/* --- Config Page --- */
+.config-page {
+  display: grid;
+  gap: 12px;
+}
+
+.config-page h1 {
+  margin: 0;
+}
+
+.config-page p {
+  margin: 4px 0 0;
+  color: var(--color-text-secondary);
+}
+
+.config-tabs {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-bottom: 16px; /* Added margin for separation */
+}
+
+.config-tabs button {
+  padding: 8px 12px;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  background: var(--color-surface);
+  color: var(--color-text-secondary); /* Default text color */
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.config-tabs button:hover {
+  background: var(--color-surface-2);
+  color: var(--color-text);
+}
+
+.config-tabs button.active {
+  background: var(--color-primary-subtle);
+  border-color: var(--color-primary);
+  color: var(--color-primary);
+}
+
+.config-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr); /* Default to 2 columns */
+  gap: 24px; /* Increased gap for better spacing */
+}
+
+.config-section {
+  background: var(--card-bg);
+  border: 1px solid var(--card-border);
+  border-radius: var(--radius-lg);
+  padding: 20px;
+  display: grid; /* Use grid for internal layout */
+  gap: 16px; /* Gap between items in the section */
+}
+
+.config-section-header {
+  margin-bottom: 12px; /* Space below header */
+}
+
+.config-section-header h3 {
+  margin: 0;
+  font-size: 1.1rem;
+  font-weight: 700;
+  color: var(--color-text);
+}
+
+.config-section-header p {
+  margin: 4px 0 0;
+  font-size: 0.85rem;
+  color: var(--color-text-muted);
+}
+
+.config-form-grid {
+  display: grid;
+  gap: 12px; /* Gap for form elements */
+}
+
+.config-actions {
+  display: flex;
+  justify-content: flex-end; /* Align buttons to the right */
+  gap: 10px;
+  margin-top: 20px; /* Space above action buttons */
+}
+
+.danger-zone {
+  border: 1px solid var(--color-danger);
+  border-radius: var(--radius-md);
+  padding: 12px;
+  display: grid;
+  gap: 8px;
+  background: var(--color-danger-bg); /* Use a subtle background for danger zone */
+  color: var(--color-danger); /* Text color for danger zone */
+}
+
+.danger-zone h4 {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+  margin: 0;
+  font-size: 0.95rem; /* Slightly smaller font for h4 */
+  font-weight: 600;
+}
+
+.switch-row {
+  display: flex !important; /* Ensure flex behavior */
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  color: var(--color-text-secondary); /* Default text color for switch label */
+  font-size: 0.9rem;
+}
+
+/* --- Responsive Design --- */
+@media (max-width: 900px) {
+  .config-grid {
+    grid-template-columns: 1fr; /* Stack columns on smaller screens */
+  }
+}

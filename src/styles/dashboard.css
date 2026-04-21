@@ -1,0 +1,330 @@
+/* --- Dashboard Page --- */
+.dashboard-page {
+  display: grid;
+  gap: 16px;
+}
+
+.dashboard-title h1 {
+  margin: 0;
+  font-size: var(--text-3xl); /* Using CSS variable for font size */
+}
+
+.dashboard-title p {
+  margin: 4px 0 0;
+  color: var(--color-text-secondary);
+}
+
+.dashboard-grid {
+  display: grid;
+  gap: 12px;
+}
+
+.dashboard-grid--kpi-main {
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+
+.dashboard-grid--kpi-secondary {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.dashboard-grid--dual {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.kpi-panel {
+  position: relative;
+  overflow: hidden;
+  background: var(--card-bg); /* Default background for KPI panels */
+  border: 1px solid var(--card-border);
+  border-radius: var(--radius-lg);
+  padding: 20px; /* Consistent padding */
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+}
+
+.kpi-panel strong {
+  font-size: 1.7rem;
+  color: var(--color-text); /* Ensure text color is readable */
+}
+
+.kpi-panel span {
+  color: var(--color-text-secondary);
+  font-size: var(--text-sm); /* Using CSS variable for font size */
+}
+
+.kpi-panel-header {
+  display: flex;
+  justify-content: flex-end;
+  color: var(--color-primary); /* Icon/indicator color */
+  margin-bottom: 8px; /* Space between header and value */
+}
+
+/* Specific background colors for KPI panels */
+.kpi-panel--success {
+  background: var(--color-success-bg);
+}
+
+.kpi-panel--warning {
+  background: var(--color-warning-bg);
+}
+
+.kpi-panel--danger {
+  background: var(--color-danger-bg);
+}
+
+.kpi-panel--info {
+  background: var(--color-info-bg);
+}
+
+.kpi-variation {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: var(--text-sm); /* Using CSS variable for font size */
+  font-weight: 700;
+  margin-top: 6px;
+}
+
+.kpi-variation.up {
+  color: var(--color-success);
+}
+
+.kpi-variation.down {
+  color: var(--color-danger);
+}
+
+/* --- Charts --- */
+.dashboard-chart-card {
+  background: var(--card-bg);
+  border: 1px solid var(--card-border);
+  border-radius: var(--radius-lg);
+  padding: 20px;
+}
+
+.dashboard-chart-card .chart-shell {
+  min-height: 320px;
+  /* Ensure chart content can scroll if too wide */
+  overflow-x: auto;
+}
+
+.chart-legend {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-bottom: 8px;
+}
+
+.chart-legend button {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  border: 1px solid var(--color-border);
+  padding: 4px 8px;
+  border-radius: var(--radius-full); /* Using CSS variable for border-radius */
+  background: var(--color-surface);
+  color: var(--color-text-secondary);
+  cursor: pointer;
+  font-size: 0.8rem;
+  transition: all 0.2s ease;
+}
+
+.chart-legend button:hover {
+  background: var(--color-surface-2);
+  color: var(--color-text);
+}
+
+.chart-legend button.active {
+  background: var(--color-primary-subtle);
+  border-color: var(--color-primary);
+  color: var(--color-primary);
+}
+
+.chart-legend span {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+}
+
+.peso-tooltip {
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  padding: 8px;
+  border-radius: var(--radius-md); /* Using CSS variable for border-radius */
+  box-shadow: var(--shadow-sm);
+  color: var(--color-text);
+  font-size: 0.875rem;
+}
+
+/* --- Tables --- */
+.table-responsive {
+  overflow-x: auto; /* Enables horizontal scrolling for tables */
+}
+
+.dashboard-table {
+  width: 100%;
+  min-width: 900px; /* Ensures table has a minimum width before scrolling */
+  border-collapse: collapse;
+}
+
+.dashboard-table th,
+.dashboard-table td {
+  padding: 12px 16px;
+  text-align: left;
+  border-bottom: 1px solid var(--table-border);
+}
+
+.dashboard-table th {
+  background: var(--table-header-bg);
+  color: var(--color-text-muted);
+  font-size: 0.75rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+
+.dashboard-table td {
+  color: var(--color-text-secondary);
+  font-size: 0.875rem;
+}
+
+.dashboard-table tr:hover td {
+  background: var(--table-row-hover);
+  color: var(--color-text);
+}
+
+/* --- Dashboard Tabs --- */
+.dashboard-tab-content {
+  display: grid;
+  gap: 16px;
+}
+
+.dashboard-tab-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 10px;
+}
+
+.dashboard-stock-card,
+.dashboard-alerts-card {
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  background: var(--card-bg);
+  padding: 20px; /* Consistent padding */
+}
+
+/* --- Alerts --- */
+.alert-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: var(--color-text-muted); /* Default for unknown priority */
+}
+
+.alert-dot.alta {
+  background: var(--color-danger);
+}
+
+.alert-dot.media {
+  background: var(--color-warning);
+}
+
+.alert-dot.baixa {
+  background: var(--color-success);
+}
+
+.alert-item-title {
+  margin: 0;
+  font-size: 0.9rem;
+  font-weight: 700;
+  color: var(--color-text);
+}
+
+.alert-item-desc {
+  margin: 3px 0 0;
+  font-size: 0.8rem;
+  color: var(--color-text-secondary);
+}
+
+.alert-action-btn {
+  border: 1px solid var(--color-border);
+  background: var(--color-surface-2);
+  color: var(--color-text);
+  border-radius: var(--radius-md);
+  padding: 8px 10px;
+  font-size: 0.75rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.alert-action-btn:hover {
+  border-color: var(--color-primary);
+  color: var(--color-primary);
+}
+
+/* --- Empty States --- */
+.empty-state-title {
+  margin: 6px 0 0;
+  font-weight: 700;
+  color: var(--color-text);
+}
+
+.empty-state-desc {
+  margin: 4px 0 0;
+  color: var(--color-text-secondary);
+}
+
+/* --- Responsive Design --- */
+@media (max-width: 1200px) {
+  .dashboard-grid--kpi-main {
+    grid-template-columns: repeat(2, minmax(0, 1fr)); /* 2 columns on medium screens */
+  }
+  .dashboard-grid--kpi-secondary {
+    grid-template-columns: repeat(2, minmax(0, 1fr)); /* 2 columns on medium screens */
+  }
+}
+
+@media (max-width: 900px) {
+  .dashboard-grid--kpi-main,
+  .dashboard-grid--kpi-secondary,
+  .dashboard-grid--dual {
+    grid-template-columns: 1fr; /* Stack all grids on small screens */
+  }
+  .dashboard-chart-card .chart-shell {
+    min-height: 220px;
+    overflow-x: auto; /* Ensure chart can scroll if needed */
+  }
+  /* Table responsiveness for small screens */
+  .dashboard-table,
+  .dashboard-table thead,
+  .dashboard-table tbody,
+  .dashboard-table tr,
+  .dashboard-table td {
+    display: block;
+    min-width: unset; /* Remove min-width to allow stacking */
+  }
+  .dashboard-table thead {
+    display: none; /* Hide table headers on small screens */
+  }
+  .dashboard-table tr {
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-md);
+    padding: 8px;
+    margin-bottom: 8px;
+  }
+  .dashboard-table td {
+    border: none;
+    padding: 4px 0;
+    /* Optional: Add labels for each cell if needed for clarity */
+    /* Example: content: attr(data-label); */
+  }
+}
+
+@media (max-width: 767px) {
+  .dashboard-tab-header {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+}

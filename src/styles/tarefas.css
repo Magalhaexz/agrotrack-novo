@@ -1,0 +1,199 @@
+/* --- Tarefas Page --- */
+.tarefas-page {
+  display: grid;
+  gap: 12px;
+}
+
+.tarefas-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 12px;
+}
+
+.tarefas-header h1 {
+  margin: 0;
+}
+
+.tarefas-header p {
+  margin: 4px 0 0;
+  color: var(--color-text-secondary);
+}
+
+.tarefas-filtros {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 8px;
+  background: var(--card-bg); /* Added background for filter section */
+  border: 1px solid var(--card-border);
+  border-radius: var(--radius-lg);
+  padding: 16px;
+  margin-bottom: 16px; /* Space below filters */
+}
+
+.tarefas-filtros select {
+  width: 100%;
+  padding: 8px 10px; /* Adjusted padding for filters */
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  background: var(--color-surface-1); /* Lighter background for select */
+  color: var(--color-text);
+  font-size: 0.9rem;
+}
+
+/* --- Kanban Board --- */
+.tarefas-board {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.tarefas-column {
+  display: grid;
+  gap: 8px;
+  background: var(--card-bg); /* Column background */
+  border: 1px solid var(--card-border);
+  border-radius: var(--radius-lg);
+  padding: 12px;
+}
+
+.tarefas-column h2 {
+  margin: 0 0 8px;
+  font-size: 1.1rem;
+  font-weight: 700;
+  color: var(--color-text);
+  padding-bottom: 8px;
+  border-bottom: 1px solid var(--color-border-subtle);
+}
+
+.tarefa-card {
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  padding: 10px;
+  display: grid;
+  gap: 8px;
+  background: var(--color-surface);
+  box-shadow: var(--shadow-sm); /* Subtle shadow for cards */
+  transition: all 0.2s ease;
+}
+
+.tarefa-card:hover {
+  border-color: var(--color-primary);
+  box-shadow: 0 0 0 1px var(--color-primary-subtle);
+}
+
+.tarefa-card-top {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  align-items: flex-start;
+}
+
+.tarefa-card-top h3 {
+  margin: 0;
+  font-size: var(--text-md);
+  color: var(--color-text);
+  font-weight: 600;
+}
+
+.tarefa-badges {
+  display: flex;
+  gap: 4px;
+  flex-wrap: wrap;
+}
+
+.tarefa-meta {
+  display: grid;
+  gap: 4px;
+  font-size: var(--text-sm);
+  color: var(--color-text-secondary);
+}
+
+.tarefa-meta .late {
+  color: var(--color-danger);
+  font-weight: 600;
+}
+
+.tarefa-actions {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+  margin-top: 8px;
+}
+
+.tarefas-empty {
+  margin: 0;
+  color: var(--color-text-muted);
+  text-align: center;
+  padding: 20px;
+}
+
+/* --- Task Form (Modal Content) --- */
+.task-form {
+  display: grid;
+  gap: 10px;
+}
+
+.task-form label {
+  display: grid;
+  gap: 4px;
+  font-size: var(--text-sm);
+  color: var(--color-text-secondary);
+}
+
+.task-form input,
+.task-form select,
+.task-form textarea {
+  width: 100%;
+  padding: 10px 12px;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  background: var(--color-surface-1);
+  color: var(--color-text);
+  font-size: 0.9rem;
+}
+
+.task-form textarea {
+  min-height: 80px;
+  resize: vertical;
+}
+
+.task-form-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.task-form-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  margin-top: 16px;
+}
+
+.tarefas-footer-link {
+  display: flex;
+  justify-content: flex-end;
+  margin-top: 16px;
+}
+
+/* --- Responsive Design --- */
+@media (max-width: 1100px) {
+  .tarefas-board {
+    grid-template-columns: 1fr; /* Stack columns on medium screens */
+  }
+  .tarefas-filtros {
+    grid-template-columns: 1fr 1fr; /* 2 columns for filters on medium screens */
+  }
+}
+
+@media (max-width: 700px) {
+  .tarefas-header {
+    flex-direction: column; /* Stack header items vertically */
+    align-items: flex-start;
+  }
+  .tarefas-filtros,
+  .task-form-grid {
+    grid-template-columns: 1fr; /* Stack filters and form fields vertically */
+  }
+}

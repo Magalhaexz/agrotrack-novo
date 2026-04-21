@@ -1,0 +1,145 @@
+/* --- Comparativo Page --- */
+.comparativo-page {
+  display: grid;
+  gap: 16px;
+}
+
+.comparativo-topbar {
+  display: flex;
+  justify-content: space-between;
+  gap: 18px;
+  align-items: flex-start;
+}
+
+.comparativo-label {
+  margin: 0 0 8px;
+  font-size: 0.75rem;
+  color: var(--color-text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+
+.comparativo-select {
+  min-width: 180px;
+  background: var(--color-surface-2);
+  border: 1px solid var(--color-border);
+  color: var(--color-text);
+  border-radius: var(--radius-md);
+  padding: 10px 12px;
+  /* Custom arrow for select */
+  appearance: none;
+  background-image: linear-gradient(45deg, transparent 50%, var(--color-text-secondary) 50%),
+    linear-gradient(135deg, var(--color-text-secondary) 50%, transparent 50%);
+  background-position: calc(100% - 16px) calc(1em + 2px), calc(100% - 11px) calc(1em + 2px);
+  background-size: 5px 5px, 5px 5px;
+  background-repeat: no-repeat;
+}
+
+.lote-toggle-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.lote-toggle {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 7px 14px;
+  border-radius: var(--radius-full);
+  border: 1px solid var(--color-border);
+  background: transparent;
+  color: var(--color-text-secondary);
+  font-size: 0.8rem;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.lote-toggle:hover {
+  background: var(--color-surface-2);
+  border-color: var(--color-border-focus);
+  color: var(--color-text);
+}
+
+.lote-toggle.active {
+  background: var(--color-primary-subtle);
+  border-color: var(--color-primary);
+  color: var(--color-primary);
+}
+
+.lote-toggle-color {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: currentColor; /* Uses the color of the parent text */
+}
+
+.comparativo-grid-2 {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 16px;
+}
+
+.comparativo-chart-card {
+  background: var(--card-bg);
+  border: 1px solid var(--card-border);
+  border-radius: var(--radius-lg);
+  padding: 20px;
+}
+
+.comparativo-chart-title {
+  font-size: 1.1rem;
+  font-weight: 700;
+  color: var(--color-text);
+  margin-bottom: 16px;
+}
+
+.comparativo-ranking-card {
+  background: var(--card-bg);
+  border: 1px solid var(--card-border);
+  border-radius: var(--radius-lg);
+  padding: 20px;
+}
+
+.ranking-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 0;
+  border-bottom: 1px solid var(--color-border-subtle);
+  font-size: 0.875rem;
+}
+
+.ranking-item:last-child {
+  border-bottom: none;
+}
+
+.ranking-metric {
+  color: var(--color-text-muted);
+  font-size: 0.8rem;
+  width: 140px; /* Fixed width for metric label */
+}
+
+.ranking-lote {
+  color: var(--color-text);
+  font-weight: 600;
+  flex: 1; /* Allows lote name to take available space */
+  text-align: center;
+}
+
+.ranking-valor {
+  color: var(--color-primary);
+  font-weight: 700;
+  width: 100px; /* Fixed width for value */
+  text-align: right;
+}
+
+/* --- Responsive Design --- */
+@media (max-width: 900px) {
+  .comparativo-topbar {
+    flex-direction: column;
+  }
+  .comparativo-grid-2 {
+    grid-template-columns: 1fr; /* Stack columns on smaller screens */
+  }
+}
