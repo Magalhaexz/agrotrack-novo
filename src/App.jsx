@@ -1,28 +1,23 @@
-import { useEffect, useMemo, useState } from 'react';
+import { Suspense, lazy, useEffect, useMemo, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 
 import Sidebar from './components/Sidebar';
 import Toast from './components/Toast';
 import ConfirmModal from './components/ConfirmModal';
-import DashboardPage from './pages/DashboardPage';
-import FazendasPage from './pages/FazendasPage';
-import LotesPage from './pages/LotesPage';
-import AnimaisPage from './pages/AnimaisPage';
-import SuplementacaoPage from './pages/SuplementacaoPage';
-import SanitarioPage from './pages/SanitarioPage';
-import CustosPage from './pages/CustosPage';
-import ResultadosPage from './pages/ResultadosPage';
-import FinanceiroPage from './pages/FinanceiroPage';
-import EstoquePage from './pages/EstoquePage';
-import PesagensPage from './pages/PesagensPage';
-import AcompanhamentoPesoPage from './pages/AcompanhamentoPesoPage';
-import RotinaPage from './pages/RotinaPage';
-import FuncionariosPage from './pages/FuncionariosPage';
+import AppHeader from './components/AppHeader';
 import LoginPage from './pages/LoginPage';
+import RotaProtegida from './components/RotaProtegida';
+import MobileBottomNav from './components/MobileBottomNav';
+import MobileFab from './components/MobileFab';
+import Modal from './components/ui/Modal';
+import Button from './components/ui/Button';
 
 import { initialDb } from './data/mockData';
 import { buildAlerts } from './utils/alerts';
+import { gerarAlertasCalendario, gerarAlertasEstoque, gerarAlertasLote, gerarAlertasPesagem, ordenarAlertas } from './domain/alertas';
 import { supabase } from './lib/supabase';
+import { useAuth } from './auth/useAuth';
+import { permissoesPorPagina } from './auth/perfis';
 import {
   registrarEntradaAnimal,
   registrarEntradaEstoque,
@@ -32,13 +27,38 @@ import {
 import { useToast } from './hooks/useToast';
 
 import './styles/app.css';
+import './styles/ui.css';
 
+const DashboardPage = lazy(() => import('./pages/DashboardPage'));
+const FazendasPage = lazy(() => import('./pages/FazendasPage'));
+const LotesPage = lazy(() => import('./pages/LotesPage'));
+const CalendarioOperacionalPage = lazy(() => import('./pages/CalendarioOperacionalPage'));
+const ComparativoLotesPage = lazy(() => import('./pages/ComparativoLotesPage'));
+const AnimaisPage = lazy(() => import('./pages/AnimaisPage'));
+const SuplementacaoPage = lazy(() => import('./pages/SuplementacaoPage'));
+const SanitarioPage = lazy(() => import('./pages/SanitarioPage'));
+const CustosPage = lazy(() => import('./pages/CustosPage'));
+const ResultadosPage = lazy(() => import('./pages/ResultadosPage'));
+const FinanceiroPage = lazy(() => import('./pages/FinanceiroPage'));
+const EstoquePage = lazy(() => import('./pages/EstoquePage'));
+const PesagensPage = lazy(() => import('./pages/PesagensPage'));
+const AcompanhamentoPesoPage = lazy(() => import('./pages/AcompanhamentoPesoPage'));
+const RotinaPage = lazy(() => import('./pages/RotinaPage'));
+const FuncionariosPage = lazy(() => import('./pages/FuncionariosPage'));
+const TarefasPage = lazy(() => import('./pages/TarefasPage'));
+const PerfilPage = lazy(() => import('./pages/PerfilPage'));
+const ConfiguracoesPage = lazy(() => import('./pages/ConfiguracoesPage'));
 const pageMap = {
   dashboard: DashboardPage,
   fazendas: FazendasPage,
   lotes: LotesPage,
+  calendarioOperacional: CalendarioOperacionalPage,
+  comparativoLotes: ComparativoLotesPage,
   funcionarios: FuncionariosPage,
   rotina: RotinaPage,
+  tarefas: TarefasPage,
+  perfil: PerfilPage,
+  configuracoes: ConfiguracoesPage,
   animais: AnimaisPage,
   suplementacao: SuplementacaoPage,
   sanitario: SanitarioPage,
@@ -63,10 +83,37 @@ export default function App() {
     alertas_resolvidos: Array.isArray(initialDb?.alertas_resolvidos)
       ? initialDb.alertas_resolvidos
       : [],
+    funcionarios: Array.isArray(initialDb?.funcionarios)
+      ? initialDb.funcionarios
+      : [],
+    fazendas: Array.isArray(initialDb?.fazendas)
+      ? initialDb.fazendas
+      : [],
+    tarefas: Array.isArray(initialDb?.tarefas)
+      ? initialDb.tarefas
+      : [],
+    configuracoes: initialDb?.configuracoes || {
+      geral: {
+        nome_sistema: 'AgroTrack',
+        moeda: 'BRL',
+        formato_data: 'DD/MM/AAAA',
+        unidade_peso: 'kg',
+        rendimento_carcaca_padrao: 52,
+        preco_arroba_padrao: 290,
+      },
+      notificacoes: {
+        estoque_critico: true,
+        sanitario_vencido: true,
+        pesagem_atrasada: true,
+        lote_data_saida: true,
+        dias_antecedencia: 3,
+      },
+    },
+    usuarios: Array.isArray(initialDb?.usuarios) ? initialDb.usuarios : [],
   }));
-  const [session, setSession] = useState(null);
-  const [loadingAuth, setLoadingAuth] = useState(true);
   const { toasts, showToast, removeToast } = useToast();
+  const { session, user, loadingAuth, hasPermission } = useAuth();
+  const [menuExtraAberto, setMenuExtraAberto] = useState(false);
   const [confirmState, setConfirmState] = useState({
     open: false,
     title: '',
@@ -75,45 +122,7 @@ export default function App() {
     resolver: null,
   });
 
-  useEffect(() => {
-    let ativo = true;
 
-    async function carregarSessao() {
-      try {
-        const { data, error } = await supabase.auth.getSession();
-
-        if (error) {
-          console.error('Erro ao obter sessão:', error);
-        }
-
-        if (ativo) {
-          setSession(data?.session ?? null);
-          setLoadingAuth(false);
-        }
-      } catch (err) {
-        console.error('Erro inesperado ao obter sessão:', err);
-
-        if (ativo) {
-          setSession(null);
-          setLoadingAuth(false);
-        }
-      }
-    }
-
-    carregarSessao();
-
-    const {
-      data: { subscription },
-    } = supabase.auth.onAuthStateChange((_event, sessionAtual) => {
-      setSession(sessionAtual ?? null);
-      setLoadingAuth(false);
-    });
-
-    return () => {
-      ativo = false;
-      subscription.unsubscribe();
-    };
-  }, []);
 
   useEffect(() => {
     const originalAlert = window.alert;
@@ -133,13 +142,20 @@ export default function App() {
     };
   }, [showToast]);
 
-  const user = session?.user ?? null;
-
   const alertasResolvidos = Array.isArray(db?.alertas_resolvidos)
     ? db.alertas_resolvidos
     : [];
 
-  const rawAlerts = useMemo(() => buildAlerts(db), [db]);
+  const rawAlerts = useMemo(() => {
+    const legacy = buildAlerts(db);
+    const auto = [
+      ...gerarAlertasEstoque(db),
+      ...gerarAlertasCalendario(db),
+      ...gerarAlertasPesagem(db),
+      ...gerarAlertasLote(db),
+    ];
+    return ordenarAlertas([...legacy, ...auto]);
+  }, [db]);
 
   const alerts = useMemo(() => {
     return rawAlerts.filter(
@@ -159,17 +175,19 @@ export default function App() {
     }));
   }
 
+  const userContext = { id: user?.id || null, email: user?.email || '' };
+
   const handleRegistrarEntradaAnimal = (dados) =>
-    setDb((prev) => registrarEntradaAnimal(prev, dados));
+    setDb((prev) => registrarEntradaAnimal(prev, dados, userContext));
 
   const handleRegistrarSaidaAnimal = (dados) =>
-    setDb((prev) => registrarSaidaAnimal(prev, dados));
+    setDb((prev) => registrarSaidaAnimal(prev, dados, userContext));
 
   const handleRegistrarEntradaEstoque = (dados) =>
-    setDb((prev) => registrarEntradaEstoque(prev, dados));
+    setDb((prev) => registrarEntradaEstoque(prev, dados, userContext));
 
   const handleRegistrarSaidaEstoque = (dados) =>
-    setDb((prev) => registrarSaidaEstoque(prev, dados));
+    setDb((prev) => registrarSaidaEstoque(prev, dados, userContext));
 
   const onConfirmAction = ({ title, message, tone = 'danger' }) =>
     new Promise((resolve) => {
@@ -195,24 +213,16 @@ export default function App() {
     });
   }
 
-  const ActivePage = pageMap[currentPage] || DashboardPage;
+  const paginaValida = currentPage in pageMap;
+  const permissaoAtual = permissoesPorPagina[currentPage] || null;
+  const podeAcessarPaginaAtual = paginaValida && (!permissaoAtual || hasPermission(permissaoAtual));
+  const pageKey = podeAcessarPaginaAtual ? currentPage : 'dashboard';
+  const ActivePage = pageMap[pageKey] || DashboardPage;
+  const permissaoPaginaAtual = permissoesPorPagina[pageKey] || null;
+
 
   if (loadingAuth) {
-    return (
-      <div
-        style={{
-          minHeight: '100vh',
-          display: 'grid',
-          placeItems: 'center',
-          background: '#061106',
-          color: '#d9f7c8',
-          fontSize: 18,
-          fontWeight: 700,
-        }}
-      >
-        Carregando...
-      </div>
-    );
+    return <div className="app-loading">Carregando...</div>;
   }
 
   if (!session) {
@@ -222,40 +232,41 @@ export default function App() {
   return (
     <div className="app">
       <Sidebar
-        currentPage={currentPage}
-        onNavigate={setCurrentPage}
+        currentPage={pageKey}
+        onNavigate={(pagina) => {
+          const permissaoDestino = permissoesPorPagina[pagina];
+          if (!permissaoDestino || hasPermission(permissaoDestino)) {
+            setCurrentPage(pagina);
+            return;
+          }
+
+          showToast({ type: 'error', message: 'Acesso não autorizado para esta área.' });
+        }}
         alertCount={alerts.length}
         user={user}
+        hasPermission={hasPermission}
       />
 
       <main className="main">
-        <div
-          style={{
-            display: 'flex',
-            justifyContent: 'flex-end',
-            marginBottom: 16,
-          }}
-        >
-          <button
-            type="button"
-            onClick={() => supabase.auth.signOut()}
-            style={{
-              background: '#163016',
-              color: '#dff9cc',
-              border: '1px solid rgba(150,255,150,0.15)',
-              borderRadius: 12,
-              padding: '10px 14px',
-              cursor: 'pointer',
-              fontWeight: 700,
-            }}
-          >
-            Sair
-          </button>
-        </div>
+        <AppHeader
+          farmName={db?.fazendas?.[0]?.nome || 'Fazenda Atual'}
+          userName={user?.user_metadata?.name || user?.email?.split('@')[0] || 'Usuário'}
+          notifications={alerts.length}
+          alerts={alerts}
+          onResolveAlert={marcarAlertaComoFeito}
+          onSnoozeAlert={(alert) => showToast({ type: 'warning', message: `Alerta adiado: ${alert.title}` })}
+          onAlertNavigate={(alert) => alert?.route && setCurrentPage(alert.route)}
+          onSignOut={() => supabase.auth.signOut()}
+          onNavigateProfile={() => setCurrentPage('perfil')}
+          onNavigateSettings={() => setCurrentPage('configuracoes')}
+          onConfirmAction={onConfirmAction}
+          onOpenMenu={() => window.dispatchEvent(new CustomEvent('agrotrack-open-drawer'))}
+          userEmail={user?.email || ''}
+        />
 
         <AnimatePresence mode="wait">
           <motion.div
-            key={currentPage}
+            key={pageKey}
             initial="initial"
             animate="animate"
             exit="exit"
@@ -263,32 +274,65 @@ export default function App() {
             transition={{ duration: 0.25, ease: 'easeOut' }}
             className="page-wrapper"
           >
-            <ActivePage
-              db={db}
-              setDb={setDb}
-              alerts={alerts}
-              onNavigate={setCurrentPage}
-              onResolveAlert={marcarAlertaComoFeito}
-              onRegistrarEntradaAnimal={handleRegistrarEntradaAnimal}
-              onRegistrarSaidaAnimal={handleRegistrarSaidaAnimal}
-              onRegistrarEntradaEstoque={handleRegistrarEntradaEstoque}
-              onRegistrarSaidaEstoque={handleRegistrarSaidaEstoque}
-              onConfirmAction={onConfirmAction}
-            />
+            <Suspense fallback={<div className="skeleton-page"><div className="skeleton-row" /><div className="skeleton-row" /><div className="skeleton-row" /></div>}>
+              <RotaProtegida permissao={permissaoPaginaAtual}>
+                <ActivePage
+                db={db}
+                setDb={setDb}
+                alerts={alerts}
+                onNavigate={setCurrentPage}
+                onResolveAlert={marcarAlertaComoFeito}
+                onRegistrarEntradaAnimal={handleRegistrarEntradaAnimal}
+                onRegistrarSaidaAnimal={handleRegistrarSaidaAnimal}
+                onRegistrarEntradaEstoque={handleRegistrarEntradaEstoque}
+                onRegistrarSaidaEstoque={handleRegistrarSaidaEstoque}
+                onConfirmAction={onConfirmAction}
+                />
+              </RotaProtegida>
+            </Suspense>
           </motion.div>
         </AnimatePresence>
       </main>
 
-      <div
-        style={{
-          position: 'fixed',
-          right: 16,
-          bottom: 16,
-          display: 'grid',
-          gap: 10,
-          zIndex: 1400,
+
+      <MobileBottomNav
+        currentPage={pageKey}
+        onNavigate={(pagina) => {
+          const permissaoDestino = permissoesPorPagina[pagina];
+          if (!permissaoDestino || hasPermission(permissaoDestino)) {
+            setCurrentPage(pagina);
+          }
         }}
+        onOpenMore={() => setMenuExtraAberto(true)}
+      />
+
+      <MobileFab page={pageKey} onAction={(acao) => showToast({ type: 'warning', message: `Ação rápida: ${acao}` })} />
+
+      <Modal
+        open={menuExtraAberto}
+        onClose={() => setMenuExtraAberto(false)}
+        title="Mais opções"
       >
+        <div style={{ display: 'grid', gap: 8 }}>
+          {Object.keys(pageMap).map((pagina) => (
+            <Button
+              key={pagina}
+              variant="outline"
+              onClick={() => {
+                const permissaoDestino = permissoesPorPagina[pagina];
+                if (!permissaoDestino || hasPermission(permissaoDestino)) {
+                  setCurrentPage(pagina);
+                  setMenuExtraAberto(false);
+                }
+              }}
+            >
+              {pagina}
+            </Button>
+          ))}
+        </div>
+      </Modal>
+
+      <div className="toast-stack">
         {toasts.map((toast) => (
           <Toast key={toast.id} toast={toast} onClose={removeToast} />
         ))}

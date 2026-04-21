@@ -1,0 +1,99 @@
+:root {
+  /* Backgrounds */
+  --color-bg: #0f1a14;
+  --color-surface: #162011;
+  --color-surface-2: #1c2b1a;
+  --color-surface-3: #243322;
+
+  /* Bordas */
+  --color-border: #2a3d28;
+  --color-border-subtle: #1f2e1d;
+
+  /* Textos */
+  --color-text: #e8f0e6;
+  --color-text-secondary: #9db89a;
+  --color-text-muted: #5c7a58;
+
+  /* Primárias */
+  --color-primary: #4ade80;
+  --color-primary-light: #22c55e;
+  --color-primary-dark: #16a34a;
+  --color-primary-lighter: #4ade80;
+  --color-primary-subtle: #14532d;
+
+  /* Semânticas */
+  --color-success: #4ade80;
+  --color-success-bg: #14532d;
+  --color-warning: #fcd34d;
+  --color-warning-bg: #451a03;
+  --color-danger: #f87171;
+  --color-danger-bg: #450a0a;
+  --color-info: #60a5fa;
+  --color-info-bg: #1e3a5f;
+
+  /* Inputs */
+  --input-bg: #1c2b1a;
+  --input-border: #2a3d28;
+  --input-focus-border: #4ade80;
+  --input-text: #e8f0e6;
+  --input-placeholder: #5c7a58;
+
+  /* Sidebar */
+  --sidebar-bg: #0a1208;
+  --sidebar-border: #1c2b1a;
+  --sidebar-item-hover: #1c2b1a;
+  --sidebar-item-active-bg: #14532d;
+  --sidebar-item-active-text: #4ade80;
+
+  /* Header */
+  --header-bg: #0f1a14;
+  --header-border: #1c2b1a;
+
+  /* Modal */
+  --modal-bg: #162011;
+  --modal-overlay: rgba(0, 0, 0, 0.75);
+
+  /* Cards */
+  --card-bg: #162011;
+  --card-border: #2a3d28;
+  --card-hover-bg: #1c2b1a;
+
+  /* Tabela */
+  --table-header-bg: #1c2b1a;
+  --table-row-hover: #1c2b1a;
+  --table-row-alt: #131e11;
+  --table-border: #2a3d28;
+
+  /* Tipografia */
+  --font-sans: 'Inter', system-ui, sans-serif;
+  --text-xs: 0.75rem;
+  --text-sm: 0.875rem;
+  --text-base: 1rem;
+  --text-lg: 1.125rem;
+  --text-xl: 1.25rem;
+  --text-2xl: 1.5rem;
+  --text-3xl: 1.875rem;
+
+  /* Espaçamentos */
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 20px;
+  --space-6: 24px;
+  --space-8: 32px;
+  --space-10: 40px;
+  --space-12: 48px;
+
+  /* Bordas */
+  --radius-sm: 6px;
+  --radius-md: 10px;
+  --radius-lg: 16px;
+  --radius-xl: 24px;
+  --radius-full: 9999px;
+
+  /* Sombras */
+  --shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.4);
+  --shadow-md: 0 4px 12px rgba(0, 0, 0, 0.5);
+  --shadow-lg: 0 8px 24px rgba(0, 0, 0, 0.6);
+}

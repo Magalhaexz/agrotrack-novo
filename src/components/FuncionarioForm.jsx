@@ -1,34 +1,110 @@
-import { useEffect, useState } from 'react';
+import { useMemo, useState } from 'react';
+import Modal from './ui/Modal';
+import Button from './ui/Button';
+import Input from './ui/Input';
+
+const CARGOS = [
+  'Vaqueiro',
+  'Gerente',
+  'Veterinário',
+  'Nutricionista',
+  'Tratorista',
+  'Administrador',
+  'Outro',
+];
 
 const vazio = {
   nome: '',
-  funcao: '',
+  cpf: '',
   telefone: '',
-  obs: '',
+  cargo: 'Vaqueiro',
+  salario: '',
+  data_admissao: '',
+  status: 'ativo',
+  fazenda_id: '',
+  observacoes: '',
 };
 
+function mascararCpf(valor) {
+  const nums = String(valor || '').replace(/\D/g, '').slice(0, 11);
+  return nums
+    .replace(/(\d{3})(\d)/, '$1.$2')
+    .replace(/(\d{3})(\d)/, '$1.$2')
+    .replace(/(\d{3})(\d{1,2})$/, '$1-$2');
+}
+
+function mascararTelefone(valor) {
+  const nums = String(valor || '').replace(/\D/g, '').slice(0, 11);
+  if (nums.length <= 10) {
+    return nums
+      .replace(/(\d{2})(\d)/, '($1) $2')
+      .replace(/(\d{4})(\d)/, '$1-$2');
+  }
+
+  return nums
+    .replace(/(\d{2})(\d)/, '($1) $2')
+    .replace(/(\d{5})(\d)/, '$1-$2');
+}
+
+function validarCpf(cpf) {
+  const digits = String(cpf || '').replace(/\D/g, '');
+  if (digits.length !== 11 || /(\d)\1{10}/.test(digits)) return false;
+
+  const calc = (len) => {
+    let sum = 0;
+    for (let i = 0; i < len; i += 1) sum += Number(digits[i]) * (len + 1 - i);
+    const resto = (sum * 10) % 11;
+    return resto === 10 ? 0 : resto;
+  };
+
+  return calc(9) === Number(digits[9]) && calc(10) === Number(digits[10]);
+}
+
 export default function FuncionarioForm({
+  open,
   initialData,
+  fazendas = [],
   onSave,
   onCancel,
 }) {
-  const [form, setForm] = useState(vazio);
+  const [erro, setErro] = useState('');
 
-  useEffect(() => {
-    if (initialData) {
-      setForm({
-        nome: initialData.nome || '',
-        funcao: initialData.funcao || '',
-        telefone: initialData.telefone || '',
-        obs: initialData.obs || '',
-      });
-    } else {
-      setForm(vazio);
+  const [form, setForm] = useState(() => {
+    if (!initialData) {
+      return { ...vazio, fazenda_id: fazendas?.[0]?.id ? String(fazendas[0].id) : '' };
     }
-  }, [initialData]);
+
+    return {
+      nome: initialData.nome || '',
+      cpf: mascararCpf(initialData.cpf || ''),
+      telefone: mascararTelefone(initialData.telefone || ''),
+      cargo: initialData.cargo || 'Vaqueiro',
+      salario: initialData.salario ?? '',
+      data_admissao: initialData.data_admissao || '',
+      status: initialData.status || 'ativo',
+      fazenda_id: initialData.fazenda_id ? String(initialData.fazenda_id) : '',
+      observacoes: initialData.observacoes || '',
+    };
+  });
+
+  const titulo = useMemo(
+    () => (initialData ? 'Editar funcionário' : 'Cadastrar funcionário'),
+    [initialData]
+  );
 
   function handleChange(e) {
     const { name, value } = e.target;
+
+    if (name === 'cpf') {
+      setForm((prev) => ({ ...prev, cpf: mascararCpf(value) }));
+      return;
+    }
+
+    if (name === 'telefone') {
+      setForm((prev) => ({ ...prev, telefone: mascararTelefone(value) }));
+      return;
+    }
+
     setForm((prev) => ({ ...prev, [name]: value }));
   }
 
@@ -36,148 +112,87 @@ export default function FuncionarioForm({
     e.preventDefault();
 
     if (!form.nome.trim()) {
-      alert('Informe o nome do funcionário.');
+      setErro('Nome é obrigatório.');
       return;
     }
 
-    if (!form.funcao.trim()) {
-      alert('Informe a função do funcionário.');
+    if (!validarCpf(form.cpf)) {
+      setErro('CPF inválido.');
       return;
     }
 
-    onSave({
+    if (!form.telefone.trim()) {
+      setErro('Telefone é obrigatório.');
+      return;
+    }
+
+    setErro('');
+    onSave?.({
       nome: form.nome.trim(),
-      funcao: form.funcao.trim(),
-      telefone: form.telefone.trim(),
-      obs: form.obs.trim(),
+      cpf: form.cpf,
+      telefone: form.telefone,
+      cargo: form.cargo,
+      salario: form.salario === '' ? null : Number(form.salario),
+      data_admissao: form.data_admissao || null,
+      status: form.status,
+      fazenda_id: form.fazenda_id ? Number(form.fazenda_id) : null,
+      observacoes: form.observacoes.trim(),
     });
   }
 
   return (
-    <div
-      style={{
-        position: 'fixed',
-        inset: 0,
-        background: 'rgba(0,0,0,0.55)',
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'center',
-        padding: '24px',
-        zIndex: 999,
-      }}
+    <Modal
+      open={open}
+      onClose={onCancel}
+      title={titulo}
+      subtitle="Preencha os dados do colaborador"
+      footer={(
+        <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8 }}>
+          <Button variant="ghost" onClick={onCancel}>Cancelar</Button>
+          <Button onClick={handleSubmit}>Salvar</Button>
+        </div>
+      )}
     >
-      <div
-        className="card"
-        style={{
-          width: '100%',
-          maxWidth: '560px',
-          borderRadius: '16px',
-          overflow: 'hidden',
-        }}
-      >
-        <div className="card-header">
-          <span className="card-title">
-            {initialData ? 'Editar funcionário' : 'Novo funcionário'}
-          </span>
+      <form onSubmit={handleSubmit} style={{ display: 'grid', gap: 12 }}>
+        <Input label="Nome completo" name="nome" value={form.nome} onChange={handleChange} required />
+        <Input label="CPF" name="cpf" value={form.cpf} onChange={handleChange} placeholder="000.000.000-00" inputMode="numeric" required />
+        <Input label="Telefone" name="telefone" value={form.telefone} onChange={handleChange} placeholder="(00) 00000-0000" inputMode="numeric" required />
+
+        <div className="ui-input-wrap">
+          <label className="ui-input-label">Cargo</label>
+          <select className="ui-input" name="cargo" value={form.cargo} onChange={handleChange}>
+            {CARGOS.map((cargo) => <option key={cargo} value={cargo}>{cargo}</option>)}
+          </select>
         </div>
 
-        <div className="card-body">
-          <form onSubmit={handleSubmit} style={{ display: 'grid', gap: 14 }}>
-            <div>
-              <label style={labelStyle}>Nome</label>
-              <input
-                name="nome"
-                value={form.nome}
-                onChange={handleChange}
-                placeholder="Ex: Carlos Silva"
-                style={inputStyle}
-              />
-            </div>
+        <Input label="Salário (R$)" name="salario" type="number" value={form.salario} onChange={handleChange} />
+        <Input label="Data de admissão" name="data_admissao" type="date" value={form.data_admissao} onChange={handleChange} />
 
-            <div>
-              <label style={labelStyle}>Função</label>
-              <input
-                name="funcao"
-                value={form.funcao}
-                onChange={handleChange}
-                placeholder="Ex: Vaqueiro, Gerente, Tratador"
-                style={inputStyle}
-              />
-            </div>
-
-            <div>
-              <label style={labelStyle}>Telefone</label>
-              <input
-                name="telefone"
-                value={form.telefone}
-                onChange={handleChange}
-                placeholder="Opcional"
-                style={inputStyle}
-              />
-            </div>
-
-            <div>
-              <label style={labelStyle}>Observação</label>
-              <input
-                name="obs"
-                value={form.obs}
-                onChange={handleChange}
-                placeholder="Opcional"
-                style={inputStyle}
-              />
-            </div>
-
-            <div
-              style={{
-                display: 'flex',
-                justifyContent: 'flex-end',
-                gap: 10,
-                marginTop: 8,
-              }}
-            >
-              <button type="button" onClick={onCancel} style={cancelBtn}>
-                Cancelar
-              </button>
-              <button type="submit" style={saveBtn}>
-                Salvar funcionário
-              </button>
-            </div>
-          </form>
+        <div className="ui-input-wrap">
+          <label className="ui-input-label">Fazenda vinculada</label>
+          <select className="ui-input" name="fazenda_id" value={form.fazenda_id} onChange={handleChange}>
+            <option value="">Não vinculada</option>
+            {(fazendas || []).map((fazenda) => (
+              <option key={fazenda.id} value={String(fazenda.id)}>{fazenda.nome}</option>
+            ))}
+          </select>
         </div>
-      </div>
-    </div>
+
+        <div className="ui-input-wrap">
+          <label className="ui-input-label">Status</label>
+          <select className="ui-input" name="status" value={form.status} onChange={handleChange}>
+            <option value="ativo">Ativo</option>
+            <option value="inativo">Inativo</option>
+          </select>
+        </div>
+
+        <div className="ui-input-wrap">
+          <label className="ui-input-label">Observações</label>
+          <textarea className="ui-input" name="observacoes" rows={3} value={form.observacoes} onChange={handleChange} />
+        </div>
+
+        {erro ? <p style={{ color: 'var(--color-danger)', margin: 0 }}>{erro}</p> : null}
+      </form>
+    </Modal>
   );
 }
-
-const labelStyle = {
-  display: 'block',
-  marginBottom: 6,
-  fontSize: 12,
-};
-
-const inputStyle = {
-  width: '100%',
-  padding: '12px 14px',
-  borderRadius: 10,
-  border: '1px solid #2e4020',
-  background: '#0f160b',
-  color: '#cce0a8',
-  outline: 'none',
-};
-
-const cancelBtn = {
-  padding: '10px 14px',
-  borderRadius: 10,
-  border: '1px solid #2e4020',
-  background: 'transparent',
-  color: '#7a9e62',
-};
-
-const saveBtn = {
-  padding: '10px 14px',
-  borderRadius: 10,
-  border: 'none',
-  background: '#6bb520',
-  color: '#081006',
-  fontWeight: 700,
-};

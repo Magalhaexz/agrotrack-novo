@@ -1,465 +1,166 @@
 import { useMemo, useState } from 'react';
-import EstoqueForm from '../components/EstoqueForm';
-import EntradaEstoqueModal from '../components/EntradaEstoqueModal';
-import SaidaEstoqueModal from '../components/SaidaEstoqueModal';
-import { formatarNumero, formatarData } from '../utils/formatters';
+import { AlertTriangle, ArrowDownCircle, ArrowUpCircle, FileText } from 'lucide-react';
+import Card from '../components/ui/Card';
+import Badge from '../components/ui/Badge';
+import Button from '../components/ui/Button';
+import Modal from '../components/ui/Modal';
+import Input from '../components/ui/Input';
+import { formatCurrency, formatDate, formatNumber } from '../utils/calculations';
 import { gerarNovoId } from '../utils/id';
-import { TIPOS_MOVIMENTACAO_ESTOQUE } from '../utils/constantes';
 
-export default function EstoquePage({
-  db,
-  setDb,
-  onRegistrarEntradaEstoque,
-  onRegistrarSaidaEstoque,
-  onConfirmAction,
-}) {
-  const [abrirForm, setAbrirForm] = useState(false);
-  const [itemEditando, setItemEditando] = useState(null);
-  const [abrirEntrada, setAbrirEntrada] = useState(false);
-  const [itemSaidaId, setItemSaidaId] = useState(null);
-  const [filtroTipoMov, setFiltroTipoMov] = useState('');
-  const [filtroItemMov, setFiltroItemMov] = useState('');
+export default function EstoquePage({ db, setDb }) {
+  const [showOnlyCrit, setShowOnlyCrit] = useState(false);
+  const [openEntrada, setOpenEntrada] = useState(false);
+  const [openSaida, setOpenSaida] = useState(false);
+  const [selectedItem, setSelectedItem] = useState(null);
+  const [filters, setFilters] = useState({ item: 'todos', tipo: 'todos', lote: 'todos', periodo: 'todos' });
 
-  const estoque = db?.estoque || [];
-  const lotes = db?.lotes || [];
-  const movimentacoesEstoque = db?.movimentacoes_estoque || [];
+  const itens = (db.estoque || []).map((item) => {
+    const hist = (db.movimentacoes_estoque || []).filter((m) => Number(m.item_estoque_id) === Number(item.id));
+    const pico = Math.max(Number(item.quantidade_atual || 0), ...hist.map((h) => Number(h.quantidade || 0)));
+    const saldo = Number(item.quantidade_atual || 0);
+    const ratio = pico ? (saldo / pico) * 100 : 0;
+    const consumos = hist.filter((h) => ['consumo', 'saida'].includes(h.tipo));
+    const mediaConsumo = consumos.length ? consumos.reduce((s, c) => s + Number(c.quantidade || 0), 0) / Math.max(consumos.length, 1) : 0;
+    const diasRest = mediaConsumo > 0 ? saldo / mediaConsumo : 999;
+    const status = ratio < 10 ? 'critico' : ratio < 20 ? 'baixo' : 'normal';
+    return { ...item, pico, saldo, ratio, mediaConsumo, diasRest, valorTotal: saldo * Number(item.valor_unitario || 0), status };
+  });
 
-  const dadosTabela = useMemo(() => {
-    return estoque.map((item) => ({
-      ...item,
-      valorTotal:
-        Number(item.quantidade_atual || 0) * Number(item.valor_unitario || 0),
-      status: obterStatus(item),
-      statusValidade: obterStatusValidade(
-        item.data_validade,
-        item.alerta_dias_antes
-      ),
-      criticoHistorico: isCriticoHistorico(item, movimentacoesEstoque),
-    }));
-  }, [estoque, movimentacoesEstoque]);
+  const itensView = showOnlyCrit ? itens.filter((i) => i.status !== 'normal') : itens;
+  const resumo = {
+    total: itens.length,
+    criticos: itens.filter((i) => i.status !== 'normal').length,
+    valorTotal: itens.reduce((s, i) => s + i.valorTotal, 0),
+  };
 
-  const movimentacoesFiltradas = useMemo(() => {
-    return movimentacoesEstoque
-      .filter((mov) =>
-        filtroTipoMov ? mov.tipo === filtroTipoMov : true
-      )
-      .filter((mov) =>
-        filtroItemMov ? String(mov.item_estoque_id) === String(filtroItemMov) : true
-      )
-      .map((mov) => {
-        const item = estoque.find((e) => e.id === mov.item_estoque_id);
-        const lote = lotes.find((l) => l.id === mov.lote_id);
-        return {
-          ...mov,
-          itemNome: item?.produto || '—',
-          unidade: item?.unidade || 'un',
-          loteNome: lote?.nome || '—',
-        };
-      })
-      .sort((a, b) => new Date(b.data) - new Date(a.data));
-  }, [movimentacoesEstoque, filtroTipoMov, filtroItemMov, estoque, lotes]);
+  const movs = useMemo(() => (db.movimentacoes_estoque || []).filter((m) => {
+    if (filters.item !== 'todos' && Number(m.item_estoque_id) !== Number(filters.item)) return false;
+    if (filters.tipo !== 'todos' && m.tipo !== filters.tipo) return false;
+    if (filters.lote !== 'todos' && Number(m.lote_id) !== Number(filters.lote)) return false;
+    return true;
+  }).sort((a, b) => new Date(b.data) - new Date(a.data)), [db.movimentacoes_estoque, filters]);
 
-  const resumo = useMemo(() => {
-    const valorTotal = estoque.reduce(
-      (acc, item) =>
-        acc +
-        Number(item.quantidade_atual || 0) * Number(item.valor_unitario || 0),
-      0
-    );
-
-    const criticos = estoque.filter(
-      (item) =>
-        Number(item.quantidade_atual || 0) <=
-        Number(item.quantidade_minima || 0)
-    ).length;
-
-    const itens = estoque.length;
-
-    return { valorTotal, criticos, itens };
-  }, [estoque]);
-
-  function abrirNovoItem() {
-    setItemEditando(null);
-    setAbrirForm(true);
-  }
-
-  function editarItem(item) {
-    setItemEditando(item);
-    setAbrirForm(true);
-  }
-
-  async function excluirItem(id) {
-    const confirmado = typeof onConfirmAction === 'function'
-      ? await onConfirmAction({
-          title: 'Excluir item de estoque',
-          message: 'Deseja excluir este item do estoque?',
-          tone: 'danger',
-        })
-      : window.confirm('Deseja excluir este item do estoque?');
-    if (!confirmado) return;
-
-    setDb((prev) => ({
-      ...prev,
-      estoque: prev.estoque.filter((item) => item.id !== id),
-    }));
-  }
-
-  function salvarItem(dados) {
-    if (Number(dados.quantidade_atual || 0) < 0) {
-      alert(
-        `Estoque insuficiente. Saldo disponível: ${formatarNumero(
-          Math.max(Number(itemEditando?.quantidade_atual || 0), 0)
-        )}`
-      );
-      return;
-    }
-
-    if (itemEditando) {
-      setDb((prev) => ({
-        ...prev,
-        estoque: prev.estoque.map((item) =>
-          item.id === itemEditando.id ? { ...item, ...dados } : item
-        ),
-      }));
-    } else {
-      setDb((prev) => ({
-        ...prev,
-        estoque: [
-          ...prev.estoque,
-          {
-            id: gerarNovoId(prev.estoque),
-            ...dados,
-          },
-        ],
-      }));
-    }
-
-    setAbrirForm(false);
-    setItemEditando(null);
+  function exportCsv() {
+    const header = 'data,item,tipo,quantidade,lote,valor,obs';
+    const rows = movs.map((m) => {
+      const item = itens.find((i) => i.id === m.item_estoque_id)?.produto || '';
+      const lote = (db.lotes || []).find((l) => l.id === m.lote_id)?.nome || '';
+      return [m.data, item, m.tipo, m.quantidade, lote, m.valor_total || 0, m.obs || ''].join(',');
+    });
+    const blob = new Blob([[header, ...rows].join('\n')], { type: 'text/csv' });
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = 'movimentacoes_estoque.csv';
+    a.click();
   }
 
   return (
-    <div className="page">
-      <div className="page-header page-topbar">
-        <div>
-          <h1>Estoque</h1>
-          <p>Controle de insumos, materiais sanitários e entradas por NF.</p>
-        </div>
-
-        <div className="page-topbar-actions">
-          <button className="primary-btn" onClick={() => setAbrirEntrada(true)}>
-            + Entrada
-          </button>
-          <button className="primary-btn" onClick={abrirNovoItem}>
-            + Novo item
-          </button>
+    <div className="page rebanho-page">
+      <div className="rebanho-header">
+        <h1>Estoque</h1>
+        <div className="lote-actions">
+          <Button icon={<ArrowUpCircle size={14} />} onClick={() => setOpenEntrada(true)}>Entrada</Button>
+          <Button variant="outline" icon={<ArrowDownCircle size={14} />} onClick={() => setOpenSaida(true)}>Saída/Consumo</Button>
+          <Button variant={showOnlyCrit ? 'warning' : 'ghost'} onClick={() => setShowOnlyCrit((v) => !v)}>Mostrar apenas críticos</Button>
         </div>
       </div>
 
-      <div className="kpi-grid-3">
-        <div className="kpi-card">
-          <div className="kpi-label">Itens em estoque</div>
-          <div className="kpi-value">{resumo.itens}</div>
-          <div className="kpi-sub">produtos cadastrados</div>
-        </div>
-
-        <div className="kpi-card">
-          <div className="kpi-label">Valor estimado</div>
-          <div className="kpi-value">R$ {formatarNumero(resumo.valorTotal)}</div>
-          <div className="kpi-sub">quantidade atual x valor unitário</div>
-        </div>
-
-        <div className="kpi-card">
-          <div className="kpi-label">Itens críticos</div>
-          <div className="kpi-value">{resumo.criticos}</div>
-          <div className="kpi-sub">abaixo ou no estoque mínimo</div>
-        </div>
+      <div className="dashboard-grid dashboard-grid--kpi-secondary">
+        <Card title="Total de itens">{resumo.total}</Card>
+        <Card title="Itens críticos">{resumo.criticos}</Card>
+        <Card title="Valor total em estoque">{formatCurrency(resumo.valorTotal)}</Card>
       </div>
 
-      <div className="fazendas-card">
-        <div className="fazendas-card-header">
-          <span className="fazendas-card-title">Lista de estoque</span>
-        </div>
-
-        <div className="fazendas-table-wrap">
-          {dadosTabela.length === 0 ? (
-            <div className="empty-box">
-              <strong>Nenhum item em estoque.</strong>
-              <span>Use o botão “Novo item” para cadastrar o primeiro.</span>
-            </div>
-          ) : (
-            <table className="data-table">
-              <thead>
-                <tr>
-                  <th>Produto</th>
-                  <th>Categoria</th>
-                  <th>Unidade</th>
-                  <th>Qtd atual</th>
-                  <th>Qtd mínima</th>
-                  <th>Valor unit.</th>
-                  <th>Valor total</th>
-                  <th>Origem</th>
-                  <th>NF</th>
-                  <th>Entrada</th>
-                  <th>Validade</th>
-                  <th>Alerta validade</th>
-                  <th>Status estoque</th>
-                  <th>Ações</th>
-                </tr>
-              </thead>
-              <tbody>
-                {dadosTabela.map((item) => (
-                  <tr key={item.id}>
-                    <td className="text-h">{item.produto}</td>
-                    <td>{item.categoria}</td>
-                    <td>{item.unidade}</td>
-                    <td>{formatarNumero(item.quantidade_atual)}</td>
-                    <td>{formatarNumero(item.quantidade_minima)}</td>
-                    <td>R$ {formatarNumero(item.valor_unitario)}</td>
-                    <td>R$ {formatarNumero(item.valorTotal)}</td>
-                    <td>{item.origem}</td>
-                    <td>{item.numero_nf || '—'}</td>
-                    <td>{formatarData(item.data_entrada)}</td>
-                    <td>{formatarData(item.data_validade)}</td>
-                    <td>{renderStatusValidade(item.statusValidade)}</td>
-                    <td>
-                      <div style={{ display: 'grid', gap: 6 }}>
-                        <strong
-                          style={{
-                            color: '#dff9cc',
-                            fontSize: 14,
-                          }}
-                        >
-                          {formatarNumero(item.quantidade_atual)} {item.unidade}
-                        </strong>
-                        {renderStatus(item.status)}
-                        {item.criticoHistorico ? (
-                          <span className="badge badge-r">Crítico histórico</span>
-                        ) : null}
-                      </div>
-                    </td>
-                    <td>
-                      <div className="row-actions">
-                        <button
-                          className="action-btn"
-                          onClick={() => setItemSaidaId(item.id)}
-                        >
-                          Saída / Consumo
-                        </button>
-                        <button
-                          className="action-btn"
-                          onClick={() => editarItem(item)}
-                        >
-                          Editar
-                        </button>
-                        <button
-                          className="action-btn action-btn-danger"
-                          onClick={() => excluirItem(item.id)}
-                        >
-                          Excluir
-                        </button>
-                      </div>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          )}
-        </div>
-      </div>
-
-      <div className="fazendas-card" style={{ marginTop: 24 }}>
-        <div className="fazendas-card-header">
-          <span className="fazendas-card-title">Movimentações</span>
-        </div>
-
-        <div className="card-body" style={{ display: 'grid', gap: 12 }}>
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
-            <select
-              value={filtroTipoMov}
-              onChange={(e) => setFiltroTipoMov(e.target.value)}
-              style={filtroStyle}
-            >
-              <option value="">Todos os tipos</option>
-              {Object.entries(TIPOS_MOVIMENTACAO_ESTOQUE).map(([value, label]) => (
-                <option key={value} value={value}>
-                  {label}
-                </option>
-              ))}
-            </select>
-
-            <select
-              value={filtroItemMov}
-              onChange={(e) => setFiltroItemMov(e.target.value)}
-              style={filtroStyle}
-            >
-              <option value="">Todos os itens</option>
-              {estoque.map((item) => (
-                <option key={item.id} value={item.id}>
-                  {item.produto}
-                </option>
-              ))}
-            </select>
-          </div>
-
-          <div className="fazendas-table-wrap">
-            {movimentacoesFiltradas.length === 0 ? (
-              <div className="empty-box">
-                <strong>Nenhuma movimentação encontrada.</strong>
-                <span>Registre entradas e saídas para acompanhar o histórico.</span>
+      <div className="lote-cards-grid">
+        {itensView.map((item) => {
+          const border = item.status === 'critico' ? '#c53030' : item.status === 'baixo' ? '#b7791f' : 'var(--color-border)';
+          const bar = item.status === 'critico' ? '#c53030' : item.status === 'baixo' ? '#b7791f' : '#2d6a4f';
+          return (
+            <Card key={item.id} className="lote-card-modern" style={{ borderColor: border }}>
+              <div className="lote-card-title">
+                <h3>{item.produto}</h3>
+                <Badge variant={item.status === 'critico' ? 'danger' : item.status === 'baixo' ? 'warning' : 'neutral'}>{item.categoria}</Badge>
               </div>
-            ) : (
-              <table className="data-table">
-                <thead>
-                  <tr>
-                    <th>Data</th>
-                    <th>Item</th>
-                    <th>Tipo</th>
-                    <th>Quantidade</th>
-                    <th>Lote vinculado</th>
-                    <th>Valor</th>
-                    <th>Observação</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {movimentacoesFiltradas.map((mov) => (
-                    <tr key={mov.id}>
-                      <td>{formatarData(mov.data)}</td>
-                      <td className="text-h">{mov.itemNome}</td>
-                      <td>{normalizarTipoMov(mov.tipo)}</td>
-                      <td>{formatarNumero(mov.quantidade)} {mov.unidade}</td>
-                      <td>{mov.lote_id ? mov.loteNome : '—'}</td>
-                      <td>R$ {formatarNumero(mov.valor_total || 0)}</td>
-                      <td>{mov.obs || '—'}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            )}
-          </div>
-        </div>
+              {item.status === 'critico' ? <p className="negative"><AlertTriangle size={14} /> Crítico</p> : null}
+              <p><strong>{formatNumber(item.saldo, 2)} {item.unidade}</strong></p>
+              <div className="progress-line"><span style={{ width: `${Math.min(Math.max(item.ratio, 4), 100)}%`, background: bar }} /></div>
+              <p>Valor unitário: {formatCurrency(item.valor_unitario)}</p>
+              <p>Valor total: {formatCurrency(item.valorTotal)}</p>
+              <p>Consumo médio diário: {formatNumber(item.mediaConsumo, 2)} {item.unidade}</p>
+              <p>Dias restantes: {item.diasRest > 900 ? '—' : `${formatNumber(item.diasRest, 0)} dias`}</p>
+              <div className="lote-actions">
+                <Button size="sm" onClick={() => { setSelectedItem(item); setOpenEntrada(true); }}>Entrada</Button>
+                <Button size="sm" variant="outline" onClick={() => { setSelectedItem(item); setOpenSaida(true); }}>Saída/Consumo</Button>
+                <Button size="sm" variant="ghost" icon={<FileText size={12} />} onClick={() => setFilters((f) => ({ ...f, item: item.id }))}>Histórico</Button>
+              </div>
+            </Card>
+          );
+        })}
       </div>
 
-      {abrirForm && (
-        <EstoqueForm
-          initialData={itemEditando}
-          onSave={salvarItem}
-          onCancel={() => {
-            setAbrirForm(false);
-            setItemEditando(null);
-          }}
-        />
-      )}
+      <Card title="Histórico de movimentações" action={<Button variant="outline" onClick={exportCsv}>Exportar CSV</Button>}>
+        <div className="rebanho-filters">
+          <select value={filters.item} onChange={(e) => setFilters((p) => ({ ...p, item: e.target.value }))}><option value="todos">Item</option>{itens.map((i) => <option key={i.id} value={i.id}>{i.produto}</option>)}</select>
+          <select value={filters.tipo} onChange={(e) => setFilters((p) => ({ ...p, tipo: e.target.value }))}><option value="todos">Tipo</option><option value="entrada">Entrada</option><option value="consumo">Consumo Diário</option><option value="tratamento">Tratamento</option><option value="ajuste">Ajuste</option><option value="perda">Perda</option></select>
+          <select value={filters.lote} onChange={(e) => setFilters((p) => ({ ...p, lote: e.target.value }))}><option value="todos">Lote</option>{(db.lotes || []).map((l) => <option key={l.id} value={l.id}>{l.nome}</option>)}</select>
+        </div>
+        <div className="alerts-list">
+          {movs.map((m) => {
+            const itemNome = itens.find((i) => i.id === m.item_estoque_id)?.produto;
+            const loteNome = (db.lotes || []).find((l) => l.id === m.lote_id)?.nome;
+            return <div key={m.id} className="alert-item"><Badge variant={m.tipo === 'entrada' ? 'info' : 'warning'}>{m.tipo}</Badge><div><strong>{itemNome}</strong><p>{formatDate(m.data)} · {formatNumber(m.quantidade, 2)} · {loteNome || 'Sem lote'} · {formatCurrency(m.valor_total || 0)}</p></div></div>;
+          })}
+        </div>
+      </Card>
 
-      {abrirEntrada ? (
-        <EntradaEstoqueModal
-          itens={estoque}
-          handleRegistrarEntradaEstoque={(dados) => {
-            if (typeof onRegistrarEntradaEstoque === 'function') {
-              onRegistrarEntradaEstoque(dados);
-            }
-          }}
-          onClose={() => setAbrirEntrada(false)}
-        />
-      ) : null}
-
-      {itemSaidaId ? (
-        <SaidaEstoqueModal
-          itens={estoque}
-          lotes={lotes}
-          itemInicialId={itemSaidaId}
-          handleRegistrarSaidaEstoque={(dados) => {
-            if (typeof onRegistrarSaidaEstoque === 'function') {
-              onRegistrarSaidaEstoque(dados);
-            }
-          }}
-          onClose={() => setItemSaidaId(null)}
-        />
-      ) : null}
+      {openEntrada && <EntradaModal db={db} setDb={setDb} selectedItem={selectedItem} onClose={() => { setSelectedItem(null); setOpenEntrada(false); }} />}
+      {openSaida && <SaidaModal db={db} setDb={setDb} selectedItem={selectedItem} onClose={() => { setSelectedItem(null); setOpenSaida(false); }} />}
     </div>
   );
 }
 
+function EntradaModal({ db, setDb, selectedItem, onClose }) {
+  const [form, setForm] = useState({ item_id: selectedItem?.id || '', qtd: '', custo: selectedItem?.valor_unitario || '', validade: '', fornecedor: '', nf: '', data: '', obs: '' });
+  const item = (db.estoque || []).find((i) => Number(i.id) === Number(form.item_id));
+  const total = Number(form.qtd || 0) * Number(form.custo || 0);
 
-
-
-function obterStatus(item) {
-  const atual = Number(item.quantidade_atual || 0);
-  const minimo = Number(item.quantidade_minima || 0);
-
-  if (atual <= minimo) return 'critico';
-  if (atual <= minimo * 1.5) return 'baixo';
-  return 'normal';
-}
-
-function obterStatusValidade(dataValidade, alertaDiasAntes = 0) {
-  if (!dataValidade) return 'sem-validade';
-
-  const hoje = new Date();
-  hoje.setHours(0, 0, 0, 0);
-
-  const validade = new Date(dataValidade);
-  validade.setHours(0, 0, 0, 0);
-
-  const diffDias = Math.round((validade - hoje) / (1000 * 60 * 60 * 24));
-
-  if (diffDias < 0) return 'vencido';
-  if (diffDias <= Number(alertaDiasAntes || 0)) return 'proximo';
-  return 'ok';
-}
-
-function renderStatusValidade(status) {
-  if (status === 'vencido') {
-    return <span className="badge badge-r">Vencido</span>;
+  function submit() {
+    if (!form.data || !form.item_id || Number(form.qtd) <= 0) return;
+    setDb((prev) => ({
+      ...prev,
+      estoque: prev.estoque.map((i) => i.id === Number(form.item_id) ? { ...i, quantidade_atual: Number(i.quantidade_atual || 0) + Number(form.qtd), valor_unitario: Number(form.custo || i.valor_unitario), data_validade: form.validade || i.data_validade } : i),
+      movimentacoes_estoque: [...(prev.movimentacoes_estoque || []), { id: gerarNovoId(prev.movimentacoes_estoque || []), item_estoque_id: Number(form.item_id), tipo: 'entrada', quantidade: Number(form.qtd), data: form.data, valor_total: total, obs: form.obs, fornecedor: form.fornecedor, numero_nf: form.nf }],
+    }));
+    onClose();
   }
 
-  if (status === 'proximo') {
-    return <span className="badge badge-a">Vence em breve</span>;
-  }
-
-  if (status === 'ok') {
-    return <span className="badge badge-g">Dentro da validade</span>;
-  }
-
-  return <span className="badge badge-n">Sem validade</span>;
+  return <Modal open onClose={onClose} title="Entrada de estoque" footer={<Button onClick={submit}>Confirmar entrada</Button>}><div className="form-grid two"><label>Item<select value={form.item_id} onChange={(e) => setForm((p) => ({ ...p, item_id: e.target.value }))}><option value="">Selecione</option>{(db.estoque || []).map((i) => <option key={i.id} value={i.id}>{i.produto}</option>)}</select></label><Input label="Quantidade" type="number" value={form.qtd} onChange={(e) => setForm((p) => ({ ...p, qtd: e.target.value }))} /><Input label="Unidade" value={item?.unidade || ''} readOnly /><Input label="Custo unitário" type="number" value={form.custo} onChange={(e) => setForm((p) => ({ ...p, custo: e.target.value }))} /><Input label="Valor total" value={formatCurrency(total)} readOnly /><Input label="Validade" type="date" value={form.validade} onChange={(e) => setForm((p) => ({ ...p, validade: e.target.value }))} /><Input label="Fornecedor" value={form.fornecedor} onChange={(e) => setForm((p) => ({ ...p, fornecedor: e.target.value }))} /><Input label="Nota fiscal" value={form.nf} onChange={(e) => setForm((p) => ({ ...p, nf: e.target.value }))} /><Input label="Data" type="date" value={form.data} onChange={(e) => setForm((p) => ({ ...p, data: e.target.value }))} /><Input label="Observações" value={form.obs} onChange={(e) => setForm((p) => ({ ...p, obs: e.target.value }))} /></div></Modal>;
 }
 
-function renderStatus(status) {
-  if (status === 'critico') {
-    return <span className="badge badge-r">Crítico</span>;
+function SaidaModal({ db, setDb, selectedItem, onClose }) {
+  const [form, setForm] = useState({ item_id: selectedItem?.id || '', tipo: 'consumo', lote_id: '', qtd: '', data: '', obs: '' });
+  const item = (db.estoque || []).find((i) => Number(i.id) === Number(form.item_id));
+  const saldo = Number(item?.quantidade_atual || 0);
+
+  function categoriaDespesa(cat) {
+    if (['ração', 'suplemento', 'insumo'].includes((cat || '').toLowerCase())) return 'Alimentação';
+    if (['medicamento', 'sanitário', 'vacina'].includes((cat || '').toLowerCase())) return 'Sanitário';
+    return 'Outros';
   }
 
-  if (status === 'baixo') {
-    return <span className="badge badge-a">Baixo</span>;
+  function submit() {
+    const qtd = Number(form.qtd || 0);
+    if (!form.data || !form.item_id || qtd <= 0 || qtd > saldo) return;
+    const valor = qtd * Number(item?.valor_unitario || 0);
+    setDb((prev) => ({
+      ...prev,
+      estoque: prev.estoque.map((i) => i.id === Number(form.item_id) ? { ...i, quantidade_atual: Number(i.quantidade_atual || 0) - qtd } : i),
+      movimentacoes_estoque: [...(prev.movimentacoes_estoque || []), { id: gerarNovoId(prev.movimentacoes_estoque || []), item_estoque_id: Number(form.item_id), tipo: form.tipo, lote_id: form.lote_id ? Number(form.lote_id) : null, quantidade: qtd, data: form.data, valor_total: valor, obs: form.obs }],
+      movimentacoes_financeiras: form.lote_id ? [...(prev.movimentacoes_financeiras || []), { id: gerarNovoId(prev.movimentacoes_financeiras || []), tipo: 'despesa', categoria: categoriaDespesa(item?.categoria), valor, data: form.data, lote_id: Number(form.lote_id), descricao: `Consumo de ${item?.produto}` }] : (prev.movimentacoes_financeiras || []),
+    }));
+    onClose();
   }
 
-  return <span className="badge badge-g">Normal</span>;
+  return <Modal open onClose={onClose} title="Saída / Consumo" footer={<Button variant="danger" onClick={submit}>Confirmar saída</Button>}><div className="form-grid two"><label>Item<select value={form.item_id} onChange={(e) => setForm((p) => ({ ...p, item_id: e.target.value }))}><option value="">Selecione</option>{(db.estoque || []).map((i) => <option key={i.id} value={i.id}>{i.produto} (saldo {formatNumber(i.quantidade_atual, 2)})</option>)}</select></label><label>Tipo<select value={form.tipo} onChange={(e) => setForm((p) => ({ ...p, tipo: e.target.value }))}><option value="consumo">Consumo Diário</option><option value="tratamento">Tratamento</option><option value="ajuste">Ajuste</option><option value="perda">Perda</option></select></label><label>Lote<select value={form.lote_id} onChange={(e) => setForm((p) => ({ ...p, lote_id: e.target.value }))}><option value="">Opcional</option>{(db.lotes || []).map((l) => <option key={l.id} value={l.id}>{l.nome}</option>)}</select></label><Input label="Quantidade" type="number" error={Number(form.qtd || 0) > saldo ? `Máximo ${formatNumber(saldo, 2)}` : ''} value={form.qtd} onChange={(e) => setForm((p) => ({ ...p, qtd: e.target.value }))} /><Input label="Data" type="date" value={form.data} onChange={(e) => setForm((p) => ({ ...p, data: e.target.value }))} /><Input label="Observações" value={form.obs} onChange={(e) => setForm((p) => ({ ...p, obs: e.target.value }))} /></div></Modal>;
 }
-
-function normalizarTipoMov(tipo) {
-  return TIPOS_MOVIMENTACAO_ESTOQUE[tipo] || tipo || '—';
-}
-
-function isCriticoHistorico(item, movimentacoes) {
-  const atual = Number(item.quantidade_atual || 0);
-  const historicoItem = movimentacoes.filter(
-    (mov) => Number(mov.item_estoque_id) === Number(item.id)
-  );
-
-  const maiorHistorico = Math.max(
-    atual,
-    ...historicoItem.map((mov) => Number(mov.quantidade || 0))
-  );
-
-  if (!maiorHistorico) return false;
-  return atual < maiorHistorico * 0.1;
-}
-
-const filtroStyle = {
-  width: '100%',
-  padding: '10px 12px',
-  borderRadius: 10,
-  border: '1px solid #2e4020',
-  background: '#0f160b',
-  color: '#cce0a8',
-};

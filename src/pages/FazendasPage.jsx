@@ -1,186 +1,130 @@
 import { useMemo, useState } from 'react';
+import PageHeader from '../components/PageHeader';
+import Button from '../components/ui/Button';
+import Badge from '../components/ui/Badge';
 import FazendaForm from '../components/FazendaForm';
 import { gerarNovoId } from '../utils/id';
 
-export default function FazendasPage({ db, setDb, onConfirmAction }) {
-  const [abrirForm, setAbrirForm] = useState(false);
-  const [fazendaEditando, setFazendaEditando] = useState(null);
+export default function FazendasPage({ db, setDb, onConfirmAction, onNavigate }) {
+  const [aberto, setAberto] = useState(false);
+  const [editando, setEditando] = useState(null);
 
-  const fazendas = db?.fazendas || [];
-  const lotes = db?.lotes || [];
+  const fazendas = Array.isArray(db?.fazendas) ? db.fazendas : [];
+  const lotes = Array.isArray(db?.lotes) ? db.lotes : [];
+  const funcionarios = Array.isArray(db?.funcionarios) ? db.funcionarios : [];
 
-  const dadosTabela = useMemo(() => {
+  const cards = useMemo(() => {
     return fazendas.map((fazenda) => {
-      const qtdLotes = lotes.filter((l) => l.faz_id === fazenda.id).length;
-      return { ...fazenda, qtdLotes };
+      const lotesAtivos = lotes.filter((l) => Number(l.faz_id) === Number(fazenda.id) && (l.status || 'ativo') === 'ativo').length;
+      const colaboradores = funcionarios.filter((f) => Number(f.fazenda_id) === Number(fazenda.id)).length;
+      return { ...fazenda, lotesAtivos, colaboradores };
     });
-  }, [fazendas, lotes]);
+  }, [fazendas, lotes, funcionarios]);
 
-  function abrirNova() {
-    setFazendaEditando(null);
-    setAbrirForm(true);
-  }
-
-  function editarFazenda(fazenda) {
-    setFazendaEditando(fazenda);
-    setAbrirForm(true);
-  }
-
-  async function excluirFazenda(id) {
-    const temLotes = lotes.some((l) => l.faz_id === id);
-
-    if (temLotes) {
-      alert('Essa fazenda possui lotes vinculados. Exclua ou mova os lotes antes.');
-      return;
-    }
-
-    const confirmado = typeof onConfirmAction === 'function'
-      ? await onConfirmAction({
-          title: 'Excluir fazenda',
-          message: 'Deseja excluir esta fazenda?',
-          tone: 'danger',
-        })
-      : window.confirm('Deseja excluir esta fazenda?');
-    if (!confirmado) return;
-
-    setDb((prev) => ({
-      ...prev,
-      fazendas: prev.fazendas.filter((f) => f.id !== id),
-    }));
+  function abrirCadastro() {
+    setEditando(null);
+    setAberto(true);
   }
 
   function salvarFazenda(dados) {
-    if (fazendaEditando) {
+    if (editando) {
       setDb((prev) => ({
         ...prev,
-        fazendas: prev.fazendas.map((f) =>
-          f.id === fazendaEditando.id ? { ...f, ...dados } : f
+        fazendas: (prev.fazendas || []).map((f) =>
+          Number(f.id) === Number(editando.id) ? { ...f, ...dados } : f
         ),
       }));
     } else {
       setDb((prev) => ({
         ...prev,
         fazendas: [
-          ...prev.fazendas,
+          ...(prev.fazendas || []),
           {
-            id: gerarNovoId(prev.fazendas),
+            id: gerarNovoId(prev.fazendas || []),
             ...dados,
+            created_at: new Date().toISOString(),
           },
         ],
       }));
     }
 
-    setAbrirForm(false);
-    setFazendaEditando(null);
+    setAberto(false);
+    setEditando(null);
   }
 
-  const responsaveisUnicos = new Set(
-    fazendas.map((f) => f.resp).filter(Boolean)
-  ).size;
+  async function alternarStatus(fazenda) {
+    const novoStatus = (fazenda.status || 'ativa') === 'ativa' ? 'inativa' : 'ativa';
+    const confirmado = typeof onConfirmAction === 'function'
+      ? await onConfirmAction({
+          title: `${novoStatus === 'ativa' ? 'Ativar' : 'Desativar'} fazenda`,
+          message: `Deseja ${novoStatus === 'ativa' ? 'ativar' : 'desativar'} ${fazenda.nome}?`,
+          tone: 'warning',
+        })
+      : true;
+
+    if (!confirmado) return;
+
+    setDb((prev) => ({
+      ...prev,
+      fazendas: (prev.fazendas || []).map((f) =>
+        Number(f.id) === Number(fazenda.id) ? { ...f, status: novoStatus } : f
+      ),
+    }));
+  }
 
   return (
     <div className="page">
-      <div className="page-header page-topbar">
-        <div>
-          <h1>Fazendas</h1>
-          <p>Cadastro e gerenciamento das propriedades do sistema.</p>
-        </div>
+      <PageHeader
+        title="Minhas Fazendas"
+        subtitle="Cadastro e controle completo das propriedades"
+        actions={<Button onClick={abrirCadastro}>+ Cadastrar Fazenda</Button>}
+      />
 
-        <div className="page-topbar-actions">
-          <button className="primary-btn" onClick={abrirNova}>
-            + Nova fazenda
-          </button>
-        </div>
-      </div>
+      {cards.length === 0 ? (
+        <div className="ui-card"><strong>Nenhuma fazenda cadastrada</strong></div>
+      ) : (
+        <div className="grid-3">
+          {cards.map((fazenda) => (
+            <article key={fazenda.id} className="ui-card" style={{ display: 'grid', gap: 10 }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', gap: 8, alignItems: 'center' }}>
+                <h3 style={{ margin: 0 }}>{fazenda.nome}</h3>
+                <Badge variant={(fazenda.status || 'ativa') === 'ativa' ? 'success' : 'warning'}>
+                  {(fazenda.status || 'ativa') === 'ativa' ? 'Ativa' : 'Inativa'}
+                </Badge>
+              </div>
 
-      <div className="kpi-grid-3">
-        <div className="kpi-card">
-          <div className="kpi-label">Fazendas</div>
-          <div className="kpi-value">{fazendas.length}</div>
-          <div className="kpi-sub">propriedades cadastradas</div>
-        </div>
+              <p style={{ margin: 0, color: 'var(--color-text-secondary)' }}>{fazenda.cidade} / {fazenda.estado}</p>
+              <p style={{ margin: 0 }}>Área total: <strong>{fazenda.area_total_ha || 0} ha</strong> · Pastagem: <strong>{fazenda.area_pastagem_ha || 0} ha</strong></p>
+              <p style={{ margin: 0 }}>Capacidade: <strong>{fazenda.capacidade_ua || 0} UA</strong></p>
+              <p style={{ margin: 0 }}>Produção: <Badge variant="info">{fazenda.tipo_producao || '—'}</Badge></p>
+              <p style={{ margin: 0 }}>Lotes ativos: <strong>{fazenda.lotesAtivos}</strong> · Funcionários: <strong>{fazenda.colaboradores}</strong></p>
 
-        <div className="kpi-card">
-          <div className="kpi-label">Lotes vinculados</div>
-          <div className="kpi-value">{lotes.length}</div>
-          <div className="kpi-sub">somando todas as fazendas</div>
+              <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+                <Button size="sm" variant="outline" onClick={() => { setEditando(fazenda); setAberto(true); }}>
+                  Editar
+                </Button>
+                <Button size="sm" variant="secondary" onClick={() => onNavigate?.('lotes')}>
+                  Ver Lotes
+                </Button>
+                <Button size="sm" variant="ghost" onClick={() => alternarStatus(fazenda)}>
+                  {(fazenda.status || 'ativa') === 'ativa' ? 'Desativar' : 'Ativar'}
+                </Button>
+              </div>
+            </article>
+          ))}
         </div>
-
-        <div className="kpi-card">
-          <div className="kpi-label">Responsáveis</div>
-          <div className="kpi-value">{responsaveisUnicos}</div>
-          <div className="kpi-sub">nomes únicos cadastrados</div>
-        </div>
-      </div>
-
-      <div className="fazendas-card">
-        <div className="fazendas-card-header">
-          <span className="fazendas-card-title">Lista de fazendas</span>
-        </div>
-
-        <div className="fazendas-table-wrap">
-          {dadosTabela.length === 0 ? (
-            <div className="empty-box">
-              <strong>Nenhuma fazenda cadastrada.</strong>
-              <span>Use o botão “Nova fazenda” para começar.</span>
-            </div>
-          ) : (
-            <table className="data-table">
-              <thead>
-                <tr>
-                  <th>Nome</th>
-                  <th>Localização</th>
-                  <th>Responsável</th>
-                  <th>Lotes</th>
-                  <th>Ações</th>
-                </tr>
-              </thead>
-              <tbody>
-                {dadosTabela.map((fazenda) => (
-                  <tr key={fazenda.id}>
-                    <td className="text-h">{fazenda.nome}</td>
-                    <td>{fazenda.local || '—'}</td>
-                    <td>{fazenda.resp || '—'}</td>
-                    <td>
-                      <span className="badge b-green">
-                        {fazenda.qtdLotes} lote{fazenda.qtdLotes === 1 ? '' : 's'}
-                      </span>
-                    </td>
-                    <td>
-                      <div className="row-actions">
-                        <button
-                          className="action-btn"
-                          onClick={() => editarFazenda(fazenda)}
-                        >
-                          Editar
-                        </button>
-                        <button
-                          className="action-btn action-btn-danger"
-                          onClick={() => excluirFazenda(fazenda.id)}
-                        >
-                          Excluir
-                        </button>
-                      </div>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          )}
-        </div>
-      </div>
-
-      {abrirForm && (
-        <FazendaForm
-          initialData={fazendaEditando}
-          onSave={salvarFazenda}
-          onCancel={() => {
-            setAbrirForm(false);
-            setFazendaEditando(null);
-          }}
-        />
       )}
+
+      <FazendaForm
+        key={editando?.id || 'novo'}
+        open={aberto}
+        initialData={editando}
+        onSave={salvarFazenda}
+        onCancel={() => {
+          setAberto(false);
+          setEditando(null);
+        }}
+      />
     </div>
   );
 }
-
