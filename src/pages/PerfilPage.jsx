@@ -1,19 +1,22 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { FileText, LogOut } from 'lucide-react';
 import Card from '../components/ui/Card';
 import Button from '../components/ui/Button';
+import UserAvatar from '../components/ui/UserAvatar';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../auth/useAuth';
 import '../styles/perfil.css';
 
-export default function PerfilPage({ db, setDb, onConfirmAction }) {
+export default function PerfilPage({ db, onConfirmAction, usuarioLogado, atualizarUsuario, onSignOut }) {
   const { user } = useAuth();
-  const nomeInicial = user?.user_metadata?.name || user?.user_metadata?.nome || user?.email?.split('@')[0] || 'Usuário';
+  const nomeInicial = usuarioLogado?.nome || user?.user_metadata?.name || user?.user_metadata?.nome || user?.email?.split('@')[0] || 'Usuário';
 
-  const [dados, setDados] = useState({
-    foto: user?.user_metadata?.avatar_url || '',
+  const [usuarioLocal, setUsuarioLocal] = useState({
+    id: usuarioLogado?.id || user?.id || null,
     nome: nomeInicial,
-    email: user?.email || '',
+    email: usuarioLogado?.email || user?.email || '',
+    perfil: usuarioLogado?.perfil || user?.user_metadata?.perfil || 'visualizador',
+    foto_url: usuarioLogado?.foto_url || user?.user_metadata?.avatar_url || null,
     telefone: user?.user_metadata?.telefone || '',
     cargo: user?.user_metadata?.cargo || '',
   });
@@ -28,38 +31,76 @@ export default function PerfilPage({ db, setDb, onConfirmAction }) {
     fazenda_padrao_id: user?.user_metadata?.fazenda_padrao_id || db?.fazendas?.[0]?.id || '',
   });
 
+  useEffect(() => {
+    if (!usuarioLogado) return;
+    setUsuarioLocal((prev) => ({
+      ...prev,
+      id: usuarioLogado?.id || prev.id,
+      nome: usuarioLogado?.nome || prev.nome,
+      email: usuarioLogado?.email || prev.email,
+      perfil: usuarioLogado?.perfil || prev.perfil,
+      foto_url: usuarioLogado?.foto_url ?? prev.foto_url,
+    }));
+  }, [usuarioLogado]);
+
   const forcaSenha = useMemo(() => calcularForcaSenha(novaSenha), [novaSenha]);
 
-  function handleFotoUpload(event) {
-    const arquivo = event.target.files?.[0];
-    if (!arquivo) return;
+  function handleFotoUpload(e) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    if (file.size > 2 * 1024 * 1024) {
+      window.alert('Imagem muito grande. Máximo 2MB.');
+      return;
+    }
+
+    if (!file.type.startsWith('image/')) {
+      window.alert('Selecione uma imagem válida.');
+      return;
+    }
+
     const reader = new FileReader();
-    reader.onload = () => setDados((prev) => ({ ...prev, foto: String(reader.result || '') }));
-    reader.readAsDataURL(arquivo);
+    reader.onloadend = () => {
+      setUsuarioLocal((prev) => ({
+        ...prev,
+        foto_url: String(reader.result || ''),
+      }));
+    };
+    reader.readAsDataURL(file);
   }
 
   async function salvarDadosPessoais() {
-    if (!dados.nome.trim()) {
+    if (!usuarioLocal.nome.trim()) {
       window.alert('Nome completo é obrigatório.');
       return;
     }
 
-    const { error } = await supabase.auth.updateUser({
-      data: {
-        name: dados.nome.trim(),
-        nome: dados.nome.trim(),
-        telefone: dados.telefone,
-        cargo: dados.cargo,
-        avatar_url: dados.foto,
-      },
-    });
+    const payload = {
+      name: usuarioLocal.nome.trim(),
+      nome: usuarioLocal.nome.trim(),
+      telefone: usuarioLocal.telefone,
+      cargo: usuarioLocal.cargo,
+      avatar_url: usuarioLocal.foto_url,
+      perfil: usuarioLocal.perfil,
+    };
+
+    const { error } = await supabase.auth.updateUser({ data: payload });
 
     if (error) {
       window.alert(`Erro ao salvar perfil: ${error.message}`);
       return;
     }
 
-    window.alert('Dados pessoais atualizados com sucesso.');
+    const usuarioAtualizado = {
+      id: usuarioLocal.id,
+      nome: usuarioLocal.nome.trim(),
+      email: usuarioLocal.email,
+      perfil: usuarioLocal.perfil,
+      foto_url: usuarioLocal.foto_url ?? null,
+    };
+
+    atualizarUsuario?.(usuarioAtualizado);
+    window.alert('Perfil salvo com sucesso!');
   }
 
   async function alterarSenha() {
@@ -114,6 +155,11 @@ export default function PerfilPage({ db, setDb, onConfirmAction }) {
 
     if (!confirmado) return;
 
+    if (onSignOut) {
+      await onSignOut();
+      return;
+    }
+
     await supabase.auth.signOut();
   }
 
@@ -127,24 +173,43 @@ export default function PerfilPage({ db, setDb, onConfirmAction }) {
       <Card title="Dados pessoais">
         <div className="perfil-grid">
           <div className="perfil-avatar-box">
-            {dados.foto ? <img src={dados.foto} alt="Foto de perfil" className="perfil-avatar-img" /> : <AvatarFallback nome={dados.nome} />}
-            <label className="perfil-upload-btn">
-              <FileText size={14} /> Upload foto
-              <input type="file" accept="image/*" onChange={handleFotoUpload} hidden />
-            </label>
+            <div style={{ position: 'relative', width: 96, margin: '0 auto 16px' }}>
+              <UserAvatar usuario={usuarioLocal} size={96} />
+              <label
+                htmlFor="foto-upload"
+                style={{
+                  position: 'absolute',
+                  bottom: 0,
+                  right: 0,
+                  width: 28,
+                  height: 28,
+                  borderRadius: '50%',
+                  background: 'var(--color-primary)',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  cursor: 'pointer',
+                  border: '2px solid var(--color-bg)',
+                  color: '#000',
+                }}
+              >
+                <FileText size={14} />
+              </label>
+              <input id="foto-upload" type="file" accept="image/*" style={{ display: 'none' }} onChange={handleFotoUpload} />
+            </div>
           </div>
           <div className="perfil-form-grid">
             <label>Nome completo *
-              <input value={dados.nome} onChange={(e) => setDados((prev) => ({ ...prev, nome: e.target.value }))} />
+              <input value={usuarioLocal.nome} onChange={(e) => setUsuarioLocal((prev) => ({ ...prev, nome: e.target.value }))} />
             </label>
             <label>E-mail
-              <input value={dados.email} readOnly />
+              <input value={usuarioLocal.email} readOnly />
             </label>
             <label>Telefone
-              <input value={dados.telefone} onChange={(e) => setDados((prev) => ({ ...prev, telefone: e.target.value }))} />
+              <input value={usuarioLocal.telefone} onChange={(e) => setUsuarioLocal((prev) => ({ ...prev, telefone: e.target.value }))} />
             </label>
             <label>Cargo / função
-              <input value={dados.cargo} onChange={(e) => setDados((prev) => ({ ...prev, cargo: e.target.value }))} />
+              <input value={usuarioLocal.cargo} onChange={(e) => setUsuarioLocal((prev) => ({ ...prev, cargo: e.target.value }))} />
             </label>
           </div>
         </div>
@@ -194,18 +259,6 @@ export default function PerfilPage({ db, setDb, onConfirmAction }) {
       </Card>
     </div>
   );
-}
-
-function AvatarFallback({ nome }) {
-  const iniciais = String(nome || 'US')
-    .split(' ')
-    .filter(Boolean)
-    .slice(0, 2)
-    .map((parte) => parte[0])
-    .join('')
-    .toUpperCase();
-
-  return <div className="perfil-avatar-fallback">{iniciais || 'US'}</div>;
 }
 
 function calcularForcaSenha(senha) {

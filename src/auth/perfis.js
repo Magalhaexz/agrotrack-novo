@@ -43,15 +43,16 @@ export const permissoesPorPerfil = {
     'resultados:ver',
     'financeiro:ver',
     'tarefas:ver',
+    'funcionarios:ver',
   ],
 };
 
 export const permissoesPorPagina = {
   dashboard: 'dashboard:ver',
-  fazendas: 'configuracoes:ver',
+  fazendas: 'dashboard:ver',
   lotes: 'lotes:ver',
   calendarioOperacional: 'sanitario:ver',
-  comparativoLotes: 'resultados:ver',
+  comparativo: 'resultados:ver',
   funcionarios: 'funcionarios:ver',
   rotina: 'sanitario:ver',
   animais: 'animais:ver',

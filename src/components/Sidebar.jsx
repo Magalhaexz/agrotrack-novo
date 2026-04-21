@@ -1,10 +1,11 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import {
   Beef,
   ChevronDown,
   ChevronRight,
   DollarSign,
   LayoutDashboard,
+  LogOut,
   Menu,
   Package,
   Scale,
@@ -12,12 +13,15 @@ import {
   Settings,
   ShieldPlus,
   Syringe,
+  User,
   Users,
   X,
   ClipboardList,
   CheckSquare,
+  TrendingUp,
 } from 'lucide-react';
 import { obterPerfilDoUsuario, permissoesPorPagina } from '../auth/perfis';
+import UserAvatar from './ui/UserAvatar';
 
 const navSections = [
   {
@@ -31,7 +35,6 @@ const navSections = [
     items: [
       { id: 'lotes', label: 'Lotes', icon: Beef },
       { id: 'animais', label: 'Animais', icon: ClipboardList },
-      { id: 'comparativoLotes', label: 'Comparativo', icon: ClipboardList },
     ],
   },
   {
@@ -44,6 +47,7 @@ const navSections = [
       { id: 'estoque', label: 'Estoque', icon: Package },
       { id: 'financeiro', label: 'Financeiro', icon: DollarSign },
       { id: 'tarefas', label: 'Tarefas', icon: CheckSquare },
+      { id: 'comparativo', label: 'Comparativo', icon: TrendingUp },
       { id: 'resultados', label: 'Relatórios', icon: ClipboardList },
       { id: 'fazendas', label: 'Fazendas', icon: MapPin },
       { id: 'funcionarios', label: 'Funcionários', icon: Users },
@@ -53,12 +57,26 @@ const navSections = [
   },
 ];
 
-export default function Sidebar({ currentPage, onNavigate, alertCount = 0, user = null, hasPermission = () => true }) {
+export default function Sidebar({
+  currentPage,
+  onNavigate,
+  alertCount = 0,
+  user = null,
+  hasPermission = () => true,
+  onSignOut,
+}) {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [openSections, setOpenSections] = useState({ main: true, rebanho: true, gestao: true });
+  const [dropdownAberto, setDropdownAberto] = useState(false);
+  const dropdownRef = useRef(null);
 
-  const userName = user?.user_metadata?.name || user?.email?.split('@')[0] || 'er482354';
-  const perfil = obterPerfilDoUsuario(user) || 'Visualizador';
+  const usuarioLogado = {
+    id: user?.id || null,
+    nome: user?.nome || user?.user_metadata?.name || user?.email?.split('@')[0] || 'Usuário',
+    email: user?.email || '',
+    perfil: user?.perfil || obterPerfilDoUsuario(user) || 'Visualizador',
+    foto_url: user?.foto_url || user?.user_metadata?.avatar_url || null,
+  };
 
   const sections = useMemo(
     () =>
@@ -88,6 +106,22 @@ export default function Sidebar({ currentPage, onNavigate, alertCount = 0, user 
       window.removeEventListener('agrotrack-open-drawer', onOpenDrawer);
     };
   }, []);
+
+  useEffect(() => {
+    const fechar = (e) => {
+      if (dropdownRef.current && !dropdownRef.current.contains(e.target)) {
+        setDropdownAberto(false);
+      }
+    };
+
+    document.addEventListener('mousedown', fechar);
+    return () => document.removeEventListener('mousedown', fechar);
+  }, []);
+
+  function handleLogout() {
+    onSignOut?.();
+    setDropdownAberto(false);
+  }
 
   return (
     <>
@@ -165,13 +199,70 @@ export default function Sidebar({ currentPage, onNavigate, alertCount = 0, user 
           ))}
         </div>
 
-        <div className="sidebar-user sb-foot">
-          <div className="avatar">{String(userName).slice(0, 2).toUpperCase()}</div>
-          <div className="sidebar-user-info">
-            <div className="sidebar-user-name u-name">{userName}</div>
-            <div className="sidebar-user-role u-role">{perfil}</div>
+        <div className="sidebar-user-wrap" ref={dropdownRef}>
+          <div className="sidebar-user sb-foot" onClick={() => setDropdownAberto((prev) => !prev)}>
+            <UserAvatar usuario={usuarioLogado} size={40} />
+            <div className="sidebar-user-info">
+              <p className="sidebar-user-name">{usuarioLogado?.nome}</p>
+              <p className="sidebar-user-role">{usuarioLogado?.perfil}</p>
+            </div>
+            <ChevronDown
+              size={16}
+              style={{
+                color: 'var(--color-text-muted)',
+                transform: dropdownAberto ? 'rotate(180deg)' : 'rotate(0)',
+                transition: 'transform 0.2s',
+              }}
+            />
           </div>
-          <ChevronDown size={14} color="var(--color-text-secondary)" />
+
+          {dropdownAberto && (
+            <div className="user-dropdown">
+              <div className="user-dropdown-header">
+                <UserAvatar usuario={usuarioLogado} size={44} />
+                <div>
+                  <p className="user-dropdown-name">{usuarioLogado?.nome}</p>
+                  <p className="user-dropdown-email">{usuarioLogado?.email}</p>
+                  <span className="user-dropdown-badge">{usuarioLogado?.perfil}</span>
+                </div>
+              </div>
+
+              <div className="user-dropdown-divider" />
+
+              <button
+                className="user-dropdown-item"
+                onClick={() => {
+                  onNavigate('perfil');
+                  setDropdownAberto(false);
+                  setIsMobileMenuOpen(false);
+                }}
+                type="button"
+              >
+                <User size={15} />
+                Meu Perfil
+              </button>
+
+              <button
+                className="user-dropdown-item"
+                onClick={() => {
+                  onNavigate('configuracoes');
+                  setDropdownAberto(false);
+                  setIsMobileMenuOpen(false);
+                }}
+                type="button"
+              >
+                <Settings size={15} />
+                Configurações
+              </button>
+
+              <div className="user-dropdown-divider" />
+
+              <button className="user-dropdown-item logout" onClick={handleLogout} type="button">
+                <LogOut size={15} />
+                Sair da conta
+              </button>
+            </div>
+          )}
         </div>
       </aside>
     </>
