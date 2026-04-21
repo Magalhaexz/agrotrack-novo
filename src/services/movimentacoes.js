@@ -116,8 +116,11 @@ export function registrarSaidaAnimal(
   if (!tiposValidos.includes(tipo)) return db;
 
   const lotes = Array.isArray(db?.lotes) ? db.lotes : [];
-  const loteExiste = lotes.some((item) => Number(item.id) === Number(loteId));
-  if (!loteExiste) return db;
+  const lote = lotes.find((item) => Number(item.id) === Number(loteId));
+  if (!lote) return db;
+  if (['encerrado', 'vendido'].includes(String(lote.status || '').toLowerCase())) {
+    return db;
+  }
 
   const quantidade = toNumber(qtd);
   const peso = toNumber(pesoMedio);
@@ -176,16 +179,20 @@ export function registrarSaidaAnimal(
         obs: obs || '',
       },
     ],
-    lotes: lotes.map((lote) => {
-      if (Number(lote.id) !== Number(loteId)) return lote;
+    lotes: lotes.map((item) => {
+      if (Number(item.id) !== Number(loteId)) return item;
 
-      const loteAtualizado = atualizarLoteComResumo(lote, novaQtd, novoPesoMedio);
+      const loteAtualizado = atualizarLoteComResumo(item, novaQtd, novoPesoMedio);
       if (novaQtd > 0) return loteAtualizado;
 
       return {
         ...loteAtualizado,
-        status: 'encerrado',
+        status: tipo === 'venda' ? 'vendido' : 'encerrado',
         data_encerramento: data || loteAtualizado.data_encerramento || null,
+        data_venda:
+          tipo === 'venda'
+            ? (data || loteAtualizado.data_venda || null)
+            : loteAtualizado.data_venda || null,
       };
     }),
     movimentacoes_financeiras: movimentacoesFinanceirasAtualizadas,
@@ -297,8 +304,10 @@ export function registrarSaidaEstoque(
   if (qtd <= 0) return db;
 
   const saldoAtual = toNumber(item.quantidade_atual);
-  if (saldoAtual - qtd < 0) {
-    return db;
+  if (qtd > saldoAtual) {
+    throw new Error(
+      `Saldo insuficiente. Disponível: ${saldoAtual} ${item?.unidade || ''}`.trim()
+    );
   }
 
   const movimentosEstoque = Array.isArray(db?.movimentacoes_estoque)

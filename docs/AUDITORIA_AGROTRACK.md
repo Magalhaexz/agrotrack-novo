@@ -1,280 +1,303 @@
-# Auditoria Técnica — AgroTrack (React JSX)
+# Auditoria Técnica — AgroTrack (React)
 
-Data da análise: 2026-04-20
+Data da análise: 2026-04-21
+
+## Escopo e método
+Análise estática do código front-end (estado em memória via `db` no `App.jsx`, páginas e serviços), com foco em confiabilidade de dados para operação pecuária comercial.
+
+---
 
 ## 1) Análise geral da estrutura
 
-### Pontos positivos
-- Organização por páginas (`src/pages`) e componentes (`src/components`) é clara.
-- Há utilitários separados para cálculo e alertas (`src/utils`).
-- Formulários estão desacoplados das páginas em componentes próprios.
+### Organização atual
+- Estrutura por camadas de pastas existe (`pages`, `components`, `services`, `domain`, `utils`), o que é positivo.
+- Porém, há **dois estilos arquiteturais convivendo**:
+  1. fluxo “novo” com serviços transacionais (`src/services/movimentacoes.js`),
+  2. fluxo “legado” com mutação direta de `setDb` dentro de páginas modais (`LotesPage`, `EstoquePage`).
 
-### Problemas estruturais
-- O estado global (`db`) fica inteiro no `App.jsx` e é mutado por todas as páginas via `setDb`, sem camada de serviço/repositório.
-- A lógica de negócio está espalhada nas páginas e utilitários, com repetição de funções auxiliares (`gerarNovoId`, `formatarNumero`, `formatarData`).
-- Não existe modelo de domínio para movimentações (animal, estoque, financeiro): só há “estado atual” em arrays.
+### Padrões encontrados (e faltantes)
+- ✅ Padrão de componentes de formulário separados (ex.: `PesagemForm`, `VendaLoteModal`).
+- ✅ Uso pontual de `useMemo` para derivados.
+- ❌ Falta padrão único para regras de negócio: parte nas páginas, parte nos serviços.
+- ❌ Inconsistência de modelo de campos (`loteId` vs `lote_id`) em movimentações.
+
+### Separação de responsabilidades
+- **Incorreta/incompleta** em pontos críticos:
+  - regras de estoque, financeiro e rebanho estão duplicadas em modais de página;
+  - validação e persistência estão misturadas com UI;
+  - não há “fonte única da verdade” para entradas/saídas.
+
+---
 
 ## 2) Bugs e problemas críticos
 
-### 2.1 Retirada de estoque (inconsistente e suscetível a negativo)
-**Problema atual:** não existe rotina de baixa de estoque por consumo real. A tela de suplementação só calcula consumo estimado.
+### 2.1 Retirada de estoque com risco de inconsistência
+Existem dois caminhos diferentes para saída de estoque:
 
+**Trecho atual problemático (muta direto no modal da página):**
 ```jsx
-const qtdEstoque = Number(estoqueItem?.quantidade_atual || 0);
-const diasRestantes = consumoTotalDia > 0 ? qtdEstoque / consumoTotalDia : 0;
+// src/pages/EstoquePage.jsx (SaidaModal)
+estoque: prev.estoque.map((i) =>
+  i.id === Number(form.item_id)
+    ? { ...i, quantidade_atual: Number(i.quantidade_atual || 0) - qtd }
+    : i
+),
 ```
 
-**Risco:** estoque não reflete consumo diário, divergindo do físico.
+**Problema:** bypass do serviço central; regras de auditoria/normalização podem divergir do restante do app.
 
-### 2.2 Média de peso incorreta (não ponderada por quantidade)
-**Problema atual em AnimaisPage:**
-
+**Trecho sugerido:**
 ```jsx
-const pesoAtualMedio =
-  animais.length > 0
-    ? animais.reduce((acc, item) => acc + Number(item.p_at || 0), 0) / animais.length
-    : 0;
+// usar handler central vindo do App
+await onRegistrarSaidaEstoque({
+  itemId: Number(form.item_id),
+  loteId: form.lote_id ? Number(form.lote_id) : '',
+  quantidade: qtd,
+  tipo: form.tipo,
+  data: form.data,
+  obs: form.obs.trim(),
+});
 ```
 
-**Erro:** média por registro, não por cabeça. Se um grupo tem 80 cabeças e outro 5, ambos pesam igual na média.
+### 2.2 Cálculo de média/peso do lote quebrado por fluxo paralelo
+`services/movimentacoes.js` calcula média ponderada corretamente, mas `LotesPage` possui modal próprio que não atualiza `lotes.qtd`/`lotes.p_at` pelo mesmo critério.
 
-### 2.3 Status de lote (ativo/vendido/encerrado) inexistente
-Não há campo `status` no lote e nem regras para transição. A UI assume implicitamente que todos os lotes são ativos.
+**Trecho atual problemático:**
+```jsx
+// src/pages/LotesPage.jsx (MovimentacaoModal)
+setDb((prev) => ({
+  ...prev,
+  movimentacoes_animais: [...(prev.movimentacoes_animais || []), mov],
+  // não recalcula resumo do lote com regra única
+}));
+```
 
-### 2.4 Integridade dos dados sanitários
-No mock inicial há IDs duplicados em `sanitario` (id 1 e 2 repetidos), o que pode quebrar edição/exclusão por chave.
+**Impacto:** indicadores podem divergir dependendo da tela usada.
 
-### 2.5 Problemas de estado/sincronização
-- Pesagens não sincronizam o `p_at` dos animais do lote.
-- Sanitário cria rotina automática, mas sem vínculo de ciclo de vida completo para “realizado” no manejo.
-- Exclusões removem registros sem trilha de auditoria.
+### 2.3 Status do lote (ativo/vendido/encerrado) não atualiza no fluxo principal
+No modal de movimentação de lotes, venda não atualiza status do lote.
+
+**Trecho atual problemático:**
+```jsx
+// src/pages/LotesPage.jsx (MovimentacaoModal)
+movimentacoes_financeiras: form.tipo === 'venda'
+  ? [...(prev.movimentacoes_financeiras || []), { ... }]
+  : (prev.movimentacoes_financeiras || []),
+```
+
+**Problema:** não marca `status: 'vendido'` nem fecha lote quando quantidade zera.
+
+### 2.4 Problema de estado/sincronização
+- `PesagensPage` grava pesagem mas não sincroniza campo de referência do lote/animal para leitura rápida.
+- existem modais/componentes prontos (`VendaLoteModal`, `EntradaEstoqueModal`, `SaidaEstoqueModal`) com regras mais consistentes que não estão conectados ao fluxo de páginas principais.
+
+---
 
 ## 3) Fluxo de entrada e saída (animais e estoque)
 
+### Animais
+- **Entrada:** existe em `registrarEntradaAnimal` (serviço) e no cadastro manual de grupos.
+- **Saída:** existe no serviço, porém tela de lotes usa fluxo alternativo que não aplica mesma regra de fechamento/status.
+- **Transferência:** UI aceita tipo de transferência, mas não há efetivação bidirecional (saída no lote origem + entrada no destino com custo/peso).
+
+### Estoque
+- **Entrada:** existe em `EstoquePage` e no serviço.
+- **Saída/consumo:** existe, mas duplicada em lógica local e serviço.
+- **Consumo por lote/tratamento:** não está totalmente amarrado ao sanitário/suplementação com baixa automática confiável.
+
+### Modelo centralizado recomendado
+Manter somente serviços como ponto de escrita:
+- `registrarMovimentoAnimal()`
+- `registrarMovimentoEstoque()`
+- `registrarMovimentoFinanceiro()`
+
+E todas as páginas chamam esses serviços (sem `setDb` de negócio inline).
+
+---
+
+## 4) Cálculo de arroba (@) em tempo real
+
 ### Situação atual
-- **Entrada de animais:** só cadastro/edição de “grupo” em `animais`.
-- **Saída de animais:** inexistente como evento (venda/morte/descarte/transferência).
-- **Entrada de estoque:** cadastro de item com quantidade atual.
-- **Saída de estoque:** inexistente como evento; apenas cálculo de consumo teórico.
+- Já existe implementação em tempo real via `useArroba` + `ArrobaPreview` (bom).
 
-### Gap central
-Falta uma tabela/coleção de **movimentações** com histórico imutável.
-
-### Modelo recomendado (centralizado)
-- `movimentacoes_animais`: `id`, `lote_origem_id`, `lote_destino_id`, `tipo` (compra/nascimento/venda/morte/descarte/transferência), `qtd`, `peso_medio`, `valor_total`, `data`, `obs`.
-- `movimentacoes_estoque`: `id`, `item_estoque_id`, `tipo` (entrada/consumo/ajuste/perda), `quantidade`, `custo_unit`, `lote_id?`, `origem_ref`, `data`, `obs`.
-- `movimentacoes_financeiras`: `id`, `tipo` (receita/despesa), `categoria`, `lote_id?`, `valor`, `data`, `origem_tipo`, `origem_id`.
-
-## 4) Cálculo de arroba em tempo real
-
-### Situação atual
-Há cálculo de arroba no consolidado (`calcLote`), mas não em formulário com preview em `onChange`.
-
-### Implementação recomendada (tempo real)
-
+**Trecho atual correto:**
 ```jsx
-const peso = Number(form.p_at || 0);
-const rendimento = Number(form.rendimento_carcaca || 52) / 100;
-const preco = Number(form.preco_arroba || 0);
-
-const arrobaViva = peso / 15;
-const arrobaCarcaca = (peso * rendimento) / 15;
+const arrobaViva = p / 15;
+const arrobaCarcaca = (p * rend) / 15;
 const valorEstimado = arrobaCarcaca * preco;
 ```
 
-Exibir esse bloco no formulário (ex.: `AnimalForm` ou `PesagemForm`) recalculando a cada `handleChange`.
+### Ajuste recomendado
+Hoje o retorno vem com `.toFixed()` (string). Para evitar bugs de comparação/soma:
+```jsx
+return {
+  arrobaViva,
+  arrobaCarcaca,
+  valorEstimado,
+};
+```
+E formatar apenas na exibição.
+
+---
 
 ## 5) Qualidade do código
 
 ### Duplicação
-- Formatação e `gerarNovoId` repetidos em várias páginas.
-- Mapeamentos de labels repetidos (`normalizarTipo`, `normalizarCategoria`).
+- `MovimentacaoModal` e `SaidaModal` implementam regras já existentes nos serviços.
+- Utilitários de normalização/formatação aparecem em múltiplos pontos sem centralização total.
 
-### Separação de responsabilidades
-- Regras de domínio (estoque, rotina sanitária, custo) estão dentro das páginas.
-- Falta camada de `services`/`domain` para operações transacionais.
+### Funções grandes
+- `LotesPage.jsx` concentra várias subfeatures e funções utilitárias no mesmo arquivo (difícil manutenção/teste).
 
-### Validação insuficiente
-- Campos numéricos aceitam negativos (qtd, peso, valor, estoque).
-- Não há validação de datas (ex.: `saida < entrada`).
-- Sem validação de consistência de lote/fazenda em exclusões.
+### Lógica de negócio misturada com UI
+- Cálculo financeiro e atualização de entidades dentro de modais de interface.
 
-### Erros
-- Operações CRUD não têm tratamento de erro estruturado (apenas `alert`/`confirm`).
+### Validação de formulário
+- Há validações básicas, mas faltam regras de consistência:
+  - data de saída < entrada,
+  - venda com preço/rendimento obrigatórios sempre,
+  - bloqueio de lote encerrado para novas movimentações.
+
+### Tratamento de erros
+- Predomínio de `alert`/retorno silencioso sem feedback estruturado de falha de negócio.
+
+---
 
 ## 6) Performance
 
-### Re-renders e recomputações
-- `DashboardPage` recalcula `calcLote` para todos os lotes em toda renderização.
-- Muitos `filter + reduce` por item de tabela (custo O(n²) em listas grandes).
+### Pontos observados
+- `lotesEnriquecidos` recalcula `calcLote` para todos os lotes em qualquer mudança de `db`.
+- Filtros com `find/filter` repetidos dentro de `map` em tabelas/cards.
 
 ### Melhorias
-- Pré-indexar dados com `Map` por `lote_id` (`useMemo`).
-- Centralizar seletores derivados (ex.: `selectLoteIndicators(db)`).
-- Evitar recriar funções inline em tabelas muito grandes (usar `useCallback` quando necessário).
+- Índices memoizados por `lote_id` e `item_estoque_id` (`Map`) para reduzir O(n²).
+- Extrair seletores derivados (`selectResumoLotes`, `selectMovimentosEstoque`) em `domain/selectors`.
+
+---
 
 ## 7) Interface e UX
 
-### Pontos críticos
-- Fluxos críticos usam `window.confirm` e `alert` (fraco para UX comercial).
-- Falta feedback visual robusto: loading de ação, toast de sucesso/erro, estado de salvamento.
-- Não há confirmação contextual para ações financeiras/sensíveis além de popup genérico.
+### Inconsistências
+- Texto e estados de ação não são padronizados entre modais/telas.
+- Feedback de sucesso/erro ainda depende de `alert` em vários fluxos.
 
-### Responsividade
-- Uso recorrente de grids fixos `1fr 1fr` e `1fr 1fr 1fr` em modais pode quebrar em celular sem media-query dedicada.
+### Faltas críticas de UX
+- Ações sensíveis (encerrar lote, venda, ajustes de estoque) sem confirmação contextual robusta em todas as telas.
+- Responsividade: vários formulários usam grid fixo `1fr 1fr` sem adaptação explícita para telas pequenas.
 
-## 8) Banco e modelo de dados
+---
 
-### Problemas atuais
-- Estrutura é “snapshot atual” e não orientada a eventos.
-- Relações insuficientes para auditoria financeira por lote.
-- Sem trilha de custo acumulado por lote em base transacional.
+## 8) Banco/modelo de dados
 
-### Melhorias para comercialização
-- Entidades de movimentação (animais, estoque, financeiro).
-- Status explícito de lote (`ativo`, `vendido`, `encerrado`) com timestamps.
-- Agregados calculados por lote: custo total, receita total, lucro líquido.
-- Campo de versão/`updated_at` e `created_by` para rastreabilidade.
+### Situação atual
+- Modelo em memória (mock) e event sourcing parcial.
+- Campos e relacionamentos são úteis, mas há inconsistência de nomenclatura (`loteId`/`lote_id`) e ausência de chave de origem completa em todos eventos.
 
-## 9) Gaps de produto (para vender)
+### Melhorias necessárias para comercialização
+- Histórico imutável obrigatório de movimentações (animal, estoque, financeiro, sanitário).
+- Custeio por lote derivado de movimentos (não de lançamentos soltos em páginas).
+- Fechamento financeiro por lote com resultado auditável (`receita - custo = lucro`).
+- Preparar camada para operação offline e sincronização posterior (idempotência de eventos).
 
-1. Fluxo de venda de lote/animal com impacto em estoque e financeiro.
-2. Fluxo de morte/descarte/transferência com histórico.
-3. Conciliação financeira (contas a pagar/receber, DRE por lote).
-4. Operação offline-first (cache local + sincronização resiliente).
-5. Controle de permissões por perfil (proprietário, gerente, funcionário).
-6. Backup/restauração e exportação de relatórios (PDF/Excel).
-7. Trilhas de auditoria (quem alterou o quê e quando).
+---
 
-## 10) Plano de correção priorizado
+## 9) Gaps de produto (para comercialização)
 
-### Prioridade 1 (crítico)
+1. Fluxo de transferência entre lotes completo e auditável.
+2. Fechamento de lote com trava de edição retroativa (ou trilha de ajuste).
+3. Conciliação financeira (contas a pagar/receber por competência e caixa).
+4. Operação offline-first para uso em campo com sinal ruim.
+5. Relatórios gerenciais de margem por lote/período com exportação robusta.
+6. Governança de permissões e auditoria por usuário em todos eventos críticos.
 
-#### P1.1 — Criar baixa real de estoque por movimentação
+---
+
+## 10) Plano de correção priorizado (com código)
+
+### Prioridade 1 — Crítico (integridade de dados)
+
+#### P1.1 Unificar escrita de movimentações (parar mutação inline em páginas)
 **Trecho atual (problema):**
-
 ```jsx
-// SuplementacaoPage: apenas leitura da quantidade atual, sem baixar saldo
-const qtdEstoque = Number(estoqueItem?.quantidade_atual || 0);
+// src/pages/LotesPage.jsx (MovimentacaoModal)
+setDb((prev) => ({
+  ...prev,
+  movimentacoes_animais: [...(prev.movimentacoes_animais || []), mov],
+  ...
+}));
 ```
 
-**Código sugerido:**
-
+**Correção sugerida:**
 ```jsx
-function registrarMovimentoEstoque({ itemId, loteId, quantidade, tipo, data, obs }) {
-  setDb((prev) => {
-    const movimentos = prev.movimentacoes_estoque || [];
-
-    return {
-      ...prev,
-      movimentacoes_estoque: [
-        ...movimentos,
-        {
-          id: gerarNovoId(movimentos),
-          item_estoque_id: itemId,
-          lote_id: loteId,
-          tipo, // entrada | consumo | ajuste | perda
-          quantidade,
-          data,
-          obs: obs || '',
-        },
-      ],
-      estoque: prev.estoque.map((it) =>
-        it.id === itemId
-          ? { ...it, quantidade_atual: Number(it.quantidade_atual || 0) - quantidade }
-          : it
-      ),
-    };
-  });
-}
+// passar handlers do App para LotesPage e usar serviços
+await onRegistrarSaidaAnimal({
+  loteId: lote.id,
+  qtd,
+  pesoMedio: peso,
+  valorTotal: liquido,
+  data: form.data,
+  comprador: form.comprador,
+  tipo: form.tipo,
+  obs: form.obs,
+});
 ```
 
-> Regra obrigatória: bloquear saldo negativo e exigir justificativa em ajustes.
-
-#### P1.2 — Corrigir média de peso por cabeça
+#### P1.2 Consolidar status de lote via regra única
 **Trecho atual (problema):**
-
 ```jsx
-const pesoAtualMedio =
-  animais.length > 0
-    ? animais.reduce((acc, item) => acc + Number(item.p_at || 0), 0) / animais.length
-    : 0;
+// venda no modal não atualiza status do lote
+movimentacoes_financeiras: form.tipo === 'venda' ? ... : ...
 ```
 
-**Código corrigido:**
-
+**Correção sugerida (serviço central):**
 ```jsx
-const totalCabecas = animais.reduce((acc, item) => acc + Number(item.qtd || 0), 0);
-const pesoAtualMedio = totalCabecas
-  ? animais.reduce((acc, item) => acc + Number(item.p_at || 0) * Number(item.qtd || 0), 0) / totalCabecas
-  : 0;
-```
-
-#### P1.3 — Criar status de lote e transições
-**Trecho atual (problema):** ausência de campo e regra de status.
-
-**Código sugerido (modelo):**
-
-```jsx
-// lote
-{
-  id,
-  nome,
-  status: 'ativo', // ativo | vendido | encerrado
-  data_venda: null,
-  data_encerramento: null,
+if (novaQtd <= 0) {
+  lote.status = tipo === 'venda' ? 'vendido' : 'encerrado';
+  lote.data_encerramento = data;
+  lote.data_venda = tipo === 'venda' ? data : lote.data_venda;
 }
 ```
 
+#### P1.3 Bloquear inconsistências de estoque em todos fluxos
+**Trecho atual (problema):**
 ```jsx
-function encerrarLote(loteId, motivo) {
-  setDb((prev) => ({
-    ...prev,
-    lotes: prev.lotes.map((l) =>
-      l.id === loteId
-        ? { ...l, status: 'encerrado', data_encerramento: new Date().toISOString().slice(0, 10), motivo_encerramento: motivo }
-        : l
-    ),
-  }));
+if (!form.data || !form.item_id || qtd <= 0 || qtd > saldo) return;
+```
+
+**Correção sugerida:**
+```jsx
+if (qtd > saldo) {
+  throw new Error(`Saldo insuficiente para ${item.produto}`);
 }
+// capturar erro e mostrar toast de falha
 ```
 
-### Prioridade 2 (importante)
+### Prioridade 2 — Importante (antes de vender)
 
-#### P2.1 — Fluxo completo de entradas/saídas de animais
-- Implementar `movimentacoes_animais`.
-- Atualizar saldo de cabeças por lote via agregação (não edição direta).
+#### P2.1 Implementar transferência real origem/destino
+- lançar dois eventos atômicos (saída + entrada), mantendo mesmo `origem_id`.
 
-#### P2.2 — Arroba em tempo real em formulários
-Adicionar preview em `AnimalForm`/`PesagemForm` com:
+#### P2.2 Sincronizar pesagem com snapshot operacional
+- ao salvar pesagem, atualizar referência de peso atual do lote para leitura rápida em dashboards.
 
-```jsx
-@ viva = peso / 15
-@ carcaça = (peso * rendimento%) / 15
-valor = @ carcaça * preço
-```
+#### P2.3 Padronizar validações de negócio
+- lote encerrado não recebe movimentação;
+- datas coerentes;
+- campos financeiros obrigatórios por tipo de evento.
 
-#### P2.3 — Validação forte de formulários
-- Bloquear números negativos.
-- Validar intervalos de datas.
-- Exigir consistência mínima por tipo de operação.
+### Prioridade 3 — Melhoria (após estabilidade)
 
-### Prioridade 3 (melhoria)
+#### P3.1 Refatorar `LotesPage` em módulos menores
+- `LoteList`, `LoteDetail`, `MovimentacaoModal`, `FechamentoModal`.
 
-#### P3.1 — Refatorar utilitários compartilhados
-Extrair para `src/utils/formatters.js` e `src/utils/id.js`.
+#### P3.2 Performance e selectors
+- indexação memoizada e seleção derivada centralizada.
 
-#### P3.2 — Seletores memorizados
-Criar camada de seletores (`src/domain/selectors`) para diminuir recomputação.
-
-#### P3.3 — UX comercial
-- Toasts e banners de erro/sucesso.
-- Modo offline com fila de sincronização.
-- Confirmações contextuais ricas para ações críticas.
+#### P3.3 UX comercial/offline
+- feedback transacional (loading/sucesso/erro),
+- fila offline de eventos e sincronização resiliente.
 
 ---
 
 ## Conclusão executiva
-O app já tem boa base visual e cobertura de módulos, mas **ainda não está pronto para comercialização** por ausência de modelo transacional (movimentações), risco de inconsistência entre estoque/animais/custos e ausência de fechamento financeiro por lote com auditoria.
-
-Com as correções da Prioridade 1 e 2, o produto evolui para um nível confiável para operação real em fazendas brasileiras.
+O produto evoluiu (há serviços e preview de arroba em tempo real), mas ainda convive com caminhos paralelos de escrita que podem gerar divergência de dados. Para um SaaS comercial rural confiável, o passo mais importante é **centralizar toda movimentação em uma camada única transacional**, garantindo estoque, lote e financeiro sempre consistentes e auditáveis.

@@ -91,6 +91,15 @@ export default function PesagensPage({ db, setDb, onConfirmAction }) {
         pesagens: prev.pesagens.map((p) =>
           p.id === pesagemEditando.id ? { ...p, ...dados } : p
         ),
+        lotes: (prev.lotes || []).map((lote) =>
+          Number(lote.id) === Number(dados.lote_id)
+            ? {
+                ...lote,
+                p_at: Number(dados.peso_medio || 0),
+                ultima_pesagem: dados.data || lote.ultima_pesagem || null,
+              }
+            : lote
+        ),
       }));
     } else {
       setDb((prev) => ({
@@ -102,6 +111,15 @@ export default function PesagensPage({ db, setDb, onConfirmAction }) {
             ...dados,
           },
         ],
+        lotes: (prev.lotes || []).map((lote) =>
+          Number(lote.id) === Number(dados.lote_id)
+            ? {
+                ...lote,
+                p_at: Number(dados.peso_medio || 0),
+                ultima_pesagem: dados.data || lote.ultima_pesagem || null,
+              }
+            : lote
+        ),
       }));
     }
 
