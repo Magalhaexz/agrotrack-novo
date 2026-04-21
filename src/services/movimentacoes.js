@@ -1,5 +1,6 @@
 import { gerarNovoId } from '../utils/id';
 import { TIPOS_SAIDA_ANIMAL } from '../utils/constantes';
+import { registrarAuditoria } from './auditoria';
 function toNumber(value) {
   return Number(value || 0);
 }
@@ -29,7 +30,8 @@ function atualizarLoteComResumo(lote, qtdAtual, pesoMedioAtual) {
 
 export function registrarEntradaAnimal(
   db,
-  { loteId, qtd, pesoMedio, valorTotal, data, fornecedor, obs }
+  { loteId, qtd, pesoMedio, valorTotal, data, fornecedor, obs },
+  userContext = {}
 ) {
   const lotes = Array.isArray(db?.lotes) ? db.lotes : [];
   const loteExiste = lotes.some((item) => Number(item.id) === Number(loteId));
@@ -56,7 +58,7 @@ export function registrarEntradaAnimal(
   const novoMovAnimalId = gerarNovoId(movimentosAnimais);
   const novoMovFinanceiroId = gerarNovoId(movimentosFinanceiros);
 
-  return {
+  const baseAtualizada = {
     ...db,
     movimentacoes_animais: [
       ...movimentosAnimais,
@@ -93,11 +95,22 @@ export function registrarEntradaAnimal(
       },
     ],
   };
+
+  return registrarAuditoria(baseAtualizada, {
+    acao: 'entrada_animal',
+    entidade: 'movimentacoes_animais',
+    entidade_id: novoMovAnimalId,
+    descricao: `Entrada de ${quantidade} animal(is) no lote ${Number(loteId)}`,
+    ator_id: userContext?.id || null,
+    ator_email: userContext?.email || '',
+    criticidade: 'alta',
+  });
 }
 
 export function registrarSaidaAnimal(
   db,
-  { loteId, qtd, pesoMedio, valorTotal, data, comprador, tipo, obs }
+  { loteId, qtd, pesoMedio, valorTotal, data, comprador, tipo, obs },
+  userContext = {}
 ) {
   const tiposValidos = Object.keys(TIPOS_SAIDA_ANIMAL);
   if (!tiposValidos.includes(tipo)) return db;
@@ -146,7 +159,7 @@ export function registrarSaidaAnimal(
         ]
       : movimentosFinanceiros;
 
-  return {
+  const baseAtualizada = {
     ...db,
     movimentacoes_animais: [
       ...movimentosAnimais,
@@ -177,11 +190,22 @@ export function registrarSaidaAnimal(
     }),
     movimentacoes_financeiras: movimentacoesFinanceirasAtualizadas,
   };
+
+  return registrarAuditoria(baseAtualizada, {
+    acao: 'saida_animal',
+    entidade: 'movimentacoes_animais',
+    entidade_id: novoMovAnimalId,
+    descricao: `Saída (${tipo}) de ${quantidade} animal(is) do lote ${Number(loteId)}`,
+    ator_id: userContext?.id || null,
+    ator_email: userContext?.email || '',
+    criticidade: tipo === 'venda' ? 'alta' : 'media',
+  });
 }
 
 export function registrarEntradaEstoque(
   db,
-  { itemId, quantidade, custoUnit, data, fornecedor, obs }
+  { itemId, quantidade, custoUnit, data, fornecedor, obs },
+  userContext = {}
 ) {
   const estoque = Array.isArray(db?.estoque) ? db.estoque : [];
   const item = estoque.find((entry) => Number(entry.id) === Number(itemId));
@@ -203,7 +227,7 @@ export function registrarEntradaEstoque(
   const novoMovEstoqueId = gerarNovoId(movimentosEstoque);
   const novoMovFinanceiroId = gerarNovoId(movimentosFinanceiros);
 
-  return {
+  const baseAtualizada = {
     ...db,
     movimentacoes_estoque: [
       ...movimentosEstoque,
@@ -245,11 +269,22 @@ export function registrarEntradaEstoque(
       },
     ],
   };
+
+  return registrarAuditoria(baseAtualizada, {
+    acao: 'entrada_estoque',
+    entidade: 'movimentacoes_estoque',
+    entidade_id: novoMovEstoqueId,
+    descricao: `Entrada de estoque do item ${item.produto || 'Item'} (${qtd})`,
+    ator_id: userContext?.id || null,
+    ator_email: userContext?.email || '',
+    criticidade: 'media',
+  });
 }
 
 export function registrarSaidaEstoque(
   db,
-  { itemId, loteId, quantidade, tipo = 'consumo', data, obs }
+  { itemId, loteId, quantidade, tipo = 'consumo', data, obs },
+  userContext = {}
 ) {
   const tiposValidos = ['consumo', 'ajuste', 'perda'];
   if (!tiposValidos.includes(tipo)) return db;
@@ -272,7 +307,7 @@ export function registrarSaidaEstoque(
   const novoMovEstoqueId = gerarNovoId(movimentosEstoque);
   const custoUnit = toNumber(item.valor_unitario);
 
-  return {
+  const baseAtualizada = {
     ...db,
     movimentacoes_estoque: [
       ...movimentosEstoque,
@@ -294,4 +329,14 @@ export function registrarSaidaEstoque(
         : entry
     ),
   };
+
+  return registrarAuditoria(baseAtualizada, {
+    acao: 'saida_estoque',
+    entidade: 'movimentacoes_estoque',
+    entidade_id: novoMovEstoqueId,
+    descricao: `Saída (${tipo}) de estoque do item ${item.produto || 'Item'} (${qtd})`,
+    ator_id: userContext?.id || null,
+    ator_email: userContext?.email || '',
+    criticidade: tipo === 'perda' ? 'alta' : 'media',
+  });
 }

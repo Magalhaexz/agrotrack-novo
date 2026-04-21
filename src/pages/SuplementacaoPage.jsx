@@ -1,278 +1,123 @@
 import { useMemo, useState } from 'react';
-import SuplementacaoForm from '../components/SuplementacaoForm';
-import { formatarNumero } from '../utils/formatters';
+import Card from '../components/ui/Card';
+import Button from '../components/ui/Button';
+import Modal from '../components/ui/Modal';
+import Input from '../components/ui/Input';
+import Badge from '../components/ui/Badge';
+import { formatCurrency, formatDate, formatNumber } from '../utils/calculations';
 import { gerarNovoId } from '../utils/id';
 
-export default function SuplementacaoPage({ db, setDb, onConfirmAction }) {
-  const [abrirForm, setAbrirForm] = useState(false);
-  const [itemEditando, setItemEditando] = useState(null);
+export default function SuplementacaoPage({ db, setDb }) {
+  const [openDieta, setOpenDieta] = useState(false);
+  const [openConsumo, setOpenConsumo] = useState(false);
 
-  const lotes = db?.lotes || [];
-  const animais = db?.animais || [];
-  const estoque = db?.estoque || [];
-  const suplementacao = db?.suplementacao || [];
+  const dietas = db.dietas || [];
+  const lotesAtivos = (db.lotes || []).filter((l) => l.status === 'ativo');
 
-  const dadosTabela = useMemo(() => {
-    return suplementacao.map((item) => {
-      const lote = lotes.find((l) => l.id === item.lote_id);
-      const estoqueItem = estoque.find((e) => e.id === item.item_estoque_id);
-
-      const cabecas = animais
-        .filter((a) => a.lote_id === item.lote_id)
-        .reduce((acc, a) => acc + Number(a.qtd || 0), 0);
-
-      const consumoTotalDia =
-        item.modo === 'por_cabeca'
-          ? Number(item.consumo_por_cabeca_dia || 0) * cabecas
-          : Number(item.consumo_total_dia || 0);
-
-      const valorUnitario = Number(estoqueItem?.valor_unitario || 0);
-      const qtdEstoque = Number(estoqueItem?.quantidade_atual || 0);
-
-      const custoDia = consumoTotalDia * valorUnitario;
-      const custoMes = custoDia * 30;
-      const diasRestantes =
-        consumoTotalDia > 0 ? qtdEstoque / consumoTotalDia : 0;
-
-      return {
-        ...item,
-        loteNome: lote?.nome || '—',
-        produtoNome: estoqueItem?.produto || '—',
-        unidade: estoqueItem?.unidade || 'kg',
-        cabecas,
-        consumoTotalDia,
-        custoDia,
-        custoMes,
-        qtdEstoque,
-        diasRestantes,
-        status: obterStatusEstoque(diasRestantes),
-      };
+  const consumoRows = useMemo(() => {
+    return lotesAtivos.map((lote) => {
+      const dieta = dietas.find((d) => Number(d.lote_id) === Number(lote.id));
+      const cabecas = (db.animais || []).filter((a) => a.lote_id === lote.id).reduce((s, a) => s + Number(a.qtd || 0), 0);
+      const previstoDia = dieta ? dieta.itens.reduce((s, i) => s + Number(i.qtd_cab_dia || 0) * cabecas, 0) : 0;
+      const reais = (db.consumo_suplementacao || []).filter((c) => Number(c.lote_id) === Number(lote.id));
+      const realDia = reais.length ? reais.reduce((s, r) => s + Number(r.qtd_total || 0), 0) / reais.length : 0;
+      return { lote, dieta, cabecas, previstoDia, realDia, diff: realDia - previstoDia };
     });
-  }, [suplementacao, lotes, animais, estoque]);
+  }, [db, dietas, lotesAtivos]);
 
-  const resumo = useMemo(() => {
-    const consumoDiaTotal = dadosTabela.reduce(
-      (acc, item) => acc + Number(item.consumoTotalDia || 0),
-      0
-    );
-
-    const custoDiaTotal = dadosTabela.reduce(
-      (acc, item) => acc + Number(item.custoDia || 0),
-      0
-    );
-
-    const itensCriticos = dadosTabela.filter(
-      (item) => item.status === 'critico'
-    ).length;
-
-    return {
-      total: suplementacao.length,
-      consumoDiaTotal,
-      custoDiaTotal,
-      itensCriticos,
-    };
-  }, [dadosTabela, suplementacao]);
-
-  function abrirNovo() {
-    setItemEditando(null);
-    setAbrirForm(true);
-  }
-
-  function editarItem(item) {
-    setItemEditando(item);
-    setAbrirForm(true);
-  }
-
-  async function excluirItem(id) {
-    const confirmado = typeof onConfirmAction === 'function'
-      ? await onConfirmAction({
-          title: 'Excluir suplementação',
-          message: 'Deseja excluir esta suplementação?',
-          tone: 'danger',
-        })
-      : window.confirm('Deseja excluir esta suplementação?');
-    if (!confirmado) return;
-
-    setDb((prev) => ({
-      ...prev,
-      suplementacao: prev.suplementacao.filter((s) => s.id !== id),
-    }));
-  }
-
-  function salvarItem(dados) {
-    if (itemEditando) {
-      setDb((prev) => ({
-        ...prev,
-        suplementacao: prev.suplementacao.map((s) =>
-          s.id === itemEditando.id ? { ...s, ...dados } : s
-        ),
-      }));
-    } else {
-      setDb((prev) => ({
-        ...prev,
-        suplementacao: [
-          ...prev.suplementacao,
-          {
-            id: gerarNovoId(prev.suplementacao),
-            ...dados,
-          },
-        ],
-      }));
-    }
-
-    setAbrirForm(false);
-    setItemEditando(null);
-  }
+  const projecao = useMemo(() => {
+    const itemMap = {};
+    consumoRows.forEach((r) => {
+      if (!r.dieta) return;
+      r.dieta.itens.forEach((it) => {
+        itemMap[it.item_estoque_id] = (itemMap[it.item_estoque_id] || 0) + Number(it.qtd_cab_dia || 0) * r.cabecas;
+      });
+    });
+    return Object.entries(itemMap).map(([itemId, consumoDia]) => {
+      const item = (db.estoque || []).find((e) => Number(e.id) === Number(itemId));
+      const saldo = Number(item?.quantidade_atual || 0);
+      const dias = consumoDia > 0 ? saldo / consumoDia : 999;
+      return { item, consumoDia, dias };
+    });
+  }, [consumoRows, db.estoque]);
 
   return (
-    <div className="page">
-      <div className="page-header page-topbar">
-        <div>
-          <h1>Suplementação</h1>
-          <p>Consumo por lote ligado diretamente aos itens do estoque.</p>
-        </div>
-
-        <div className="page-topbar-actions">
-          <button className="primary-btn" onClick={abrirNovo}>
-            + Nova suplementação
-          </button>
+    <div className="page rebanho-page">
+      <div className="rebanho-header">
+        <h1>Suplementação</h1>
+        <div className="lote-actions">
+          <Button onClick={() => setOpenDieta(true)}>Cadastrar dieta</Button>
+          <Button variant="outline" onClick={() => setOpenConsumo(true)}>Registrar consumo diário</Button>
         </div>
       </div>
 
-      <div className="kpi-grid-3">
-        <div className="kpi-card">
-          <div className="kpi-label">Suplementações</div>
-          <div className="kpi-value">{resumo.total}</div>
-          <div className="kpi-sub">vinculações lote + estoque</div>
-        </div>
+      <Card title="Dietas vinculadas por lote">
+        <table className="dashboard-table"><thead><tr><th>Lote</th><th>Dieta</th><th>Itens</th></tr></thead><tbody>
+          {lotesAtivos.map((l) => {
+            const d = dietas.find((x) => Number(x.lote_id) === Number(l.id));
+            return <tr key={l.id}><td>{l.nome}</td><td>{d?.nome || 'Sem dieta'}</td><td>{d ? d.itens.map((i) => `${i.item_nome}: ${i.qtd_cab_dia}/cab/dia`).join(' | ') : '—'}</td></tr>;
+          })}
+        </tbody></table>
+      </Card>
 
-        <div className="kpi-card">
-          <div className="kpi-label">Consumo diário total</div>
-          <div className="kpi-value">{formatarNumero(resumo.consumoDiaTotal)}</div>
-          <div className="kpi-sub">somando todos os lotes</div>
-        </div>
+      <Card title="Consumo previsto x real">
+        <table className="dashboard-table"><thead><tr><th>Lote</th><th>Dieta</th><th>Previsto/dia</th><th>Real/dia</th><th>Diferença</th></tr></thead><tbody>
+          {consumoRows.map((r) => <tr key={r.lote.id}><td>{r.lote.nome}</td><td>{r.dieta?.nome || '—'}</td><td>{formatNumber(r.previstoDia, 2)}</td><td>{formatNumber(r.realDia, 2)}</td><td className={r.diff <= 0 ? 'positive' : 'negative'}>{formatNumber(r.diff, 2)}</td></tr>)}
+        </tbody></table>
+      </Card>
 
-        <div className="kpi-card">
-          <div className="kpi-label">Custo diário total</div>
-          <div className="kpi-value">R$ {formatarNumero(resumo.custoDiaTotal)}</div>
-          <div className="kpi-sub">
-            {resumo.itensCriticos} item(ns) com estoque crítico
-          </div>
+      <Card title="Projeção de estoque por consumo médio">
+        <div className="alerts-list">
+          {projecao.map((p) => <div key={p.item?.id} className="alert-item"><Badge variant={p.dias < 7 ? 'danger' : 'info'}>{p.dias < 7 ? 'Alerta < 7 dias' : 'OK'}</Badge><div><strong>{p.item?.produto}</strong><p>Consumo/dia: {formatNumber(p.consumoDia, 2)} · Dias restantes: {formatNumber(p.dias, 1)}</p></div></div>)}
         </div>
-      </div>
+      </Card>
 
-      <div className="fazendas-card">
-        <div className="fazendas-card-header">
-          <span className="fazendas-card-title">Lista de suplementação</span>
-        </div>
-
-        <div className="fazendas-table-wrap">
-          {dadosTabela.length === 0 ? (
-            <div className="empty-box">
-              <strong>Nenhuma suplementação cadastrada.</strong>
-              <span>Use o botão “Nova suplementação” para começar.</span>
-            </div>
-          ) : (
-            <table className="data-table">
-              <thead>
-                <tr>
-                  <th>Lote</th>
-                  <th>Produto</th>
-                  <th>Cabeças</th>
-                  <th>Modo</th>
-                  <th>Consumo / dia</th>
-                  <th>Custo / dia</th>
-                  <th>Custo / mês</th>
-                  <th>Estoque atual</th>
-                  <th>Dias restantes</th>
-                  <th>Status</th>
-                  <th>Ações</th>
-                </tr>
-              </thead>
-              <tbody>
-                {dadosTabela.map((item) => (
-                  <tr key={item.id}>
-                    <td className="text-h">{item.loteNome}</td>
-                    <td>{item.produtoNome}</td>
-                    <td>{item.cabecas}</td>
-                    <td>{normalizarModo(item.modo)}</td>
-                    <td>
-                      {formatarNumero(item.consumoTotalDia)} {item.unidade}
-                    </td>
-                    <td>R$ {formatarNumero(item.custoDia)}</td>
-                    <td>R$ {formatarNumero(item.custoMes)}</td>
-                    <td>
-                      {formatarNumero(item.qtdEstoque)} {item.unidade}
-                    </td>
-                    <td>
-                      {item.consumoTotalDia > 0
-                        ? `${formatarNumero(item.diasRestantes)} dias`
-                        : '—'}
-                    </td>
-                    <td>{renderStatus(item.status)}</td>
-                    <td>
-                      <div className="row-actions">
-                        <button
-                          className="action-btn"
-                          onClick={() => editarItem(item)}
-                        >
-                          Editar
-                        </button>
-                        <button
-                          className="action-btn action-btn-danger"
-                          onClick={() => excluirItem(item.id)}
-                        >
-                          Excluir
-                        </button>
-                      </div>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          )}
-        </div>
-      </div>
-
-      {abrirForm && (
-        <SuplementacaoForm
-          initialData={itemEditando}
-          lotes={lotes}
-          estoque={estoque}
-          onSave={salvarItem}
-          onCancel={() => {
-            setAbrirForm(false);
-            setItemEditando(null);
-          }}
-        />
-      )}
+      {openDieta && <DietaModal db={db} setDb={setDb} onClose={() => setOpenDieta(false)} />}
+      {openConsumo && <ConsumoModal db={db} setDb={setDb} onClose={() => setOpenConsumo(false)} />}
     </div>
   );
 }
 
-
-
-function normalizarModo(modo) {
-  if (modo === 'por_cabeca') return 'Por cabeça';
-  if (modo === 'total_lote') return 'Total do lote';
-  return modo || '—';
+function DietaModal({ db, setDb, onClose }) {
+  const [form, setForm] = useState({ nome: '', lote_id: '', itens: [{ item_estoque_id: '', qtd_cab_dia: '' }] });
+  function updateItem(idx, key, val) { setForm((p) => ({ ...p, itens: p.itens.map((i, j) => j === idx ? { ...i, [key]: val } : i) })); }
+  function addItem() { setForm((p) => ({ ...p, itens: [...p.itens, { item_estoque_id: '', qtd_cab_dia: '' }] })); }
+  function submit() {
+    const itens = form.itens.filter((i) => i.item_estoque_id && i.qtd_cab_dia).map((i) => ({ ...i, item_nome: (db.estoque || []).find((e) => Number(e.id) === Number(i.item_estoque_id))?.produto }));
+    if (!form.nome || !form.lote_id || !itens.length) return;
+    setDb((prev) => ({ ...prev, dietas: [...(prev.dietas || []), { id: gerarNovoId(prev.dietas || []), nome: form.nome, lote_id: Number(form.lote_id), itens }] }));
+    onClose();
+  }
+  return <Modal open onClose={onClose} title="Cadastro de dieta" size="lg" footer={<Button onClick={submit}>Salvar dieta</Button>}><div className="form-grid two"><Input label="Nome da dieta" value={form.nome} onChange={(e)=>setForm((p)=>({...p,nome:e.target.value}))} /><label>Lote<select value={form.lote_id} onChange={(e)=>setForm((p)=>({...p,lote_id:e.target.value}))}><option value="">Selecione</option>{(db.lotes||[]).filter((l)=>l.status==='ativo').map((l)=><option key={l.id} value={l.id}>{l.nome}</option>)}</select></label>{form.itens.map((it,idx)=><div key={idx} className="form-grid two full"><label>Item<select value={it.item_estoque_id} onChange={(e)=>updateItem(idx,'item_estoque_id',e.target.value)}><option value="">Selecione</option>{(db.estoque||[]).map((e)=><option key={e.id} value={e.id}>{e.produto}</option>)}</select></label><Input label="Qtd/cab/dia" type="number" value={it.qtd_cab_dia} onChange={(e)=>updateItem(idx,'qtd_cab_dia',e.target.value)} /></div>)}<Button variant="ghost" onClick={addItem}>+ adicionar item</Button></div></Modal>;
 }
 
-function obterStatusEstoque(diasRestantes) {
-  if (!Number.isFinite(diasRestantes) || diasRestantes <= 0) return 'critico';
-  if (diasRestantes <= 7) return 'critico';
-  if (diasRestantes <= 15) return 'baixo';
-  return 'normal';
-}
+function ConsumoModal({ db, setDb, onClose }) {
+  const [form, setForm] = useState({ lote_id: '', data: '', qtd_total: '' });
+  const dieta = (db.dietas || []).find((d) => Number(d.lote_id) === Number(form.lote_id));
+  const cabecas = (db.animais || []).filter((a) => Number(a.lote_id) === Number(form.lote_id)).reduce((s, a) => s + Number(a.qtd || 0), 0);
+  const previsto = dieta ? dieta.itens.reduce((s, i) => s + Number(i.qtd_cab_dia || 0) * cabecas, 0) : 0;
 
-function renderStatus(status) {
-  if (status === 'critico') {
-    return <span className="badge badge-r">Crítico</span>;
+  function submit() {
+    if (!form.lote_id || !form.data) return;
+    const qtdTotal = Number(form.qtd_total || previsto);
+    if (!dieta) return;
+
+    setDb((prev) => {
+      let estoque = prev.estoque.slice();
+      const movEst = [...(prev.movimentacoes_estoque || [])];
+      const movFin = [...(prev.movimentacoes_financeiras || [])];
+      dieta.itens.forEach((it) => {
+        const qtdItem = Number(it.qtd_cab_dia || 0) * cabecas;
+        estoque = estoque.map((e) => e.id === Number(it.item_estoque_id) ? { ...e, quantidade_atual: Math.max(0, Number(e.quantidade_atual || 0) - qtdItem) } : e);
+        const item = prev.estoque.find((e) => e.id === Number(it.item_estoque_id));
+        const valor = qtdItem * Number(item?.valor_unitario || 0);
+        movEst.push({ id: gerarNovoId(movEst), item_estoque_id: Number(it.item_estoque_id), tipo: 'consumo', lote_id: Number(form.lote_id), quantidade: qtdItem, data: form.data, valor_total: valor, obs: 'Consumo suplementação' });
+        movFin.push({ id: gerarNovoId(movFin), tipo: 'despesa', categoria: 'Alimentação', valor, data: form.data, lote_id: Number(form.lote_id), descricao: `Consumo dieta ${dieta.nome}` });
+      });
+      return { ...prev, estoque, movimentacoes_estoque: movEst, movimentacoes_financeiras: movFin, consumo_suplementacao: [...(prev.consumo_suplementacao || []), { id: gerarNovoId(prev.consumo_suplementacao || []), lote_id: Number(form.lote_id), data: form.data, qtd_total: qtdTotal }] };
+    });
+    onClose();
   }
 
-  if (status === 'baixo') {
-    return <span className="badge badge-a">Baixo</span>;
-  }
-
-  return <span className="badge badge-g">Normal</span>;
+  return <Modal open onClose={onClose} title="Registrar consumo diário" footer={<Button onClick={submit}>Confirmar consumo</Button>}><div className="form-grid two"><label>Lote<select value={form.lote_id} onChange={(e)=>setForm((p)=>({...p,lote_id:e.target.value}))}><option value="">Selecione</option>{(db.lotes||[]).filter((l)=>l.status==='ativo').map((l)=><option key={l.id} value={l.id}>{l.nome}</option>)}</select></label><Input label="Data" type="date" value={form.data} onChange={(e)=>setForm((p)=>({...p,data:e.target.value}))} /><Input label="Consumo previsto" value={formatNumber(previsto,2)} readOnly /><Input label="Consumo real (ajuste)" type="number" value={form.qtd_total} onChange={(e)=>setForm((p)=>({...p,qtd_total:e.target.value}))} /><p className="full">Dieta: {dieta?.nome || '—'}</p></div></Modal>;
 }
