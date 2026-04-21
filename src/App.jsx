@@ -125,6 +125,7 @@ export default function App() {
   const [menuExtraAberto, setMenuExtraAberto] = useState(false);
   const [tabAtiva, setTabAtiva] = useState('geral');
   const [fazendaSelecionada, setFazendaSelecionada] = useState(null);
+  const [forcarTelaLogin, setForcarTelaLogin] = useState(false);
   const [confirmState, setConfirmState] = useState({
     open: false,
     title: '',
@@ -158,6 +159,8 @@ export default function App() {
       setUsuarioLogado(null);
       return;
     }
+
+    setForcarTelaLogin(false);
 
     setUsuarioLogado((prev) => ({
       id: user.id || prev?.id || null,
@@ -216,10 +219,17 @@ export default function App() {
   }
 
   async function handleLogout() {
+    setForcarTelaLogin(true);
     setUsuarioLogado(null);
     localStorage.removeItem('herdon_usuario');
+    localStorage.removeItem('herdon_user');
     localStorage.removeItem('herdon_token');
-    await supabase.auth.signOut();
+    sessionStorage.clear();
+    try {
+      await supabase.auth.signOut();
+    } catch (error) {
+      console.error('Erro ao finalizar sessão:', error);
+    }
     setCurrentPage('dashboard');
   }
 
@@ -306,7 +316,7 @@ export default function App() {
     return <div className="app-loading">Carregando...</div>;
   }
 
-  if (!session) {
+  if (forcarTelaLogin || !session) {
     return <LoginPage />;
   }
 
@@ -377,6 +387,7 @@ export default function App() {
                 atualizarUsuario={atualizarUsuario}
                 tabAtiva={tabAtiva}
                 setTabAtiva={setTabAtiva}
+                onSignOut={handleLogout}
                 />
               </RotaProtegida>
             </Suspense>

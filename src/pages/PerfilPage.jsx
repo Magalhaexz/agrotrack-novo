@@ -7,7 +7,7 @@ import { supabase } from '../lib/supabase';
 import { useAuth } from '../auth/useAuth';
 import '../styles/perfil.css';
 
-export default function PerfilPage({ db, onConfirmAction, usuarioLogado, atualizarUsuario }) {
+export default function PerfilPage({ db, onConfirmAction, usuarioLogado, atualizarUsuario, onSignOut }) {
   const { user } = useAuth();
   const nomeInicial = usuarioLogado?.nome || user?.user_metadata?.name || user?.user_metadata?.nome || user?.email?.split('@')[0] || 'Usuário';
 
@@ -154,6 +154,11 @@ export default function PerfilPage({ db, onConfirmAction, usuarioLogado, atualiz
       : window.confirm('Deseja sair da conta agora?');
 
     if (!confirmado) return;
+
+    if (onSignOut) {
+      await onSignOut();
+      return;
+    }
 
     await supabase.auth.signOut();
   }
