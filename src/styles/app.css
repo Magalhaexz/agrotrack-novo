@@ -10,9 +10,12 @@
   --color-text: #c9d1d9; /* Primary text */
   --color-text-secondary: #8b949e; /* Secondary text, muted */
   --color-text-muted: #6e7681; /* Muted text, hints */
+  --color-surface: #161b22;
+  --color-surface-hover: #2a3138;
 
   /* Primary Accent Color (Green) */
   --color-primary: #22c55e; /* Main accent green */
+  --color-primary-light: #58d982;
   --color-primary-dark: #1a9e4a; /* Darker green */
   --color-primary-subtle: rgba(34, 197, 94, 0.15); /* Light background for primary */
   --color-primary-bg: rgba(34, 197, 94, 0.08); /* Even lighter background */
@@ -62,10 +65,23 @@
   --card-hover-border: var(--color-primary); /* Example hover */
 
   --modal-bg: var(--color-surface-1);
+  --modal-overlay: rgba(4, 8, 6, 0.68);
 
   --table-header-bg: var(--color-surface-1);
   --table-border: var(--color-border-subtle);
   --table-row-hover: var(--color-surface-1);
+  --table-row-alt: rgba(255, 255, 255, 0.015);
+  --input-border: rgba(255, 255, 255, 0.08);
+  --input-bg: rgba(255, 255, 255, 0.035);
+  --input-text: var(--color-text);
+  --input-placeholder: rgba(201, 209, 217, 0.42);
+  --input-focus-border: color-mix(in srgb, var(--color-primary) 52%, var(--color-border));
+  --space-6: 24px;
+  --text-xs: 0.74rem;
+  --text-sm: 0.875rem;
+  --text-base: 0.95rem;
+  --text-lg: 1.05rem;
+  --text-2xl: 1.8rem;
 }
 
 /* --- Base Styles & Resets --- */
@@ -1539,6 +1555,18 @@ a:hover {
   border-radius: 18px;
   backdrop-filter: blur(16px);
   color: var(--color-text);
+  animation: toastIn 0.18s ease;
+}
+
+@keyframes toastIn {
+  from {
+    opacity: 0;
+    transform: translateY(-8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
 }
 
 .ui-toast-accent {
@@ -1562,6 +1590,7 @@ a:hover {
   justify-content: center;
   color: var(--color-text-secondary);
   background: rgba(255, 255, 255, 0.04);
+  border: 1px solid transparent;
 }
 
 .ui-toast-close-btn:hover {
@@ -1575,10 +1604,30 @@ a:hover {
   gap: 10px;
   padding: 28px;
   text-align: center;
+  border-radius: 20px;
+  border: 1px dashed rgba(255, 255, 255, 0.08);
+  background: rgba(255, 255, 255, 0.02);
 }
 
 .empty-state--compact {
   padding: 20px;
+}
+
+.empty-state--left {
+  justify-items: start;
+  text-align: left;
+}
+
+.empty-state--success {
+  border-color: rgba(34, 197, 94, 0.18);
+}
+
+.empty-state--warning {
+  border-color: rgba(234, 179, 8, 0.18);
+}
+
+.empty-state--danger {
+  border-color: rgba(239, 68, 68, 0.18);
 }
 
 .empty-state-icon {
@@ -1667,9 +1716,9 @@ a:hover {
 
 .mobile-card {
   padding: 16px;
-  border-radius: var(--radius-lg);
+  border-radius: 18px;
   border: 1px solid var(--color-border);
-  background: var(--color-surface);
+  background: rgba(255, 255, 255, 0.025);
   display: grid;
   gap: 14px;
 }

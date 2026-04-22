@@ -1,18 +1,22 @@
-export default function EmptyState({ title, subtitle }) {
+import { FileSearch } from 'lucide-react';
+
+export default function EmptyState({
+  title,
+  subtitle,
+  icon: Icon = FileSearch,
+  compact = false,
+  tone = 'neutral',
+  align = 'center',
+  action = null,
+}) {
   return (
-    <div className="empty">
-<<<<<<< HEAD
-      <div className="empty-circle" aria-hidden="true">—</div>
-      <p className="empty-title">{title}</p>
-      <span className="empty-subtitle">{subtitle}</span>
+    <div className={`empty-state empty-state--${tone} empty-state--${align} ${compact ? 'empty-state--compact' : ''}`.trim()}>
+      <div className="empty-state-icon" aria-hidden="true">
+        <Icon size={compact ? 18 : 24} />
+      </div>
+      <p className="empty-state-title">{title}</p>
+      {subtitle ? <span className="empty-state-description">{subtitle}</span> : null}
+      {action ? <div className="empty-state-action">{action}</div> : null}
     </div>
   );
 }
-=======
-      <div className="empty-circle">—</div>
-      <p>{title}</p>
-      <span>{subtitle}</span>
-    </div>
-  );
-}
->>>>>>> f7f6d2991c81e0a38b5e190db55c7ad82834360d

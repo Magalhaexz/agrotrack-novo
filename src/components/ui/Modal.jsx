@@ -13,24 +13,41 @@ export default function Modal({
   const [touchStartY, setTouchStartY] = useState(null);
 
   useEffect(() => {
-    if (!open) return undefined;
-    const prev = document.body.style.overflow;
-    document.body.style.overflow = 'hidden';
-    return () => {
-      document.body.style.overflow = prev;
-    };
-  }, [open]);
+    if (!open) {
+      return undefined;
+    }
 
-  if (!open) return null;
+    const prevOverflow = document.body.style.overflow;
+    const handleEscape = (event) => {
+      if (event.key === 'Escape') {
+        onClose?.();
+      }
+    };
+
+    document.body.style.overflow = 'hidden';
+    document.addEventListener('keydown', handleEscape);
+
+    return () => {
+      document.body.style.overflow = prevOverflow;
+      document.removeEventListener('keydown', handleEscape);
+    };
+  }, [open, onClose]);
+
+  if (!open) {
+    return null;
+  }
 
   return (
     <div className="ui-modal-overlay" onClick={onClose}>
       <div
         className={`ui-modal ui-modal--${size}`}
-        onClick={(e) => e.stopPropagation()}
-        onTouchStart={(e) => setTouchStartY(e.changedTouches[0]?.clientY || null)}
-        onTouchEnd={(e) => {
-          const endY = e.changedTouches[0]?.clientY || 0;
+        role="dialog"
+        aria-modal="true"
+        aria-label={title || 'Janela modal'}
+        onClick={(event) => event.stopPropagation()}
+        onTouchStart={(event) => setTouchStartY(event.changedTouches[0]?.clientY || null)}
+        onTouchEnd={(event) => {
+          const endY = event.changedTouches[0]?.clientY || 0;
           if (touchStartY && endY - touchStartY > 80) {
             onClose?.();
           }
@@ -43,11 +60,11 @@ export default function Modal({
             {title ? <h3 className="ui-card-title">{title}</h3> : null}
             {subtitle ? <p className="ui-card-subtitle">{subtitle}</p> : null}
           </div>
-          <button type="button" onClick={onClose} aria-label="Fechar">
+          <button type="button" className="ui-modal-close" onClick={onClose} aria-label="Fechar">
             <X size={18} />
           </button>
         </div>
-        <div className="ui-modal-body">{children}</div>
+        <div className={`ui-modal-body ${footer ? 'has-footer' : ''}`}>{children}</div>
         {footer ? <div className="ui-modal-foot">{footer}</div> : null}
       </div>
     </div>

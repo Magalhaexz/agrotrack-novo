@@ -1,11 +1,12 @@
 import { Loader2 } from 'lucide-react';
 
-const variants = ['primary', 'secondary', 'danger', 'ghost', 'outline'];
+const variants = ['primary', 'secondary', 'warning', 'danger', 'ghost', 'outline'];
 
 export default function Button({
   variant = 'primary',
   size = 'md',
   loading = false,
+  loadingLabel = null,
   icon = null,
   fullWidth = false,
   className = '',
@@ -23,7 +24,7 @@ export default function Button({
       {...props}
     >
       {loading ? <Loader2 size={16} className="ui-spin" /> : icon}
-      <span>{children}</span>
+      <span>{loading && loadingLabel ? loadingLabel : children}</span>
     </button>
   );
 }
