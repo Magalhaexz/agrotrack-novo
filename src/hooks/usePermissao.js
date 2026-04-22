@@ -1,6 +1,5 @@
 import { useAuth } from '../auth/useAuth';
 
-<<<<<<< HEAD
 /**
  * Hook para verificar se o usuário autenticado possui uma permissão específica.
  * Utiliza o contexto de autenticação para acessar a função de verificação de permissões.
@@ -15,9 +14,3 @@ export function usePermissao(permissao) {
   // e o resultado é uma função pura das permissões do usuário e da permissão solicitada.
   return hasPermission(permissao);
 }
-=======
-export function usePermissao(permissao) {
-  const { hasPermission } = useAuth();
-  return hasPermission(permissao);
-}
->>>>>>> f7f6d2991c81e0a38b5e190db55c7ad82834360d

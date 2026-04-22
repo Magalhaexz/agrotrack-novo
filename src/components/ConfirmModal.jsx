@@ -1,6 +1,5 @@
 import Button from './ui/Button';
 import Modal from './ui/Modal';
-<<<<<<< HEAD
 import { AlertTriangle, CheckCircle2, Info } from 'lucide-react';
 
 const ICONS_BY_TONE = {
@@ -9,9 +8,6 @@ const ICONS_BY_TONE = {
   info: <Info size={16} />,
   primary: <CheckCircle2 size={16} />, // Default para primary
 };
-=======
-import { AlertTriangle, CheckCircle2 } from 'lucide-react';
->>>>>>> f7f6d2991c81e0a38b5e190db55c7ad82834360d
 
 export default function ConfirmModal({
   open,
@@ -21,11 +17,7 @@ export default function ConfirmModal({
   onCancel,
   onConfirm,
 }) {
-<<<<<<< HEAD
   const icon = ICONS_BY_TONE[tone] || ICONS_BY_TONE.info; // Fallback para info se o tone não for reconhecido
-=======
-  const icon = tone === 'danger' ? <AlertTriangle size={16} /> : <CheckCircle2 size={16} />;
->>>>>>> f7f6d2991c81e0a38b5e190db55c7ad82834360d
 
   return (
     <Modal
@@ -44,8 +36,4 @@ export default function ConfirmModal({
       )}
     />
   );
-<<<<<<< HEAD
 }
-=======
-}
->>>>>>> f7f6d2991c81e0a38b5e190db55c7ad82834360d
