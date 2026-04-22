@@ -1,4 +1,4 @@
-<<<<<<< HEAD
+
 import { formatDate } from './calculations'; // Assuming calculations.js contains formatDate
 
 /**
@@ -20,19 +20,11 @@ export function exportarRelatorio(elemento, nomeArquivo = 'relatorio', meta = {}
 
   const conteudo = elemento.innerHTML;
   // Obtém a data atual e formata para BR, usando a função importada
-=======
-import { formatDate } from './calculations';
-
-export function exportarRelatorio(elemento, nomeArquivo = 'relatorio', meta = {}) {
-  if (!elemento) return;
-
-  const conteudo = elemento.innerHTML;
->>>>>>> f7f6d2991c81e0a38b5e190db55c7ad82834360d
   const dataGeracao = formatDate(new Date().toISOString().slice(0, 10));
   const titulo = meta.titulo || 'Relatório Gerencial';
   const fazenda = meta.fazenda || 'Fazenda';
 
-<<<<<<< HEAD
+
   // Abre uma nova janela do navegador
   const janela = window.open('', '_blank', 'width=1024,height=768');
   if (!janela) {
@@ -43,17 +35,11 @@ export function exportarRelatorio(elemento, nomeArquivo = 'relatorio', meta = {}
   // Escreve o conteúdo HTML na nova janela
   janela.document.write(`
     <!DOCTYPE html>
-=======
-  const janela = window.open('', '_blank', 'width=1024,height=768');
-  if (!janela) return;
-
-  janela.document.write(`
->>>>>>> f7f6d2991c81e0a38b5e190db55c7ad82834360d
     <html>
       <head>
         <title>${nomeArquivo}</title>
         <style>
-<<<<<<< HEAD
+
           /* Reset básico para impressão */
           body {
             font-family: Arial, sans-serif;
@@ -125,12 +111,6 @@ export function exportarRelatorio(elemento, nomeArquivo = 'relatorio', meta = {}
             background-color: #f3f4f6;
             font-weight: bold;
           }
-=======
-          body { font-family: Arial, sans-serif; padding: 24px; color: #1f2937; }
-          .pdf-head { display:flex; justify-content:space-between; align-items:center; margin-bottom:16px; border-bottom:1px solid #d1d5db; padding-bottom:8px; }
-          .pdf-foot { position:fixed; bottom:10px; left:24px; right:24px; font-size:12px; color:#6b7280; display:flex; justify-content:space-between; }
-          .card, .ui-card { break-inside: avoid; page-break-inside: avoid; }
->>>>>>> f7f6d2991c81e0a38b5e190db55c7ad82834360d
         </style>
       </head>
       <body>
@@ -142,27 +122,18 @@ export function exportarRelatorio(elemento, nomeArquivo = 'relatorio', meta = {}
           <div>Gerado em ${dataGeracao}</div>
         </header>
         <main>${conteudo}</main>
-<<<<<<< HEAD
+
         <footer class="pdf-foot">
           <span>${nomeArquivo}</span>
           <span>Página 1</span>
         </footer>
-=======
-        <footer class="pdf-foot"><span>${nomeArquivo}</span><span>Página 1</span></footer>
->>>>>>> f7f6d2991c81e0a38b5e190db55c7ad82834360d
       </body>
     </html>
   `);
 
-<<<<<<< HEAD
+
   janela.document.close(); // Fecha o fluxo de escrita do documento
   janela.focus(); // Foca na nova janela
   janela.print(); // Invoca a caixa de diálogo de impressão do navegador
   // janela.close(); // Opcional: fecha a janela após a impressão (pode não funcionar em todos os navegadores ou ser indesejável)
 }
-=======
-  janela.document.close();
-  janela.focus();
-  janela.print();
-}
->>>>>>> f7f6d2991c81e0a38b5e190db55c7ad82834360d
