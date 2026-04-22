@@ -22,3 +22,7 @@ dist-ssr
 *.njsproj
 *.sln
 *.sw?
+.env
+HERDON.png
+logo_app1.png
+.DS_Store
