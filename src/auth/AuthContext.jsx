@@ -7,10 +7,7 @@ const AuthContext = createContext(null);
 export function AuthProvider({ children }) {
   const [session, setSession] = useState(null);
   const [loadingAuth, setLoadingAuth] = useState(true);
-<<<<<<< HEAD
   const [authError, setAuthError] = useState(null);
-=======
->>>>>>> f7f6d2991c81e0a38b5e190db55c7ad82834360d
 
   useEffect(() => {
     let ativo = true;
@@ -21,23 +18,17 @@ export function AuthProvider({ children }) {
 
         if (error) {
           console.error('Erro ao obter sessão:', error);
-<<<<<<< HEAD
           if (ativo) {
             setAuthError(error);
             setSession(null);
             setLoadingAuth(false);
           }
           return;
-=======
->>>>>>> f7f6d2991c81e0a38b5e190db55c7ad82834360d
         }
 
         if (ativo) {
           setSession(data?.session ?? null);
-<<<<<<< HEAD
           setAuthError(null);
-=======
->>>>>>> f7f6d2991c81e0a38b5e190db55c7ad82834360d
           setLoadingAuth(false);
         }
       } catch (err) {
@@ -45,10 +36,7 @@ export function AuthProvider({ children }) {
 
         if (ativo) {
           setSession(null);
-<<<<<<< HEAD
           setAuthError(err);
-=======
->>>>>>> f7f6d2991c81e0a38b5e190db55c7ad82834360d
           setLoadingAuth(false);
         }
       }
@@ -60,10 +48,7 @@ export function AuthProvider({ children }) {
       data: { subscription },
     } = supabase.auth.onAuthStateChange((_event, sessionAtual) => {
       setSession(sessionAtual ?? null);
-<<<<<<< HEAD
       setAuthError(null);
-=======
->>>>>>> f7f6d2991c81e0a38b5e190db55c7ad82834360d
       setLoadingAuth(false);
     });
 
@@ -73,24 +58,15 @@ export function AuthProvider({ children }) {
     };
   }, []);
 
-<<<<<<< HEAD
   const value = useMemo(() => {
     const user = session?.user ?? null;
     const perfil = obterPerfilDoUsuario(user);
 
     return {
-=======
-  const user = session?.user ?? null;
-  const perfil = obterPerfilDoUsuario(user);
-
-  const value = useMemo(
-    () => ({
->>>>>>> f7f6d2991c81e0a38b5e190db55c7ad82834360d
       session,
       user,
       perfil,
       loadingAuth,
-<<<<<<< HEAD
       authError,
       hasPermission: (permissao) => usuarioTemPermissao(user, permissao),
     };
@@ -114,14 +90,3 @@ export function useAuth() {
 }
 
 export { AuthContext };
-=======
-      hasPermission: (permissao) => usuarioTemPermissao(user, permissao),
-    }),
-    [session, user, perfil, loadingAuth]
-  );
-
-  return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
-}
-
-export { AuthContext };
->>>>>>> f7f6d2991c81e0a38b5e190db55c7ad82834360d
