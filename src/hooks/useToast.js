@@ -1,6 +1,5 @@
 import { useCallback, useState } from 'react';
 
-<<<<<<< HEAD
 /**
  * Hook personalizado para gerenciar e exibir notificações "toast".
  * Permite adicionar toasts que são automaticamente removidos após um tempo.
@@ -36,29 +35,11 @@ export function useToast() {
       setToasts((prev) => [...prev, { id, type, message }]);
 
       // Agenda a remoção automática do toast após 4 segundos
-=======
-export function useToast() {
-  const [toasts, setToasts] = useState([]);
-
-  const removeToast = useCallback((id) => {
-    setToasts((prev) => prev.filter((toast) => toast.id !== id));
-  }, []);
-
-  const showToast = useCallback(
-    ({ type = 'info', message = '' }) => {
-      const id = `${Date.now()}-${Math.random().toString(16).slice(2)}`;
-      setToasts((prev) => [...prev, { id, type, message }]);
-
->>>>>>> f7f6d2991c81e0a38b5e190db55c7ad82834360d
       setTimeout(() => {
         removeToast(id);
       }, 4000);
     },
-<<<<<<< HEAD
     [removeToast] // Depende de removeToast, que é uma função memorizada.
-=======
-    [removeToast]
->>>>>>> f7f6d2991c81e0a38b5e190db55c7ad82834360d
   );
 
   return {
@@ -66,8 +47,4 @@ export function useToast() {
     showToast,
     removeToast,
   };
-<<<<<<< HEAD
 }
-=======
-}
->>>>>>> f7f6d2991c81e0a38b5e190db55c7ad82834360d

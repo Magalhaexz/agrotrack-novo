@@ -1,10 +1,5 @@
-<<<<<<< HEAD
-css
-Copiar
 
 /* --- Login Page --- */
-=======
->>>>>>> f7f6d2991c81e0a38b5e190db55c7ad82834360d
 .login-page {
   min-height: 100vh;
   display: grid;
@@ -12,16 +7,10 @@ Copiar
   background: var(--color-bg);
 }
 
-<<<<<<< HEAD
 /* --- Left Side (Brand/Marketing) --- */
 .login-brand-side {
   background: linear-gradient(160deg, #0d1a0d 0%, #080808 100%);
   border-right: 1px solid #1a1a1a; /* Using a hardcoded dark border */
-=======
-.login-brand-side {
-  background: linear-gradient(160deg, #0D1A0D 0%, #080808 100%);
-  border-right: 1px solid #1A1A1A;
->>>>>>> f7f6d2991c81e0a38b5e190db55c7ad82834360d
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -36,11 +25,7 @@ Copiar
   position: absolute;
   width: 300px;
   height: 300px;
-<<<<<<< HEAD
   background: radial-gradient(circle, rgba(34, 197, 94, 0.08) 0%, transparent 70%);
-=======
-  background: radial-gradient(circle, rgba(34,197,94,0.08) 0%, transparent 70%);
->>>>>>> f7f6d2991c81e0a38b5e190db55c7ad82834360d
   top: 50%;
   left: 50%;
   transform: translate(-50%, -50%);
@@ -57,11 +42,7 @@ Copiar
   width: 82px;
   height: 82px;
   border-radius: var(--radius-lg);
-<<<<<<< HEAD
   border: 1px solid rgba(34, 197, 94, 0.22);
-=======
-  border: 1px solid rgba(34,197,94,0.22);
->>>>>>> f7f6d2991c81e0a38b5e190db55c7ad82834360d
   background: var(--color-primary-subtle);
   display: grid;
   place-items: center;
@@ -77,11 +58,7 @@ Copiar
 .login-brand-logo {
   font-size: 3rem;
   font-weight: 900;
-<<<<<<< HEAD
   color: #f0f0f0; /* Using a hardcoded light color */
-=======
-  color: #F0F0F0;
->>>>>>> f7f6d2991c81e0a38b5e190db55c7ad82834360d
   letter-spacing: 0.1em;
 }
 
@@ -105,11 +82,7 @@ Copiar
 
 .login-benefit-card {
   border: 1px solid var(--color-border);
-<<<<<<< HEAD
   background: rgba(255, 255, 255, 0.02); /* Using rgba for a subtle transparent effect */
-=======
-  background: rgba(255, 255, 255, 0.02);
->>>>>>> f7f6d2991c81e0a38b5e190db55c7ad82834360d
   color: var(--color-text-secondary);
   padding: 12px 14px;
   border-radius: var(--radius-md);
@@ -117,16 +90,12 @@ Copiar
   font-weight: 600;
 }
 
-<<<<<<< HEAD
 /* --- Right Side (Login Form) --- */
-=======
->>>>>>> f7f6d2991c81e0a38b5e190db55c7ad82834360d
 .login-form-side {
   background: var(--color-bg);
   display: flex;
   align-items: center;
   justify-content: center;
-<<<<<<< HEAD
   padding: 48px;
 }
 
@@ -187,69 +156,6 @@ Copiar
 
 .login-input:focus {
   outline: none;
-=======
-  width: 100%;
-  padding: 48px 24px;
-}
-
-.login-form-side .login-form,
-.login-form-side .login-header,
-.login-form-side .login-links,
-.login-form-side .login-error,
-.login-form-side .login-success {
-  width: 100%;
-  max-width: 380px;
-}
-
-.login-mobile-brand {
-  display: none;
-  text-align: center;
-  margin-bottom: 20px;
-}
-
-.login-title {
-  font-size: 1.5rem;
-  font-weight: 800;
-  color: var(--color-text);
-  margin-bottom: 4px;
-}
-
-.login-subtitle {
-  font-size: 0.875rem;
-  color: var(--color-text-secondary);
-  margin-bottom: 32px;
-}
-
-.login-form {
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-}
-
-.login-form label {
-  font-size: 0.75rem;
-  font-weight: 600;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
-  color: var(--color-text-muted);
-  margin-top: 4px;
-}
-
-.login-form input {
-  background: var(--input-bg);
-  border: 1px solid var(--color-border);
-  color: var(--input-text);
-  padding: 12px 14px;
-  border-radius: var(--radius-md);
-  outline: none;
-}
-
-.login-form input::placeholder {
-  color: var(--input-placeholder);
-}
-
-.login-form input:focus {
->>>>>>> f7f6d2991c81e0a38b5e190db55c7ad82834360d
   border-color: var(--color-primary);
   box-shadow: 0 0 0 3px var(--color-primary-subtle);
 }
@@ -260,11 +166,7 @@ Copiar
 
 .login-password-wrap input {
   width: 100%;
-<<<<<<< HEAD
   padding-right: 42px; /* Make space for the toggle button */
-=======
-  padding-right: 42px;
->>>>>>> f7f6d2991c81e0a38b5e190db55c7ad82834360d
 }
 
 .login-password-toggle {
@@ -279,30 +181,19 @@ Copiar
   height: 28px;
   display: grid;
   place-items: center;
-<<<<<<< HEAD
   cursor: pointer;
-=======
->>>>>>> f7f6d2991c81e0a38b5e190db55c7ad82834360d
 }
 
 .login-btn {
   margin-top: 10px;
   background: var(--color-primary);
-<<<<<<< HEAD
   color: #000; /* Hardcoded black text for contrast */
-=======
-  color: #000;
->>>>>>> f7f6d2991c81e0a38b5e190db55c7ad82834360d
   border: none;
   border-radius: var(--radius-md);
   padding: 12px;
   font-weight: 700;
   cursor: pointer;
-<<<<<<< HEAD
   transition: all 0.2s ease;
-=======
-  transition: all 0.2s;
->>>>>>> f7f6d2991c81e0a38b5e190db55c7ad82834360d
   width: 100%;
   font-size: 1rem;
 }
@@ -330,11 +221,7 @@ Copiar
 }
 
 .login-error {
-<<<<<<< HEAD
   background: rgba(196, 80, 60, 0.1); /* Using rgba for a subtle transparent effect */
-=======
-  background: rgba(196, 80, 60, 0.1);
->>>>>>> f7f6d2991c81e0a38b5e190db55c7ad82834360d
   border: 1px solid rgba(196, 80, 60, 0.25);
   color: var(--color-danger);
   padding: 10px 12px;
@@ -346,7 +233,6 @@ Copiar
 .login-success {
   padding: 12px 14px;
   border-radius: 12px;
-<<<<<<< HEAD
   background: rgba(80, 180, 80, 0.12); /* Using rgba for a subtle transparent effect */
   border: 1px solid rgba(80, 180, 80, 0.24);
   font-size: 14px;
@@ -376,32 +262,3 @@ Copiar
     font-size: 2rem; /* Adjust font size for mobile brand */
   }
 }
-=======
-  background: rgba(80,180,80,0.12);
-  border: 1px solid rgba(80,180,80,0.24);
-  font-size: 14px;
-  margin-top: 8px;
-}
-
-@media (max-width: 767px) {
-  .login-page {
-    grid-template-columns: 1fr;
-  }
-
-  .login-brand-side {
-    display: none;
-  }
-
-  .login-form-side {
-    padding: 24px 16px;
-  }
-
-  .login-mobile-brand {
-    display: block;
-  }
-
-  .login-brand-logo {
-    font-size: 2rem;
-  }
-}
->>>>>>> f7f6d2991c81e0a38b5e190db55c7ad82834360d
