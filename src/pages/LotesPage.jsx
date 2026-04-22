@@ -22,6 +22,7 @@ import '../styles/rebanho.css';
 
 const tabs = ['visao', 'mov', 'pesagens', 'financeiro', 'sanitario', 'historico'];
 const movTypes = ['compra', 'nascimento', 'transferencia_entrada', 'venda', 'morte', 'descarte', 'transferencia_saida', 'abate'];
+const getTodayIso = () => new Date().toISOString().slice(0, 10);
 
 export default function LotesPage({
   db,
@@ -511,7 +512,7 @@ function LoteDetailView({ lote, db, setDb, activeTab, setActiveTab, onBack, onOp
  */
 function FechamentoLoteModal({ lote, db, setDb, onClose, showToast }) {
   const [form, setForm] = useState({
-    data_saida: formatDate(new Date()),
+    data_saida: getTodayIso(),
     status: 'encerrado',
     mortalidade: 0,
     motivo_saida: '',
@@ -580,7 +581,7 @@ function FechamentoLoteModal({ lote, db, setDb, onClose, showToast }) {
 function MovimentacaoModal({ lote, db, setDb, onClose, onRegistrarEntradaAnimal, onRegistrarSaidaAnimal, showToast, lotesMap }) {
   const [form, setForm] = useState({
     tipo: 'compra',
-    data: formatDate(new Date()),
+    data: getTodayIso(),
     qtd: '',
     peso_medio: '',
     // Compra
@@ -807,7 +808,7 @@ function MovimentacaoModal({ lote, db, setDb, onClose, onRegistrarEntradaAnimal,
  */
 function PesagemModal({ lote, db, setDb, onClose, showToast }) {
   const ultima = useMemo(() => (db.pesagens || []).filter((p) => p.lote_id === lote.id).sort((a, b) => new Date(b.data) - new Date(a.data))[0], [db.pesagens, lote.id]);
-  const [form, setForm] = useState({ data: formatDate(new Date()), peso_medio: '', qtd: lote.indicators.totalAnimais, obs: '' });
+  const [form, setForm] = useState({ data: getTodayIso(), peso_medio: '', qtd: lote.indicators.totalAnimais, obs: '' });
 
   const diasDesdeUltima = ultima ? daysBetween(ultima.data, form.data) : 0;
   const gmd = ultima && form.peso_medio && diasDesdeUltima > 0 ? (Number(form.peso_medio) - Number(ultima.peso_medio)) / diasDesdeUltima : 0;
@@ -874,7 +875,7 @@ function NovoLoteModal({ db, setDb, onClose, showToast }) {
     raca: '',
     sexo: 'Macho',
     categoria: 'Novilho',
-    entrada: formatDate(new Date()),
+    entrada: getTodayIso(),
     fornecedor: '',
     peso_inicial: '',
     qtd_inicial: '',

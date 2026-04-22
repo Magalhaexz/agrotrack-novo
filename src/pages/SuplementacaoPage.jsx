@@ -8,6 +8,8 @@ import { formatCurrency, formatDate, formatNumber } from '../utils/calculations'
 import { gerarNovoId } from '../utils/id';
 import { useToast } from '../hooks/useToast'; // Assuming useToast hook is available
 
+const getTodayIso = () => new Date().toISOString().slice(0, 10);
+
 export default function SuplementacaoPage({ db, setDb }) {
   const { showToast } = useToast();
   const [openDieta, setOpenDieta] = useState(false);
@@ -216,6 +218,8 @@ function DietaModal({ db, setDb, initialData, onClose, showToast }) {
   const [editingItemIndex, setEditingItemIndex] = useState(null);
   const [errors, setErrors] = useState({});
 
+  const lotesMap = useMemo(() => new Map((db.lotes || []).map((lote) => [lote.id, lote])), [db.lotes]);
+  const estoqueMap = useMemo(() => new Map((db.estoque || []).map((item) => [item.id, item])), [db.estoque]);
   const lotesComDieta = useMemo(() => new Set((db.dietas || []).filter(d => d.id !== form.id).map(d => d.lote_id)), [db.dietas, form.id]);
   const lotesSemDieta = useMemo(() => (db.lotes || []).filter(l => l.status === 'ativo' && !lotesComDieta.has(l.id)), [db.lotes, lotesComDieta]);
 
@@ -387,7 +391,7 @@ function ItemDietaModal({ db, initialData, onSave, onCancel, showToast }) {
  * @param {function} props.showToast - Função para exibir toasts.
  */
 function ConsumoModal({ db, setDb, onClose, showToast }) {
-  const [form, setForm] = useState({ lote_id: '', data: formatDate(new Date()), qtd_total: '' });
+  const [form, setForm] = useState({ lote_id: '', data: getTodayIso(), qtd_total: '' });
   const [errors, setErrors] = useState({});
 
   const lotesAtivos = useMemo(() => (db.lotes || []).filter(l => l.status === 'ativo'), [db.lotes]);
