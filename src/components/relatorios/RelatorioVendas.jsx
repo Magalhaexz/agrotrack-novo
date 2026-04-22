@@ -1,4 +1,4 @@
-<<<<<<< HEAD
+
 import { useMemo } from 'react';
 import Card from '../ui/Card';
 import { formatCurrency, formatNumber } from '../../utils/calculations';
@@ -9,16 +9,11 @@ function formatarData(data) {
   return `${dia}/${mes}/${ano}`;
 }
 
-=======
-import Card from '../ui/Card';
-import { formatCurrency, formatNumber } from '../../utils/calculations';
-
->>>>>>> f7f6d2991c81e0a38b5e190db55c7ad82834360d
 export default function RelatorioVendas({ db, dataInicio, dataFim, loteIds = [] }) {
   const inicio = dataInicio || '0000-01-01';
   const fim = dataFim || '9999-12-31';
 
-<<<<<<< HEAD
+
   const mapaLotes = useMemo(() =>
     Object.fromEntries((db.lotes || []).map((l) => [l.id, l])),
     [db.lotes]
@@ -56,30 +51,11 @@ export default function RelatorioVendas({ db, dataInicio, dataFim, loteIds = [] 
       }, {})
     ).sort((a, b) => b[1] - a[1]),
     [vendas]
-=======
-  const vendas = (db.movimentacoes_animais || []).filter((item) => {
-    const okTipo = item.tipo === 'venda';
-    const okData = item.data >= inicio && item.data <= fim;
-    const okLote = loteIds.length === 0 || loteIds.includes(String(item.lote_id));
-    return okTipo && okData && okLote;
-  });
-
-  const receitaTotal = vendas.reduce((acc, item) => acc + Number(item.valor_total || 0), 0);
-  const pesoVendido = vendas.reduce((acc, item) => acc + Number(item.peso_medio || 0) * Number(item.qtd || 0), 0);
-  const arrobasVendidas = pesoVendido / 15;
-  const precoMedioArroba = arrobasVendidas > 0 ? receitaTotal / arrobasVendidas : 0;
-
-  const porComprador = Object.entries(
-    vendas.reduce((acc, item) => {
-      const chave = item.comprador_fornecedor || 'Não informado';
-      return { ...acc, [chave]: (acc[chave] || 0) + Number(item.valor_total || 0) };
-    }, {})
->>>>>>> f7f6d2991c81e0a38b5e190db55c7ad82834360d
   );
 
   return (
     <div style={{ display: 'grid', gap: 16 }}>
-<<<<<<< HEAD
+
 
       <Card title="Resumo de vendas">
         {vendas.length === 0 ? (
@@ -160,23 +136,3 @@ export default function RelatorioVendas({ db, dataInicio, dataFim, loteIds = [] 
     </div>
   );
 }
-=======
-      <Card title="Resumo de vendas">
-        <p>Vendas no período: <strong>{vendas.length}</strong></p>
-        <p>Peso vendido: <strong>{formatNumber(pesoVendido, 1)} kg</strong></p>
-        <p>Arrobas vendidas: <strong>{formatNumber(arrobasVendidas, 2)} @</strong></p>
-        <p>Receita total: <strong>{formatCurrency(receitaTotal)}</strong></p>
-        <p>Preço médio por @: <strong>{formatCurrency(precoMedioArroba)}</strong></p>
-      </Card>
-
-      <Card title="Receita por comprador">
-        <ul>
-          {porComprador.map(([comprador, valor]) => (
-            <li key={comprador}>{comprador}: {formatCurrency(valor)}</li>
-          ))}
-        </ul>
-      </Card>
-    </div>
-  );
-}
->>>>>>> f7f6d2991c81e0a38b5e190db55c7ad82834360d
