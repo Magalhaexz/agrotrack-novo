@@ -4,7 +4,6 @@ const NIVEL_ORDEM = {
   info: 2,
 };
 
-<<<<<<< HEAD
 /**
  * Converte um valor para número, tratando valores nulos/indefinidos como 0.
  * @param {*} value - O valor a ser convertido.
@@ -138,25 +137,16 @@ function recorrenciaValeNaData(item, dataReferencia) {
  */
 export function buildAlerts(db = {}) {
   // Garante que as propriedades do DB são arrays ou arrays vazios
-=======
-export function buildAlerts(db = {}) {
->>>>>>> f7f6d2991c81e0a38b5e190db55c7ad82834360d
   const estoque = Array.isArray(db.estoque) ? db.estoque : [];
   const sanitario = Array.isArray(db.sanitario) ? db.sanitario : [];
   const rotinas = Array.isArray(db.rotinas) ? db.rotinas : [];
   const lotes = Array.isArray(db.lotes) ? db.lotes : [];
   const funcionarios = Array.isArray(db.funcionarios) ? db.funcionarios : [];
 
-<<<<<<< HEAD
   // Cria Maps para lookup eficiente de lotes e funcionários
   const lotesMap = new Map(lotes.map((item) => [toNumber(item.id), item]));
   const funcionariosMap = new Map(
     funcionarios.map((item) => [toNumber(item.id), item])
-=======
-  const lotesMap = new Map(lotes.map((item) => [Number(item.id), item]));
-  const funcionariosMap = new Map(
-    funcionarios.map((item) => [Number(item.id), item])
->>>>>>> f7f6d2991c81e0a38b5e190db55c7ad82834360d
   );
 
   const hoje = zerarHora(new Date());
@@ -164,7 +154,6 @@ export function buildAlerts(db = {}) {
 
   const alerts = [];
 
-<<<<<<< HEAD
   // --- Alertas de Estoque ---
   estoque.forEach((item) => {
     const produto = item.produto || 'Produto sem nome';
@@ -175,17 +164,6 @@ export function buildAlerts(db = {}) {
     // Estoque crítico (abaixo ou igual ao mínimo)
     if (qtdMinima > 0 && qtdAtual <= qtdMinima) {
       const chave = `estoque-critico-${item.id}-${qtdAtual}-${qtdMinima}`;
-=======
-  estoque.forEach((item) => {
-    const produto = item.produto || 'Produto sem nome';
-    const unidade = item.unidade || 'un';
-    const qtdAtual = Number(item.quantidade_atual || 0);
-    const qtdMinima = Number(item.quantidade_minima || 0);
-
-    if (qtdMinima > 0 && qtdAtual <= qtdMinima) {
-      const chave = `estoque-critico-${item.id}-${qtdAtual}-${qtdMinima}`;
-
->>>>>>> f7f6d2991c81e0a38b5e190db55c7ad82834360d
       alerts.push({
         id: chave,
         ackKey: chave,
@@ -199,7 +177,6 @@ export function buildAlerts(db = {}) {
           qtdMinima
         )} ${unidade}.`,
         pagina: 'estoque',
-<<<<<<< HEAD
         // Prioriza alertas críticos de estoque mais antigos ou com ID menor
         data_sort: Number.MIN_SAFE_INTEGER + toNumber(item.id),
       });
@@ -207,13 +184,6 @@ export function buildAlerts(db = {}) {
     // Estoque baixo (entre o mínimo e 1.5x o mínimo)
     else if (qtdMinima > 0 && qtdAtual <= qtdMinima * 1.5) {
       const chave = `estoque-baixo-${item.id}-${qtdAtual}-${qtdMinima}`;
-=======
-        data_sort: Number.MIN_SAFE_INTEGER + Number(item.id || 0),
-      });
-    } else if (qtdMinima > 0 && qtdAtual <= qtdMinima * 1.5) {
-      const chave = `estoque-baixo-${item.id}-${qtdAtual}-${qtdMinima}`;
-
->>>>>>> f7f6d2991c81e0a38b5e190db55c7ad82834360d
       alerts.push({
         id: chave,
         ackKey: chave,
@@ -223,7 +193,6 @@ export function buildAlerts(db = {}) {
         titulo: 'Estoque baixo',
         mensagem: `${produto} está se aproximando do estoque mínimo.`,
         pagina: 'estoque',
-<<<<<<< HEAD
         // Prioriza alertas de estoque baixo mais antigos ou com ID menor, mas depois dos críticos
         data_sort: Number.MIN_SAFE_INTEGER + 1000 + toNumber(item.id),
       });
@@ -238,20 +207,6 @@ export function buildAlerts(db = {}) {
       // Produto vencido
       if (diffDias < 0) {
         const chave = `estoque-vencido-${item.id}-${item.data_validade}`;
-=======
-        data_sort: Number.MIN_SAFE_INTEGER + 1000 + Number(item.id || 0),
-      });
-    }
-
-    if (item.data_validade) {
-      const dataValidade = parseISODate(item.data_validade);
-      const diffDias = diferencaEmDias(dataValidade, hoje);
-      const alertaDiasAntes = Number(item.alerta_dias_antes || 0);
-
-      if (diffDias < 0) {
-        const chave = `estoque-vencido-${item.id}-${item.data_validade}`;
-
->>>>>>> f7f6d2991c81e0a38b5e190db55c7ad82834360d
         alerts.push({
           id: chave,
           ackKey: chave,
@@ -265,16 +220,10 @@ export function buildAlerts(db = {}) {
           pagina: 'estoque',
           data_sort: dataValidade.getTime(),
         });
-<<<<<<< HEAD
       }
       // Validade próxima
       else if (diffDias <= alertaDiasAntes) {
         const chave = `estoque-validade-${item.id}-${item.data_validade}`;
-=======
-      } else if (diffDias <= alertaDiasAntes) {
-        const chave = `estoque-validade-${item.id}-${item.data_validade}`;
-
->>>>>>> f7f6d2991c81e0a38b5e190db55c7ad82834360d
         alerts.push({
           id: chave,
           ackKey: chave,
@@ -292,7 +241,6 @@ export function buildAlerts(db = {}) {
     }
   });
 
-<<<<<<< HEAD
   // --- Alertas Sanitários ---
   sanitario.forEach((item) => {
     if (!item.proxima) return; // Requer data da próxima ocorrência
@@ -304,31 +252,13 @@ export function buildAlerts(db = {}) {
       lotesMap.get(toNumber(item.lote_id))?.nome || 'Lote sem identificação';
     const funcionarioNome =
       funcionariosMap.get(toNumber(item.funcionario_responsavel_id))?.nome ||
-=======
-  sanitario.forEach((item) => {
-    if (!item.proxima) return;
-
-    const dataProxima = parseISODate(item.proxima);
-    const diffDias = diferencaEmDias(dataProxima, hoje);
-    const alertaDiasAntes = Number(item.alerta_dias_antes || 0);
-    const loteNome =
-      lotesMap.get(Number(item.lote_id))?.nome || 'Lote sem identificação';
-    const funcionarioNome =
-      funcionariosMap.get(Number(item.funcionario_responsavel_id))?.nome ||
->>>>>>> f7f6d2991c81e0a38b5e190db55c7ad82834360d
       'Sem responsável';
     const tipo = normalizarTipoSanitario(item.tipo);
     const descricao = item.desc || 'Manejo sem descrição';
 
-<<<<<<< HEAD
     // Manejo sanitário vencido
     if (diffDias < 0) {
       const chave = `sanitario-vencido-${item.id}-${item.proxima}`;
-=======
-    if (diffDias < 0) {
-      const chave = `sanitario-vencido-${item.id}-${item.proxima}`;
-
->>>>>>> f7f6d2991c81e0a38b5e190db55c7ad82834360d
       alerts.push({
         id: chave,
         ackKey: chave,
@@ -342,16 +272,10 @@ export function buildAlerts(db = {}) {
         pagina: 'sanitario',
         data_sort: dataProxima.getTime(),
       });
-<<<<<<< HEAD
     }
     // Manejo sanitário próximo
     else if (diffDias <= alertaDiasAntes) {
       const chave = `sanitario-proximo-${item.id}-${item.proxima}`;
-=======
-    } else if (diffDias <= alertaDiasAntes) {
-      const chave = `sanitario-proximo-${item.id}-${item.proxima}`;
-
->>>>>>> f7f6d2991c81e0a38b5e190db55c7ad82834360d
       alerts.push({
         id: chave,
         ackKey: chave,
@@ -368,7 +292,6 @@ export function buildAlerts(db = {}) {
     }
   });
 
-<<<<<<< HEAD
   // --- Alertas de Rotinas (Tarefas) ---
   rotinas.forEach((item) => {
     const funcionarioNome =
@@ -379,21 +302,10 @@ export function buildAlerts(db = {}) {
       : '';
 
     // Ignora rotinas de origem sanitária para evitar duplicidade com alertas sanitários
-=======
-  rotinas.forEach((item) => {
-    const funcionarioNome =
-      funcionariosMap.get(Number(item.funcionario_id))?.nome ||
-      'Sem responsável';
-    const loteNome = item.lote_id
-      ? lotesMap.get(Number(item.lote_id))?.nome || 'Lote sem identificação'
-      : '';
-
->>>>>>> f7f6d2991c81e0a38b5e190db55c7ad82834360d
     if (!item.recorrente && item.origem_sistema === 'sanitario') {
       return;
     }
 
-<<<<<<< HEAD
     // Rotinas não recorrentes
     if (!item.recorrente) {
       if (!item.data || item.status === 'concluido') return; // Requer data e não pode estar concluída
@@ -403,16 +315,6 @@ export function buildAlerts(db = {}) {
       // Tarefa atrasada
       if (dataTarefa.getTime() < hoje.getTime()) {
         const chave = `rotina-atrasada-${item.id}-${item.data}`;
-=======
-    if (!item.recorrente) {
-      if (!item.data || item.status === 'concluido') return;
-
-      const dataTarefa = parseISODate(item.data);
-
-      if (dataTarefa.getTime() < hoje.getTime()) {
-        const chave = `rotina-atrasada-${item.id}-${item.data}`;
-
->>>>>>> f7f6d2991c81e0a38b5e190db55c7ad82834360d
         alerts.push({
           id: chave,
           ackKey: chave,
@@ -426,16 +328,10 @@ export function buildAlerts(db = {}) {
           pagina: 'rotina',
           data_sort: dataTarefa.getTime(),
         });
-<<<<<<< HEAD
       }
       // Tarefa para hoje
       else if (dataTarefa.getTime() === hoje.getTime()) {
         const chave = `rotina-hoje-${item.id}-${item.data}`;
-=======
-      } else if (dataTarefa.getTime() === hoje.getTime()) {
-        const chave = `rotina-hoje-${item.id}-${item.data}`;
-
->>>>>>> f7f6d2991c81e0a38b5e190db55c7ad82834360d
         alerts.push({
           id: chave,
           ackKey: chave,
@@ -450,34 +346,19 @@ export function buildAlerts(db = {}) {
           data_sort: dataTarefa.getTime(),
         });
       }
-<<<<<<< HEAD
       return;
     }
 
     // Rotinas recorrentes
     if (!recorrenciaValeNaData(item, hoje)) return; // Verifica se a recorrência é válida para hoje
-=======
-
-      return;
-    }
-
-    if (!recorrenciaValeNaData(item, hoje)) return;
->>>>>>> f7f6d2991c81e0a38b5e190db55c7ad82834360d
 
     const concluidas = Array.isArray(item.concluido_datas)
       ? item.concluido_datas
       : [];
 
-<<<<<<< HEAD
     if (concluidas.includes(hojeStr)) return; // Já concluída para hoje
 
     const chave = `rotina-recorrente-${item.id}-${hojeStr}`;
-=======
-    if (concluidas.includes(hojeStr)) return;
-
-    const chave = `rotina-recorrente-${item.id}-${hojeStr}`;
-
->>>>>>> f7f6d2991c81e0a38b5e190db55c7ad82834360d
     alerts.push({
       id: chave,
       ackKey: chave,
@@ -493,104 +374,19 @@ export function buildAlerts(db = {}) {
     });
   });
 
-<<<<<<< HEAD
   // Ordena os alertas: primeiro por nível (critical, warning, info), depois por data_sort
   return alerts
     .sort((a, b) => {
       const nivelA = NIVEL_ORDEM[a.nivel] ?? 99; // Fallback para nível desconhecido
-=======
-  return alerts
-    .sort((a, b) => {
-      const nivelA = NIVEL_ORDEM[a.nivel] ?? 99;
->>>>>>> f7f6d2991c81e0a38b5e190db55c7ad82834360d
       const nivelB = NIVEL_ORDEM[b.nivel] ?? 99;
 
       if (nivelA !== nivelB) return nivelA - nivelB;
 
-<<<<<<< HEAD
       // Ordenação secundária por data_sort, com fallback para o maior valor seguro
-=======
->>>>>>> f7f6d2991c81e0a38b5e190db55c7ad82834360d
       return (
         (a.data_sort ?? Number.MAX_SAFE_INTEGER) -
         (b.data_sort ?? Number.MAX_SAFE_INTEGER)
       );
     })
-<<<<<<< HEAD
     .map(({ data_sort, ...item }) => item); // Remove a propriedade data_sort antes de retornar
 }
-=======
-    .map(({ data_sort, ...item }) => item);
-}
-
-function recorrenciaValeNaData(item, dataReferencia) {
-  if (!item.recorrente) return false;
-  if (!item.data_inicio) return false;
-
-  const inicio = zerarHora(parseISODate(item.data_inicio));
-  const fim = item.data_fim ? zerarHora(parseISODate(item.data_fim)) : null;
-  const hoje = zerarHora(dataReferencia);
-
-  if (hoje.getTime() < inicio.getTime()) return false;
-  if (fim && hoje.getTime() > fim.getTime()) return false;
-
-  if (item.recorrencia_tipo === 'diaria') return true;
-
-  if (item.recorrencia_tipo === 'semanal') {
-    const diaHoje = hoje.getDay();
-    return Array.isArray(item.dias_semana) && item.dias_semana.includes(diaHoje);
-  }
-
-  return false;
-}
-
-function parseISODate(valor) {
-  if (!valor) return zerarHora(new Date());
-
-  const [ano, mes, dia] = String(valor).split('-').map(Number);
-  return new Date(ano, (mes || 1) - 1, dia || 1);
-}
-
-function zerarHora(data) {
-  const d = new Date(data);
-  d.setHours(0, 0, 0, 0);
-  return d;
-}
-
-function diferencaEmDias(dataA, dataB) {
-  const msPorDia = 1000 * 60 * 60 * 24;
-  return Math.round((zerarHora(dataA) - zerarHora(dataB)) / msPorDia);
-}
-
-function formatarDataISO(data) {
-  const ano = data.getFullYear();
-  const mes = String(data.getMonth() + 1).padStart(2, '0');
-  const dia = String(data.getDate()).padStart(2, '0');
-  return `${ano}-${mes}-${dia}`;
-}
-
-function formatarDataBR(valor) {
-  if (!valor) return '—';
-  const [ano, mes, dia] = String(valor).split('-');
-  return `${dia}/${mes}/${ano}`;
-}
-
-function formatarNumeroSimples(valor) {
-  return Number(valor || 0).toLocaleString('pt-BR', {
-    minimumFractionDigits: 0,
-    maximumFractionDigits: 2,
-  });
-}
-
-function normalizarTipoSanitario(tipo) {
-  const mapa = {
-    vacina: 'Vacina',
-    vermifugo: 'Vermífugo',
-    medicamento: 'Medicamento',
-    exame: 'Exame',
-    outro: 'Outro',
-  };
-
-  return mapa[tipo] || tipo || 'Manejo';
-}
->>>>>>> f7f6d2991c81e0a38b5e190db55c7ad82834360d

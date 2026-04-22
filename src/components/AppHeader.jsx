@@ -3,7 +3,6 @@ import { useEffect, useRef, useState } from 'react';
 import Button from './ui/Button';
 import UserAvatar from './ui/UserAvatar';
 
-<<<<<<< HEAD
 // Hook customizado para fechar dropdowns ao clicar fora ou pressionar Esc
 function useDropdown(initialState = false) {
   const [isOpen, setIsOpen] = useState(initialState);
@@ -31,8 +30,6 @@ function useDropdown(initialState = false) {
   return [ref, isOpen, setIsOpen];
 }
 
-=======
->>>>>>> f7f6d2991c81e0a38b5e190db55c7ad82834360d
 export default function AppHeader({
   farmName = 'Fazenda Santa Rita',
   usuarioLogado = null,
@@ -52,7 +49,6 @@ export default function AppHeader({
   fazendaSelecionada = null,
   onSelectFazenda,
 }) {
-<<<<<<< HEAD
   const [userMenuRef, openUserMenu, setOpenUserMenu] = useDropdown(false);
   const [notifRef, openNotif, setOpenNotif] = useDropdown(false);
   const [farmsRef, openFarms, setOpenFarms] = useDropdown(false);
@@ -67,42 +63,6 @@ export default function AppHeader({
     if (confirmado) {
       onSignOut?.();
     }
-=======
-  const [openUserMenu, setOpenUserMenu] = useState(false);
-  const [openNotif, setOpenNotif] = useState(false);
-  const [openFarms, setOpenFarms] = useState(false);
-  const userMenuRef = useRef(null);
-  const notifRef = useRef(null);
-  const farmsRef = useRef(null);
-
-  useEffect(() => {
-    function handleClickOutside(event) {
-      if (userMenuRef.current && !userMenuRef.current.contains(event.target)) setOpenUserMenu(false);
-      if (notifRef.current && !notifRef.current.contains(event.target)) setOpenNotif(false);
-      if (farmsRef.current && !farmsRef.current.contains(event.target)) setOpenFarms(false);
-    }
-    function handleEsc(event) {
-      if (event.key === 'Escape') {
-        setOpenUserMenu(false);
-        setOpenNotif(false);
-        setOpenFarms(false);
-      }
-    }
-    document.addEventListener('mousedown', handleClickOutside);
-    document.addEventListener('keydown', handleEsc);
-    return () => {
-      document.removeEventListener('mousedown', handleClickOutside);
-      document.removeEventListener('keydown', handleEsc);
-    };
-  }, []);
-
-  async function handleLogout() {
-    const confirmado = onConfirmAction
-      ? await onConfirmAction({ title: 'Sair da conta', message: 'Deseja realmente sair da sua conta?', tone: 'danger' })
-      : window.confirm('Deseja realmente sair da sua conta?');
-    if (!confirmado) return;
-    onSignOut?.();
->>>>>>> f7f6d2991c81e0a38b5e190db55c7ad82834360d
     setOpenUserMenu(false);
   }
 
@@ -115,7 +75,6 @@ export default function AppHeader({
       </button>
 
       <div className="farm-selector-wrap" ref={farmsRef}>
-<<<<<<< HEAD
         <button
           type="button"
           className="header-farm-selector"
@@ -152,30 +111,6 @@ export default function AppHeader({
             )}
           </div>
         )}
-=======
-        <button type="button" className="header-farm-selector" onClick={() => setOpenFarms((v) => !v)}>
-          <strong>{fazendaSelecionada?.nome || farmName}</strong>
-          <ChevronDown size={14} style={{ transform: openFarms ? 'rotate(180deg)' : 'rotate(0deg)', transition: 'transform 0.2s' }} />
-        </button>
-        {openFarms ? (
-          <div className="header-farm-dropdown">
-            {(fazendas || []).map((fazenda) => (
-              <button
-                key={fazenda.id}
-                type="button"
-                className={`header-farm-item ${Number(fazendaSelecionada?.id) === Number(fazenda.id) ? 'active' : ''}`}
-                onClick={() => {
-                  onSelectFazenda?.(fazenda);
-                  setOpenFarms(false);
-                }}
-              >
-                <span>{fazenda.nome}</span>
-                <small>{fazenda.cidade} / {fazenda.estado}</small>
-              </button>
-            ))}
-          </div>
-        ) : null}
->>>>>>> f7f6d2991c81e0a38b5e190db55c7ad82834360d
       </div>
 
       <nav className="header-tabs">
@@ -185,11 +120,8 @@ export default function AppHeader({
             type="button"
             className={`header-tab ${tabAtiva === tab ? 'active' : ''}`}
             onClick={() => onTabChange?.(tab)}
-<<<<<<< HEAD
             aria-selected={tabAtiva === tab}
             role="tab"
-=======
->>>>>>> f7f6d2991c81e0a38b5e190db55c7ad82834360d
           >
             {tab[0].toUpperCase() + tab.slice(1)}
           </button>
@@ -198,7 +130,6 @@ export default function AppHeader({
 
       <div className="top-header-actions">
         <div className="user-menu-wrap" ref={notifRef}>
-<<<<<<< HEAD
           <button
             type="button"
             className="header-notification-btn notif-btn"
@@ -219,27 +150,12 @@ export default function AppHeader({
                   <div key={alert.ackKey || alert.id} className="notif-item">
                     <strong>{alert.title || alert.titulo}</strong>
                     <small>{alert.description || alert.mensagem}</small>
-=======
-          <button type="button" className="header-notification-btn notif-btn" aria-label="Notificações" onClick={() => setOpenNotif((v) => !v)}>
-            <Bell size={16} />
-            {notifications > 0 ? <span className="notification-badge notif-badge">{notifications}</span> : null}
-          </button>
-          {openNotif ? (
-            <div className="notif-dropdown">
-              {alerts.length === 0
-                ? <p>Sem alertas.</p>
-                : alerts.map((alert) => (
-                  <div key={alert.ackKey || alert.id} className="notif-item">
-                    <strong>{alert.title}</strong>
-                    <small>{alert.description}</small>
->>>>>>> f7f6d2991c81e0a38b5e190db55c7ad82834360d
                     <div className="notif-actions">
                       <Button size="sm" variant="outline" onClick={() => onResolveAlert?.(alert)}>Resolver</Button>
                       <Button size="sm" variant="ghost" icon={<Clock3 size={12} />} onClick={() => onSnoozeAlert?.(alert)}>Adiar</Button>
                       <Button size="sm" variant="ghost" onClick={() => onAlertNavigate?.(alert)}>Abrir</Button>
                     </div>
                   </div>
-<<<<<<< HEAD
                 ))
               )}
             </div>
@@ -264,22 +180,6 @@ export default function AppHeader({
 
           {openUserMenu && (
             <div id="user-dropdown-menu" className="header-user-dropdown">
-=======
-                ))}
-            </div>
-          ) : null}
-        </div>
-
-        <div className="user-menu-wrap" ref={userMenuRef}>
-          <button type="button" className="header-user-btn user-menu-btn" onClick={() => setOpenUserMenu((v) => !v)}>
-            <UserAvatar usuario={usuarioLogado} size={32} />
-            <span className="header-user-name">{nomeExibicao.split(' ')[0]}</span>
-            <ChevronDown size={14} style={{ transform: openUserMenu ? 'rotate(180deg)' : 'rotate(0deg)', transition: 'transform 0.2s' }} />
-          </button>
-
-          {openUserMenu ? (
-            <div className="header-user-dropdown">
->>>>>>> f7f6d2991c81e0a38b5e190db55c7ad82834360d
               <div className="user-dropdown-header">
                 <UserAvatar usuario={usuarioLogado} size={44} />
                 <div>
@@ -303,17 +203,9 @@ export default function AppHeader({
                 Sair da conta
               </button>
             </div>
-<<<<<<< HEAD
           )}
-=======
-          ) : null}
->>>>>>> f7f6d2991c81e0a38b5e190db55c7ad82834360d
         </div>
       </div>
     </header>
   );
-<<<<<<< HEAD
 }
-=======
-}
->>>>>>> f7f6d2991c81e0a38b5e190db55c7ad82834360d

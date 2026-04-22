@@ -1,4 +1,3 @@
-<<<<<<< HEAD
 /**
  * Formata um número para exibição com um número específico de casas decimais, usando o locale pt-BR.
  * Retorna '—' para valores indefinidos, nulos ou não numéricos.
@@ -6,8 +5,6 @@
  * @param {number} [digits=1] - O número de casas decimais.
  * @returns {string} O número formatado ou '—'.
  */
-=======
->>>>>>> f7f6d2991c81e0a38b5e190db55c7ad82834360d
 export const formatNumber = (value, digits = 1) => {
   if (value === undefined || value === null || Number.isNaN(Number(value))) return '—';
   return Number(value).toLocaleString('pt-BR', {
@@ -16,15 +13,12 @@ export const formatNumber = (value, digits = 1) => {
   });
 };
 
-<<<<<<< HEAD
 /**
  * Formata um número como moeda brasileira (R$), com 2 casas decimais.
  * Retorna '—' para valores indefinidos, nulos ou não numéricos.
  * @param {number} value - O valor monetário a ser formatado.
  * @returns {string} O valor formatado como moeda ou '—'.
  */
-=======
->>>>>>> f7f6d2991c81e0a38b5e190db55c7ad82834360d
 export const formatCurrency = (value) => {
   if (value === undefined || value === null || Number.isNaN(Number(value))) return '—';
   return `R$ ${Number(value).toLocaleString('pt-BR', {
@@ -33,22 +27,18 @@ export const formatCurrency = (value) => {
   })}`;
 };
 
-<<<<<<< HEAD
 /**
  * Formata uma string de data (YYYY-MM-DD) para o formato brasileiro (DD/MM/YYYY).
  * Retorna '—' para valores nulos ou vazios.
  * @param {string} value - A string de data.
  * @returns {string} A data formatada ou '—'.
  */
-=======
->>>>>>> f7f6d2991c81e0a38b5e190db55c7ad82834360d
 export const formatDate = (value) => {
   if (!value) return '—';
   const [y, m, d] = value.split('-');
   return `${d}/${m}/${y}`;
 };
 
-<<<<<<< HEAD
 /**
  * Calcula a diferença em dias entre uma data alvo e a data atual.
  * Retorna 999 para strings de data nulas ou vazias.
@@ -161,75 +151,15 @@ export const calcLote = (db, loteId) => {
   const receitaTotal = arrobasCarcaca * precoArroba;
   const receitaPorCabeca = totalAnimais ? receitaTotal / totalAnimais : 0;
   const investimento = toNumber(lote.investimento || 0);
-=======
-export const daysDiff = (dateStr) => {
-  if (!dateStr) return 999;
-  const today = new Date();
-  const target = new Date(dateStr);
-  return Math.round((target - today) / (1000 * 60 * 60 * 24));
-};
-
-export const calcLote = (db, loteId) => {
-  const lote = db.lotes.find((item) => item.id === loteId);
-  const animais = db.animais.filter((item) => item.lote_id === loteId);
-  const custos = db.custos.filter((item) => item.lote_id === loteId);
-
-  const totalAnimais = animais.reduce((sum, item) => sum + item.qtd, 0);
-  const totalCustos = custos.reduce((sum, item) => sum + item.val, 0);
-  const machos = animais.filter((item) => item.sexo === 'macho');
-  const femeas = animais.filter((item) => item.sexo === 'fêmea');
-
-  const costByCategory = {
-    alimentacao: custos.filter((item) => item.cat === 'alimentação').reduce((sum, item) => sum + item.val, 0),
-    sanitario: custos.filter((item) => item.cat === 'sanitário').reduce((sum, item) => sum + item.val, 0),
-    outros: custos.filter((item) => item.cat === 'outros').reduce((sum, item) => sum + item.val, 0),
-  };
-
-  const calcGmd = (list) => {
-    const quantity = list.reduce((sum, item) => sum + item.qtd, 0);
-    if (!quantity) return 0;
-    return (
-      list.reduce((sum, item) => sum + ((item.p_at - item.p_ini) / Math.max(item.dias, 1)) * item.qtd, 0) /
-      quantity
-    );
-  };
-
-  const gainTotal = animais.reduce((sum, item) => sum + (item.p_at - item.p_ini) * item.qtd, 0);
-  const arrobasProduzidas = gainTotal / 15;
-  const dias = animais[0]?.dias || 0;
-  const pesoInicialMedio = totalAnimais
-    ? animais.reduce((sum, item) => sum + item.p_ini * item.qtd, 0) / totalAnimais
-    : 0;
-  const pesoAtualMedio = totalAnimais
-    ? animais.reduce((sum, item) => sum + item.p_at * item.qtd, 0) / totalAnimais
-    : 0;
-
-  const rendimentoCarcaca = (lote?.rendimento_carcaca || 52) / 100;
-  const precoArroba = lote?.preco_arroba || 270;
-  const arrobasCarcaca = totalAnimais * pesoAtualMedio * rendimentoCarcaca / 15;
-  const receitaTotal = arrobasCarcaca * precoArroba;
-  const receitaPorCabeca = totalAnimais ? receitaTotal / totalAnimais : 0;
-  const investimento = lote?.investimento || 0;
->>>>>>> f7f6d2991c81e0a38b5e190db55c7ad82834360d
   const custoTotalLote = totalCustos + investimento;
   const margem = receitaTotal - custoTotalLote;
   const margemPct = receitaTotal ? (margem / receitaTotal) * 100 : 0;
 
-<<<<<<< HEAD
   const percentualPv = toNumber(lote.supl_pv_pct || 0);
   const consumoSuplementoDia = totalAnimais * (pesoAtualMedio * percentualPv / 100);
   const diasEstoque = consumoSuplementoDia > 0 ? toNumber(lote.supl_estoque_kg || 0) / consumoSuplementoDia : 999;
   const custoSuplementoCabDia = (toNumber(lote.supl_rkg || 0) * (pesoAtualMedio * percentualPv / 100)) / 100;
   const gmdMedio = calcGmd(animaisDoLote);
-=======
-  const percentualPv = lote?.supl_pv_pct || 0;
-  const consumoSuplementoDia = totalAnimais * (pesoAtualMedio * percentualPv / 100);
-  const diasEstoque = consumoSuplementoDia > 0 ? (lote?.supl_estoque_kg || 0) / consumoSuplementoDia : 999;
-  const custoSuplementoCabDia = (lote?.supl_rkg || 0) * (pesoAtualMedio * percentualPv / 100) / 100;
-  const gmdMedio = totalAnimais
-    ? animais.reduce((sum, item) => sum + ((item.p_at - item.p_ini) / Math.max(item.dias, 1)) * item.qtd, 0) / totalAnimais
-    : 0;
->>>>>>> f7f6d2991c81e0a38b5e190db55c7ad82834360d
 
   return {
     lote,
@@ -240,13 +170,8 @@ export const calcLote = (db, loteId) => {
     gmdMacho: calcGmd(machos),
     gmdFemea: calcGmd(femeas),
     gmdMedio,
-<<<<<<< HEAD
     qtdMachos: machos.reduce((sum, item) => sum + toNumber(item.qtd), 0),
     qtdFemeas: femeas.reduce((sum, item) => sum + toNumber(item.qtd), 0),
-=======
-    qtdMachos: machos.reduce((sum, item) => sum + item.qtd, 0),
-    qtdFemeas: femeas.reduce((sum, item) => sum + item.qtd, 0),
->>>>>>> f7f6d2991c81e0a38b5e190db55c7ad82834360d
     custoPorArroba: arrobasProduzidas ? totalCustos / arrobasProduzidas : 0,
     custoPorCabeca: totalAnimais ? totalCustos / totalAnimais : 0,
     pesoInicialMedio,
@@ -265,7 +190,6 @@ export const calcLote = (db, loteId) => {
   };
 };
 
-<<<<<<< HEAD
 /**
  * Calcula e retorna uma lista de alertas com base nos dados do banco de dados.
  * @param {object} db - O objeto do banco de dados.
@@ -294,29 +218,12 @@ export const computeAlerts = (db) => {
     }
 
     // Alerta: Suplemento crítico (menos de 7 dias de estoque)
-=======
-export const computeAlerts = (db) => {
-  const alerts = [];
-
-  db.lotes.forEach((lote) => {
-    const indicators = calcLote(db, lote.id);
-
-    if (indicators.totalAnimais > 0 && lote.gmd_meta && indicators.gmdMedio < lote.gmd_meta * 0.9) {
-      alerts.push({
-        level: 'crit',
-        title: `GMD abaixo da meta — ${lote.nome}`,
-        description: `Atual: ${formatNumber(indicators.gmdMedio, 3)} kg/dia · Meta: ${formatNumber(lote.gmd_meta, 3)} kg/dia`,
-      });
-    }
-
->>>>>>> f7f6d2991c81e0a38b5e190db55c7ad82834360d
     if (indicators.diasEstoque < 7) {
       alerts.push({
         level: 'crit',
         title: `Suplemento crítico — ${lote.nome}`,
         description: `Estoque para ${formatNumber(indicators.diasEstoque, 0)} dias`,
       });
-<<<<<<< HEAD
     }
     // Alerta: Suplemento baixo (abaixo da meta de dias)
     else if (indicators.diasEstoque < toNumber(lote.supl_meta_dias)) {
@@ -328,16 +235,6 @@ export const computeAlerts = (db) => {
     }
 
     // Alerta: Lote próximo do abate (saída em até 15 dias)
-=======
-    } else if (indicators.diasEstoque < lote.supl_meta_dias) {
-      alerts.push({
-        level: 'warn',
-        title: `Suplemento baixo — ${lote.nome}`,
-        description: `Estoque para ${formatNumber(indicators.diasEstoque, 0)} dias · Meta: ${lote.supl_meta_dias} dias`,
-      });
-    }
-
->>>>>>> f7f6d2991c81e0a38b5e190db55c7ad82834360d
     const daysToExit = daysDiff(lote.saida);
     if (daysToExit >= 0 && daysToExit <= 15) {
       alerts.push({
@@ -347,10 +244,7 @@ export const computeAlerts = (db) => {
       });
     }
 
-<<<<<<< HEAD
     // Alerta: Margem negativa
-=======
->>>>>>> f7f6d2991c81e0a38b5e190db55c7ad82834360d
     if (indicators.totalAnimais > 0 && indicators.margem < 0) {
       alerts.push({
         level: 'crit',
@@ -360,7 +254,6 @@ export const computeAlerts = (db) => {
     }
   });
 
-<<<<<<< HEAD
   sanitario.forEach((item) => {
     const lote = lotesMap.get(toNumber(item.lote_id));
     const days = daysDiff(item.proxima);
@@ -379,31 +272,10 @@ export const computeAlerts = (db) => {
       alerts.push({
         level: 'warn',
         title: `Manejo em ${days} dias — ${item.desc || 'Manejo'} · ${loteNome}`,
-=======
-  db.sanitario.forEach((item) => {
-    const lote = db.lotes.find((entry) => entry.id === item.lote_id);
-    const days = daysDiff(item.proxima);
-    const loteNome = lote ? lote.nome : 'Lote';
-
-    if (days < 0) {
-      alerts.push({
-        level: 'crit',
-        title: `Manejo atrasado — ${item.desc} · ${loteNome}`,
-        description: `Previsto para ${formatDate(item.proxima)} (${Math.abs(days)} dias atrás)`,
-      });
-    } else if (days <= 7) {
-      alerts.push({
-        level: 'warn',
-        title: `Manejo em ${days} dias — ${item.desc} · ${loteNome}`,
->>>>>>> f7f6d2991c81e0a38b5e190db55c7ad82834360d
         description: `Previsto para ${formatDate(item.proxima)}`,
       });
     }
   });
 
   return alerts;
-<<<<<<< HEAD
 };
-=======
-};
->>>>>>> f7f6d2991c81e0a38b5e190db55c7ad82834360d

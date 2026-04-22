@@ -39,7 +39,6 @@ const KPI_VARIANTS = {
   neutral: 'neutral',
 };
 
-<<<<<<< HEAD
 /**
  * Página do Dashboard, exibindo uma visão consolidada de desempenho, riscos e operação dos lotes.
  *
@@ -60,27 +59,16 @@ export default function DashboardPage({ db, alerts = [], onNavigate = null, onRe
   }, [db.lotes]);
 
   const lotesAtivos = useMemo(() => (db.lotes || []).filter((lote) => lote.status === 'ativo'), [db.lotes]);
-=======
-export default function DashboardPage({ db, alerts = [], onNavigate = null, onResolveAlert = null, tabAtiva = 'geral', setTabAtiva }) {
-  const [hiddenLines, setHiddenLines] = useState({});
-
-  const lotesAtivos = useMemo(() => db.lotes.filter((lote) => lote.status === 'ativo'), [db.lotes]);
->>>>>>> f7f6d2991c81e0a38b5e190db55c7ad82834360d
 
   const lotesStats = useMemo(
     () =>
       lotesAtivos.map((lote) => ({
         lote,
-<<<<<<< HEAD
         indicators: calcLote(db, lote.id), // calcLote é potencialmente caro, mas é memoizado aqui
-=======
-        indicators: calcLote(db, lote.id),
->>>>>>> f7f6d2991c81e0a38b5e190db55c7ad82834360d
       })),
     [db, lotesAtivos]
   );
 
-<<<<<<< HEAD
   // --- KPIs Principais ---
   const totalCabecasAtivas = useMemo(() => lotesStats.reduce((sum, item) => sum + item.indicators.totalAnimais, 0), [lotesStats]);
   const arrobaMedia = useMemo(() => totalCabecasAtivas
@@ -96,21 +84,6 @@ export default function DashboardPage({ db, alerts = [], onNavigate = null, onRe
     : 0, [lotesStats]);
 
   const estoqueCritico = useMemo(() => (db.estoque || [])
-=======
-  const totalCabecasAtivas = lotesStats.reduce((sum, item) => sum + item.indicators.totalAnimais, 0);
-  const arrobaMedia = totalCabecasAtivas
-    ? lotesStats.reduce((sum, item) => sum + item.indicators.pesoAtualMedio * item.indicators.totalAnimais, 0) / totalCabecasAtivas / 15
-    : 0;
-  const receitaMes = lotesStats.reduce((sum, item) => sum + item.indicators.receitaTotal, 0);
-  const custoMes = db.custos.reduce((sum, item) => sum + Number(item.val || 0), 0);
-  const resultadoMes = receitaMes - custoMes;
-
-  const gmdMedio = lotesStats.length
-    ? lotesStats.reduce((sum, item) => sum + item.indicators.gmdMedio, 0) / lotesStats.length
-    : 0;
-
-  const estoqueCritico = (db.estoque || [])
->>>>>>> f7f6d2991c81e0a38b5e190db55c7ad82834360d
     .map((item) => {
       const atual = Number(item.quantidade_atual || 0);
       const min = Number(item.quantidade_minima || 0);
@@ -118,7 +91,6 @@ export default function DashboardPage({ db, alerts = [], onNavigate = null, onRe
       return { ...item, ratio, critico: atual <= min };
     })
     .filter((item) => item.critico)
-<<<<<<< HEAD
     .sort((a, b) => a.ratio - b.ratio), [db.estoque]);
 
   const itensCriticos = useMemo(() => estoqueCritico.length, [estoqueCritico]);
@@ -131,28 +103,11 @@ export default function DashboardPage({ db, alerts = [], onNavigate = null, onRe
   const eventosCalendario = useMemo(() => (db.sanitario || [])
     .map((item) => {
       const lote = lotesMap.get(item.lote_id); // Usar loteMap
-=======
-    .sort((a, b) => a.ratio - b.ratio);
-
-  const itensCriticos = (db.estoque || []).filter(
-    (i) => Number(i.quantidade_atual) <= Number(i.quantidade_minima || 0)
-  ).length;
-
-  const valorTotalEstoque = (db.estoque || []).reduce(
-    (acc, i) => acc + (Number(i.preco_unitario || 0) * Number(i.quantidade_atual || 0)),
-    0
-  );
-
-  const eventosCalendario = (db.sanitario || [])
-    .map((item) => {
-      const lote = db.lotes.find((l) => l.id === item.lote_id);
->>>>>>> f7f6d2991c81e0a38b5e190db55c7ad82834360d
       const dias = daysUntil(item.proxima);
       return { ...item, loteNome: lote?.nome || 'Sem lote', dias };
     })
     .filter((item) => Number.isFinite(item.dias))
     .sort((a, b) => a.dias - b.dias)
-<<<<<<< HEAD
     .slice(0, 8), [db.sanitario, lotesMap]);
 
   const alertasPendentesCalendario = useMemo(() => eventosCalendario.filter((item) => item.dias <= 3).length, [eventosCalendario]);
@@ -162,46 +117,26 @@ export default function DashboardPage({ db, alerts = [], onNavigate = null, onRe
       title: 'Total de cabeças ativas',
       value: formatNumber(totalCabecasAtivas, 0),
       variation: getVariation(totalCabecasAtivas, totalCabecasAtivas * 0.92), // Variação de exemplo
-=======
-    .slice(0, 8);
-
-  const alertasPendentesCalendario = eventosCalendario.filter((item) => item.dias <= 3).length;
-
-  const kpisMain = [
-    {
-      title: 'Total de cabeças ativas',
-      value: formatNumber(totalCabecasAtivas, 0),
-      variation: getVariation(totalCabecasAtivas, totalCabecasAtivas * 0.92),
->>>>>>> f7f6d2991c81e0a38b5e190db55c7ad82834360d
       icon: Users,
       variant: KPI_VARIANTS.info,
     },
     {
       title: 'Lotes ativos',
       value: formatNumber(lotesAtivos.length, 0),
-<<<<<<< HEAD
       variation: getVariation(lotesAtivos.length, Math.max(1, lotesAtivos.length - 1)), // Variação de exemplo
-=======
-      variation: getVariation(lotesAtivos.length, Math.max(1, lotesAtivos.length - 1)),
->>>>>>> f7f6d2991c81e0a38b5e190db55c7ad82834360d
       icon: Tractor,
       variant: KPI_VARIANTS.neutral,
     },
     {
       title: '@ média estimada do rebanho',
       value: `${formatNumber(arrobaMedia, 2)} @`,
-<<<<<<< HEAD
       variation: getVariation(arrobaMedia, arrobaMedia * 0.95), // Variação de exemplo
-=======
-      variation: getVariation(arrobaMedia, arrobaMedia * 0.95),
->>>>>>> f7f6d2991c81e0a38b5e190db55c7ad82834360d
       icon: Weight,
       variant: KPI_VARIANTS.success,
     },
     {
       title: 'Resultado financeiro do mês',
       value: formatCurrency(resultadoMes),
-<<<<<<< HEAD
       variation: getVariation(resultadoMes, resultadoMes * 0.85), // Variação de exemplo
       icon: DollarSign,
       variant: resultadoMes >= 0 ? KPI_VARIANTS.success : KPI_VARIANTS.danger,
@@ -213,49 +148,24 @@ export default function DashboardPage({ db, alerts = [], onNavigate = null, onRe
       title: 'GMD médio dos lotes ativos',
       value: `${formatNumber(gmdMedio, 3)} kg/dia`,
       variation: getVariation(gmdMedio, gmdMedio * 0.96), // Variação de exemplo
-=======
-      variation: getVariation(resultadoMes, resultadoMes * 0.85),
-      icon: DollarSign,
-      variant: resultadoMes >= 0 ? KPI_VARIANTS.success : KPI_VARIANTS.danger,
-    },
-  ];
-
-  const kpisSecondary = [
-    {
-      title: 'GMD médio dos lotes ativos',
-      value: `${formatNumber(gmdMedio, 3)} kg/dia`,
-      variation: getVariation(gmdMedio, gmdMedio * 0.96),
->>>>>>> f7f6d2991c81e0a38b5e190db55c7ad82834360d
       icon: Scale,
       variant: KPI_VARIANTS.info,
     },
     {
       title: 'Itens com estoque crítico',
       value: formatNumber(estoqueCritico.length, 0),
-<<<<<<< HEAD
       variation: getVariation(estoqueCritico.length, Math.max(0, estoqueCritico.length - 1)), // Variação de exemplo
-=======
-      variation: getVariation(estoqueCritico.length, Math.max(0, estoqueCritico.length - 1)),
->>>>>>> f7f6d2991c81e0a38b5e190db55c7ad82834360d
       icon: Package,
       variant: estoqueCritico.length ? KPI_VARIANTS.warning : KPI_VARIANTS.success,
     },
     {
       title: 'Alertas pendentes do calendário',
       value: formatNumber(alertasPendentesCalendario, 0),
-<<<<<<< HEAD
       variation: getVariation(alertasPendentesCalendario, Math.max(0, alertasPendentesCalendario - 1)), // Variação de exemplo
       icon: BellRing,
       variant: alertasPendentesCalendario ? KPI_VARIANTS.warning : KPI_VARIANTS.success,
     },
   ], [gmdMedio, estoqueCritico.length, alertasPendentesCalendario]);
-=======
-      variation: getVariation(alertasPendentesCalendario, Math.max(0, alertasPendentesCalendario - 1)),
-      icon: BellRing,
-      variant: alertasPendentesCalendario ? KPI_VARIANTS.warning : KPI_VARIANTS.success,
-    },
-  ];
->>>>>>> f7f6d2991c81e0a38b5e190db55c7ad82834360d
 
   const chartRows = useMemo(() => {
     const pesagens = db.pesagens || [];
@@ -269,7 +179,6 @@ export default function DashboardPage({ db, alerts = [], onNavigate = null, onRe
         if (!timelineMap.has(p.data)) {
           timelineMap.set(p.data, { data: p.data, label: formatDate(p.data) });
         }
-<<<<<<< HEAD
         const loteNome = lotesMap.get(p.lote_id)?.nome; // Usar loteMap
         if (loteNome) { // Apenas adiciona se o lote for encontrado
           timelineMap.get(p.data)[loteNome] = Number(p.peso_medio || 0);
@@ -278,14 +187,6 @@ export default function DashboardPage({ db, alerts = [], onNavigate = null, onRe
 
     return Array.from(timelineMap.values());
   }, [db.pesagens, lotesAtivos, lotesMap]);
-=======
-        const loteNome = db.lotes.find((l) => l.id === p.lote_id)?.nome;
-        timelineMap.get(p.data)[loteNome] = Number(p.peso_medio || 0);
-      });
-
-    return Array.from(timelineMap.values());
-  }, [db.lotes, db.pesagens, lotesAtivos]);
->>>>>>> f7f6d2991c81e0a38b5e190db55c7ad82834360d
 
   const lotesColorMap = useMemo(
     () =>
@@ -296,21 +197,12 @@ export default function DashboardPage({ db, alerts = [], onNavigate = null, onRe
     [lotesAtivos]
   );
 
-<<<<<<< HEAD
   const movimentacoesRecentes = useMemo(() => (db.movimentacoes_animais || [])
     .slice()
     .sort((a, b) => new Date(b.data || b.created_at) - new Date(a.data || a.created_at))
     .slice(0, 6), [db.movimentacoes_animais]);
 
   const tarefasUrgentes = useMemo(() => (db.tarefas || [])
-=======
-  const movimentacoesRecentes = (db.movimentacoes_animais || [])
-    .slice()
-    .sort((a, b) => new Date(b.data || b.created_at) - new Date(a.data || a.created_at))
-    .slice(0, 6);
-
-  const tarefasUrgentes = (db.tarefas || [])
->>>>>>> f7f6d2991c81e0a38b5e190db55c7ad82834360d
     .map((item) => ({
       ...item,
       dias: daysUntil(item.data_vencimento),
@@ -321,15 +213,9 @@ export default function DashboardPage({ db, alerts = [], onNavigate = null, onRe
       if (rankDiff !== 0) return rankDiff;
       return a.dias - b.dias;
     })
-<<<<<<< HEAD
     .slice(0, 5), [db.tarefas]);
 
   const tarefasResumo = useMemo(() => (db.tarefas || []).reduce(
-=======
-    .slice(0, 5);
-
-  const tarefasResumo = (db.tarefas || []).reduce(
->>>>>>> f7f6d2991c81e0a38b5e190db55c7ad82834360d
     (acc, item) => {
       if (item.status === 'pendente') acc.pendente += 1;
       if (item.status === 'em_andamento') acc.em_andamento += 1;
@@ -337,16 +223,10 @@ export default function DashboardPage({ db, alerts = [], onNavigate = null, onRe
       return acc;
     },
     { pendente: 0, em_andamento: 0, concluida: 0 }
-<<<<<<< HEAD
   ), [db.tarefas]);
 
   // Alertas já vêm memoizados via props, mas a transformação interna também é memoizada
   const alertasFormatados = useMemo(
-=======
-  );
-
-  const alertas = useMemo(
->>>>>>> f7f6d2991c81e0a38b5e190db55c7ad82834360d
     () =>
       (alerts || []).map((alert, index) => ({
         ...alert,
@@ -434,11 +314,7 @@ export default function DashboardPage({ db, alerts = [], onNavigate = null, onRe
 
             <Card title="Próximos eventos do calendário" subtitle="Ordenados por urgência">
               <div className="alerts-list">
-<<<<<<< HEAD
                 {eventosCalendario.length === 0 ? <p>Sem eventos próximos.</p> : eventosCalendario.map((item) => {
-=======
-                {eventosCalendario.map((item) => {
->>>>>>> f7f6d2991c81e0a38b5e190db55c7ad82834360d
                   const variant = item.dias < 0 ? 'danger' : item.dias <= 3 ? 'warning' : 'success';
                   return (
                     <div key={item.id} className="alert-item">
@@ -456,7 +332,6 @@ export default function DashboardPage({ db, alerts = [], onNavigate = null, onRe
           </section>
 
           <section className="dashboard-grid dashboard-grid--dual">
-<<<<<<< HEAD
             <Card title="Tarefas prioritárias" subtitle="Próximos vencimentos">
               <div className="alerts-list">
                 {tarefasUrgentes.length === 0 ? <p>Nenhuma tarefa urgente.</p> : tarefasUrgentes.map((item) => (
@@ -476,38 +351,6 @@ export default function DashboardPage({ db, alerts = [], onNavigate = null, onRe
               <div className="alerts-list">
                 {movimentacoesRecentes.length === 0 ? <p>Nenhuma movimentação recente.</p> : movimentacoesRecentes.map((mov) => (
                   <div key={mov.id} className="alert-item">
-=======
-            <Card title="Tarefas prioritárias" subtitle="Top 5 por urgência de vencimento">
-              <div className="alerts-list">
-                {tarefasUrgentes.length === 0 ? <p>Nenhuma tarefa pendente no momento.</p> : tarefasUrgentes.map((item) => {
-                  const variant = item.dias < 0 ? 'danger' : item.dias <= 2 ? 'warning' : 'info';
-                  return (
-                    <div key={item.id} className="alert-item">
-                      <CheckSquare size={16} />
-                      <div>
-                        <strong>{item.titulo}</strong>
-                        <p>{item.dias < 0 ? `Atrasada há ${Math.abs(item.dias)} dia(s)` : `Vence em ${item.dias} dia(s)`}</p>
-                      </div>
-                      <Badge variant={variant}>{item.prioridade || 'media'}</Badge>
-                    </div>
-                  );
-                })}
-              </div>
-              <div className="dashboard-kpi-inline" style={{ marginTop: 12 }}>
-                <span>Pendentes: <strong>{tarefasResumo.pendente}</strong></span>
-                <span>Em andamento: <strong>{tarefasResumo.em_andamento}</strong></span>
-                <span>Concluídas: <strong>{tarefasResumo.concluida}</strong></span>
-              </div>
-              <div style={{ marginTop: 10 }}>
-                <Button size="sm" variant="outline" onClick={() => onNavigate?.('tarefas')}>Ver todas</Button>
-              </div>
-            </Card>
-
-            <Card title="Últimas movimentações de animais">
-              <div className="mov-list">
-                {movimentacoesRecentes.length === 0 ? <p>Nenhuma movimentação recente.</p> : movimentacoesRecentes.map((mov) => (
-                  <div key={mov.id} className="mov-item">
->>>>>>> f7f6d2991c81e0a38b5e190db55c7ad82834360d
                     <Badge variant={mov.tipo === 'saida' ? 'danger' : 'info'}>{mov.tipo || 'mov'}</Badge>
                     <div>
                       <strong>{mov.qtd || 0} cabeças</strong>
@@ -517,13 +360,9 @@ export default function DashboardPage({ db, alerts = [], onNavigate = null, onRe
                 ))}
               </div>
             </Card>
-<<<<<<< HEAD
           </section>
 
           <section className="dashboard-grid dashboard-grid--dual">
-=======
-
->>>>>>> f7f6d2991c81e0a38b5e190db55c7ad82834360d
             <Card title="Estoque crítico" subtitle="Progresso versus mínimo recomendado">
               <div className="stock-list">
                 {estoqueCritico.length === 0 ? <p>Sem itens críticos no momento.</p> : estoqueCritico.map((item) => (
@@ -537,29 +376,16 @@ export default function DashboardPage({ db, alerts = [], onNavigate = null, onRe
                 ))}
               </div>
             </Card>
-<<<<<<< HEAD
 
             <Card title="Alertas pendentes" subtitle="Ordenados por urgência">
               {alertasFormatados.length === 0 ? <p>Nenhum alerta pendente.</p> : alertasFormatados.slice().sort((a, b) => urgencyRank(a) - urgencyRank(b)).map((alert) => {
-=======
-          </section>
-
-          <section className="dashboard-alerts-panel">
-            <Card title="Alertas pendentes" subtitle="Ordenados por urgência">
-              {(alerts || []).slice().sort((a, b) => urgencyRank(a) - urgencyRank(b)).map((alert) => {
->>>>>>> f7f6d2991c81e0a38b5e190db55c7ad82834360d
                 const variant = urgencyVariant(alert);
                 return (
                   <div className="alert-item" key={alert.id}>
                     <AlertTriangle size={16} />
                     <div>
-<<<<<<< HEAD
                       <strong>{alert.titulo}</strong>
                       <p>{alert.descricao}</p>
-=======
-                      <strong>{alert.title}</strong>
-                      <p>{alert.description}</p>
->>>>>>> f7f6d2991c81e0a38b5e190db55c7ad82834360d
                     </div>
                     <Badge variant={variant}>{variant}</Badge>
                     <Button size="sm" variant="ghost" onClick={() => onResolveAlert?.(alert)}>Resolver</Button>
@@ -573,11 +399,7 @@ export default function DashboardPage({ db, alerts = [], onNavigate = null, onRe
 
       {tabAtiva === 'estoque' && (
         <div className="dashboard-tab-content">
-<<<<<<< HEAD
           <div className="kpi-grid dashboard-kpi-stock-summary"> {/* Adicionada classe para o grid */}
-=======
-          <div className="kpi-grid" style={{ gridTemplateColumns: 'repeat(3, minmax(0,1fr))', marginBottom: 24 }}>
->>>>>>> f7f6d2991c81e0a38b5e190db55c7ad82834360d
             <div className="kpi-card">
               <div className="kpi-icon-wrapper">
                 <Package size={22} />
@@ -589,7 +411,6 @@ export default function DashboardPage({ db, alerts = [], onNavigate = null, onRe
               </div>
             </div>
 
-<<<<<<< HEAD
             <div className={`kpi-card ${itensCriticos > 0 ? 'kpi-card--danger' : ''}`}> {/* Usando classe */}
               <div className={`kpi-icon-wrapper ${itensCriticos > 0 ? 'kpi-icon-wrapper--danger' : ''}`}> {/* Usando classe */}
                 <AlertTriangle size={22} className={itensCriticos > 0 ? 'text-danger' : ''} /> {/* Usando classe */}
@@ -597,15 +418,6 @@ export default function DashboardPage({ db, alerts = [], onNavigate = null, onRe
               <div>
                 <p className="kpi-label">Estoque crítico</p>
                 <p className={`kpi-value ${itensCriticos > 0 ? 'text-danger' : ''}`}>{itensCriticos}</p> {/* Usando classe */}
-=======
-            <div className="kpi-card" style={{ borderColor: itensCriticos > 0 ? 'rgba(239,68,68,0.3)' : undefined }}>
-              <div className="kpi-icon-wrapper" style={{ background: itensCriticos > 0 ? 'rgba(239,68,68,0.1)' : undefined }}>
-                <AlertTriangle size={22} style={{ color: itensCriticos > 0 ? 'var(--color-danger)' : undefined }} />
-              </div>
-              <div>
-                <p className="kpi-label">Estoque crítico</p>
-                <p className="kpi-value" style={{ color: itensCriticos > 0 ? 'var(--color-danger)' : undefined }}>{itensCriticos}</p>
->>>>>>> f7f6d2991c81e0a38b5e190db55c7ad82834360d
                 <p className="kpi-sub">itens abaixo do mínimo</p>
               </div>
             </div>
@@ -650,17 +462,7 @@ export default function DashboardPage({ db, alerts = [], onNavigate = null, onRe
                       <td>{item.quantidade_atual} {item.unidade}</td>
                       <td>{item.quantidade_minima || '-'} {item.unidade}</td>
                       <td>
-<<<<<<< HEAD
                         <span className={critico ? 'text-danger' : 'text-success'}> {/* Usando classes */}
-=======
-                        <span
-                          style={{
-                            color: critico ? 'var(--color-danger)' : 'var(--color-success)',
-                            fontSize: '0.8rem',
-                            fontWeight: 600,
-                          }}
-                        >
->>>>>>> f7f6d2991c81e0a38b5e190db55c7ad82834360d
                           {critico ? '⚠ Crítico' : '✓ Normal'}
                         </span>
                       </td>
@@ -685,7 +487,6 @@ export default function DashboardPage({ db, alerts = [], onNavigate = null, onRe
 
       {tabAtiva === 'alertas' && (
         <div className="dashboard-tab-content">
-<<<<<<< HEAD
           <div className="kpi-grid dashboard-kpi-alerts-summary"> {/* Adicionada classe para o grid */}
             <div className="kpi-card kpi-card--danger"> {/* Usando classe */}
               <div className="kpi-icon-wrapper kpi-icon-wrapper--danger"> {/* Usando classe */}
@@ -694,21 +495,10 @@ export default function DashboardPage({ db, alerts = [], onNavigate = null, onRe
               <div>
                 <p className="kpi-label">Alta prioridade</p>
                 <p className="kpi-value text-danger">{alertasFormatados.filter((a) => a.prioridade === 'alta').length}</p> {/* Usando classe */}
-=======
-          <div className="kpi-grid" style={{ gridTemplateColumns: 'repeat(3, minmax(0,1fr))', marginBottom: 24 }}>
-            <div className="kpi-card" style={{ borderColor: 'rgba(239,68,68,0.2)' }}>
-              <div className="kpi-icon-wrapper" style={{ background: 'rgba(239,68,68,0.1)' }}>
-                <AlertTriangle size={22} style={{ color: 'var(--color-danger)' }} />
-              </div>
-              <div>
-                <p className="kpi-label">Alta prioridade</p>
-                <p className="kpi-value" style={{ color: 'var(--color-danger)' }}>{alertas.filter((a) => a.prioridade === 'alta').length}</p>
->>>>>>> f7f6d2991c81e0a38b5e190db55c7ad82834360d
                 <p className="kpi-sub">requer ação imediata</p>
               </div>
             </div>
 
-<<<<<<< HEAD
             <div className="kpi-card kpi-card--warning"> {/* Usando classe */}
               <div className="kpi-icon-wrapper kpi-icon-wrapper--warning"> {/* Usando classe */}
                 <Bell size={22} className="text-warning" /> {/* Usando classe */}
@@ -716,15 +506,6 @@ export default function DashboardPage({ db, alerts = [], onNavigate = null, onRe
               <div>
                 <p className="kpi-label">Média prioridade</p>
                 <p className="kpi-value text-warning">{alertasFormatados.filter((a) => a.prioridade === 'media').length}</p> {/* Usando classe */}
-=======
-            <div className="kpi-card" style={{ borderColor: 'rgba(245,158,11,0.2)' }}>
-              <div className="kpi-icon-wrapper" style={{ background: 'rgba(245,158,11,0.1)' }}>
-                <Bell size={22} style={{ color: 'var(--color-warning)' }} />
-              </div>
-              <div>
-                <p className="kpi-label">Média prioridade</p>
-                <p className="kpi-value" style={{ color: 'var(--color-warning)' }}>{alertas.filter((a) => a.prioridade === 'media').length}</p>
->>>>>>> f7f6d2991c81e0a38b5e190db55c7ad82834360d
                 <p className="kpi-sub">atenção recomendada</p>
               </div>
             </div>
@@ -735,11 +516,7 @@ export default function DashboardPage({ db, alerts = [], onNavigate = null, onRe
               </div>
               <div>
                 <p className="kpi-label">Total de alertas</p>
-<<<<<<< HEAD
                 <p className="kpi-value">{alertasFormatados.length}</p>
-=======
-                <p className="kpi-value">{alertas.length}</p>
->>>>>>> f7f6d2991c81e0a38b5e190db55c7ad82834360d
                 <p className="kpi-sub">pendentes</p>
               </div>
             </div>
@@ -751,11 +528,7 @@ export default function DashboardPage({ db, alerts = [], onNavigate = null, onRe
               <button className="btn-primary btn-sm" onClick={() => setTabAtiva?.('geral')} type="button">Voltar ao Geral</button>
             </div>
 
-<<<<<<< HEAD
             {alertasFormatados.length === 0 ? (
-=======
-            {alertas.length === 0 ? (
->>>>>>> f7f6d2991c81e0a38b5e190db55c7ad82834360d
               <div className="empty-state">
                 <div className="empty-state-icon">
                   <CheckCircle2 size={28} />
@@ -764,11 +537,7 @@ export default function DashboardPage({ db, alerts = [], onNavigate = null, onRe
                 <p className="empty-state-desc">Sua operação está em dia!</p>
               </div>
             ) : (
-<<<<<<< HEAD
               alertasFormatados.map((alerta) => (
-=======
-              alertas.map((alerta) => (
->>>>>>> f7f6d2991c81e0a38b5e190db55c7ad82834360d
                 <div key={alerta.id} className="alert-item">
                   <div className={`alert-dot ${alerta.prioridade}`} />
                   <div style={{ flex: 1 }}>
@@ -792,7 +561,6 @@ export default function DashboardPage({ db, alerts = [], onNavigate = null, onRe
   );
 }
 
-<<<<<<< HEAD
 /**
  * Componente para exibir um painel de KPI.
  * @param {object} props - As propriedades do componente.
@@ -803,8 +571,6 @@ export default function DashboardPage({ db, alerts = [], onNavigate = null, onRe
  * @param {string} [props.variant='neutral'] - Variante de estilo ('success', 'warning', 'danger', 'info', 'neutral').
  * @param {boolean} [props.compact=false] - Se o painel deve ser compacto.
  */
-=======
->>>>>>> f7f6d2991c81e0a38b5e190db55c7ad82834360d
 function KpiPanel({ title, value, variation, icon, variant = 'neutral', compact = false }) {
   const IconComp = icon;
 
@@ -823,28 +589,22 @@ function KpiPanel({ title, value, variation, icon, variant = 'neutral', compact 
   );
 }
 
-<<<<<<< HEAD
 /**
  * Calcula a variação percentual entre dois valores.
  * @param {number} current - Valor atual.
  * @param {number} previous - Valor anterior.
  * @returns {number} A variação percentual.
  */
-=======
->>>>>>> f7f6d2991c81e0a38b5e190db55c7ad82834360d
 function getVariation(current, previous) {
   if (!previous) return 0;
   return ((current - previous) / Math.abs(previous)) * 100;
 }
 
-<<<<<<< HEAD
 /**
  * Mapeia um valor de prioridade para um rank numérico.
  * @param {string} valor - O valor da prioridade ('critica', 'alta', 'media', 'baixa').
  * @returns {number} O rank numérico.
  */
-=======
->>>>>>> f7f6d2991c81e0a38b5e190db55c7ad82834360d
 function prioridadeRank(valor) {
   if (valor === 'critica') return 4;
   if (valor === 'alta') return 3;
@@ -852,14 +612,11 @@ function prioridadeRank(valor) {
   return 1;
 }
 
-<<<<<<< HEAD
 /**
  * Calcula o número de dias até uma data.
  * @param {string} dateStr - A string da data no formato 'YYYY-MM-DD'.
  * @returns {number} O número de dias até a data, ou Infinity se a data for inválida.
  */
-=======
->>>>>>> f7f6d2991c81e0a38b5e190db55c7ad82834360d
 function daysUntil(dateStr) {
   if (!dateStr) return Number.POSITIVE_INFINITY;
   const now = new Date();
@@ -869,14 +626,11 @@ function daysUntil(dateStr) {
   return Math.round((target - now) / 86400000);
 }
 
-<<<<<<< HEAD
 /**
  * Determina a variante de urgência de um alerta com base no seu título/descrição.
  * @param {object} alert - O objeto do alerta.
  * @returns {string} A variante de urgência ('danger', 'warning', 'success').
  */
-=======
->>>>>>> f7f6d2991c81e0a38b5e190db55c7ad82834360d
 function urgencyVariant(alert) {
   const text = `${alert.title || ''} ${alert.description || ''}`.toLowerCase();
   if (text.includes('atrasad') || text.includes('venc')) return 'danger';
@@ -884,14 +638,11 @@ function urgencyVariant(alert) {
   return 'success';
 }
 
-<<<<<<< HEAD
 /**
  * Mapeia a variante de urgência para um rank numérico para ordenação.
  * @param {object} alert - O objeto do alerta.
  * @returns {number} O rank numérico da urgência.
  */
-=======
->>>>>>> f7f6d2991c81e0a38b5e190db55c7ad82834360d
 function urgencyRank(alert) {
   const variant = urgencyVariant(alert);
   if (variant === 'danger') return 0;
@@ -899,7 +650,6 @@ function urgencyRank(alert) {
   return 2;
 }
 
-<<<<<<< HEAD
 /**
  * Componente de Tooltip personalizado para o gráfico de peso.
  * @param {object} props - As propriedades do componente.
@@ -907,8 +657,6 @@ function urgencyRank(alert) {
  * @param {Array<object>} props.payload - Dados do tooltip.
  * @param {string} props.label - Label do tooltip (data).
  */
-=======
->>>>>>> f7f6d2991c81e0a38b5e190db55c7ad82834360d
 function PesoTooltip({ active, payload, label }) {
   if (!active || !payload?.length) return null;
   return (
@@ -921,8 +669,4 @@ function PesoTooltip({ active, payload, label }) {
       ))}
     </div>
   );
-<<<<<<< HEAD
 }
-=======
-}
->>>>>>> f7f6d2991c81e0a38b5e190db55c7ad82834360d

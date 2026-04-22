@@ -1,4 +1,3 @@
-<<<<<<< HEAD
 import { useMemo } from 'react';
 import { Bar, BarChart, CartesianGrid, Legend, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
 import Card from '../ui/Card';
@@ -71,37 +70,6 @@ export default function RelatorioLote({ db, loteIds = [] }) {
                   <td style={{ color: item.margem >= 0 ? 'var(--color-success)' : 'var(--color-danger)' }}>
                     {formatCurrency(item.margem)}
                   </td>
-=======
-import Card from '../ui/Card';
-import { Bar, BarChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
-import { calcLote, formatCurrency, formatNumber } from '../../utils/calculations';
-
-export default function RelatorioLote({ db, loteIds = [] }) {
-  const lotes = db.lotes.filter((l) => loteIds.length === 0 || loteIds.includes(String(l.id)));
-  const dados = lotes.map((lote) => {
-    const i = calcLote(db, lote.id);
-    return {
-      id: lote.id,
-      lote: lote.nome,
-      animais: i.totalAnimais,
-      gmd: i.gmdMedio,
-      margem: i.margem,
-      receita: i.receitaTotal,
-    };
-  });
-
-  return (
-    <div style={{ display: 'grid', gap: 16 }}>
-      <Card title="Dados do lote e indicadores zootécnicos">
-        <div className="ui-table-wrap">
-          <table className="ui-table">
-            <thead><tr><th>Lote</th><th>Animais</th><th>GMD</th><th>Receita</th><th>Margem</th></tr></thead>
-            <tbody>
-              {dados.map((item) => (
-                <tr key={item.id}>
-                  <td>{item.lote}</td><td>{item.animais}</td><td>{formatNumber(item.gmd, 3)} kg/dia</td>
-                  <td>{formatCurrency(item.receita)}</td><td>{formatCurrency(item.margem)}</td>
->>>>>>> f7f6d2991c81e0a38b5e190db55c7ad82834360d
                 </tr>
               ))}
             </tbody>
@@ -113,7 +81,6 @@ export default function RelatorioLote({ db, loteIds = [] }) {
         <div style={{ height: 260 }}>
           <ResponsiveContainer width="100%" height="100%">
             <BarChart data={dados}>
-<<<<<<< HEAD
               <CartesianGrid strokeDasharray="3 3" stroke="var(--color-border)" />
 
               <XAxis
@@ -140,24 +107,11 @@ export default function RelatorioLote({ db, loteIds = [] }) {
 
               <Bar dataKey="receita" name="Receita" fill="var(--color-info)" radius={[4, 4, 0, 0]} />
               <Bar dataKey="margem" name="Margem" fill="var(--color-primary)" radius={[4, 4, 0, 0]} />
-=======
-              <XAxis dataKey="lote" />
-              <YAxis />
-              <Tooltip />
-              <Bar dataKey="receita" fill="#4f46e5" />
-              <Bar dataKey="margem" fill="#16a34a" />
->>>>>>> f7f6d2991c81e0a38b5e190db55c7ad82834360d
             </BarChart>
           </ResponsiveContainer>
         </div>
       </Card>
-<<<<<<< HEAD
 
     </div>
   );
 }
-=======
-    </div>
-  );
-}
->>>>>>> f7f6d2991c81e0a38b5e190db55c7ad82834360d
