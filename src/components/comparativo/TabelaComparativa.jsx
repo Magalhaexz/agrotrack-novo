@@ -8,71 +8,100 @@ const ESTILO_DESTAQUE = {
 function calcularMelhorPorIndicador(lotes, linha) {
   if (!linha.highlight) return [];
 
-  const valores = lotes.map((l) => ({
-    id: l.id,
-    valor: linha.valores?.[l.id]?.raw ?? null,
+  const valores = lotes.map((lote) => ({
+    id: lote.id,
+    valor: linha.valores?.[lote.id]?.raw ?? null,
   }));
 
-  const validos = valores.filter((v) => Number.isFinite(Number(v.valor)));
+  const validos = valores.filter((item) => Number.isFinite(Number(item.valor)));
   if (!validos.length) return [];
 
-  const nums = validos.map((v) => Number(v.valor));
-  const alvo = linha.highlight === 'min' ? Math.min(...nums) : Math.max(...nums);
+  const numeros = validos.map((item) => Number(item.valor));
+  const alvo = linha.highlight === 'min' ? Math.min(...numeros) : Math.max(...numeros);
 
-  return validos.filter((v) => Number(v.valor) === alvo).map((v) => v.id);
+  return validos.filter((item) => Number(item.valor) === alvo).map((item) => item.id);
 }
 
 export default function TabelaComparativa({ lotes = [], indicadores = [] }) {
-  const destacadosPorIndicador = useMemo(() => {
-    return Object.fromEntries(
-      indicadores.map((linha) => [
-        linha.key,
-        calcularMelhorPorIndicador(lotes, linha),
-      ])
-    );
-  }, [lotes, indicadores]);
+  const destacadosPorIndicador = useMemo(
+    () => Object.fromEntries(indicadores.map((linha) => [linha.key, calcularMelhorPorIndicador(lotes, linha)])),
+    [indicadores, lotes]
+  );
 
   if (!lotes.length || !indicadores.length) {
     return (
-      <div className="table-responsive">
+      <div className="comparativo-empty-state">
         <p style={{ color: 'var(--color-text-secondary)', fontSize: '0.85rem' }}>
-          Nenhum dado disponível para comparação.
+          Nenhum dado disponivel para comparacao.
         </p>
       </div>
     );
   }
 
   return (
-    <div className="table-responsive">
-      <table className="compare-table">
-        <thead>
-          <tr>
-            <th>Indicador</th>
-            {lotes.map((l) => (
-              <th key={l.id}>{l.nome}</th>
-            ))}
-          </tr>
-        </thead>
-        <tbody>
-          {indicadores.map((linha) => {
-            const destacados = destacadosPorIndicador[linha.key] ?? [];
+    <>
+      <div className="table-responsive comparativo-table-wrap desktop-table">
+        <table className="compare-table">
+          <thead>
+            <tr>
+              <th className="compare-table-indicator-head">Indicador</th>
+              {lotes.map((lote) => (
+                <th key={lote.id} className="compare-table-lote-head">{lote.nome}</th>
+              ))}
+            </tr>
+          </thead>
+          <tbody>
+            {indicadores.map((linha) => {
+              const destacados = destacadosPorIndicador[linha.key] ?? [];
 
-            return (
-              <tr key={linha.key}>
-                <td>{linha.label}</td>
-                {lotes.map((l) => (
-                  <td
-                    key={`${linha.key}-${l.id}`}
-                    style={destacados.includes(l.id) ? ESTILO_DESTAQUE : undefined}
-                  >
-                    {linha.valores?.[l.id]?.display || '—'}
-                  </td>
-                ))}
-              </tr>
-            );
-          })}
-        </tbody>
-      </table>
-    </div>
+              return (
+                <tr key={linha.key}>
+                  <th scope="row" className="compare-table-indicator-cell">{linha.label}</th>
+                  {lotes.map((lote) => (
+                    <td
+                      key={`${linha.key}-${lote.id}`}
+                      className={`compare-table-value ${destacados.includes(lote.id) ? 'is-highlight' : ''}`}
+                      style={destacados.includes(lote.id) ? ESTILO_DESTAQUE : undefined}
+                    >
+                      {linha.valores?.[lote.id]?.display || '-'}
+                    </td>
+                  ))}
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
+      </div>
+
+      <div className="compare-mobile-list mobile-table-cards">
+        {indicadores.map((linha) => {
+          const destacados = destacadosPorIndicador[linha.key] ?? [];
+
+          return (
+            <article className="compare-mobile-card" key={linha.key}>
+              <header className="compare-mobile-header">
+                <span className="compare-mobile-kicker">Indicador</span>
+                <strong>{linha.label}</strong>
+              </header>
+
+              <div className="compare-mobile-values">
+                {lotes.map((lote) => {
+                  const destaque = destacados.includes(lote.id);
+
+                  return (
+                    <div className={`compare-mobile-value-row ${destaque ? 'is-highlight' : ''}`} key={`${linha.key}-${lote.id}`}>
+                      <span>{lote.nome}</span>
+                      <strong style={destaque ? ESTILO_DESTAQUE : undefined}>
+                        {linha.valores?.[lote.id]?.display || '-'}
+                      </strong>
+                    </div>
+                  );
+                })}
+              </div>
+            </article>
+          );
+        })}
+      </div>
+    </>
   );
 }
