@@ -3,15 +3,10 @@ import { AlertTriangle, FileText, Plus, X } from 'lucide-react';
 import Card from '../components/ui/Card';
 import Button from '../components/ui/Button';
 import Modal from '../components/ui/Modal';
-<<<<<<< HEAD
 import { supabase } from '../lib/supabase'; // Assumindo que supabase está configurado
 import { useAuth } from '../auth/useAuth';
 import { useToast } from '../hooks/useToast'; // Importa o hook de toast
 import { gerarNovoId } from '../utils/id'; // Importa a função de gerar ID
-=======
-import { supabase } from '../lib/supabase';
-import { useAuth } from '../auth/useAuth';
->>>>>>> f7f6d2991c81e0a38b5e190db55c7ad82834360d
 import '../styles/configuracoes.css';
 
 const TABS = [
@@ -21,7 +16,6 @@ const TABS = [
   { id: 'dados', label: 'Dados e Segurança' },
 ];
 
-<<<<<<< HEAD
 /**
  * Página de Configurações da aplicação.
  * Permite gerenciar parâmetros globais, preferências de notificação,
@@ -35,10 +29,6 @@ const TABS = [
 export default function ConfiguracoesPage({ db, setDb, onConfirmAction }) {
   const { perfil } = useAuth();
   const { showToast } = useToast(); // Hook para exibir toasts
-=======
-export default function ConfiguracoesPage({ db, setDb, onConfirmAction }) {
-  const { perfil } = useAuth();
->>>>>>> f7f6d2991c81e0a38b5e190db55c7ad82834360d
   const [tab, setTab] = useState('geral');
   const [openInvite, setOpenInvite] = useState(false);
   const [confirmText, setConfirmText] = useState('');
@@ -66,11 +56,7 @@ export default function ConfiguracoesPage({ db, setDb, onConfirmAction }) {
 
   function salvarGeral() {
     if (!geral.nome_sistema.trim()) {
-<<<<<<< HEAD
       showToast({ type: 'error', message: 'Nome do sistema/empresa é obrigatório.' });
-=======
-      window.alert('Nome do sistema/empresa é obrigatório.');
->>>>>>> f7f6d2991c81e0a38b5e190db55c7ad82834360d
       return;
     }
 
@@ -86,20 +72,12 @@ export default function ConfiguracoesPage({ db, setDb, onConfirmAction }) {
       },
     }));
 
-<<<<<<< HEAD
     showToast({ type: 'success', message: 'Configurações gerais salvas com sucesso.' });
-=======
-    window.alert('Configurações gerais salvas com sucesso.');
->>>>>>> f7f6d2991c81e0a38b5e190db55c7ad82834360d
   }
 
   function salvarNotificacoes() {
     if (Number(notificacoes.dias_antecedencia) < 0) {
-<<<<<<< HEAD
       showToast({ type: 'error', message: 'Dias de antecedência deve ser maior ou igual a zero.' });
-=======
-      window.alert('Dias de antecedência deve ser maior ou igual a zero.');
->>>>>>> f7f6d2991c81e0a38b5e190db55c7ad82834360d
       return;
     }
 
@@ -114,11 +92,7 @@ export default function ConfiguracoesPage({ db, setDb, onConfirmAction }) {
       },
     }));
 
-<<<<<<< HEAD
     showToast({ type: 'success', message: 'Preferências de notificação salvas com sucesso.' });
-=======
-    window.alert('Preferências de notificação salvas com sucesso.');
->>>>>>> f7f6d2991c81e0a38b5e190db55c7ad82834360d
   }
 
   function exportarDados() {
@@ -129,11 +103,7 @@ export default function ConfiguracoesPage({ db, setDb, onConfirmAction }) {
     anchor.download = `herdon-backup-${new Date().toISOString().slice(0, 10)}.json`;
     anchor.click();
     URL.revokeObjectURL(url);
-<<<<<<< HEAD
     showToast({ type: 'success', message: 'Backup exportado com sucesso.' });
-=======
-    window.alert('Backup exportado com sucesso.');
->>>>>>> f7f6d2991c81e0a38b5e190db55c7ad82834360d
   }
 
   function importarDados(event) {
@@ -146,7 +116,6 @@ export default function ConfiguracoesPage({ db, setDb, onConfirmAction }) {
         const parsed = JSON.parse(String(reader.result || '{}'));
         if (!parsed || typeof parsed !== 'object') throw new Error('Arquivo inválido');
         setDb(parsed);
-<<<<<<< HEAD
         showToast({ type: 'success', message: 'Dados importados com sucesso.' });
       } catch (error) {
         showToast({ type: 'error', message: `Erro ao importar dados: ${error.message}` });
@@ -154,15 +123,6 @@ export default function ConfiguracoesPage({ db, setDb, onConfirmAction }) {
     };
     reader.readAsText(file);
     event.target.value = ''; // Limpa o input de arquivo
-=======
-        window.alert('Dados importados com sucesso.');
-      } catch (error) {
-        window.alert(`Erro ao importar dados: ${error.message}`);
-      }
-    };
-    reader.readAsText(file);
-    event.target.value = '';
->>>>>>> f7f6d2991c81e0a38b5e190db55c7ad82834360d
   }
 
   async function limparDadosDemo() {
@@ -182,7 +142,6 @@ export default function ConfiguracoesPage({ db, setDb, onConfirmAction }) {
       rotinas: [],
       tarefas: [],
       pesagens: [],
-<<<<<<< HEAD
       movimentacoes_animais: [],
       movimentacoes_estoque: [],
       movimentacoes_financeiras: [],
@@ -190,20 +149,11 @@ export default function ConfiguracoesPage({ db, setDb, onConfirmAction }) {
     }));
 
     showToast({ type: 'success', message: 'Dados de demonstração removidos.' });
-=======
-    }));
-
-    window.alert('Dados de demonstração removidos.');
->>>>>>> f7f6d2991c81e0a38b5e190db55c7ad82834360d
   }
 
   async function excluirConta() {
     if (confirmText !== 'CONFIRMAR') {
-<<<<<<< HEAD
       showToast({ type: 'error', message: 'Digite CONFIRMAR para prosseguir.' });
-=======
-      window.alert('Digite CONFIRMAR para prosseguir.');
->>>>>>> f7f6d2991c81e0a38b5e190db55c7ad82834360d
       return;
     }
 
@@ -217,15 +167,10 @@ export default function ConfiguracoesPage({ db, setDb, onConfirmAction }) {
 
     if (!confirmado) return;
 
-<<<<<<< HEAD
     // Simulação de exclusão de conta no backend/auth
     await supabase.auth.signOut(); // Desloga o usuário localmente
     showToast({ type: 'success', message: 'Conta encerrada no app local. (Fluxo remoto deve ser conectado ao backend).' });
     // Em um ambiente real, aqui você chamaria uma API para excluir a conta do usuário no backend.
-=======
-    await supabase.auth.signOut();
-    window.alert('Conta encerrada no app local. (Fluxo remoto deve ser conectado ao backend).');
->>>>>>> f7f6d2991c81e0a38b5e190db55c7ad82834360d
   }
 
   return (
@@ -246,7 +191,6 @@ export default function ConfiguracoesPage({ db, setDb, onConfirmAction }) {
       {tab === 'geral' ? (
         <Card title="Geral">
           <div className="config-grid">
-<<<<<<< HEAD
             <label className="ui-input-wrap">
               <span className="ui-input-label">Nome do sistema / empresa</span>
               <input className="ui-input" value={geral.nome_sistema} onChange={(e) => setGeral((prev) => ({ ...prev, nome_sistema: e.target.value }))} />
@@ -254,42 +198,24 @@ export default function ConfiguracoesPage({ db, setDb, onConfirmAction }) {
             <label className="ui-input-wrap">
               <span className="ui-input-label">Moeda padrão</span>
               <select className="ui-input" value={geral.moeda} onChange={(e) => setGeral((prev) => ({ ...prev, moeda: e.target.value }))}>
-=======
-            <label>Nome do sistema / empresa
-              <input value={geral.nome_sistema} onChange={(e) => setGeral((prev) => ({ ...prev, nome_sistema: e.target.value }))} />
-            </label>
-            <label>Moeda padrão
-              <select value={geral.moeda} onChange={(e) => setGeral((prev) => ({ ...prev, moeda: e.target.value }))}>
->>>>>>> f7f6d2991c81e0a38b5e190db55c7ad82834360d
                 <option value="BRL">R$ BRL</option>
                 <option value="USD">$ USD</option>
               </select>
             </label>
-<<<<<<< HEAD
             <label className="ui-input-wrap">
               <span className="ui-input-label">Formato de data</span>
               <select className="ui-input" value={geral.formato_data} onChange={(e) => setGeral((prev) => ({ ...prev, formato_data: e.target.value }))}>
-=======
-            <label>Formato de data
-              <select value={geral.formato_data} onChange={(e) => setGeral((prev) => ({ ...prev, formato_data: e.target.value }))}>
->>>>>>> f7f6d2991c81e0a38b5e190db55c7ad82834360d
                 <option value="DD/MM/AAAA">DD/MM/AAAA</option>
                 <option value="AAAA-MM-DD">AAAA-MM-DD</option>
               </select>
             </label>
-<<<<<<< HEAD
             <label className="ui-input-wrap">
               <span className="ui-input-label">Unidade de peso padrão</span>
               <select className="ui-input" value={geral.unidade_peso} onChange={(e) => setGeral((prev) => ({ ...prev, unidade_peso: e.target.value }))}>
-=======
-            <label>Unidade de peso padrão
-              <select value={geral.unidade_peso} onChange={(e) => setGeral((prev) => ({ ...prev, unidade_peso: e.target.value }))}>
->>>>>>> f7f6d2991c81e0a38b5e190db55c7ad82834360d
                 <option value="kg">kg</option>
                 <option value="arroba">@</option>
               </select>
             </label>
-<<<<<<< HEAD
             <label className="ui-input-wrap">
               <span className="ui-input-label">Rendimento de carcaça padrão (%)</span>
               <input className="ui-input" type="number" min="0" max="100" value={geral.rendimento_carcaca_padrao} onChange={(e) => setGeral((prev) => ({ ...prev, rendimento_carcaca_padrao: e.target.value }))} />
@@ -297,13 +223,6 @@ export default function ConfiguracoesPage({ db, setDb, onConfirmAction }) {
             <label className="ui-input-wrap">
               <span className="ui-input-label">Preço da arroba padrão (R$)</span>
               <input className="ui-input" type="number" min="0" step="0.01" value={geral.preco_arroba_padrao} onChange={(e) => setGeral((prev) => ({ ...prev, preco_arroba_padrao: e.target.value }))} />
-=======
-            <label>Rendimento de carcaça padrão (%)
-              <input type="number" min="0" max="100" value={geral.rendimento_carcaca_padrao} onChange={(e) => setGeral((prev) => ({ ...prev, rendimento_carcaca_padrao: e.target.value }))} />
-            </label>
-            <label>Preço da arroba padrão (R$)
-              <input type="number" min="0" step="0.01" value={geral.preco_arroba_padrao} onChange={(e) => setGeral((prev) => ({ ...prev, preco_arroba_padrao: e.target.value }))} />
->>>>>>> f7f6d2991c81e0a38b5e190db55c7ad82834360d
             </label>
           </div>
           <div className="config-actions"><Button onClick={salvarGeral}>Salvar configurações gerais</Button></div>
@@ -317,14 +236,9 @@ export default function ConfiguracoesPage({ db, setDb, onConfirmAction }) {
             <SwitchRow label="Alertas de vacinas/manejos vencidos" checked={notificacoes.sanitario_vencido} onChange={(value) => setNotificacoes((prev) => ({ ...prev, sanitario_vencido: value }))} />
             <SwitchRow label="Alertas de pesagem atrasada" checked={notificacoes.pesagem_atrasada} onChange={(value) => setNotificacoes((prev) => ({ ...prev, pesagem_atrasada: value }))} />
             <SwitchRow label="Alertas de lote na data de saída prevista" checked={notificacoes.lote_data_saida} onChange={(value) => setNotificacoes((prev) => ({ ...prev, lote_data_saida: value }))} />
-<<<<<<< HEAD
             <label className="ui-input-wrap">
               <span className="ui-input-label">Quantos dias antes avisar</span>
               <input className="ui-input" type="number" min="0" value={notificacoes.dias_antecedencia} onChange={(e) => setNotificacoes((prev) => ({ ...prev, dias_antecedencia: e.target.value }))} />
-=======
-            <label>Quantos dias antes avisar
-              <input type="number" min="0" value={notificacoes.dias_antecedencia} onChange={(e) => setNotificacoes((prev) => ({ ...prev, dias_antecedencia: e.target.value }))} />
->>>>>>> f7f6d2991c81e0a38b5e190db55c7ad82834360d
             </label>
           </div>
           <div className="config-actions"><Button onClick={salvarNotificacoes}>Salvar preferências de notificação</Button></div>
@@ -346,10 +260,7 @@ export default function ConfiguracoesPage({ db, setDb, onConfirmAction }) {
                     <td>{item.email}</td>
                     <td>
                       <select
-<<<<<<< HEAD
                         className="ui-input" // Adicionado classe ui-input
-=======
->>>>>>> f7f6d2991c81e0a38b5e190db55c7ad82834360d
                         value={item.perfil}
                         onChange={(e) => {
                           const novoPerfil = e.target.value;
@@ -367,10 +278,7 @@ export default function ConfiguracoesPage({ db, setDb, onConfirmAction }) {
                     </td>
                     <td>
                       <select
-<<<<<<< HEAD
                         className="ui-input" // Adicionado classe ui-input
-=======
->>>>>>> f7f6d2991c81e0a38b5e190db55c7ad82834360d
                         value={item.status}
                         onChange={(e) => {
                           const novoStatus = e.target.value;
@@ -413,11 +321,7 @@ export default function ConfiguracoesPage({ db, setDb, onConfirmAction }) {
           <div className="danger-zone">
             <h4><AlertTriangle size={14} /> Zona de perigo</h4>
             <p>Para excluir conta, digite <strong>CONFIRMAR</strong>.</p>
-<<<<<<< HEAD
             <input className="ui-input" value={confirmText} onChange={(e) => setConfirmText(e.target.value)} placeholder="Digite CONFIRMAR" />
-=======
-            <input value={confirmText} onChange={(e) => setConfirmText(e.target.value)} placeholder="Digite CONFIRMAR" />
->>>>>>> f7f6d2991c81e0a38b5e190db55c7ad82834360d
             <Button variant="danger" onClick={excluirConta}>Excluir conta</Button>
           </div>
         </Card>
@@ -429,15 +333,9 @@ export default function ConfiguracoesPage({ db, setDb, onConfirmAction }) {
           onInvite={(payload) => {
             setDb((prev) => ({
               ...prev,
-<<<<<<< HEAD
               usuarios: [...(prev.usuarios || []), { ...payload, id: gerarNovoId(prev.usuarios || []) }],
             }));
             showToast({ type: 'success', message: 'Usuário convidado com sucesso.' });
-=======
-              usuarios: [...(prev.usuarios || []), { ...payload, id: nextId(prev.usuarios || []) }],
-            }));
-            window.alert('Usuário convidado com sucesso.');
->>>>>>> f7f6d2991c81e0a38b5e190db55c7ad82834360d
             setOpenInvite(false);
           }}
         />
@@ -446,7 +344,6 @@ export default function ConfiguracoesPage({ db, setDb, onConfirmAction }) {
   );
 }
 
-<<<<<<< HEAD
 /**
  * Formulário para convidar um novo usuário.
  * @param {object} props - As propriedades do componente.
@@ -455,9 +352,6 @@ export default function ConfiguracoesPage({ db, setDb, onConfirmAction }) {
  */
 function InviteForm({ onInvite, onClose }) {
   const { showToast } = useToast(); // Hook para exibir toasts
-=======
-function InviteForm({ onInvite, onClose }) {
->>>>>>> f7f6d2991c81e0a38b5e190db55c7ad82834360d
   const [form, setForm] = useState({ nome: '', email: '', perfil: 'visualizador', status: 'ativo' });
 
   return (
@@ -466,17 +360,12 @@ function InviteForm({ onInvite, onClose }) {
       onSubmit={(e) => {
         e.preventDefault();
         if (!form.nome.trim() || !form.email.trim()) {
-<<<<<<< HEAD
           showToast({ type: 'error', message: 'Informe nome e e-mail do usuário.' });
-=======
-          window.alert('Informe nome e e-mail do usuário.');
->>>>>>> f7f6d2991c81e0a38b5e190db55c7ad82834360d
           return;
         }
         onInvite({ ...form, nome: form.nome.trim(), email: form.email.trim() });
       }}
     >
-<<<<<<< HEAD
       <label className="ui-input-wrap">
         <span className="ui-input-label">Nome</span>
         <input className="ui-input" value={form.nome} onChange={(e) => setForm((prev) => ({ ...prev, nome: e.target.value }))} />
@@ -488,16 +377,6 @@ function InviteForm({ onInvite, onClose }) {
       <label className="ui-input-wrap">
         <span className="ui-input-label">Perfil</span>
         <select className="ui-input" value={form.perfil} onChange={(e) => setForm((prev) => ({ ...prev, perfil: e.target.value }))}>
-=======
-      <label>Nome
-        <input value={form.nome} onChange={(e) => setForm((prev) => ({ ...prev, nome: e.target.value }))} />
-      </label>
-      <label>E-mail
-        <input type="email" value={form.email} onChange={(e) => setForm((prev) => ({ ...prev, email: e.target.value }))} />
-      </label>
-      <label>Perfil
-        <select value={form.perfil} onChange={(e) => setForm((prev) => ({ ...prev, perfil: e.target.value }))}>
->>>>>>> f7f6d2991c81e0a38b5e190db55c7ad82834360d
           <option value="proprietario">Proprietário</option>
           <option value="gerente">Gerente</option>
           <option value="operador">Operador</option>
@@ -512,7 +391,6 @@ function InviteForm({ onInvite, onClose }) {
   );
 }
 
-<<<<<<< HEAD
 /**
  * Componente de linha com um switch (checkbox).
  * @param {object} props - As propriedades do componente.
@@ -520,8 +398,6 @@ function InviteForm({ onInvite, onClose }) {
  * @param {boolean} props.checked - O estado do switch.
  * @param {function} props.onChange - Callback para quando o switch muda de estado.
  */
-=======
->>>>>>> f7f6d2991c81e0a38b5e190db55c7ad82834360d
 function SwitchRow({ label, checked, onChange }) {
   return (
     <label className="switch-row">
@@ -529,12 +405,4 @@ function SwitchRow({ label, checked, onChange }) {
       <input type="checkbox" checked={checked} onChange={(e) => onChange(e.target.checked)} />
     </label>
   );
-<<<<<<< HEAD
 }
-=======
-}
-
-function nextId(items) {
-  return items.reduce((max, item) => Math.max(max, Number(item.id || 0)), 0) + 1;
-}
->>>>>>> f7f6d2991c81e0a38b5e190db55c7ad82834360d

@@ -1,16 +1,12 @@
-<<<<<<< HEAD
 /**
  * Converte um valor para número, usando 0 como fallback para valores nulos ou indefinidos.
  * @param {*} value - O valor a ser convertido.
  * @returns {number} O valor numérico.
  */
-=======
->>>>>>> f7f6d2991c81e0a38b5e190db55c7ad82834360d
 function toNumber(value) {
   return Number(value || 0);
 }
 
-<<<<<<< HEAD
 /**
  * Verifica se um item pertence a um lote específico.
  * @param {object} item - O item a ser verificado (deve ter uma propriedade lote_id).
@@ -27,12 +23,6 @@ function pertenceAoLote(item, loteId) {
  * @param {number|string} loteId - O ID do lote.
  * @returns {{custoAnimais: number, custoEstoque: number, custoOutros: number, custoTotal: number}} Os custos do lote.
  */
-=======
-function pertenceAoLote(item, loteId) {
-  return Number(item?.lote_id) === Number(loteId);
-}
-
->>>>>>> f7f6d2991c81e0a38b5e190db55c7ad82834360d
 export function calcularCustoLote(db, loteId) {
   const movimentosFinanceiros = Array.isArray(db?.movimentacoes_financeiras)
     ? db.movimentacoes_financeiras
@@ -42,7 +32,6 @@ export function calcularCustoLote(db, loteId) {
     (mov) => mov.tipo === 'despesa' && pertenceAoLote(mov, loteId)
   );
 
-<<<<<<< HEAD
   // Otimização: calcular todas as categorias de custo em uma única passagem
   const { custoAnimais, custoEstoque, custoOutros } = despesasLote.reduce(
     (acc, mov) => {
@@ -58,19 +47,6 @@ export function calcularCustoLote(db, loteId) {
     },
     { custoAnimais: 0, custoEstoque: 0, custoOutros: 0 }
   );
-=======
-  const custoAnimais = despesasLote
-    .filter((mov) => mov.categoria === 'compra_animal')
-    .reduce((acc, mov) => acc + toNumber(mov.valor), 0);
-
-  const custoEstoque = despesasLote
-    .filter((mov) => mov.categoria === 'compra_estoque')
-    .reduce((acc, mov) => acc + toNumber(mov.valor), 0);
-
-  const custoOutros = despesasLote
-    .filter((mov) => !['compra_animal', 'compra_estoque'].includes(mov.categoria))
-    .reduce((acc, mov) => acc + toNumber(mov.valor), 0);
->>>>>>> f7f6d2991c81e0a38b5e190db55c7ad82834360d
 
   return {
     custoAnimais,
@@ -80,15 +56,12 @@ export function calcularCustoLote(db, loteId) {
   };
 }
 
-<<<<<<< HEAD
 /**
  * Calcula as receitas totais e categorizadas para um lote específico.
  * @param {object} db - O objeto do banco de dados.
  * @param {number|string} loteId - O ID do lote.
  * @returns {{receitaVendas: number, receitaOutros: number, receitaTotal: number}} As receitas do lote.
  */
-=======
->>>>>>> f7f6d2991c81e0a38b5e190db55c7ad82834360d
 export function calcularReceitaLote(db, loteId) {
   const movimentosFinanceiros = Array.isArray(db?.movimentacoes_financeiras)
     ? db.movimentacoes_financeiras
@@ -98,7 +71,6 @@ export function calcularReceitaLote(db, loteId) {
     (mov) => mov.tipo === 'receita' && pertenceAoLote(mov, loteId)
   );
 
-<<<<<<< HEAD
   // Otimização: calcular todas as categorias de receita em uma única passagem
   const { receitaVendas, receitaOutros } = receitasLote.reduce(
     (acc, mov) => {
@@ -112,15 +84,6 @@ export function calcularReceitaLote(db, loteId) {
     },
     { receitaVendas: 0, receitaOutros: 0 }
   );
-=======
-  const receitaVendas = receitasLote
-    .filter((mov) => mov.categoria === 'venda_animal')
-    .reduce((acc, mov) => acc + toNumber(mov.valor), 0);
-
-  const receitaOutros = receitasLote
-    .filter((mov) => mov.categoria !== 'venda_animal')
-    .reduce((acc, mov) => acc + toNumber(mov.valor), 0);
->>>>>>> f7f6d2991c81e0a38b5e190db55c7ad82834360d
 
   return {
     receitaVendas,
@@ -129,15 +92,12 @@ export function calcularReceitaLote(db, loteId) {
   };
 }
 
-<<<<<<< HEAD
 /**
  * Calcula o resultado financeiro completo e indicadores zootécnicos para um lote.
  * @param {object} db - O objeto do banco de dados.
  * @param {number|string} loteId - O ID do lote.
  * @returns {{custoTotal: number, receitaTotal: number, lucroTotal: number, qtdCabecas: number, lucroPorCabeca: number, pesoMedioAtual: number, arrobaViva: number, lucroPorArroba: number}} Os resultados do lote.
  */
-=======
->>>>>>> f7f6d2991c81e0a38b5e190db55c7ad82834360d
 export function calcularResultadoLote(db, loteId) {
   const custo = calcularCustoLote(db, loteId);
   const receita = calcularReceitaLote(db, loteId);
@@ -146,10 +106,6 @@ export function calcularResultadoLote(db, loteId) {
   const animais = Array.isArray(db?.animais) ? db.animais : [];
   const animaisLote = animais.filter((item) => pertenceAoLote(item, loteId));
   const qtdCabecas = animaisLote.reduce((acc, item) => acc + toNumber(item.qtd), 0);
-<<<<<<< HEAD
-
-=======
->>>>>>> f7f6d2991c81e0a38b5e190db55c7ad82834360d
   const pesoMedioAtual = qtdCabecas
     ? animaisLote.reduce((acc, item) => acc + toNumber(item.p_at) * toNumber(item.qtd), 0) /
       qtdCabecas
@@ -165,17 +121,9 @@ export function calcularResultadoLote(db, loteId) {
     receitaTotal: receita.receitaTotal,
     lucroTotal,
     qtdCabecas,
-<<<<<<< HEAD
     lucroPorCabeca, // Corrigido o nome da propriedade
-=======
-    lucroporCabeca: lucroPorCabeca,
->>>>>>> f7f6d2991c81e0a38b5e190db55c7ad82834360d
     pesoMedioAtual,
     arrobaViva,
     lucroPorArroba,
   };
-<<<<<<< HEAD
 }
-=======
-}
->>>>>>> f7f6d2991c81e0a38b5e190db55c7ad82834360d

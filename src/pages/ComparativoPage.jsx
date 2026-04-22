@@ -1,13 +1,8 @@
 import { useMemo, useState } from 'react';
 import { TrendingUp } from 'lucide-react';
 import Card from '../components/ui/Card';
-<<<<<<< HEAD
 import { calcLote, formatNumber } from '../utils/calculations'; // Assumindo calcLote e formatNumber são robustos
 import { formatarMoeda } from '../utils/formatters'; // Assumindo formatarMoeda é robusto
-=======
-import { calcLote, formatNumber } from '../utils/calculations';
-import { formatarMoeda } from '../utils/formatters';
->>>>>>> f7f6d2991c81e0a38b5e190db55c7ad82834360d
 import CurvasCrescimento from '../components/comparativo/CurvasCrescimento';
 import GraficoFinanceiro from '../components/comparativo/GraficoFinanceiro';
 import GraficoGmd from '../components/comparativo/GraficoGmd';
@@ -18,7 +13,6 @@ import '../styles/comparativo.css';
 
 const coresLotes = ['#22C55E', '#3B82F6', '#F59E0B', '#EF4444', '#8B5CF6', '#EC4899'];
 
-<<<<<<< HEAD
 /**
  * Componente da página de Análise Comparativa de Lotes.
  * Permite comparar o desempenho, crescimento e resultado financeiro entre lotes ativos,
@@ -28,8 +22,6 @@ const coresLotes = ['#22C55E', '#3B82F6', '#F59E0B', '#EF4444', '#8B5CF6', '#EC4
  * @param {object} props.db - O objeto do banco de dados.
  * @param {function} [props.onNavigate] - Função de callback para navegação.
  */
-=======
->>>>>>> f7f6d2991c81e0a38b5e190db55c7ad82834360d
 export default function ComparativoPage({ db, onNavigate }) {
   const lotesAtivos = useMemo(() => (db.lotes || []).filter((l) => l.status === 'ativo'), [db.lotes]);
   const [lotesSelecionadosIds, setLotesSelecionadosIds] = useState(lotesAtivos.map((l) => l.id));
@@ -47,7 +39,6 @@ export default function ComparativoPage({ db, onNavigate }) {
     return base;
   }, [db.pesagens, lotesSelecionadosIds, periodo]);
 
-<<<<<<< HEAD
   // Otimização: Pré-indexar pesagens por lote e data para busca eficiente
   const pesagensByLoteAndDate = useMemo(() => {
     const map = new Map();
@@ -58,29 +49,20 @@ export default function ComparativoPage({ db, onNavigate }) {
     return map;
   }, [pesagensFiltradas]);
 
-=======
->>>>>>> f7f6d2991c81e0a38b5e190db55c7ad82834360d
   const dadosGrafico = useMemo(() => {
     const todasDatas = [...new Set(pesagensFiltradas.map((p) => p.data))].sort();
 
     return todasDatas.map((data) => {
       const ponto = { data };
       lotesSelecionados.forEach((lote) => {
-<<<<<<< HEAD
         // Busca otimizada
         const pesagem = pesagensByLoteAndDate.get(`${lote.id}-${data}`);
-=======
-        const pesagem = pesagensFiltradas.find(
-          (p) => p.lote_id === lote.id && p.data === data
-        );
->>>>>>> f7f6d2991c81e0a38b5e190db55c7ad82834360d
         if (pesagem) {
           ponto[`lote_${lote.id}`] = Number(pesagem.peso_medio || 0);
         }
       });
       return ponto;
     });
-<<<<<<< HEAD
   }, [pesagensFiltradas, lotesSelecionados, pesagensByLoteAndDate]);
 
   // Otimização: Calcular as métricas para TODOS os lotes ativos uma única vez
@@ -88,19 +70,6 @@ export default function ComparativoPage({ db, onNavigate }) {
     return lotesAtivos.map(lote => {
       const calc = calcLote(db, lote.id); // Chamada potencialmente cara, feita uma vez por lote ativo
       const metaPeso = Number(lote.meta_peso || lote.peso_meta || 480); // Assumindo meta_peso ou peso_meta no lote
-=======
-  }, [pesagensFiltradas, lotesSelecionados]);
-
-  const metricas = useMemo(() => {
-    return lotesSelecionados.map((lote) => {
-      const calc = calcLote(db, lote.id);
-      const metaPeso = Number(lote.meta_peso || lote.peso_meta || 480);
-      const pctMeta = metaPeso ? (calc.pesoAtualMedio / metaPeso) * 100 : 0;
-      const diasSaida = calc.gmdMedio > 0 && metaPeso > calc.pesoAtualMedio
-        ? Math.ceil((metaPeso - calc.pesoAtualMedio) / calc.gmdMedio)
-        : 0;
-
->>>>>>> f7f6d2991c81e0a38b5e190db55c7ad82834360d
       return {
         id: lote.id,
         nome: lote.nome,
@@ -111,18 +80,12 @@ export default function ComparativoPage({ db, onNavigate }) {
         gmd: calc.gmdMedio,
         dias: calc.dias,
         metaPeso,
-<<<<<<< HEAD
-=======
-        pctMeta,
-        diasSaida,
->>>>>>> f7f6d2991c81e0a38b5e190db55c7ad82834360d
         arrobasCabeca: calc.pesoAtualMedio / 15,
         custoTotal: calc.custoTotalLote,
         custoCabeca: calc.totalAnimais ? calc.custoTotalLote / calc.totalAnimais : 0,
         margemPct: calc.margemPct,
         receita: calc.receitaTotal,
         lucro: calc.margem,
-<<<<<<< HEAD
         // Adicionar aqui quaisquer outras métricas base que não dependam de lotesSelecionados
       };
     });
@@ -141,16 +104,10 @@ export default function ComparativoPage({ db, onNavigate }) {
         return { ...m, pctMeta, diasSaida };
       });
   }, [allActiveLoteMetrics, lotesSelecionadosIds]); // Recalcula quando as métricas de todos os lotes ou os IDs selecionados mudam
-=======
-      };
-    });
-  }, [db, lotesSelecionados]);
->>>>>>> f7f6d2991c81e0a38b5e190db55c7ad82834360d
 
   const dadosGmd = metricas.map((m) => ({ id: m.id, nome: m.nome, gmd: Number(m.gmd || 0) }));
   const dadosFinanceiros = metricas.map((m) => ({ id: m.id, nome: m.nome, custo: m.custoTotal, receita: m.receita, lucro: m.lucro }));
 
-<<<<<<< HEAD
   const indicadoresTabela = useMemo(() => {
     return [
       { key: 'cabecas', label: 'Cabeças', highlight: 'max', format: (v) => `${v}` },
@@ -171,26 +128,6 @@ export default function ComparativoPage({ db, onNavigate }) {
       valores: Object.fromEntries(metricas.map((m) => [m.id, { raw: m[item.key], display: item.format(m[item.key]) }])),
     }));
   }, [metricas]); // Depende apenas de 'metricas'
-=======
-  const indicadoresTabela = [
-    { key: 'cabecas', label: 'Cabeças', highlight: 'max', format: (v) => `${v}` },
-    { key: 'pesoEntrada', label: 'Peso de entrada', highlight: 'max', format: (v) => `${formatNumber(v, 1)} kg` },
-    { key: 'pesoAtual', label: 'Peso atual', highlight: 'max', format: (v) => `${formatNumber(v, 1)} kg` },
-    { key: 'ganhoTotal', label: 'Ganho total', highlight: 'max', format: (v) => `+${formatNumber(v, 1)} kg` },
-    { key: 'gmd', label: 'GMD', highlight: 'max', format: (v) => `${formatNumber(v, 3)} kg/dia` },
-    { key: 'dias', label: 'Dias em campo', highlight: 'min', format: (v) => `${formatNumber(v, 0)} dias` },
-    { key: 'metaPeso', label: 'Meta de peso', format: (v) => `${formatNumber(v, 0)} kg` },
-    { key: 'pctMeta', label: '% da meta', highlight: 'max', format: (v) => `${formatNumber(v, 1)}%` },
-    { key: 'diasSaida', label: 'Dias p/ saída', highlight: 'min', format: (v) => `~${formatNumber(v, 0)} dias` },
-    { key: 'arrobasCabeca', label: 'Arrobas/cabeça', highlight: 'max', format: (v) => `${formatNumber(v, 2)} @` },
-    { key: 'custoTotal', label: 'Custo total', highlight: 'min', format: (v) => formatarMoeda(v) },
-    { key: 'custoCabeca', label: 'Custo/cabeça', highlight: 'min', format: (v) => formatarMoeda(v) },
-    { key: 'margemPct', label: 'Margem estimada', highlight: 'max', format: (v) => `${formatNumber(v, 1)}%` },
-  ].map((item) => ({
-    ...item,
-    valores: Object.fromEntries(metricas.map((m) => [m.id, { raw: m[item.key], display: item.format(m[item.key]) }])),
-  }));
->>>>>>> f7f6d2991c81e0a38b5e190db55c7ad82834360d
 
   const ranking = useMemo(() => {
     const by = (key, type = 'max') => {
@@ -216,14 +153,11 @@ export default function ComparativoPage({ db, onNavigate }) {
   function toggleLote(id) {
     setLotesSelecionadosIds((prev) => {
       if (prev.includes(id)) return prev.filter((item) => item !== id);
-<<<<<<< HEAD
       // Limita a seleção a um número razoável de lotes para evitar sobrecarga visual/performance
       if (prev.length >= coresLotes.length) { // Exemplo: Limitar ao número de cores disponíveis
         alert(`Você pode comparar no máximo ${coresLotes.length} lotes.`);
         return prev;
       }
-=======
->>>>>>> f7f6d2991c81e0a38b5e190db55c7ad82834360d
       return [...prev, id];
     });
   }
@@ -287,8 +221,4 @@ export default function ComparativoPage({ db, onNavigate }) {
       )}
     </div>
   );
-<<<<<<< HEAD
 }
-=======
-}
->>>>>>> f7f6d2991c81e0a38b5e190db55c7ad82834360d

@@ -17,7 +17,6 @@ export default function MobileFab({ page, onAction }) {
 
   return (
     <>
-<<<<<<< HEAD
       <button
         type="button"
         className="mobile-fab sem-impressao"
@@ -27,10 +26,6 @@ export default function MobileFab({ page, onAction }) {
         aria-expanded={open} // Indica se o diálogo está aberto
       >
         <Plus size={20} aria-hidden="true" /> {/* Ícone decorativo */}
-=======
-      <button type="button" className="mobile-fab sem-impressao" onClick={() => setOpen(true)} aria-label="Ações rápidas">
-        <Plus size={20} />
->>>>>>> f7f6d2991c81e0a38b5e190db55c7ad82834360d
       </button>
 
       <Modal
@@ -38,11 +33,8 @@ export default function MobileFab({ page, onAction }) {
         onClose={() => setOpen(false)}
         title="Ações rápidas"
         subtitle="Atalhos da página"
-<<<<<<< HEAD
         // Adicionar role="menu" ou role="listbox" se os botões funcionarem como itens de menu/seleção
         // Por enquanto, div com botões é ok, mas dependendo da interação, pode ser melhor.
-=======
->>>>>>> f7f6d2991c81e0a38b5e190db55c7ad82834360d
       >
         <div style={{ display: 'grid', gap: 10 }}>
           {acoes.map((acao) => (
@@ -61,8 +53,4 @@ export default function MobileFab({ page, onAction }) {
       </Modal>
     </>
   );
-<<<<<<< HEAD
 }
-=======
-}
->>>>>>> f7f6d2991c81e0a38b5e190db55c7ad82834360d
