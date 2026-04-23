@@ -55,6 +55,8 @@ export default function AppHeader({
   const [userMenuRef, openUserMenu, setOpenUserMenu] = useDropdown(false);
   const [notifRef, openNotif, setOpenNotif] = useDropdown(false);
   const [farmsRef, openFarms, setOpenFarms] = useDropdown(false);
+  const notifButtonRef = useRef(null);
+  const [notifPosition, setNotifPosition] = useState({ top: 0, left: 0, width: 430 });
 
   async function handleLogout() {
     const confirmado = await onConfirmAction?.({
@@ -81,6 +83,37 @@ export default function AppHeader({
   }
 
   const nomeExibicao = usuarioLogado?.nome || 'Usuario';
+
+  useEffect(() => {
+    if (!openNotif) return undefined;
+
+    const updateNotifPosition = () => {
+      if (!notifButtonRef.current) return;
+
+      const rect = notifButtonRef.current.getBoundingClientRect();
+      const dropdownWidth = Math.min(430, Math.max(320, window.innerWidth - 28));
+      const nextLeft = Math.min(
+        Math.max(14, rect.right - dropdownWidth),
+        Math.max(14, window.innerWidth - dropdownWidth - 14)
+      );
+
+      setNotifPosition({
+        top: rect.bottom + 10,
+        left: nextLeft,
+        width: dropdownWidth,
+      });
+    };
+
+    updateNotifPosition();
+
+    window.addEventListener('resize', updateNotifPosition);
+    window.addEventListener('scroll', updateNotifPosition, true);
+
+    return () => {
+      window.removeEventListener('resize', updateNotifPosition);
+      window.removeEventListener('scroll', updateNotifPosition, true);
+    };
+  }, [openNotif]);
 
   return (
     <header className="header top-header">
@@ -163,6 +196,7 @@ export default function AppHeader({
           <button
             type="button"
             className="header-notification-btn notif-btn"
+            ref={notifButtonRef}
             aria-label={`Notificacoes: ${notifications} ${notifications === 1 ? 'alerta' : 'alertas'} pendentes`}
             onClick={() => setOpenNotif((value) => !value)}
             aria-expanded={openNotif}
@@ -173,7 +207,20 @@ export default function AppHeader({
           </button>
 
           {openNotif && (
-            <div id="notification-dropdown-menu" className="notif-dropdown">
+            <div
+              id="notification-dropdown-menu"
+              className="notif-dropdown"
+              style={
+                window.innerWidth > 900
+                  ? {
+                      position: 'fixed',
+                      top: `${notifPosition.top}px`,
+                      left: `${notifPosition.left}px`,
+                      width: `${notifPosition.width}px`,
+                    }
+                  : undefined
+              }
+            >
               <div className="notif-panel-header">
                 <div>
                   <span className="notif-panel-kicker">Central de alertas</span>

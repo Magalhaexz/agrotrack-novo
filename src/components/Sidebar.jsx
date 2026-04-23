@@ -115,10 +115,7 @@ export default function Sidebar({
               <img src={herdonLogo} alt="HERDON" className="shell-logo-image" />
             </div>
             <div className="sidebar-logo-copy">
-              <span className="sidebar-brand-badge">Premium Ops</span>
               <div className="sidebar-logo-text">HERDON</div>
-              <div className="sidebar-logo-sub">Gestao Inteligente</div>
-              <div className="sidebar-logo-caption">Shell operacional premium para rebanho, manejo e resultado.</div>
             </div>
           </div>
 
@@ -144,7 +141,6 @@ export default function Sidebar({
                   aria-controls={`nav-section-${section.id}`}
                 >
                   <span>{section.title}</span>
-                  <small>{section.items.length} modulos</small>
                   <ChevronDown size={14} className={`nav-group-arrow ${section.isOpen ? 'open' : ''}`} aria-hidden="true" />
                 </button>
               ) : null}
@@ -174,7 +170,6 @@ export default function Sidebar({
                         <ItemIcon size={16} className="nav-icon" aria-hidden="true" />
                         <div className="sidebar-item-copy">
                           <span className="sidebar-item-label">{item.label}</span>
-                          <small className="sidebar-item-subtitle">{section.title || 'Painel principal'}</small>
                         </div>
                         {item.id === 'dashboard' && alertCount > 0 ? <span className="sidebar-badge nav-badge">{alertCount}</span> : null}
                         <span className="sidebar-item-glow" aria-hidden="true" />

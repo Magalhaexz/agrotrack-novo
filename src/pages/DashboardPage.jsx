@@ -66,27 +66,29 @@ export default function DashboardPage({
     [lotesStats]
   );
 
-  const arrobaMedia = useMemo(
+  const pesoMedioAtual = useMemo(
     () =>
       totalCabecasAtivas
         ? lotesStats.reduce(
             (sum, item) => sum + item.indicators.pesoAtualMedio * item.indicators.totalAnimais,
             0
-          ) /
-            totalCabecasAtivas /
-            15
+          ) / totalCabecasAtivas
         : 0,
     [lotesStats, totalCabecasAtivas]
   );
+
+  const arrobaMedia = useMemo(() => pesoMedioAtual / 15, [pesoMedioAtual]);
 
   const receitaMes = useMemo(
     () => lotesStats.reduce((sum, item) => sum + item.indicators.receitaTotal, 0),
     [lotesStats]
   );
+
   const custoMes = useMemo(
     () => (db.custos || []).reduce((sum, item) => sum + Number(item.val || 0), 0),
     [db.custos]
   );
+
   const resultadoMes = useMemo(() => receitaMes - custoMes, [receitaMes, custoMes]);
 
   const gmdMedio = useMemo(
@@ -111,8 +113,6 @@ export default function DashboardPage({
     [db.estoque]
   );
 
-  const itensCriticos = useMemo(() => estoqueCritico.length, [estoqueCritico]);
-
   const valorTotalEstoque = useMemo(
     () =>
       (db.estoque || []).reduce(
@@ -133,117 +133,8 @@ export default function DashboardPage({
         })
         .filter((item) => Number.isFinite(item.dias))
         .sort((a, b) => a.dias - b.dias)
-        .slice(0, 8),
-    [db.sanitario, lotesMap]
-  );
-
-  const alertasPendentesCalendario = useMemo(
-    () => eventosCalendario.filter((item) => item.dias <= 3).length,
-    [eventosCalendario]
-  );
-
-  const kpisMain = useMemo(
-    () => [
-      {
-        title: 'Cabecas ativas',
-        value: formatNumber(totalCabecasAtivas, 0),
-        variation: getVariation(totalCabecasAtivas, totalCabecasAtivas * 0.92),
-        icon: Users,
-        variant: KPI_VARIANTS.info,
-      },
-      {
-        title: 'Lotes em operacao',
-        value: formatNumber(lotesAtivos.length, 0),
-        variation: getVariation(lotesAtivos.length, Math.max(1, lotesAtivos.length - 1)),
-        icon: Tractor,
-        variant: KPI_VARIANTS.neutral,
-      },
-      {
-        title: 'Arroba media do rebanho',
-        value: `${formatNumber(arrobaMedia, 2)} @`,
-        variation: getVariation(arrobaMedia, arrobaMedia * 0.95),
-        icon: Weight,
-        variant: KPI_VARIANTS.success,
-      },
-      {
-        title: 'Resultado do mes',
-        value: formatCurrency(resultadoMes),
-        variation: getVariation(resultadoMes, resultadoMes * 0.85),
-        icon: DollarSign,
-        variant: resultadoMes >= 0 ? KPI_VARIANTS.success : KPI_VARIANTS.danger,
-      },
-    ],
-    [totalCabecasAtivas, lotesAtivos.length, arrobaMedia, resultadoMes]
-  );
-
-  const kpisSecondary = useMemo(
-    () => [
-      {
-        title: 'GMD medio',
-        value: `${formatNumber(gmdMedio, 3)} kg/dia`,
-        variation: getVariation(gmdMedio, gmdMedio * 0.96),
-        icon: Scale,
-        variant: KPI_VARIANTS.info,
-      },
-      {
-        title: 'Estoque critico',
-        value: formatNumber(estoqueCritico.length, 0),
-        variation: getVariation(estoqueCritico.length, Math.max(0, estoqueCritico.length - 1)),
-        icon: Package,
-        variant: estoqueCritico.length ? KPI_VARIANTS.warning : KPI_VARIANTS.success,
-      },
-      {
-        title: 'Alertas de calendario',
-        value: formatNumber(alertasPendentesCalendario, 0),
-        variation: getVariation(
-          alertasPendentesCalendario,
-          Math.max(0, alertasPendentesCalendario - 1)
-        ),
-        icon: BellRing,
-        variant: alertasPendentesCalendario ? KPI_VARIANTS.warning : KPI_VARIANTS.success,
-      },
-    ],
-    [gmdMedio, estoqueCritico.length, alertasPendentesCalendario]
-  );
-
-  const chartRows = useMemo(() => {
-    const pesagens = db.pesagens || [];
-    const activeIds = new Set(lotesAtivos.map((lote) => lote.id));
-    const timelineMap = new Map();
-
-    pesagens
-      .filter((item) => activeIds.has(item.lote_id))
-      .sort((a, b) => new Date(a.data) - new Date(b.data))
-      .forEach((item) => {
-        if (!timelineMap.has(item.data)) {
-          timelineMap.set(item.data, { data: item.data, label: formatDate(item.data) });
-        }
-
-        const loteNome = lotesMap.get(item.lote_id)?.nome;
-        if (loteNome) {
-          timelineMap.get(item.data)[loteNome] = Number(item.peso_medio || 0);
-        }
-      });
-
-    return Array.from(timelineMap.values());
-  }, [db.pesagens, lotesAtivos, lotesMap]);
-
-  const lotesColorMap = useMemo(
-    () =>
-      lotesAtivos.reduce((acc, lote, index) => {
-        acc[lote.nome] = ['#22c55e', '#3b82f6', '#eab308', '#ef4444', '#a855f7'][index % 5];
-        return acc;
-      }, {}),
-    [lotesAtivos]
-  );
-
-  const movimentacoesRecentes = useMemo(
-    () =>
-      (db.movimentacoes_animais || [])
-        .slice()
-        .sort((a, b) => new Date(b.data || b.created_at) - new Date(a.data || a.created_at))
         .slice(0, 6),
-    [db.movimentacoes_animais]
+    [db.sanitario, lotesMap]
   );
 
   const tarefasUrgentes = useMemo(
@@ -301,76 +192,191 @@ export default function DashboardPage({
     [alertasFormatados]
   );
 
-  const proximoEvento = eventosCalendario[0] || null;
-  const loteCampeao = lotesStats
-    .slice()
-    .sort((a, b) => b.indicators.margem - a.indicators.margem)[0];
+  const alertasOperacionais = useMemo(
+    () =>
+      alertasFormatados
+        .slice()
+        .sort((a, b) => urgencyRank(a) - urgencyRank(b))
+        .slice(0, 5),
+    [alertasFormatados]
+  );
+
+  const lotesEmAtencao = useMemo(
+    () =>
+      lotesStats
+        .map((item) => {
+          const metaGmd = Number(item.lote.gmd_meta || 0);
+          const deltaPesoPct = item.indicators.pesoInicialMedio
+            ? ((item.indicators.pesoAtualMedio - item.indicators.pesoInicialMedio) /
+                item.indicators.pesoInicialMedio) *
+              100
+            : 0;
+
+          const motivos = [];
+          if (metaGmd > 0 && item.indicators.gmdMedio < metaGmd * 0.9) motivos.push('GMD abaixo da meta');
+          if (item.indicators.margem < 0) motivos.push('Margem negativa');
+          if (item.indicators.diasEstoque < 7) motivos.push('Suplemento curto');
+          if (deltaPesoPct < 0) motivos.push('Perda de peso');
+
+          return {
+            ...item,
+            deltaPesoPct,
+            motivos,
+          };
+        })
+        .filter((item) => item.motivos.length > 0)
+        .sort((a, b) => {
+          if (b.motivos.length !== a.motivos.length) return b.motivos.length - a.motivos.length;
+          return a.deltaPesoPct - b.deltaPesoPct;
+        })
+        .slice(0, 5),
+    [lotesStats]
+  );
+
+  const animaisEmRisco = useMemo(
+    () => lotesEmAtencao.reduce((sum, item) => sum + item.indicators.totalAnimais, 0),
+    [lotesEmAtencao]
+  );
+
+  const chartRows = useMemo(() => {
+    const pesagens = db.pesagens || [];
+    const activeIds = new Set(lotesAtivos.map((lote) => lote.id));
+    const timelineMap = new Map();
+
+    pesagens
+      .filter((item) => activeIds.has(item.lote_id))
+      .sort((a, b) => new Date(a.data) - new Date(b.data))
+      .forEach((item) => {
+        if (!timelineMap.has(item.data)) {
+          timelineMap.set(item.data, { data: item.data, label: formatDate(item.data) });
+        }
+
+        const loteNome = lotesMap.get(item.lote_id)?.nome;
+        if (loteNome) {
+          timelineMap.get(item.data)[loteNome] = Number(item.peso_medio || 0);
+        }
+      });
+
+    return Array.from(timelineMap.values());
+  }, [db.pesagens, lotesAtivos, lotesMap]);
+
+  const lotesColorMap = useMemo(
+    () =>
+      lotesAtivos.reduce((acc, lote, index) => {
+        acc[lote.nome] = ['#22c55e', '#3b82f6', '#eab308', '#ef4444', '#a855f7'][index % 5];
+        return acc;
+      }, {}),
+    [lotesAtivos]
+  );
+
+  const melhorLote = useMemo(
+    () => lotesStats.slice().sort((a, b) => b.indicators.margem - a.indicators.margem)[0],
+    [lotesStats]
+  );
+
+  const piorLote = useMemo(
+    () => lotesStats.slice().sort((a, b) => a.indicators.margem - b.indicators.margem)[0],
+    [lotesStats]
+  );
+
+  const kpisMain = [
+    {
+      title: 'Cabecas ativas',
+      value: formatNumber(totalCabecasAtivas, 0),
+      variation: getVariation(totalCabecasAtivas, totalCabecasAtivas * 0.92),
+      icon: Users,
+      variant: KPI_VARIANTS.info,
+    },
+    {
+      title: 'Lotes ativos',
+      value: formatNumber(lotesAtivos.length, 0),
+      variation: getVariation(lotesAtivos.length, Math.max(1, lotesAtivos.length - 1)),
+      icon: Tractor,
+      variant: KPI_VARIANTS.neutral,
+    },
+    {
+      title: 'GMD medio',
+      value: `${formatNumber(gmdMedio, 3)} kg/dia`,
+      variation: getVariation(gmdMedio, gmdMedio * 0.96),
+      icon: Scale,
+      variant: KPI_VARIANTS.success,
+    },
+    {
+      title: 'Peso medio atual',
+      value: `${formatNumber(pesoMedioAtual, 1)} kg`,
+      variation: getVariation(pesoMedioAtual, pesoMedioAtual * 0.95),
+      icon: Weight,
+      variant: KPI_VARIANTS.info,
+    },
+    {
+      title: 'Custo operacional',
+      value: formatCurrency(custoMes),
+      variation: getVariation(custoMes, custoMes * 0.91),
+      icon: DollarSign,
+      variant: KPI_VARIANTS.warning,
+    },
+    {
+      title: 'Resultado do mes',
+      value: formatCurrency(resultadoMes),
+      variation: getVariation(resultadoMes, resultadoMes * 0.85),
+      icon: BellRing,
+      variant: resultadoMes >= 0 ? KPI_VARIANTS.success : KPI_VARIANTS.danger,
+    },
+  ];
+
+  const kpisSecondary = [
+    {
+      title: 'Estoque critico',
+      value: formatNumber(estoqueCritico.length, 0),
+      variation: getVariation(estoqueCritico.length, Math.max(0, estoqueCritico.length - 1)),
+      icon: Package,
+      variant: estoqueCritico.length ? KPI_VARIANTS.warning : KPI_VARIANTS.success,
+    },
+    {
+      title: 'Pendencias operacionais',
+      value: formatNumber(tarefasResumo.pendente + tarefasResumo.em_andamento, 0),
+      variation: getVariation(
+        tarefasResumo.pendente + tarefasResumo.em_andamento,
+        Math.max(0, tarefasResumo.pendente + tarefasResumo.em_andamento - 1)
+      ),
+      icon: CheckSquare,
+      variant: tarefasResumo.pendente + tarefasResumo.em_andamento ? KPI_VARIANTS.warning : KPI_VARIANTS.success,
+    },
+    {
+      title: 'Animais em risco',
+      value: formatNumber(animaisEmRisco, 0),
+      variation: getVariation(animaisEmRisco, Math.max(1, animaisEmRisco * 0.88)),
+      icon: AlertTriangle,
+      variant: animaisEmRisco ? KPI_VARIANTS.danger : KPI_VARIANTS.success,
+    },
+  ];
 
   return (
     <div className="dashboard-page">
-      <header className="dashboard-title">
-        <div>
-          <span className="dashboard-kicker">Centro executivo HERDON</span>
-          <h1>Painel premium da operacao pecuaria</h1>
-          <p>
-            Mais leitura estrategica para rebanho, manejo, estoque e resultado financeiro em uma
-            experiencia escura, clara e orientada a decisao.
-          </p>
+      <header className="dashboard-toolbar">
+        <div className="dashboard-toolbar-copy">
+          <h1>Dashboard</h1>
+          <p>Monitoramento executivo da operacao, com foco em risco, desempenho e proximos passos.</p>
         </div>
 
-        <div className="dashboard-title-actions">
-          <Button variant="outline" onClick={() => onNavigate?.('resultados')}>
-            Abrir relatorios
+        <div className="dashboard-toolbar-actions">
+          <Button variant="outline" onClick={() => onNavigate?.('lotes')}>
+            Novo lote
           </Button>
-          <Button variant="primary" onClick={() => onNavigate?.('calendarioOperacional')}>
-            Ver calendario
+          <Button variant="outline" onClick={() => onNavigate?.('pesagens')}>
+            Nova pesagem
+          </Button>
+          <Button variant="outline" onClick={() => onNavigate?.('sanitario')}>
+            Registrar manejo
+          </Button>
+          <Button variant="primary" onClick={() => onNavigate?.('suplementacao')}>
+            Registrar consumo
           </Button>
         </div>
       </header>
 
       {tabAtiva === 'geral' && (
         <>
-          <section className="dashboard-hero">
-            <div className="dashboard-hero-main">
-              <span className="dashboard-hero-eyebrow">Operacao de alta clareza</span>
-              <h2>
-                Mais controle da rotina, mais leitura executiva dos indicadores e mais velocidade
-                para agir.
-              </h2>
-              <p>
-                O dashboard foi reorganizado para destacar risco, performance e proximos passos sem
-                perder o contexto das paginas operacionais ja existentes.
-              </p>
-
-              <div className="dashboard-hero-pills">
-                <span>{formatNumber(totalCabecasAtivas, 0)} cabecas monitoradas</span>
-                <span>{formatNumber(lotesAtivos.length, 0)} lotes em operacao</span>
-                <span>{formatNumber(alerts.length, 0)} alertas ativos</span>
-              </div>
-            </div>
-
-            <div className="dashboard-hero-side">
-              <div className="hero-stat-card hero-stat-card--highlight">
-                <small>Resultado do ciclo atual</small>
-                <strong>{formatCurrency(resultadoMes)}</strong>
-                <span>{receitaMes >= custoMes ? 'Receita acima do custo mensal' : 'Custo acima da receita mensal'}</span>
-              </div>
-
-              <div className="hero-stat-grid">
-                <div className="hero-stat-card">
-                  <small>Estoque protegido</small>
-                  <strong>{formatarMoeda(valorTotalEstoque)}</strong>
-                  <span>base financeira dos insumos</span>
-                </div>
-                <div className="hero-stat-card">
-                  <small>Alertas criticos</small>
-                  <strong>{formatNumber(totalAlertasCriticos, 0)}</strong>
-                  <span>pontos que exigem resposta</span>
-                </div>
-              </div>
-            </div>
-          </section>
-
           <section className="dashboard-grid dashboard-grid--kpi-main">
             {kpisMain.map((item) => (
               <KpiPanel key={item.title} {...item} />
@@ -383,10 +389,109 @@ export default function DashboardPage({
             ))}
           </section>
 
+          <section className="dashboard-monitor-grid">
+            <Card
+              title="Alertas criticos"
+              subtitle="Itens que precisam de acao imediata"
+              action={
+                <Button size="sm" variant="ghost" onClick={() => setTabAtiva?.('alertas')}>
+                  Ver todos
+                </Button>
+              }
+            >
+              <div className="dashboard-list">
+                {alertasOperacionais.length === 0 ? (
+                  <p className="dashboard-empty-copy">Nenhum alerta pendente.</p>
+                ) : (
+                  alertasOperacionais.map((alert) => {
+                    const variant = urgencyVariant(alert);
+                    return (
+                      <button
+                        key={alert.id}
+                        type="button"
+                        className="dashboard-list-item dashboard-list-item--button"
+                        onClick={() => onNavigate?.(alert.acao?.rota || 'dashboard')}
+                      >
+                        <div className="dashboard-list-copy">
+                          <strong>{alert.titulo}</strong>
+                          <p>{alert.descricao}</p>
+                        </div>
+                        <Badge variant={variant}>{variant === 'danger' ? 'Critico' : variant === 'warning' ? 'Atencao' : 'Ativo'}</Badge>
+                      </button>
+                    );
+                  })
+                )}
+              </div>
+            </Card>
+
+            <Card
+              title="Tarefas prioritarias"
+              subtitle="Pendencias urgentes ou proximas do vencimento"
+              action={
+                <Button size="sm" variant="ghost" onClick={() => onNavigate?.('tarefas')}>
+                  Abrir tarefas
+                </Button>
+              }
+            >
+              <div className="dashboard-list">
+                {tarefasUrgentes.length === 0 ? (
+                  <p className="dashboard-empty-copy">Nenhuma tarefa urgente.</p>
+                ) : (
+                  tarefasUrgentes.map((item) => (
+                    <div key={item.id} className="dashboard-list-item">
+                      <div className="dashboard-list-copy">
+                        <strong>{item.titulo}</strong>
+                        <p>
+                          {formatDate(item.data_vencimento)} · {item.prioridade}
+                        </p>
+                      </div>
+                      <Badge variant={item.dias < 0 ? 'danger' : item.dias === 0 ? 'warning' : 'info'}>
+                        {item.dias < 0 ? 'Vencida' : item.dias === 0 ? 'Hoje' : `${item.dias}d`}
+                      </Badge>
+                    </div>
+                  ))
+                )}
+              </div>
+            </Card>
+
+            <Card
+              title="Sanitario e agenda"
+              subtitle="Proximos manejos e vencimentos"
+              action={
+                <Button size="sm" variant="ghost" onClick={() => onNavigate?.('calendarioOperacional')}>
+                  Ver calendario
+                </Button>
+              }
+            >
+              <div className="dashboard-list">
+                {eventosCalendario.length === 0 ? (
+                  <p className="dashboard-empty-copy">Sem eventos proximos.</p>
+                ) : (
+                  eventosCalendario.map((item) => {
+                    const variant = item.dias < 0 ? 'danger' : item.dias <= 3 ? 'warning' : 'success';
+                    return (
+                      <div key={item.id} className="dashboard-list-item">
+                        <div className="dashboard-list-copy">
+                          <strong>{item.desc}</strong>
+                          <p>
+                            {item.loteNome} · {formatDate(item.proxima)}
+                          </p>
+                        </div>
+                        <Badge variant={variant}>
+                          {item.dias < 0 ? 'Atrasado' : item.dias <= 3 ? 'Urgente' : 'Programado'}
+                        </Badge>
+                      </div>
+                    );
+                  })
+                )}
+              </div>
+            </Card>
+          </section>
+
           <section className="dashboard-grid dashboard-grid--feature">
             <Card
               title="Evolucao de peso por lote"
-              subtitle="Peso medio por data para leitura rapida de tendencia"
+              subtitle="Comparativo simples para monitorar ganho e perda de peso"
               className="dashboard-chart-card"
             >
               <div className="chart-legend">
@@ -409,7 +514,7 @@ export default function DashboardPage({
               </div>
 
               <div className="chart-shell">
-                <ResponsiveContainer width="100%" height={340}>
+                <ResponsiveContainer width="100%" height={320}>
                   <LineChart data={chartRows}>
                     <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.08)" />
                     <XAxis dataKey="label" stroke="rgba(214,223,219,0.56)" />
@@ -432,176 +537,36 @@ export default function DashboardPage({
             </Card>
 
             <Card
-              title="Sala executiva"
-              subtitle="Leitura sintetica do que merece atencao agora"
-              className="dashboard-spotlight-card"
+              title="Lotes que exigem atencao"
+              subtitle="Ganho de peso, margem e suplemento sob monitoramento"
+              className="dashboard-focus-card"
             >
-              <div className="dashboard-spotlight-block">
-                <div className="dashboard-spotlight-head">
-                  <span>Lote com melhor margem</span>
-                  <Badge variant="success">Performance</Badge>
-                </div>
-                <strong>{loteCampeao?.lote?.nome || 'Sem dados suficientes'}</strong>
-                <p>
-                  {loteCampeao
-                    ? `${formatCurrency(loteCampeao.indicators.margem)} de margem e ${formatNumber(
-                        loteCampeao.indicators.gmdMedio,
-                        3
-                      )} kg/dia.`
-                    : 'Cadastre movimentacoes e pesagens para liberar esta leitura.'}
-                </p>
-              </div>
-
-              <div className="dashboard-spotlight-grid">
-                <div className="dashboard-spotlight-mini">
-                  <small>Tarefas em aberto</small>
-                  <strong>{formatNumber(tarefasResumo.pendente + tarefasResumo.em_andamento, 0)}</strong>
-                  <span>{formatNumber(tarefasResumo.concluida, 0)} concluidas no fluxo atual</span>
-                </div>
-                <div className="dashboard-spotlight-mini">
-                  <small>Proximo evento</small>
-                  <strong>{proximoEvento ? formatDate(proximoEvento.proxima) : '-'}</strong>
-                  <span>{proximoEvento ? proximoEvento.loteNome : 'Nenhum evento proximo'}</span>
-                </div>
-              </div>
-
-              <div className="dashboard-spotlight-actions">
-                <Button variant="outline" onClick={() => onNavigate?.('tarefas')}>
-                  Abrir tarefas
-                </Button>
-                <Button variant="ghost" onClick={() => setTabAtiva?.('alertas')}>
-                  Ver alertas
-                </Button>
-              </div>
-            </Card>
-          </section>
-
-          <section className="dashboard-grid dashboard-grid--dual">
-            <Card title="Lotes ativos" subtitle="Resumo produtivo com acesso rapido ao modulo">
-              <div className="table-responsive">
-                <table className="dashboard-table">
-                  <thead>
-                    <tr>
-                      <th>Nome</th>
-                      <th>Cabecas</th>
-                      <th>Peso medio</th>
-                      <th>@ viva</th>
-                      <th>GMD</th>
-                      <th>Dias</th>
-                      <th>Custo/cab</th>
-                      <th>Resultado</th>
-                      <th>Status</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {lotesStats.map(({ lote, indicators }) => (
-                      <tr key={lote.id} onClick={() => onNavigate?.('lotes')}>
-                        <td>{lote.nome}</td>
-                        <td>{indicators.totalAnimais}</td>
-                        <td>{formatNumber(indicators.pesoAtualMedio, 1)} kg</td>
-                        <td>{formatNumber(indicators.pesoAtualMedio / 15, 2)} @</td>
-                        <td>{formatNumber(indicators.gmdMedio, 3)}</td>
-                        <td>{indicators.dias}</td>
-                        <td>{formatCurrency(indicators.custoPorCabeca)}</td>
-                        <td className={indicators.margem >= 0 ? 'positive' : 'negative'}>
-                          {formatCurrency(indicators.margem)}
-                        </td>
-                        <td>
-                          <Badge variant={lote.status === 'ativo' ? 'success' : 'neutral'}>
-                            {lote.status}
-                          </Badge>
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            </Card>
-
-            <Card title="Janela de calendario" subtitle="Eventos ordenados por urgencia operativa">
-              <div className="alerts-list">
-                {eventosCalendario.length === 0 ? (
-                  <p>Sem eventos proximos.</p>
+              <div className="dashboard-list">
+                {lotesEmAtencao.length === 0 ? (
+                  <p className="dashboard-empty-copy">Nenhum lote critico no momento.</p>
                 ) : (
-                  eventosCalendario.map((item) => {
-                    const variant =
-                      item.dias < 0 ? 'danger' : item.dias <= 3 ? 'warning' : 'success';
-
-                    return (
-                      <div key={item.id} className="alert-item">
-                        <Badge variant={variant}>
-                          {item.dias < 0 ? 'Atrasado' : item.dias <= 3 ? 'Urgente' : 'Programado'}
-                        </Badge>
-                        <div>
-                          <strong>{item.desc}</strong>
-                          <p>
-                            {item.loteNome} · {formatDate(item.proxima)}
-                          </p>
-                        </div>
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          icon={<CalendarClock size={14} />}
-                          onClick={() => onResolveAlert?.({ id: item.id, ackKey: `sanitario-${item.id}` })}
-                        >
-                          Resolver
-                        </Button>
-                      </div>
-                    );
-                  })
-                )}
-              </div>
-            </Card>
-          </section>
-
-          <section className="dashboard-grid dashboard-grid--dual">
-            <Card title="Tarefas prioritarias" subtitle="Leitura rapida dos proximos vencimentos">
-              <div className="alerts-list">
-                {tarefasUrgentes.length === 0 ? (
-                  <p>Nenhuma tarefa urgente.</p>
-                ) : (
-                  tarefasUrgentes.map((item) => (
-                    <div key={item.id} className="alert-item">
-                      <Badge variant={item.dias < 0 ? 'danger' : item.dias === 0 ? 'warning' : 'info'}>
-                        {item.dias < 0 ? 'Vencida' : item.dias === 0 ? 'Hoje' : 'Futura'}
-                      </Badge>
-                      <div>
-                        <strong>{item.titulo}</strong>
+                  lotesEmAtencao.map((item) => (
+                    <button
+                      key={item.lote.id}
+                      type="button"
+                      className="dashboard-list-item dashboard-list-item--button"
+                      onClick={() => onNavigate?.('lotes')}
+                    >
+                      <div className="dashboard-list-copy">
+                        <strong>{item.lote.nome}</strong>
                         <p>
-                          {formatDate(item.data_vencimento)} · {item.prioridade}
+                          {formatNumber(item.deltaPesoPct, 1)}% no peso · {formatNumber(item.indicators.gmdMedio, 3)} kg/dia
                         </p>
+                        <span className="dashboard-inline-tags">
+                          {item.motivos.map((motivo) => (
+                            <span key={motivo}>{motivo}</span>
+                          ))}
+                        </span>
                       </div>
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        icon={<CheckSquare size={14} />}
-                        onClick={() => onResolveAlert?.({ id: item.id, ackKey: `tarefa-${item.id}` })}
-                      >
-                        Concluir
-                      </Button>
-                    </div>
-                  ))
-                )}
-              </div>
-            </Card>
-
-            <Card title="Movimentacoes recentes" subtitle="Ultimas movimentacoes registradas no rebanho">
-              <div className="alerts-list">
-                {movimentacoesRecentes.length === 0 ? (
-                  <p>Nenhuma movimentacao recente.</p>
-                ) : (
-                  movimentacoesRecentes.map((mov) => (
-                    <div key={mov.id} className="alert-item">
-                      <Badge variant={mov.tipo === 'saida' ? 'danger' : 'info'}>
-                        {mov.tipo || 'mov'}
+                      <Badge variant={item.indicators.margem >= 0 ? 'warning' : 'danger'}>
+                        {item.indicators.margem >= 0 ? 'Monitorar' : 'Critico'}
                       </Badge>
-                      <div>
-                        <strong>{mov.qtd || 0} cabecas</strong>
-                        <p>
-                          {formatDate(mov.data)} · {mov.observacao || 'Movimentacao registrada'}
-                        </p>
-                      </div>
-                    </div>
+                    </button>
                   ))
                 )}
               </div>
@@ -609,10 +574,18 @@ export default function DashboardPage({
           </section>
 
           <section className="dashboard-grid dashboard-grid--dual">
-            <Card title="Estoque critico" subtitle="Progresso em relacao ao minimo recomendado">
+            <Card
+              title="Estoque critico"
+              subtitle="Produtos no minimo ou abaixo do minimo recomendado"
+              action={
+                <Button size="sm" variant="ghost" onClick={() => onNavigate?.('estoque')}>
+                  Abrir estoque
+                </Button>
+              }
+            >
               <div className="stock-list">
                 {estoqueCritico.length === 0 ? (
-                  <p>Sem itens criticos no momento.</p>
+                  <p className="dashboard-empty-copy">Sem itens criticos no momento.</p>
                 ) : (
                   estoqueCritico.map((item) => (
                     <div key={item.id} className="stock-item">
@@ -629,30 +602,51 @@ export default function DashboardPage({
               </div>
             </Card>
 
-            <Card title="Alertas pendentes" subtitle="Itens ordenados por urgencia">
-              {alertasFormatados.length === 0 ? (
-                <p>Nenhum alerta pendente.</p>
-              ) : (
-                alertasFormatados
-                  .slice()
-                  .sort((a, b) => urgencyRank(a) - urgencyRank(b))
-                  .map((alert) => {
-                    const variant = urgencyVariant(alert);
-                    return (
-                      <div className="alert-item" key={alert.id}>
-                        <AlertTriangle size={16} />
-                        <div>
-                          <strong>{alert.titulo}</strong>
-                          <p>{alert.descricao}</p>
-                        </div>
-                        <Badge variant={variant}>{variant}</Badge>
-                        <Button size="sm" variant="ghost" onClick={() => onResolveAlert?.(alert)}>
-                          Resolver
-                        </Button>
-                      </div>
-                    );
-                  })
-              )}
+            <Card
+              title="Resumo financeiro"
+              subtitle="Leitura rapida do periodo e dos lotes extremos"
+              className="dashboard-summary-card"
+            >
+              <div className="dashboard-summary-grid">
+                <div className="dashboard-summary-metric">
+                  <small>Receita estimada</small>
+                  <strong>{formatCurrency(receitaMes)}</strong>
+                </div>
+                <div className="dashboard-summary-metric">
+                  <small>Custo operacional</small>
+                  <strong>{formatCurrency(custoMes)}</strong>
+                </div>
+                <div className="dashboard-summary-metric">
+                  <small>Resultado do mes</small>
+                  <strong className={resultadoMes >= 0 ? 'positive' : 'negative'}>
+                    {formatCurrency(resultadoMes)}
+                  </strong>
+                </div>
+                <div className="dashboard-summary-metric">
+                  <small>Valor em estoque</small>
+                  <strong>{formatarMoeda(valorTotalEstoque)}</strong>
+                </div>
+              </div>
+
+              <div className="dashboard-summary-divider" />
+
+              <div className="dashboard-summary-list">
+                <div className="dashboard-summary-line">
+                  <span>Melhor margem</span>
+                  <strong>{melhorLote?.lote?.nome || '-'}</strong>
+                  <small>{melhorLote ? formatCurrency(melhorLote.indicators.margem) : '-'}</small>
+                </div>
+                <div className="dashboard-summary-line">
+                  <span>Maior atencao financeira</span>
+                  <strong>{piorLote?.lote?.nome || '-'}</strong>
+                  <small>{piorLote ? formatCurrency(piorLote.indicators.margem) : '-'}</small>
+                </div>
+                <div className="dashboard-summary-line">
+                  <span>Arroba media atual</span>
+                  <strong>{formatNumber(arrobaMedia, 2)} @</strong>
+                  <small>media consolidada do rebanho ativo</small>
+                </div>
+              </div>
             </Card>
           </section>
         </>
@@ -672,13 +666,13 @@ export default function DashboardPage({
               </div>
             </div>
 
-            <div className={`kpi-card ${itensCriticos > 0 ? 'kpi-card--danger' : ''}`}>
-              <div className={`kpi-icon-wrapper ${itensCriticos > 0 ? 'kpi-icon-wrapper--danger' : ''}`}>
-                <AlertTriangle size={22} className={itensCriticos > 0 ? 'text-danger' : ''} />
+            <div className={`kpi-card ${estoqueCritico.length > 0 ? 'kpi-card--danger' : ''}`}>
+              <div className={`kpi-icon-wrapper ${estoqueCritico.length > 0 ? 'kpi-icon-wrapper--danger' : ''}`}>
+                <AlertTriangle size={22} className={estoqueCritico.length > 0 ? 'text-danger' : ''} />
               </div>
               <div>
                 <p className="kpi-label">Estoque critico</p>
-                <p className={`kpi-value ${itensCriticos > 0 ? 'text-danger' : ''}`}>{itensCriticos}</p>
+                <p className={`kpi-value ${estoqueCritico.length > 0 ? 'text-danger' : ''}`}>{estoqueCritico.length}</p>
                 <p className="kpi-sub">itens abaixo do minimo</p>
               </div>
             </div>
@@ -715,8 +709,7 @@ export default function DashboardPage({
               </thead>
               <tbody>
                 {(db.estoque || []).map((item) => {
-                  const critico =
-                    Number(item.quantidade_atual) <= Number(item.quantidade_minima || 0);
+                  const critico = Number(item.quantidade_atual) <= Number(item.quantidade_minima || 0);
                   return (
                     <tr key={item.id}>
                       <td>{item.nome || item.produto}</td>
@@ -879,9 +872,9 @@ function daysUntil(dateStr) {
 }
 
 function urgencyVariant(alert) {
-  const text = `${alert.title || ''} ${alert.description || ''}`.toLowerCase();
-  if (text.includes('atrasad') || text.includes('venc')) return 'danger';
-  if (text.includes('3 dia') || text.includes('urg')) return 'warning';
+  const text = `${alert.title || alert.titulo || ''} ${alert.description || alert.descricao || ''}`.toLowerCase();
+  if (text.includes('atrasad') || text.includes('venc') || text.includes('crit')) return 'danger';
+  if (text.includes('3 dia') || text.includes('urg') || text.includes('alerta')) return 'warning';
   return 'success';
 }
 

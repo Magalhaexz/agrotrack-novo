@@ -235,7 +235,7 @@ export default function AnimalForm({ initialData, lotes = [], onSave, onCancel }
         </div>
 
         <ArrobaPreview
-          peso={form.p_at}
+          peso={form.p_at || form.p_ini}
           rendimento={form.rendimento_carcaca}
           precoPorArroba={form.preco_arroba}
         />
