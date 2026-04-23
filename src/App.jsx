@@ -321,6 +321,32 @@ export default function App() {
     return false;
   }
 
+  function handleMobileQuickAction(acao) {
+    const action = String(acao || '').toLowerCase();
+
+    if (action.includes('pesagem')) {
+      navigateWithPermission('pesagens');
+      return;
+    }
+
+    if (action.includes('movimenta') || action.includes('lote')) {
+      navigateWithPermission('lotes');
+      return;
+    }
+
+    if (action.includes('entrada') || action.includes('saida') || action.includes('item')) {
+      navigateWithPermission('estoque');
+      return;
+    }
+
+    if (action.includes('receita') || action.includes('despesa') || action.includes('fluxo')) {
+      navigateWithPermission('financeiro');
+      return;
+    }
+
+    showToast({ type: 'info', message: `Acao rapida disponivel: ${acao}` });
+  }
+
   const paginaValida = currentPage in pageMap;
   const permissaoAtual = permissoesPorPagina[currentPage] || null;
   const podeAcessarPaginaAtual = paginaValida && (!permissaoAtual || hasPermission(permissaoAtual));
@@ -474,7 +500,7 @@ export default function App() {
 
       <MobileFab
         page={pageKey}
-        onAction={(acao) => showToast({ type: 'warning', message: `Ação rápida: ${acao}` })}
+        onAction={handleMobileQuickAction}
       />
 
       <Modal
@@ -498,7 +524,7 @@ export default function App() {
                       type="button"
                       className={`mobile-nav-option ${isActive ? 'active' : ''}`}
                       onClick={() => {
-                        setCurrentPage(item.id);
+                        navigateWithPermission(item.id);
                         setMenuExtraAberto(false);
                       }}
                       aria-current={isActive ? 'page' : undefined}

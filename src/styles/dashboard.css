@@ -50,10 +50,20 @@
   gap: 16px;
 }
 
+.dashboard-executive-strip {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 16px;
+}
+
 .dashboard-monitor-grid {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 16px;
+}
+
+.dashboard-grid--operations {
+  grid-template-columns: minmax(0, 1.2fr) minmax(0, 1.2fr) minmax(300px, 0.85fr);
 }
 
 .dashboard-grid--feature {
@@ -256,6 +266,42 @@
   color: rgba(214, 223, 219, 0.68);
   font-size: 0.9rem;
   line-height: 1.7;
+}
+
+.dashboard-executive-chip {
+  display: grid;
+  gap: 6px;
+  padding: 18px 20px;
+  border-radius: 22px;
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.03), rgba(255, 255, 255, 0.015)),
+    rgba(8, 11, 10, 0.84);
+}
+
+.dashboard-executive-chip span {
+  color: rgba(214, 223, 219, 0.58);
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+.dashboard-executive-chip strong {
+  color: #f5f8f6;
+  font-family: "Inter Tight", "Segoe UI", sans-serif;
+  font-size: 1.35rem;
+  letter-spacing: -0.04em;
+}
+
+.dashboard-executive-chip small {
+  color: rgba(214, 223, 219, 0.72);
+  line-height: 1.5;
+}
+
+.dashboard-action-grid {
+  display: grid;
+  gap: 10px;
 }
 
 .chart-legend {
@@ -535,11 +581,13 @@
 @media (max-width: 1280px) {
   .dashboard-grid--kpi-main,
   .dashboard-strip,
-  .dashboard-monitor-grid {
+  .dashboard-monitor-grid,
+  .dashboard-executive-strip {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
-  .dashboard-grid--feature {
+  .dashboard-grid--feature,
+  .dashboard-grid--operations {
     grid-template-columns: 1fr;
   }
 }
@@ -567,6 +615,7 @@
   .dashboard-grid--kpi-main,
   .dashboard-strip,
   .dashboard-monitor-grid,
+  .dashboard-executive-strip,
   .dashboard-grid--dual {
     grid-template-columns: 1fr;
   }

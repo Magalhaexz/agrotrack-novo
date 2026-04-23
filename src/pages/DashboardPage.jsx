@@ -309,22 +309,12 @@ export default function DashboardPage({
       variant: KPI_VARIANTS.info,
     },
     {
-      title: 'Custo operacional',
-      value: formatCurrency(custoMes),
-      variation: getVariation(custoMes, custoMes * 0.91),
-      icon: DollarSign,
-      variant: KPI_VARIANTS.warning,
-    },
-    {
-      title: 'Resultado do mes',
+      title: 'Resultado financeiro',
       value: formatCurrency(resultadoMes),
       variation: getVariation(resultadoMes, resultadoMes * 0.85),
-      icon: BellRing,
+      icon: DollarSign,
       variant: resultadoMes >= 0 ? KPI_VARIANTS.success : KPI_VARIANTS.danger,
     },
-  ];
-
-  const kpisSecondary = [
     {
       title: 'Estoque critico',
       value: formatNumber(estoqueCritico.length, 0),
@@ -332,24 +322,73 @@ export default function DashboardPage({
       icon: Package,
       variant: estoqueCritico.length ? KPI_VARIANTS.warning : KPI_VARIANTS.success,
     },
+  ];
+
+  const executiveSignals = [
     {
-      title: 'Pendencias operacionais',
-      value: formatNumber(tarefasResumo.pendente + tarefasResumo.em_andamento, 0),
-      variation: getVariation(
-        tarefasResumo.pendente + tarefasResumo.em_andamento,
-        Math.max(0, tarefasResumo.pendente + tarefasResumo.em_andamento - 1)
-      ),
-      icon: CheckSquare,
-      variant: tarefasResumo.pendente + tarefasResumo.em_andamento ? KPI_VARIANTS.warning : KPI_VARIANTS.success,
+      label: 'Alertas prioritarios',
+      value: formatNumber(totalAlertasCriticos || alertasFormatados.length, 0),
+      helper: totalAlertasCriticos ? 'criticos aguardando acao' : 'alertas operacionais em leitura',
     },
     {
-      title: 'Animais em risco',
-      value: formatNumber(animaisEmRisco, 0),
-      variation: getVariation(animaisEmRisco, Math.max(1, animaisEmRisco * 0.88)),
-      icon: AlertTriangle,
-      variant: animaisEmRisco ? KPI_VARIANTS.danger : KPI_VARIANTS.success,
+      label: 'Arroba media',
+      value: `${formatNumber(arrobaMedia, 2)} @`,
+      helper: 'media consolidada do rebanho ativo',
+    },
+    {
+      label: 'Valor em estoque',
+      value: formatarMoeda(valorTotalEstoque),
+      helper: 'base disponivel para operacao',
     },
   ];
+
+  const alertasPrioritarios = useMemo(() => {
+    const operacionais = alertasOperacionais.map((alert) => ({
+      id: `alerta-${alert.id}`,
+      titulo: alert.titulo,
+      descricao: alert.descricao,
+      badge: urgencyVariant(alert) === 'danger' ? 'Critico' : urgencyVariant(alert) === 'warning' ? 'Atencao' : 'Monitorar',
+      variant: urgencyVariant(alert),
+      action: () => onNavigate?.(alert.acao?.rota || 'dashboard'),
+    }));
+
+    const lotesCriticos = lotesEmAtencao.map((item) => ({
+      id: `lote-${item.lote.id}`,
+      titulo: item.lote.nome,
+      descricao: item.motivos.join(' · '),
+      badge: item.indicators.margem >= 0 ? 'Monitorar' : 'Critico',
+      variant: item.indicators.margem >= 0 ? 'warning' : 'danger',
+      action: () => onNavigate?.('lotes'),
+    }));
+
+    return [...operacionais, ...lotesCriticos].slice(0, 6);
+  }, [alertasOperacionais, lotesEmAtencao, onNavigate]);
+
+  const proximosPassos = useMemo(() => {
+    const tarefas = tarefasUrgentes.map((item) => ({
+      id: `tarefa-${item.id}`,
+      titulo: item.titulo,
+      descricao: `${formatDate(item.data_vencimento)} · ${item.prioridade}`,
+      badge: item.dias < 0 ? 'Vencida' : item.dias === 0 ? 'Hoje' : `${item.dias}d`,
+      variant: item.dias < 0 ? 'danger' : item.dias <= 1 ? 'warning' : 'info',
+      action: () => onNavigate?.('tarefas'),
+      sortScore: item.dias,
+    }));
+
+    const agenda = eventosCalendario.map((item) => ({
+      id: `agenda-${item.id}`,
+      titulo: item.desc,
+      descricao: `${item.loteNome} · ${formatDate(item.proxima)}`,
+      badge: item.dias < 0 ? 'Atrasado' : item.dias <= 3 ? 'Urgente' : 'Programado',
+      variant: item.dias < 0 ? 'danger' : item.dias <= 3 ? 'warning' : 'success',
+      action: () => onNavigate?.('calendarioOperacional'),
+      sortScore: item.dias,
+    }));
+
+    return [...tarefas, ...agenda]
+      .sort((a, b) => a.sortScore - b.sortScore)
+      .slice(0, 6);
+  }, [eventosCalendario, tarefasUrgentes, onNavigate]);
 
   return (
     <div className="dashboard-page">
@@ -383,16 +422,20 @@ export default function DashboardPage({
             ))}
           </section>
 
-          <section className="dashboard-strip">
-            {kpisSecondary.map((item) => (
-              <KpiPanel key={item.title} {...item} compact />
+          <section className="dashboard-executive-strip">
+            {executiveSignals.map((item) => (
+              <div key={item.label} className="dashboard-executive-chip">
+                <span>{item.label}</span>
+                <strong>{item.value}</strong>
+                <small>{item.helper}</small>
+              </div>
             ))}
           </section>
 
-          <section className="dashboard-monitor-grid">
+          <section className="dashboard-grid dashboard-grid--operations">
             <Card
-              title="Alertas criticos"
-              subtitle="Itens que precisam de acao imediata"
+              title="Alertas prioritarios"
+              subtitle="O que mais pesa na demonstracao comercial e na rotina operacional."
               action={
                 <Button size="sm" variant="ghost" onClick={() => setTabAtiva?.('alertas')}>
                   Ver todos
@@ -400,175 +443,79 @@ export default function DashboardPage({
               }
             >
               <div className="dashboard-list">
-                {alertasOperacionais.length === 0 ? (
-                  <p className="dashboard-empty-copy">Nenhum alerta pendente.</p>
+                {alertasPrioritarios.length === 0 ? (
+                  <p className="dashboard-empty-copy">Nenhum alerta prioritario no momento.</p>
                 ) : (
-                  alertasOperacionais.map((alert) => {
-                    const variant = urgencyVariant(alert);
-                    return (
-                      <button
-                        key={alert.id}
-                        type="button"
-                        className="dashboard-list-item dashboard-list-item--button"
-                        onClick={() => onNavigate?.(alert.acao?.rota || 'dashboard')}
-                      >
-                        <div className="dashboard-list-copy">
-                          <strong>{alert.titulo}</strong>
-                          <p>{alert.descricao}</p>
-                        </div>
-                        <Badge variant={variant}>{variant === 'danger' ? 'Critico' : variant === 'warning' ? 'Atencao' : 'Ativo'}</Badge>
-                      </button>
-                    );
-                  })
-                )}
-              </div>
-            </Card>
-
-            <Card
-              title="Tarefas prioritarias"
-              subtitle="Pendencias urgentes ou proximas do vencimento"
-              action={
-                <Button size="sm" variant="ghost" onClick={() => onNavigate?.('tarefas')}>
-                  Abrir tarefas
-                </Button>
-              }
-            >
-              <div className="dashboard-list">
-                {tarefasUrgentes.length === 0 ? (
-                  <p className="dashboard-empty-copy">Nenhuma tarefa urgente.</p>
-                ) : (
-                  tarefasUrgentes.map((item) => (
-                    <div key={item.id} className="dashboard-list-item">
+                  alertasPrioritarios.map((item) => (
+                    <button
+                      key={item.id}
+                      type="button"
+                      className="dashboard-list-item dashboard-list-item--button"
+                      onClick={item.action}
+                    >
                       <div className="dashboard-list-copy">
                         <strong>{item.titulo}</strong>
-                        <p>
-                          {formatDate(item.data_vencimento)} · {item.prioridade}
-                        </p>
+                        <p>{item.descricao}</p>
                       </div>
-                      <Badge variant={item.dias < 0 ? 'danger' : item.dias === 0 ? 'warning' : 'info'}>
-                        {item.dias < 0 ? 'Vencida' : item.dias === 0 ? 'Hoje' : `${item.dias}d`}
-                      </Badge>
-                    </div>
+                      <Badge variant={item.variant}>{item.badge}</Badge>
+                    </button>
                   ))
                 )}
               </div>
             </Card>
 
             <Card
-              title="Sanitario e agenda"
-              subtitle="Proximos manejos e vencimentos"
+              title="Tarefas e proximos passos"
+              subtitle="Pendencias, agenda sanitaria e follow-ups para manter a operacao fluindo."
               action={
-                <Button size="sm" variant="ghost" onClick={() => onNavigate?.('calendarioOperacional')}>
-                  Ver calendario
+                <Button size="sm" variant="ghost" onClick={() => onNavigate?.('tarefas')}>
+                  Abrir rotina
                 </Button>
               }
             >
               <div className="dashboard-list">
-                {eventosCalendario.length === 0 ? (
-                  <p className="dashboard-empty-copy">Sem eventos proximos.</p>
+                {proximosPassos.length === 0 ? (
+                  <p className="dashboard-empty-copy">Nenhuma pendencia imediata registrada.</p>
                 ) : (
-                  eventosCalendario.map((item) => {
-                    const variant = item.dias < 0 ? 'danger' : item.dias <= 3 ? 'warning' : 'success';
-                    return (
-                      <div key={item.id} className="dashboard-list-item">
-                        <div className="dashboard-list-copy">
-                          <strong>{item.desc}</strong>
-                          <p>
-                            {item.loteNome} · {formatDate(item.proxima)}
-                          </p>
-                        </div>
-                        <Badge variant={variant}>
-                          {item.dias < 0 ? 'Atrasado' : item.dias <= 3 ? 'Urgente' : 'Programado'}
-                        </Badge>
-                      </div>
-                    );
-                  })
-                )}
-              </div>
-            </Card>
-          </section>
-
-          <section className="dashboard-grid dashboard-grid--feature">
-            <Card
-              title="Evolucao de peso por lote"
-              subtitle="Comparativo simples para monitorar ganho e perda de peso"
-              className="dashboard-chart-card"
-            >
-              <div className="chart-legend">
-                {Object.entries(lotesColorMap).map(([nome, cor]) => (
-                  <button
-                    key={nome}
-                    type="button"
-                    className={hiddenLines[nome] ? '' : 'active'}
-                    onClick={() =>
-                      setHiddenLines((prev) => ({
-                        ...prev,
-                        [nome]: !prev[nome],
-                      }))
-                    }
-                  >
-                    <span style={{ background: cor, opacity: hiddenLines[nome] ? 0.32 : 1 }} />
-                    {nome}
-                  </button>
-                ))}
-              </div>
-
-              <div className="chart-shell">
-                <ResponsiveContainer width="100%" height={320}>
-                  <LineChart data={chartRows}>
-                    <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.08)" />
-                    <XAxis dataKey="label" stroke="rgba(214,223,219,0.56)" />
-                    <YAxis unit="kg" stroke="rgba(214,223,219,0.56)" />
-                    <Tooltip content={<PesoTooltip />} />
-                    {Object.entries(lotesColorMap).map(([nome, cor]) => (
-                      <Line
-                        key={nome}
-                        dataKey={nome}
-                        stroke={cor}
-                        strokeWidth={2.5}
-                        hide={!!hiddenLines[nome]}
-                        dot={{ r: 3 }}
-                        activeDot={{ r: 5 }}
-                      />
-                    ))}
-                  </LineChart>
-                </ResponsiveContainer>
-              </div>
-            </Card>
-
-            <Card
-              title="Lotes que exigem atencao"
-              subtitle="Ganho de peso, margem e suplemento sob monitoramento"
-              className="dashboard-focus-card"
-            >
-              <div className="dashboard-list">
-                {lotesEmAtencao.length === 0 ? (
-                  <p className="dashboard-empty-copy">Nenhum lote critico no momento.</p>
-                ) : (
-                  lotesEmAtencao.map((item) => (
+                  proximosPassos.map((item) => (
                     <button
-                      key={item.lote.id}
+                      key={item.id}
                       type="button"
                       className="dashboard-list-item dashboard-list-item--button"
-                      onClick={() => onNavigate?.('lotes')}
+                      onClick={item.action}
                     >
                       <div className="dashboard-list-copy">
-                        <strong>{item.lote.nome}</strong>
+                        <strong>{item.titulo}</strong>
                         <p>
-                          {formatNumber(item.deltaPesoPct, 1)}% no peso · {formatNumber(item.indicators.gmdMedio, 3)} kg/dia
+                          {item.descricao}
                         </p>
-                        <span className="dashboard-inline-tags">
-                          {item.motivos.map((motivo) => (
-                            <span key={motivo}>{motivo}</span>
-                          ))}
-                        </span>
                       </div>
-                      <Badge variant={item.indicators.margem >= 0 ? 'warning' : 'danger'}>
-                        {item.indicators.margem >= 0 ? 'Monitorar' : 'Critico'}
+                      <Badge variant={item.variant}>
+                        {item.badge}
                       </Badge>
                     </button>
                   ))
                 )}
+              </div>
+            </Card>
+
+            <Card
+              title="Acoes rapidas uteis"
+              subtitle="Atalhos diretos para os fluxos que mais importam em uma demo."
+            >
+              <div className="dashboard-action-grid">
+                <Button fullWidth onClick={() => onNavigate?.('pesagens')}>
+                  Nova pesagem
+                </Button>
+                <Button fullWidth variant="outline" onClick={() => onNavigate?.('lotes')}>
+                  Novo lote
+                </Button>
+                <Button fullWidth variant="outline" onClick={() => onNavigate?.('sanitario')}>
+                  Registrar manejo
+                </Button>
+                <Button fullWidth variant="ghost" onClick={() => onNavigate?.('suplementacao')}>
+                  Registrar consumo
+                </Button>
               </div>
             </Card>
           </section>
@@ -576,7 +523,7 @@ export default function DashboardPage({
           <section className="dashboard-grid dashboard-grid--dual">
             <Card
               title="Estoque critico"
-              subtitle="Produtos no minimo ou abaixo do minimo recomendado"
+              subtitle="Cobertura baixa, reposicao e itens que merecem atencao comercial."
               action={
                 <Button size="sm" variant="ghost" onClick={() => onNavigate?.('estoque')}>
                   Abrir estoque
@@ -603,8 +550,8 @@ export default function DashboardPage({
             </Card>
 
             <Card
-              title="Resumo financeiro"
-              subtitle="Leitura rapida do periodo e dos lotes extremos"
+              title="Resultado financeiro"
+              subtitle="Receita, custo e leitura executiva para a conversa comercial."
               className="dashboard-summary-card"
             >
               <div className="dashboard-summary-grid">

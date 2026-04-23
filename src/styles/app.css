@@ -2663,15 +2663,30 @@ a:hover {
 
 .animais-content-grid {
   display: grid;
-  grid-template-columns: minmax(360px, 0.98fr) minmax(0, 1.22fr);
+  grid-template-columns: minmax(0, 1.42fr) minmax(320px, 0.82fr);
   gap: 18px;
-  align-items: start;
+  align-items: stretch;
+}
+
+.animais-workspace-shell {
+  padding: 4px;
+  border-radius: 30px;
+  border: 1px solid rgba(255, 255, 255, 0.04);
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.018), rgba(255, 255, 255, 0.008)),
+    rgba(7, 10, 9, 0.64);
+}
+
+.animais-add-panel,
+.animais-list-card {
+  display: flex;
+  flex-direction: column;
+  min-height: 100%;
 }
 
 .animais-add-panel {
   position: sticky;
   top: calc(var(--header-height) + 18px);
-  min-height: 100%;
 }
 
 .animais-hero-cta-card {
@@ -2691,6 +2706,37 @@ a:hover {
 .animais-add-panel-body {
   display: grid;
   gap: 16px;
+  flex: 1;
+}
+
+.animais-side-metrics {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.animais-side-metric {
+  display: grid;
+  gap: 6px;
+  padding: 14px;
+  border-radius: 18px;
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.03), rgba(255, 255, 255, 0.012)),
+    rgba(8, 11, 10, 0.84);
+}
+
+.animais-side-metric span {
+  color: var(--color-text-muted);
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.animais-side-metric strong {
+  color: var(--color-text);
+  font-size: 1rem;
 }
 
 .animais-add-point {
@@ -2708,12 +2754,17 @@ a:hover {
   margin-bottom: 18px;
 }
 
-.animais-list-card {
-  min-height: 100%;
+.animais-list-card .ui-card-header {
+  align-items: center;
+}
+
+.animais-table-wrap {
+  flex: 1;
 }
 
 .animais-empty-state {
-  min-height: 220px;
+  flex: 1;
+  min-height: 260px;
   align-content: center;
   justify-items: center;
   text-align: center;
@@ -2779,9 +2830,40 @@ a:hover {
   font-size: 0.92rem;
 }
 
+.arroba-preview-empty {
+  color: rgba(214, 223, 219, 0.72);
+  font-size: 0.88rem;
+  line-height: 1.55;
+}
+
 .arroba-preview-item strong,
 .arroba-preview-value strong {
   color: #f5f8f6;
+}
+
+.animal-form {
+  display: grid;
+  gap: 16px;
+}
+
+.animal-form-grid {
+  display: grid;
+  gap: 14px;
+}
+
+.animal-form-grid--2 {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.animal-form-field {
+  display: grid;
+  gap: 8px;
+}
+
+.animal-form-label {
+  color: rgba(214, 223, 219, 0.74);
+  font-size: 0.85rem;
+  font-weight: 600;
 }
 
 @media (max-width: 1100px) {
@@ -2794,6 +2876,10 @@ a:hover {
 
   .animais-add-panel {
     position: static;
+  }
+
+  .animal-form-grid--2 {
+    grid-template-columns: 1fr;
   }
 
   .calendar-year-grid {

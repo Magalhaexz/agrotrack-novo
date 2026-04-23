@@ -161,91 +161,104 @@ export default function AnimaisPage({ db, setDb, onConfirmAction }) {
         </Card>
       </div>
 
-      <div className="animais-content-grid">
-        <Card className="animais-add-panel" title="Cadastro rapido" subtitle="Atalho visivel para abrir o formulario em qualquer momento da pagina.">
-          <div className="animais-add-panel-body">
-            <div className="animais-add-point">
-              <Users size={18} />
-              <div>
-                <strong>Grupos organizados por lote</strong>
-                <span>Sexo, genetica, quantidade e dias no lote em um unico fluxo.</span>
+      <section className="animais-workspace-shell">
+        <div className="animais-content-grid">
+          <Card
+            className="animais-list-card"
+            title="Lista de animais"
+            subtitle="Edite ou exclua registros mantendo o cadastro rapido sempre ao lado do historico atual."
+            action={<Button size="sm" icon={<Plus size={14} />} onClick={abrirNovo}>Adicionar</Button>}
+          >
+            {dadosTabela.length === 0 ? (
+              <div className="animais-empty-state">
+                <strong>Nenhum registro de animais.</strong>
+                <span>Use o botao destacado acima para cadastrar o primeiro grupo do rebanho.</span>
+                <Button variant="outline" onClick={abrirNovo}>Cadastrar primeiro grupo</Button>
               </div>
-            </div>
-            <div className="animais-add-point">
-              <Scale size={18} />
-              <div>
-                <strong>Peso e rendimento no mesmo cadastro</strong>
-                <span>Facilita previsao de arroba e acompanhamento zootecnico.</span>
-              </div>
-            </div>
-            <div className="animais-add-point">
-              <Leaf size={18} />
-              <div>
-                <strong>Consumo sempre a vista</strong>
-                <span>Ajuda a cruzar dados com suplementacao e desempenho.</span>
-              </div>
-            </div>
-            <Button fullWidth icon={<Plus size={16} />} onClick={abrirNovo}>Novo grupo agora</Button>
-          </div>
-        </Card>
-
-        <Card
-          className="animais-list-card"
-          title="Lista de animais"
-          subtitle="Edite ou exclua registros mantendo o cadastro principal sempre visivel."
-          action={<Button size="sm" icon={<Plus size={14} />} onClick={abrirNovo}>Adicionar</Button>}
-        >
-          {dadosTabela.length === 0 ? (
-            <div className="animais-empty-state">
-              <strong>Nenhum registro de animais.</strong>
-              <span>Use o botao destacado acima para cadastrar o primeiro grupo do rebanho.</span>
-              <Button variant="outline" onClick={abrirNovo}>Cadastrar primeiro grupo</Button>
-            </div>
-          ) : (
-            <div className="table-responsive">
-              <table className="data-table">
-                <thead>
-                  <tr>
-                    <th>Lote</th>
-                    <th>Sexo</th>
-                    <th>Genetica</th>
-                    <th>Qtd</th>
-                    <th>Peso inicial</th>
-                    <th>Peso atual</th>
-                    <th>Dias</th>
-                    <th>GMD</th>
-                    <th>Consumo</th>
-                    <th>Acoes</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {dadosTabela.map((animal) => (
-                    <tr key={animal.id}>
-                      <td className="text-h">{animal.loteNome}</td>
-                      <td>{animal.sexo}</td>
-                      <td>{animal.gen}</td>
-                      <td>{animal.qtd}</td>
-                      <td>{formatarNumero(animal.p_ini)} kg</td>
-                      <td>{formatarNumero(animal.p_at)} kg</td>
-                      <td>{animal.dias}</td>
-                      <td>
-                        <span className="animais-gmd-chip">{formatarNumero(animal.gmd)} kg/dia</span>
-                      </td>
-                      <td>{formatarNumero(animal.consumo)} kg</td>
-                      <td>
-                        <div className="row-actions">
-                          <button className="action-btn" onClick={() => editarAnimal(animal)}>Editar</button>
-                          <button className="action-btn action-btn-danger" onClick={() => excluirAnimal(animal.id)}>Excluir</button>
-                        </div>
-                      </td>
+            ) : (
+              <div className="table-responsive animais-table-wrap">
+                <table className="data-table">
+                  <thead>
+                    <tr>
+                      <th>Lote</th>
+                      <th>Sexo</th>
+                      <th>Genetica</th>
+                      <th>Qtd</th>
+                      <th>Peso inicial</th>
+                      <th>Peso atual</th>
+                      <th>Dias</th>
+                      <th>GMD</th>
+                      <th>Consumo</th>
+                      <th>Acoes</th>
                     </tr>
-                  ))}
-                </tbody>
-              </table>
+                  </thead>
+                  <tbody>
+                    {dadosTabela.map((animal) => (
+                      <tr key={animal.id}>
+                        <td className="text-h">{animal.loteNome}</td>
+                        <td>{animal.sexo}</td>
+                        <td>{animal.gen}</td>
+                        <td>{animal.qtd}</td>
+                        <td>{formatarNumero(animal.p_ini)} kg</td>
+                        <td>{formatarNumero(animal.p_at)} kg</td>
+                        <td>{animal.dias}</td>
+                        <td>
+                          <span className="animais-gmd-chip">{formatarNumero(animal.gmd)} kg/dia</span>
+                        </td>
+                        <td>{formatarNumero(animal.consumo)} kg</td>
+                        <td>
+                          <div className="row-actions">
+                            <button className="action-btn" onClick={() => editarAnimal(animal)}>Editar</button>
+                            <button className="action-btn action-btn-danger" onClick={() => excluirAnimal(animal.id)}>Excluir</button>
+                          </div>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </Card>
+
+          <Card className="animais-add-panel" title="Cadastro rapido" subtitle="Fluxo lateral para registrar um novo grupo sem perder a leitura da listagem.">
+            <div className="animais-add-panel-body">
+              <div className="animais-side-metrics">
+                <div className="animais-side-metric">
+                  <span>Lotes cobertos</span>
+                  <strong>{resumo.lotesCobertos}</strong>
+                </div>
+                <div className="animais-side-metric">
+                  <span>Peso medio</span>
+                  <strong>{formatarNumero(resumo.pesoAtualMedio)} kg</strong>
+                </div>
+              </div>
+
+              <div className="animais-add-point">
+                <Users size={18} />
+                <div>
+                  <strong>Grupos organizados por lote</strong>
+                  <span>Sexo, genetica, quantidade e dias no lote em um unico fluxo.</span>
+                </div>
+              </div>
+              <div className="animais-add-point">
+                <Scale size={18} />
+                <div>
+                  <strong>Peso e rendimento no mesmo cadastro</strong>
+                  <span>Facilita previsao de arroba e acompanhamento zootecnico.</span>
+                </div>
+              </div>
+              <div className="animais-add-point">
+                <Leaf size={18} />
+                <div>
+                  <strong>Consumo sempre a vista</strong>
+                  <span>Ajuda a cruzar dados com suplementacao e desempenho.</span>
+                </div>
+              </div>
+              <Button fullWidth icon={<Plus size={16} />} onClick={abrirNovo}>Novo grupo agora</Button>
             </div>
-          )}
-        </Card>
-      </div>
+          </Card>
+        </div>
+      </section>
 
       <Card className="animais-history-card" title="Historico de saidas" subtitle="Venda, morte, descarte e transferencia continuam centralizados nesta area.">
         {historicoSaidas.length === 0 ? (

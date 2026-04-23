@@ -1,7 +1,8 @@
 import { useEffect, useState } from 'react';
-import Modal from './ui/Modal';
-import Button from './ui/Button';
 import ArrobaPreview from './ArrobaPreview';
+import Button from './ui/Button';
+import Modal from './ui/Modal';
+import { parseNumeroEntrada } from '../utils/formatters';
 
 const FORM_VAZIO = {
   lote_id: '',
@@ -17,37 +18,40 @@ const FORM_VAZIO = {
 };
 
 const VALIDACOES_NUMERICAS = [
-  { campo: 'Quantidade',            key: 'qtd' },
-  { campo: 'Peso inicial',          key: 'p_ini' },
-  { campo: 'Peso atual',            key: 'p_at' },
-  { campo: 'Dias no lote',          key: 'dias' },
-  { campo: 'Consumo',               key: 'consumo' },
-  { campo: 'Rendimento de carcaça', key: 'rendimento_carcaca' },
+  { campo: 'Quantidade', key: 'qtd' },
+  { campo: 'Peso inicial', key: 'p_ini' },
+  { campo: 'Peso atual', key: 'p_at' },
+  { campo: 'Dias no lote', key: 'dias' },
+  { campo: 'Consumo', key: 'consumo' },
+  { campo: 'Rendimento de carcaca', key: 'rendimento_carcaca' },
 ];
 
 function normalizarInitialData(data) {
   if (!data) return FORM_VAZIO;
   return {
-    lote_id:            data.lote_id          ?? '',
-    sexo:               data.sexo             || 'macho',
-    gen:                data.gen              || '',
-    qtd:                data.qtd              ?? '',
-    p_ini:              data.p_ini            ?? '',
-    p_at:               data.p_at             ?? '',
-    dias:               data.dias             ?? '',
-    consumo:            data.consumo          ?? '',
+    lote_id: data.lote_id ?? '',
+    sexo: data.sexo === 'fêmea' ? 'femea' : (data.sexo || 'macho'),
+    gen: data.gen || '',
+    qtd: data.qtd ?? '',
+    p_ini: data.p_ini ?? '',
+    p_at: data.p_at ?? '',
+    dias: data.dias ?? '',
+    consumo: data.consumo ?? '',
     rendimento_carcaca: data.rendimento_carcaca ?? 52,
-    preco_arroba:       data.preco_arroba     ?? '',
+    preco_arroba: data.preco_arroba ?? '',
   };
 }
 
-function validarForm(form) {
-  if (!form.lote_id)       return 'Selecione o lote.';
-  if (!form.gen.trim())    return 'Informe a genética/raça.';
+function obterNumero(form, key) {
+  const numero = parseNumeroEntrada(form[key]);
+  return Number.isFinite(numero) ? numero : 0;
+}
 
-  const invalido = VALIDACOES_NUMERICAS.find(
-    ({ key }) => Number(form[key] || 0) <= 0
-  );
+function validarForm(form) {
+  if (!form.lote_id) return 'Selecione o lote.';
+  if (!form.gen.trim()) return 'Informe a genetica/raca.';
+
+  const invalido = VALIDACOES_NUMERICAS.find(({ key }) => obterNumero(form, key) <= 0);
   if (invalido) return `${invalido.campo} deve ser maior que zero.`;
 
   return null;
@@ -62,13 +66,13 @@ export default function AnimalForm({ initialData, lotes = [], onSave, onCancel }
     setErro('');
   }, [initialData]);
 
-  function handleChange(e) {
-    const { name, value } = e.target;
+  function handleChange(event) {
+    const { name, value } = event.target;
     setForm((prev) => ({ ...prev, [name]: value }));
   }
 
-  function handleSubmit(e) {
-    e.preventDefault();
+  function handleSubmit(event) {
+    event.preventDefault();
     const erroValidacao = validarForm(form);
 
     if (erroValidacao) {
@@ -78,16 +82,16 @@ export default function AnimalForm({ initialData, lotes = [], onSave, onCancel }
 
     setErro('');
     onSave?.({
-      lote_id:            Number(form.lote_id),
-      sexo:               form.sexo,
-      gen:                form.gen.trim(),
-      qtd:                Number(form.qtd),
-      p_ini:              Number(form.p_ini),
-      p_at:               Number(form.p_at),
-      dias:               Number(form.dias),
-      consumo:            Number(form.consumo),
-      rendimento_carcaca: Number(form.rendimento_carcaca),
-      preco_arroba:       form.preco_arroba ? Number(form.preco_arroba) : null,
+      lote_id: Number(form.lote_id),
+      sexo: form.sexo === 'femea' ? 'femea' : form.sexo,
+      gen: form.gen.trim(),
+      qtd: obterNumero(form, 'qtd'),
+      p_ini: obterNumero(form, 'p_ini'),
+      p_at: obterNumero(form, 'p_at'),
+      dias: obterNumero(form, 'dias'),
+      consumo: obterNumero(form, 'consumo'),
+      rendimento_carcaca: obterNumero(form, 'rendimento_carcaca'),
+      preco_arroba: form.preco_arroba === '' ? null : obterNumero(form, 'preco_arroba'),
     });
   }
 
@@ -101,12 +105,18 @@ export default function AnimalForm({ initialData, lotes = [], onSave, onCancel }
   );
 
   return (
-    <Modal open onClose={onCancel} title={titulo} footer={footer}>
-      <form onSubmit={handleSubmit} style={{ display: 'grid', gap: 14 }}>
-
-        <div className="grid-2">
-          <label>
-            Lote
+    <Modal
+      open
+      onClose={onCancel}
+      title={titulo}
+      subtitle="Preencha os dados do grupo e acompanhe o reflexo em arrobas em tempo real."
+      footer={footer}
+      size="lg"
+    >
+      <form onSubmit={handleSubmit} className="animal-form">
+        <div className="animal-form-grid animal-form-grid--2">
+          <label className="animal-form-field">
+            <span className="animal-form-label">Lote</span>
             <select className="ui-input" name="lote_id" value={form.lote_id} onChange={handleChange}>
               <option value="">Selecione</option>
               {lotes.map((lote) => (
@@ -114,18 +124,19 @@ export default function AnimalForm({ initialData, lotes = [], onSave, onCancel }
               ))}
             </select>
           </label>
-          <label>
-            Sexo
+
+          <label className="animal-form-field">
+            <span className="animal-form-label">Sexo</span>
             <select className="ui-input" name="sexo" value={form.sexo} onChange={handleChange}>
               <option value="macho">Macho</option>
-              <option value="fêmea">Fêmea</option>
+              <option value="femea">Femea</option>
             </select>
           </label>
         </div>
 
-        <div className="grid-2">
-          <label>
-            Genética / raça
+        <div className="animal-form-grid animal-form-grid--2">
+          <label className="animal-form-field">
+            <span className="animal-form-label">Genetica / raca</span>
             <input
               className="ui-input"
               name="gen"
@@ -134,12 +145,13 @@ export default function AnimalForm({ initialData, lotes = [], onSave, onCancel }
               placeholder="Ex: Nelore PO, Brangus, Cruzado"
             />
           </label>
-          <label>
-            Quantidade
+
+          <label className="animal-form-field">
+            <span className="animal-form-label">Quantidade</span>
             <input
               className="ui-input"
-              type="number"
-              min={1}
+              type="text"
+              inputMode="numeric"
               name="qtd"
               value={form.qtd}
               onChange={handleChange}
@@ -148,84 +160,82 @@ export default function AnimalForm({ initialData, lotes = [], onSave, onCancel }
           </label>
         </div>
 
-        <div className="grid-2">
-          <label>
-            Peso inicial (kg)
+        <div className="animal-form-grid animal-form-grid--2">
+          <label className="animal-form-field">
+            <span className="animal-form-label">Peso inicial (kg)</span>
             <input
               className="ui-input"
-              type="number"
-              step="0.01"
-              min={0}
+              type="text"
+              inputMode="decimal"
               name="p_ini"
               value={form.p_ini}
               onChange={handleChange}
-              placeholder="Ex: 320"
+              placeholder="Ex: 320 ou 320,5"
             />
           </label>
-          <label>
-            Peso atual (kg)
+
+          <label className="animal-form-field">
+            <span className="animal-form-label">Peso atual (kg)</span>
             <input
               className="ui-input"
-              type="number"
-              step="0.01"
-              min={0}
+              type="text"
+              inputMode="decimal"
               name="p_at"
               value={form.p_at}
               onChange={handleChange}
-              placeholder="Ex: 440"
+              placeholder="Ex: 440 ou 440,5"
             />
           </label>
         </div>
 
-        <div className="grid-2">
-          <label>
-            Dias no lote
+        <div className="animal-form-grid animal-form-grid--2">
+          <label className="animal-form-field">
+            <span className="animal-form-label">Dias no lote</span>
             <input
               className="ui-input"
-              type="number"
-              min={1}
+              type="text"
+              inputMode="numeric"
               name="dias"
               value={form.dias}
               onChange={handleChange}
               placeholder="Ex: 120"
             />
           </label>
-          <label>
-            Consumo (kg/dia)
+
+          <label className="animal-form-field">
+            <span className="animal-form-label">Consumo (kg/dia)</span>
             <input
               className="ui-input"
-              type="number"
-              step="0.01"
-              min={0}
+              type="text"
+              inputMode="decimal"
               name="consumo"
               value={form.consumo}
               onChange={handleChange}
-              placeholder="Ex: 12.5"
+              placeholder="Ex: 12,5"
             />
           </label>
         </div>
 
-        <div className="grid-2">
-          <label>
-            Rendimento de carcaça (%)
+        <div className="animal-form-grid animal-form-grid--2">
+          <label className="animal-form-field">
+            <span className="animal-form-label">Rendimento de carcaca (%)</span>
             <input
               className="ui-input"
-              type="number"
-              step="0.1"
-              min={0}
-              max={100}
+              type="text"
+              inputMode="decimal"
               name="rendimento_carcaca"
               value={form.rendimento_carcaca}
               onChange={handleChange}
+              placeholder="Ex: 52"
             />
           </label>
-          <label>
-            Preço por @ (opcional)
+
+          <label className="animal-form-field">
+            <span className="animal-form-label">Preco por @ (opcional)</span>
             <input
               className="ui-input"
-              type="number"
-              step="0.01"
-              min={0}
+              type="text"
+              inputMode="decimal"
               name="preco_arroba"
               value={form.preco_arroba}
               onChange={handleChange}
@@ -240,12 +250,11 @@ export default function AnimalForm({ initialData, lotes = [], onSave, onCancel }
           precoPorArroba={form.preco_arroba}
         />
 
-        {erro && (
+        {erro ? (
           <p style={{ margin: 0, color: 'var(--color-danger)', fontSize: '0.85rem' }}>
             {erro}
           </p>
-        )}
-
+        ) : null}
       </form>
     </Modal>
   );
