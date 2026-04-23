@@ -2668,6 +2668,11 @@ a:hover {
   align-items: start;
 }
 
+.animais-add-panel {
+  position: sticky;
+  top: calc(var(--header-height) + 18px);
+}
+
 .animais-hero-cta-card {
   align-items: flex-start;
 }
@@ -2734,6 +2739,10 @@ a:hover {
   .calendar-hero,
   .animais-hero {
     grid-template-columns: 1fr;
+  }
+
+  .animais-add-panel {
+    position: static;
   }
 
   .calendar-year-grid {
@@ -3077,7 +3086,11 @@ a:hover {
 }
 
 .top-header-actions {
+  display: flex;
+  align-items: center;
   gap: 12px;
+  position: relative;
+  z-index: 330;
 }
 
 .header-notification-btn,
@@ -3129,6 +3142,8 @@ a:hover {
 .notif-dropdown {
   width: min(430px, calc(100vw - 28px));
   max-height: min(520px, calc(100vh - 110px));
+  overflow: hidden;
+  overscroll-behavior: contain;
   gap: 12px;
   padding: 14px;
   border-radius: 24px;
@@ -3188,6 +3203,9 @@ a:hover {
 .notif-list {
   display: grid;
   gap: 10px;
+  max-height: min(360px, calc(100vh - 210px));
+  overflow-y: auto;
+  padding-right: 2px;
 }
 
 .notif-empty {
@@ -3366,6 +3384,7 @@ a:hover {
 }
 
 .sidebar-logo-content {
+  display: flex;
   width: 100%;
   align-items: flex-start;
   gap: 16px;
@@ -3411,10 +3430,13 @@ a:hover {
 }
 
 .sidebar-content {
+  display: grid;
+  align-content: start;
   padding: 16px 14px 24px;
 }
 
 .sidebar-section {
+  display: grid;
   gap: 12px;
   margin-bottom: 12px;
 }
@@ -3435,6 +3457,7 @@ a:hover {
 }
 
 .nav-sublist {
+  display: grid;
   gap: 8px;
 }
 

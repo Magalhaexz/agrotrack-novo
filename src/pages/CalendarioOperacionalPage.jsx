@@ -334,8 +334,8 @@ function YearCalendar({ year, selectedDate, eventsByDateMap, onSelectDate }) {
 function MiniMonthCard({ year, monthIndex, label, selectedDate, eventsByDateMap, onSelectDate }) {
   const firstDay = new Date(year, monthIndex, 1);
   const firstWeekDay = firstDay.getDay();
-  const daysInMonth = new Date(year, monthIndex + 1, 0).getDate();
-  const slots = Array.from({ length: firstWeekDay + daysInMonth }, (_, index) => {
+  const totalDays = new Date(year, monthIndex + 1, 0).getDate();
+  const slots = Array.from({ length: firstWeekDay + totalDays }, (_, index) => {
     if (index < firstWeekDay) {
       return null;
     }
@@ -495,11 +495,12 @@ function buildCalendarEvents(db, lotesMap, funcionariosMap) {
   const operacionais = (db?.eventos_operacionais || []).map((event) => normalizeOperationalEvent(event, lotesMap, funcionariosMap));
   const sanitarios = (db?.sanitario || []).map((event) => normalizeSanitaryEvent(event, lotesMap, funcionariosMap));
   const pesagens = (db?.pesagens || []).map((event) => normalizePesagemEvent(event, lotesMap));
+  const rotinas = expandRecurringRotinas(db?.rotinas || [], lotesMap, funcionariosMap);
   const saidas = (db?.lotes || [])
     .filter((lote) => lote?.saida || lote?.data_saida)
     .map((lote) => normalizeSaidaEvent(lote));
 
-  return [...operacionais, ...sanitarios, ...pesagens, ...saidas]
+  return [...operacionais, ...sanitarios, ...pesagens, ...rotinas, ...saidas]
     .filter((event) => event?.data)
     .sort((a, b) => a.data.localeCompare(b.data));
 }
@@ -577,4 +578,73 @@ function getEventTone(events) {
     return 'success';
   }
   return 'warning';
+}
+
+function expandRecurringRotinas(rotinas, lotesMap, funcionariosMap) {
+  const today = new Date();
+  const start = new Date(today.getFullYear(), today.getMonth() - 2, 1);
+  const end = new Date(today.getFullYear(), today.getMonth() + 13, 0);
+
+  return rotinas.flatMap((rotina) => {
+    if (!rotina?.recorrente) {
+      return rotina?.data ? [normalizeRotinaEvent(rotina, rotina.data, lotesMap, funcionariosMap)] : [];
+    }
+
+    const inicio = rotina?.data_inicio ? new Date(`${rotina.data_inicio}T00:00:00`) : start;
+    const termino = rotina?.data_fim ? new Date(`${rotina.data_fim}T00:00:00`) : end;
+    const from = inicio > start ? inicio : start;
+    const to = termino < end ? termino : end;
+    const eventos = [];
+
+    for (let cursor = new Date(from); cursor <= to; cursor.setDate(cursor.getDate() + 1)) {
+      if (matchesRotinaRecurrence(rotina, cursor)) {
+        eventos.push(normalizeRotinaEvent(rotina, cursor.toISOString().slice(0, 10), lotesMap, funcionariosMap));
+      }
+    }
+
+    return eventos;
+  });
+}
+
+function matchesRotinaRecurrence(rotina, date) {
+  const freq = String(rotina?.recorrencia_tipo || '').toLowerCase();
+  const weekday = date.getDay();
+
+  if (freq === 'semanal') {
+    const dias = Array.isArray(rotina?.dias_semana) ? rotina.dias_semana : [weekday];
+    return dias.includes(weekday);
+  }
+
+  if (freq === 'quinzenal') {
+    const inicio = rotina?.data_inicio ? new Date(`${rotina.data_inicio}T00:00:00`) : date;
+    const diff = Math.floor((date - inicio) / 86400000);
+    return diff >= 0 && diff % 14 === 0;
+  }
+
+  if (freq === 'mensal') {
+    const inicio = rotina?.data_inicio ? new Date(`${rotina.data_inicio}T00:00:00`) : date;
+    return date.getDate() === inicio.getDate();
+  }
+
+  if (freq === 'anual') {
+    const inicio = rotina?.data_inicio ? new Date(`${rotina.data_inicio}T00:00:00`) : date;
+    return date.getDate() === inicio.getDate() && date.getMonth() === inicio.getMonth();
+  }
+
+  return false;
+}
+
+function normalizeRotinaEvent(rotina, data, lotesMap, funcionariosMap) {
+  const lote = rotina?.lote_id ? lotesMap.get(Number(rotina.lote_id)) : null;
+  const responsavel = rotina?.funcionario_id ? funcionariosMap.get(Number(rotina.funcionario_id)) : null;
+
+  return {
+    id: `rotina-${rotina.id}-${data}`,
+    source: 'rotina',
+    type: 'operacional',
+    data: String(data || '').slice(0, 10),
+    title: rotina?.tarefa || 'Rotina operacional',
+    description: [rotina?.setor || 'Operacao', lote?.nome || null].filter(Boolean).join(' · '),
+    metaLine: responsavel?.nome || 'Rotina automatica',
+  };
 }

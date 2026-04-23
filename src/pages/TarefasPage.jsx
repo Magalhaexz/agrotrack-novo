@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { CheckSquare, ChevronRight, FileText, Plus, X } from 'lucide-react';
+import { ChevronRight, Plus } from 'lucide-react';
 import Card from '../components/ui/Card';
 import Badge from '../components/ui/Badge';
 import Button from '../components/ui/Button';
@@ -29,7 +29,7 @@ const EMPTY_TASK = {
   data_vencimento: '',
 };
 
-export default function TarefasPage({ db, setDb, onNavigate, onConfirmAction }) {
+export default function TarefasPage({ db, setDb, onConfirmAction }) {
   const { showToast } = useToast();
   const tarefas = Array.isArray(db?.tarefas) ? db.tarefas : [];
   const [openModal, setOpenModal] = useState(false);
@@ -66,6 +66,12 @@ export default function TarefasPage({ db, setDb, onNavigate, onConfirmAction }) 
       }, {}),
     [tarefasFiltradas]
   );
+
+  const resumo = useMemo(() => ({
+    total: tarefasFiltradas.length,
+    atrasadas: tarefasFiltradas.filter((task) => isOverdue(task.data_vencimento) && task.status !== 'concluida').length,
+    concluidas: tarefasFiltradas.filter((task) => task.status === 'concluida').length,
+  }), [tarefasFiltradas]);
 
   const openNewTask = useCallback(() => {
     setEditingTask(null);
@@ -150,6 +156,21 @@ export default function TarefasPage({ db, setDb, onNavigate, onConfirmAction }) 
         <p>Organize e acompanhe as atividades da sua fazenda.</p>
         <Button icon={<Plus size={16} />} onClick={openNewTask}>Nova Tarefa</Button>
       </header>
+
+      <div className="dashboard-grid dashboard-grid--kpi-main">
+        <Card title="Em foco">
+          <div className="animais-kpi-value">{resumo.total}</div>
+          <p className="animais-kpi-sub">Tarefas considerando os filtros aplicados</p>
+        </Card>
+        <Card title="Atrasadas">
+          <div className="animais-kpi-value">{resumo.atrasadas}</div>
+          <p className="animais-kpi-sub">Exigem atencao imediata</p>
+        </Card>
+        <Card title="Concluidas">
+          <div className="animais-kpi-value">{resumo.concluidas}</div>
+          <p className="animais-kpi-sub">Ja resolvidas neste quadro</p>
+        </Card>
+      </div>
 
       <Card className="tarefas-filters">
         <label className="ui-input-wrap">
@@ -247,7 +268,7 @@ export default function TarefasPage({ db, setDb, onNavigate, onConfirmAction }) 
  * @param {Map} props.lotesMap - Mapa de lotes para lookup eficiente.
  * @param {Map} props.fazendasMap - Mapa de fazendas para lookup eficiente.
  */
-function TaskForm({ open, initialData, onSave, onCancel, db, funcionariosMap, lotesMap, fazendasMap }) {
+function TaskForm({ open, initialData, onSave, onCancel, funcionariosMap, lotesMap, fazendasMap }) {
   const { showToast } = useToast();
   const [form, setForm] = useState(initialData || EMPTY_TASK);
   const [errors, setErrors] = useState({});

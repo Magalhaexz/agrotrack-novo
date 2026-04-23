@@ -181,39 +181,6 @@ label textarea {
   background: var(--color-primary); /* Example dot color */
 }
 
-/* --- Notification Dropdown --- */
-.notif-dropdown {
-  position: absolute;
-  right: 0;
-  top: calc(100% + 6px);
-  width: 320px;
-  max-height: 360px;
-  overflow-y: auto; /* Changed to auto for better scroll behavior */
-  background: var(--color-surface);
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-md);
-  padding: 8px;
-  display: grid;
-  gap: 8px;
-  box-shadow: var(--shadow-md);
-  z-index: 100; /* Ensure it's above other content */
-}
-
-.notif-item {
-  display: grid;
-  gap: 4px;
-  border: 1px solid var(--color-border);
-  border-radius: 8px;
-  padding: 8px;
-  background: var(--color-surface-2); /* Slightly different background for items */
-}
-
-.notif-actions {
-  display: flex;
-  gap: 6px;
-  margin-top: 8px; /* Space for actions */
-}
-
 /* --- Indicadores Painel --- */
 .indicadores-painel {
   display: grid;

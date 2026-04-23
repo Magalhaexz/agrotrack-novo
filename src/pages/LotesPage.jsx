@@ -9,13 +9,8 @@ import Input from '../components/ui/Input';
 import { calcLote, formatCurrency, formatDate, formatNumber } from '../utils/calculations';
 import { gerarNovoId } from '../utils/id';
 import {
-  calcularArrobasProduzidas,
-  calcularCustoPorCabecaDia,
-  calcularCustoporArroba,
   calcularDesvioPorcentual,
-  calcularGMD,
   calcularGMDMeta,
-  calcularTaxaMortalidade,
 } from '../domain/indicadores';
 import { useToast } from '../hooks/useToast'; // Importar useToast
 import '../styles/rebanho.css';
@@ -112,7 +107,6 @@ export default function LotesPage({
         onOpenPesagem={() => setOpenPesagemModal(activeLote)}
         onOpenFechamento={() => setOpenFechamentoModal(activeLote)}
         pesagensByLoteId={pesagensByLoteId}
-        allLoteIndicators={allLoteIndicators}
       />
     );
   }
@@ -206,9 +200,7 @@ export default function LotesPage({
  * @param {Map<number, Array<object>>} props.pesagensByLoteId - Mapa de pesagens por ID de lote.
  * @param {Map<number, object>} props.allLoteIndicators - Mapa de indicadores pré-calculados para todos os lotes.
  */
-function LoteDetailView({ lote, db, setDb, activeTab, setActiveTab, onBack, onOpenMov, onOpenPesagem, onOpenFechamento, pesagensByLoteId, allLoteIndicators }) {
-  const { showToast } = useToast();
-
+function LoteDetailView({ lote, db, activeTab, setActiveTab, onBack, onOpenMov, onOpenPesagem, onOpenFechamento, pesagensByLoteId }) {
   const lotePesagens = useMemo(() => (pesagensByLoteId.get(lote.id) || []).slice().sort((a, b) => new Date(a.data) - new Date(b.data)), [lote.id, pesagensByLoteId]);
   const movimentacoes = useMemo(() => (db.movimentacoes_animais || []).filter((m) => Number(m.loteId || m.lote_id) === lote.id).sort((a, b) => new Date(b.data) - new Date(a.data)), [lote.id, db.movimentacoes_animais]);
   const custos = useMemo(() => (db.custos || []).filter((c) => c.lote_id === lote.id).sort((a, b) => new Date(b.data) - new Date(a.data)), [lote.id, db.custos]);
@@ -237,21 +229,13 @@ function LoteDetailView({ lote, db, setDb, activeTab, setActiveTab, onBack, onOp
   const chartData = useMemo(() => lotePesagens.map((p) => ({
     data: formatDate(p.data),
     peso: Number(p.peso_medio),
-    gmd: calcularGMD(lotePesagens, p.data), // Recalcular GMD para cada ponto
+    gmd: calcularGmdEntrePesagens(lotePesagens, p.id),
   })), [lotePesagens]);
 
   const custosPorCategoria = useMemo(() => {
     const grouped = groupCustos(custos);
     return Object.entries(grouped).map(([cat, valor]) => ({ name: cat, value: valor }));
   }, [custos]);
-
-  const receitasPorCategoria = useMemo(() => {
-    const grouped = (financeiro || []).filter(f => f.tipo === 'receita').reduce((acc, f) => {
-      acc[f.categoria] = (acc[f.categoria] || 0) + Number(f.valor || 0);
-      return acc;
-    }, {});
-    return Object.entries(grouped).map(([cat, valor]) => ({ name: cat, value: valor }));
-  }, [financeiro]);
 
   const timelineFinanceira = useMemo(() => buildFinanceTimeline(db, lote.id), [db, lote.id]);
 
@@ -404,7 +388,7 @@ function LoteDetailView({ lote, db, setDb, activeTab, setActiveTab, onBack, onOp
               <tbody>
                 {lotePesagens.map((p, index) => {
                   const prevPesagem = index > 0 ? lotePesagens[index - 1] : null;
-                  const gmd = prevPesagem ? calcularGMD([prevPesagem, p], p.data) : 0; // GMD entre esta e a anterior
+                  const gmd = prevPesagem ? calcularGmdEntrePesagens([prevPesagem, p], p.id) : 0;
                   return (
                     <tr key={p.id}>
                       <td>{formatDate(p.data)}</td>
@@ -685,13 +669,14 @@ function MovimentacaoModal({ lote, db, setDb, onClose, onRegistrarEntradaAnimal,
       });
 
       // Atualizar lote de destino (para transferências)
-      if (form.tipo === 'transferencia_entrada' && form.lote_destino) {
+      if ((form.tipo === 'transferencia_saida' || form.tipo === 'transferencia_entrada') && form.lote_destino) {
         newLotes = newLotes.map((l) => {
           if (l.id === Number(form.lote_destino)) {
-            const destinoLote = lotesMap.get(Number(form.lote_destino));
-            const destinoIndicators = allLoteIndicators.get(Number(form.lote_destino));
+            const destinoIndicators = calcLote(prev, Number(form.lote_destino));
             const totalAnimais = (destinoIndicators?.totalAnimais || 0) + qtd;
-            const pesoAtualMedio = ((destinoIndicators?.pesoAtualMedio || 0) * (destinoIndicators?.totalAnimais || 0) + (peso * qtd)) / totalAnimais;
+            const pesoAtualMedio = totalAnimais
+              ? (((destinoIndicators?.pesoAtualMedio || 0) * (destinoIndicators?.totalAnimais || 0)) + (peso * qtd)) / totalAnimais
+              : peso;
             return { ...l, totalAnimais, p_at: pesoAtualMedio };
           }
           return l;
@@ -871,7 +856,7 @@ function NovoLoteModal({ db, setDb, onClose, showToast }) {
   const configGeral = db.configuracoes?.geral || {};
   const [form, setForm] = useState({
     nome: '',
-    faz_id: '',
+    faz_id: db.fazendas?.[0]?.id ? String(db.fazendas[0].id) : '',
     raca: '',
     sexo: 'Macho',
     categoria: 'Novilho',
@@ -909,7 +894,7 @@ function NovoLoteModal({ db, setDb, onClose, showToast }) {
     setDb((prev) => ({
       ...prev,
       lotes: [
-        ...(prev.lotes || []),
+        ...(Array.isArray(prev?.lotes) ? prev.lotes : []),
         {
           id: novoLoteId,
           nome: form.nome,
@@ -934,9 +919,9 @@ function NovoLoteModal({ db, setDb, onClose, showToast }) {
         },
       ],
       animais: [
-        ...(prev.animais || []),
+        ...(Array.isArray(prev?.animais) ? prev.animais : []),
         {
-          id: gerarNovoId(prev.animais),
+          id: gerarNovoId(prev.animais || []),
           lote_id: novoLoteId,
           sexo: form.sexo.toLowerCase(),
           gen: form.raca || 'Misto',
@@ -949,9 +934,9 @@ function NovoLoteModal({ db, setDb, onClose, showToast }) {
       ],
       // Adicionar custo de aquisição como um custo financeiro
       custos: custoAquisicao > 0 ? [
-        ...(prev.custos || []),
+        ...(Array.isArray(prev?.custos) ? prev.custos : []),
         {
-          id: gerarNovoId(prev.custos),
+          id: gerarNovoId(prev.custos || []),
           lote_id: novoLoteId,
           cat: 'aquisição',
           desc: `Custo de aquisição do lote ${form.nome}`,
@@ -1075,6 +1060,25 @@ function calcGmd30(pesagens, loteId) {
   if (daysDiff <= 0) return 0; // Evitar divisão por zero ou GMD inválido
 
   return (Number(last.peso_medio) - Number(prev.peso_medio)) / daysDiff;
+}
+
+function calcularGmdEntrePesagens(pesagens, pesagemId) {
+  const ordenadas = [...pesagens].sort((a, b) => new Date(a.data) - new Date(b.data));
+  const indice = ordenadas.findIndex((item) => Number(item.id) === Number(pesagemId));
+
+  if (indice <= 0) {
+    return 0;
+  }
+
+  const atual = ordenadas[indice];
+  const anterior = ordenadas[indice - 1];
+  const dias = daysBetween(anterior?.data, atual?.data);
+
+  if (dias <= 0) {
+    return 0;
+  }
+
+  return (Number(atual?.peso_medio || 0) - Number(anterior?.peso_medio || 0)) / dias;
 }
 
 /**

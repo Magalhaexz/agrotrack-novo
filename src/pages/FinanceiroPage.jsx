@@ -249,52 +249,62 @@ export default function FinanceiroPage({ db, setDb }) {
       {tab === 'lote' ? (
         <>
           <Card title="Resultado por lote">
-            <table className="data-table">
-              <thead>
-                <tr>
-                  <th>Lote</th>
-                  <th>Status</th>
-                  <th>Custo total</th>
-                  <th>Receita</th>
-                  <th>Lucro</th>
-                  <th>Margem (%)</th>
-                  <th>Lucro/cab</th>
-                  <th>Lucro/@</th>
-                  <th>Custo/cab/dia</th>
-                  <th>Acoes</th>
-                </tr>
-              </thead>
-              <tbody>
-                {lotesRows.map((row) => (
-                  <tr key={row.lote.id}>
-                    <td>{row.lote.nome}</td>
-                    <td><Badge variant={row.status === 'ativo' ? 'info' : 'neutral'}>{row.status}</Badge></td>
-                    <td>{formatCurrency(row.custoTotal)}</td>
-                    <td>{formatCurrency(row.receita)}</td>
-                    <td className={row.lucro >= 0 ? 'text-success' : 'text-danger'}>{formatCurrency(row.lucro)}</td>
-                    <td>{formatNumber(row.margem, 2)}%</td>
-                    <td>{formatCurrency(row.lucroCab)}</td>
-                    <td>{formatCurrency(row.lucroArroba)}</td>
-                    <td>{formatCurrency(row.custoCabDia)}</td>
-                    <td><Button size="sm" onClick={() => setDetailLoteId(row.lote.id)}>Detalhes</Button></td>
+            <div className="table-responsive">
+              <table className="data-table">
+                <thead>
+                  <tr>
+                    <th>Lote</th>
+                    <th>Status</th>
+                    <th>Custo total</th>
+                    <th>Receita</th>
+                    <th>Lucro</th>
+                    <th>Margem (%)</th>
+                    <th>Lucro/cab</th>
+                    <th>Lucro/@</th>
+                    <th>Custo/cab/dia</th>
+                    <th>Acoes</th>
                   </tr>
-                ))}
-              </tbody>
-              <tfoot>
-                <tr>
-                  <td>Total</td>
-                  <td>-</td>
-                  <td>{formatCurrency(lotesRows.reduce((sum, row) => sum + row.custoTotal, 0))}</td>
-                  <td>{formatCurrency(lotesRows.reduce((sum, row) => sum + row.receita, 0))}</td>
-                  <td>{formatCurrency(lotesRows.reduce((sum, row) => sum + row.lucro, 0))}</td>
-                  <td>-</td>
-                  <td>-</td>
-                  <td>-</td>
-                  <td>-</td>
-                  <td>-</td>
-                </tr>
-              </tfoot>
-            </table>
+                </thead>
+                <tbody>
+                  {lotesRows.length === 0 ? (
+                    <tr>
+                      <td colSpan="10" className="empty-state-td">Nenhum lote disponivel para analise financeira.</td>
+                    </tr>
+                  ) : (
+                    lotesRows.map((row) => (
+                      <tr key={row.lote.id}>
+                        <td>{row.lote.nome}</td>
+                        <td><Badge variant={row.status === 'ativo' ? 'info' : 'neutral'}>{row.status}</Badge></td>
+                        <td>{formatCurrency(row.custoTotal)}</td>
+                        <td>{formatCurrency(row.receita)}</td>
+                        <td className={row.lucro >= 0 ? 'text-success' : 'text-danger'}>{formatCurrency(row.lucro)}</td>
+                        <td>{formatNumber(row.margem, 2)}%</td>
+                        <td>{formatCurrency(row.lucroCab)}</td>
+                        <td>{formatCurrency(row.lucroArroba)}</td>
+                        <td>{formatCurrency(row.custoCabDia)}</td>
+                        <td><Button size="sm" onClick={() => setDetailLoteId(row.lote.id)}>Detalhes</Button></td>
+                      </tr>
+                    ))
+                  )}
+                </tbody>
+                {lotesRows.length ? (
+                  <tfoot>
+                    <tr>
+                      <td>Total</td>
+                      <td>-</td>
+                      <td>{formatCurrency(lotesRows.reduce((sum, row) => sum + row.custoTotal, 0))}</td>
+                      <td>{formatCurrency(lotesRows.reduce((sum, row) => sum + row.receita, 0))}</td>
+                      <td>{formatCurrency(lotesRows.reduce((sum, row) => sum + row.lucro, 0))}</td>
+                      <td>-</td>
+                      <td>-</td>
+                      <td>-</td>
+                      <td>-</td>
+                      <td>-</td>
+                    </tr>
+                  </tfoot>
+                ) : null}
+              </table>
+            </div>
           </Card>
 
           <Card title="Margem por lote">
