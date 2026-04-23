@@ -1,4 +1,5 @@
 import { Bell, ChevronDown, Clock3, LogOut, Menu, Settings, User } from 'lucide-react';
+import { createPortal } from 'react-dom';
 import { useEffect, useRef, useState } from 'react';
 import herdonLogo from '../assets/logo_app1.png';
 import { getNavLabel } from '../navigation/navConfig';
@@ -56,7 +57,13 @@ export default function AppHeader({
   const [notifRef, openNotif, setOpenNotif] = useDropdown(false);
   const [farmsRef, openFarms, setOpenFarms] = useDropdown(false);
   const notifButtonRef = useRef(null);
-  const [notifPosition, setNotifPosition] = useState({ top: 0, left: 0, width: 430 });
+  const [notifPosition, setNotifPosition] = useState({
+    top: 0,
+    left: 0,
+    width: 430,
+    maxHeight: 520,
+    mobile: false,
+  });
 
   async function handleLogout() {
     const confirmado = await onConfirmAction?.({
@@ -91,16 +98,26 @@ export default function AppHeader({
       if (!notifButtonRef.current) return;
 
       const rect = notifButtonRef.current.getBoundingClientRect();
-      const dropdownWidth = Math.min(430, Math.max(320, window.innerWidth - 28));
-      const nextLeft = Math.min(
-        Math.max(14, rect.right - dropdownWidth),
-        Math.max(14, window.innerWidth - dropdownWidth - 14)
-      );
+      const isMobile = window.innerWidth <= 900;
+      const viewportPadding = 14;
+      const dropdownWidth = isMobile
+        ? Math.max(280, window.innerWidth - viewportPadding * 2)
+        : Math.min(430, Math.max(320, window.innerWidth - 28));
+      const nextLeft = isMobile
+        ? viewportPadding
+        : Math.min(
+            Math.max(viewportPadding, rect.right - dropdownWidth),
+            Math.max(viewportPadding, window.innerWidth - dropdownWidth - viewportPadding)
+          );
+      const top = rect.bottom + 12;
+      const maxHeight = Math.max(240, window.innerHeight - top - viewportPadding);
 
       setNotifPosition({
-        top: rect.bottom + 10,
+        top,
         left: nextLeft,
         width: dropdownWidth,
+        maxHeight,
+        mobile: isMobile,
       });
     };
 
@@ -191,8 +208,6 @@ export default function AppHeader({
 
       <div className="top-header-actions">
         <div className="user-menu-wrap" ref={notifRef}>
-          {openNotif ? <button type="button" className="notif-overlay" aria-label="Fechar notificacoes" onClick={() => setOpenNotif(false)} /> : null}
-
           <button
             type="button"
             className="header-notification-btn notif-btn"
@@ -205,64 +220,6 @@ export default function AppHeader({
             <Bell size={16} />
             {notifications > 0 && <span className="notification-badge notif-badge">{notifications}</span>}
           </button>
-
-          {openNotif && (
-            <div
-              id="notification-dropdown-menu"
-              className="notif-dropdown"
-              style={
-                window.innerWidth > 900
-                  ? {
-                      position: 'fixed',
-                      top: `${notifPosition.top}px`,
-                      left: `${notifPosition.left}px`,
-                      width: `${notifPosition.width}px`,
-                    }
-                  : undefined
-              }
-            >
-              <div className="notif-panel-header">
-                <div>
-                  <span className="notif-panel-kicker">Central de alertas</span>
-                  <strong>{notifications > 0 ? `${notifications} pendentes` : 'Tudo em dia'}</strong>
-                  <small>Alertas operacionais, sanitarios, estoque e lembretes do HERDON.</small>
-                </div>
-                <span className="notif-panel-pill">{notifications}</span>
-              </div>
-
-              {alerts.length === 0 ? (
-                <p className="notif-empty">Sem alertas ativos no momento.</p>
-              ) : (
-                <div className="notif-list">
-                  {alerts.map((alert) => {
-                    const tone = getAlertTone(alert);
-                    const destino = getNavLabel(alert?.route || 'dashboard');
-
-                    return (
-                      <div key={alert.ackKey || alert.id} className={`notif-item notif-item--${tone}`}>
-                        <div className="notif-item-head">
-                          <div className={`notif-item-dot notif-item-dot--${tone}`} aria-hidden="true" />
-                          <div className="notif-item-copy">
-                            <strong>{alert.title || alert.titulo}</strong>
-                            <span className="notif-item-meta">{destino}</span>
-                          </div>
-                          <span className={`notif-item-tag notif-item-tag--${tone}`}>
-                            {tone === 'danger' ? 'Critico' : tone === 'warning' ? 'Atencao' : tone === 'info' ? 'Monitorar' : 'Operacional'}
-                          </span>
-                        </div>
-                        <small>{alert.description || alert.mensagem}</small>
-                        <div className="notif-actions">
-                          <Button size="sm" variant="outline" onClick={() => { onResolveAlert?.(alert); setOpenNotif(false); }}>Resolver</Button>
-                          <Button size="sm" variant="ghost" icon={<Clock3 size={12} />} onClick={() => { onSnoozeAlert?.(alert); setOpenNotif(false); }}>Adiar</Button>
-                          <Button size="sm" variant="ghost" onClick={() => { onAlertNavigate?.(alert); setOpenNotif(false); }}>Abrir</Button>
-                        </div>
-                      </div>
-                    );
-                  })}
-                </div>
-              )}
-            </div>
-          )}
         </div>
 
         <div className="user-menu-wrap" ref={userMenuRef}>
@@ -312,6 +269,72 @@ export default function AppHeader({
           )}
         </div>
       </div>
+
+      {openNotif
+        ? createPortal(
+            <>
+              <button
+                type="button"
+                className="notif-overlay"
+                aria-label="Fechar notificacoes"
+                onClick={() => setOpenNotif(false)}
+              />
+              <div
+                id="notification-dropdown-menu"
+                className={`notif-dropdown ${notifPosition.mobile ? 'notif-dropdown--mobile' : ''}`}
+                style={{
+                  position: 'fixed',
+                  top: `${notifPosition.top}px`,
+                  left: `${notifPosition.left}px`,
+                  width: `${notifPosition.width}px`,
+                  maxHeight: `${notifPosition.maxHeight}px`,
+                }}
+              >
+                <div className="notif-panel-header">
+                  <div>
+                    <span className="notif-panel-kicker">Central de alertas</span>
+                    <strong>{notifications > 0 ? `${notifications} pendentes` : 'Tudo em dia'}</strong>
+                    <small>Alertas operacionais, sanitarios, estoque e lembretes do HERDON.</small>
+                  </div>
+                  <span className="notif-panel-pill">{notifications}</span>
+                </div>
+
+                {alerts.length === 0 ? (
+                  <p className="notif-empty">Sem alertas ativos no momento.</p>
+                ) : (
+                  <div className="notif-list">
+                    {alerts.map((alert) => {
+                      const tone = getAlertTone(alert);
+                      const destino = getNavLabel(alert?.route || 'dashboard');
+
+                      return (
+                        <div key={alert.ackKey || alert.id} className={`notif-item notif-item--${tone}`}>
+                          <div className="notif-item-head">
+                            <div className={`notif-item-dot notif-item-dot--${tone}`} aria-hidden="true" />
+                            <div className="notif-item-copy">
+                              <strong>{alert.title || alert.titulo}</strong>
+                              <span className="notif-item-meta">{destino}</span>
+                            </div>
+                            <span className={`notif-item-tag notif-item-tag--${tone}`}>
+                              {tone === 'danger' ? 'Critico' : tone === 'warning' ? 'Atencao' : tone === 'info' ? 'Monitorar' : 'Operacional'}
+                            </span>
+                          </div>
+                          <small>{alert.description || alert.mensagem}</small>
+                          <div className="notif-actions">
+                            <Button size="sm" variant="outline" onClick={() => { onResolveAlert?.(alert); setOpenNotif(false); }}>Resolver</Button>
+                            <Button size="sm" variant="ghost" icon={<Clock3 size={12} />} onClick={() => { onSnoozeAlert?.(alert); setOpenNotif(false); }}>Adiar</Button>
+                            <Button size="sm" variant="ghost" onClick={() => { onAlertNavigate?.(alert); setOpenNotif(false); }}>Abrir</Button>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+            </>,
+            document.body
+          )
+        : null}
     </header>
   );
 }
