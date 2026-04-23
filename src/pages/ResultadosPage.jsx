@@ -28,36 +28,48 @@ const REPORT_TYPES = [
     id: 'lote',
     title: 'Relatórios por lote',
     description: 'Indicadores produtivos, financeiros e operacionais por lote.',
+    purpose: 'Ideal para fechar leitura de lote, conferir custo e acompanhar peso e margem.',
+    output: 'Resumo executivo e tabela operacional por lote.',
     icon: FileText,
   },
   {
     id: 'fazenda',
     title: 'Relatórios por fazenda',
     description: 'Consolidação dos resultados por fazenda e capacidade operacional.',
+    purpose: 'Bom para comparar unidades, capacidade operacional e concentracao do rebanho.',
+    output: 'Consolidado por fazenda com leitura de margem e receita.',
     icon: MapPin,
   },
   {
     id: 'sanitario',
     title: 'Relatórios sanitários',
     description: 'Protocolos aplicados, pendências, responsáveis e agenda de manejo.',
+    purpose: 'Ajuda a priorizar vencimentos, proximos manejos e gargalos sanitarios.',
+    output: 'Agenda sanitaria e base de protocolos filtrados.',
     icon: Pill,
   },
   {
     id: 'estoque',
     title: 'Relatórios de estoque',
     description: 'Saldo, criticidade, movimentações e cobertura operacional.',
+    purpose: 'Serve para compras, reposicao, leitura de saldo e monitoramento de validade.',
+    output: 'Saldo consolidado e movimentacoes do periodo.',
     icon: Package,
   },
   {
     id: 'financeiro',
     title: 'Relatórios financeiros',
     description: 'Despesas, receitas, categorias e visão pronta para DRE.',
+    purpose: 'Apoia fechamento operacional, leitura de caixa e preparacao para DRE.',
+    output: 'Lancamentos filtrados e resumo financeiro do escopo.',
     icon: DollarSign,
   },
   {
     id: 'desempenho',
     title: 'Relatórios de desempenho',
     description: 'Ranking zootécnico, metas de GMD e evolução recente de peso.',
+    purpose: 'Facilita priorizacao dos lotes acima ou abaixo da meta de desempenho.',
+    output: 'Ranking zootecnico e destaques do periodo.',
     icon: TrendingUp,
   },
 ];
@@ -117,13 +129,61 @@ export default function ResultadosPage({ db }) {
 
   const reportBundle = useMemo(() => buildReportBundle(db, appliedFilters), [db, appliedFilters]);
   const activeReport = reportBundle[selectedReport];
+  const selectedReportMeta = useMemo(
+    () => REPORT_TYPES.find((report) => report.id === selectedReport) || REPORT_TYPES[0],
+    [selectedReport]
+  );
   const reportCatalogSummary = useMemo(
     () => [
-      { label: 'Relatorios ativos', value: REPORT_TYPES.length, helper: 'modulos prontos para leitura' },
+      {
+        label: 'Modulo ativo',
+        value: selectedReportMeta.title
+          .replace('Relatórios por ', '')
+          .replace('Relatórios de ', '')
+          .replace('Relatório ', ''),
+        helper: 'leitura principal selecionada',
+      },
       { label: 'Escopo atual', value: activeReport.exportConfig.sheets.length, helper: 'abas consolidadas nesta visao' },
       { label: 'Base exportavel', value: activeReport.exportConfig.totalRows, helper: 'linhas preparadas para futura exportacao' },
     ],
-    [activeReport]
+    [activeReport, selectedReportMeta]
+  );
+  const filterSummary = useMemo(
+    () => [
+      {
+        label: 'Periodo aplicado',
+        value: activeReport.periodLabel,
+        helper: 'janela mestre usada em todos os cards e tabelas',
+      },
+      {
+        label: 'Escopo operacional',
+        value: activeReport.scopeLabel,
+        helper: 'fazenda, lote e status refletidos na mesma leitura',
+      },
+      {
+        label: 'Saida sugerida',
+        value: selectedReportMeta.output,
+        helper: 'estrutura pronta para leitura e futura exportacao',
+      },
+    ],
+    [activeReport.periodLabel, activeReport.scopeLabel, selectedReportMeta.output]
+  );
+  const workflowSteps = useMemo(
+    () => [
+      {
+        label: '1. Defina o escopo',
+        value: 'Use o filtro mestre para travar periodo, fazenda, lote e status antes da leitura.',
+      },
+      {
+        label: '2. Escolha o relatorio',
+        value: selectedReportMeta.purpose,
+      },
+      {
+        label: '3. Leia e exporte',
+        value: 'A tela ja entrega resumo, destaques, tabelas e base preparada para PDF ou XLSX.',
+      },
+    ],
+    [selectedReportMeta.purpose]
   );
 
   function applyFilters() {
@@ -186,7 +246,7 @@ export default function ResultadosPage({ db }) {
       </div>
 
       <div className="reports-layout">
-        <Card className="reports-filter-card" title="Filtro mestre" subtitle="Período, fazenda, lote e status para todos os relatórios">
+        <Card className="reports-filter-card" title="Filtro mestre" subtitle="Defina um escopo único para leitura, comparação e futura exportação do módulo inteiro.">
           <div className="reports-filter-meta">
             <Badge variant="neutral">Base: {formatDate(dateBounds.min) || '--'} até {formatDate(dateBounds.max) || '--'}</Badge>
             <Badge variant="info">Exportação futura preparada</Badge>
@@ -296,6 +356,16 @@ export default function ResultadosPage({ db }) {
               Aplicar filtros
             </Button>
           </div>
+
+          <div className="reports-filter-summary-grid">
+            {filterSummary.map((item) => (
+              <div key={item.label} className="reports-filter-summary-card">
+                <span>{item.label}</span>
+                <strong>{item.value}</strong>
+                <small>{item.helper}</small>
+              </div>
+            ))}
+          </div>
         </Card>
 
         <div className="reports-content">
@@ -320,13 +390,37 @@ export default function ResultadosPage({ db }) {
                   </div>
                   <strong>{report.title}</strong>
                   <p>{report.description}</p>
+                  <div className="report-type-card-copy">
+                    <span>Serve para</span>
+                    <small>{report.purpose}</small>
+                  </div>
                   <div className="report-type-card-foot">
                     <span>{data.catalogMetric}</span>
-                    <small>{data.scopeLabel}</small>
+                    <small>{report.output}</small>
                   </div>
                 </button>
               );
             })}
+          </div>
+
+          <div className="reports-context-band">
+            <div className="reports-context-head">
+              <div>
+                <span className="reports-context-kicker">Faixa contextual</span>
+                <strong>{selectedReportMeta.title}</strong>
+                <p>{selectedReportMeta.purpose}</p>
+              </div>
+              <Badge variant="info">{activeReport.periodLabel}</Badge>
+            </div>
+
+            <div className="reports-workflow-strip">
+              {workflowSteps.map((step) => (
+                <div key={step.label} className="reports-workflow-card">
+                  <span>{step.label}</span>
+                  <strong>{step.value}</strong>
+                </div>
+              ))}
+            </div>
           </div>
 
           {isGenerating ? (
