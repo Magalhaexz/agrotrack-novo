@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { ChevronDown, LogOut, Menu, Settings, User, X } from 'lucide-react';
-import { obterPerfilDoUsuario, permissoesPorPagina } from '../auth/perfis';
+import { obterLabelPerfil, obterPerfilDoUsuario, permissoesPorPagina } from '../auth/perfis';
 import herdonLogo from '../assets/logo_app1.png';
 import { getNavLabel, navSections } from '../navigation/navConfig';
 import UserAvatar from './ui/UserAvatar';
@@ -31,6 +31,7 @@ export default function Sidebar({
     perfil: user?.perfil || obterPerfilDoUsuario(user) || 'Visualizador',
     foto_url: user?.foto_url || user?.user_metadata?.avatar_url || null,
   };
+  const perfilExibicao = obterLabelPerfil(usuarioLogado?.perfil);
 
   const sections = useMemo(
     () =>
@@ -193,7 +194,7 @@ export default function Sidebar({
             <UserAvatar usuario={usuarioLogado} size={40} />
             <div className="sidebar-user-info">
               <p className="sidebar-user-name">{usuarioLogado?.nome}</p>
-              <p className="sidebar-user-role">{usuarioLogado?.perfil}</p>
+              <p className="sidebar-user-role">{perfilExibicao}</p>
             </div>
             <ChevronDown
               size={16}
@@ -213,7 +214,7 @@ export default function Sidebar({
                 <div>
                   <p className="user-dropdown-name">{usuarioLogado?.nome}</p>
                   <p className="user-dropdown-email">{usuarioLogado?.email}</p>
-                  <span className="user-dropdown-badge">{usuarioLogado?.perfil}</span>
+                  <span className="user-dropdown-badge">{perfilExibicao}</span>
                 </div>
               </div>
 

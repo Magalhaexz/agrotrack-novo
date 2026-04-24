@@ -2,6 +2,7 @@ import { Bell, ChevronDown, Clock3, LogOut, Menu, Settings, User } from 'lucide-
 import { createPortal } from 'react-dom';
 import { useEffect, useRef, useState } from 'react';
 import herdonLogo from '../assets/logo_app1.png';
+import { obterLabelPerfil } from '../auth/perfis';
 import { getNavLabel } from '../navigation/navConfig';
 import Button from './ui/Button';
 import UserAvatar from './ui/UserAvatar';
@@ -90,6 +91,7 @@ export default function AppHeader({
   }
 
   const nomeExibicao = usuarioLogado?.nome || 'Usuario';
+  const perfilExibicao = obterLabelPerfil(usuarioLogado?.perfilLabel || usuarioLogado?.perfil);
 
   useEffect(() => {
     if (!openNotif) return undefined;
@@ -233,7 +235,7 @@ export default function AppHeader({
             <UserAvatar usuario={usuarioLogado} size={32} />
             <div className="header-user-copy">
               <span className="header-user-name">{nomeExibicao.split(' ')[0]}</span>
-              <small>{usuarioLogado?.perfil || 'Visualizador'}</small>
+              <small>{perfilExibicao}</small>
             </div>
             <ChevronDown
               size={14}
@@ -248,7 +250,7 @@ export default function AppHeader({
                 <div>
                   <p className="user-dropdown-name">{nomeExibicao}</p>
                   <p className="user-dropdown-email">{usuarioLogado?.email || 'sem-email@herdon.app'}</p>
-                  <span className="user-dropdown-badge">{usuarioLogado?.perfil || 'Visualizador'}</span>
+                  <span className="user-dropdown-badge">{perfilExibicao}</span>
                 </div>
               </div>
               <div className="user-dropdown-divider" />

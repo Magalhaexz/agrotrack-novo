@@ -1,5 +1,5 @@
 import { AnimatePresence, motion } from 'framer-motion';
-import { Suspense, lazy, useEffect, useMemo, useState } from 'react';
+import { Suspense, lazy, useEffect, useMemo, useRef, useState } from 'react';
 import { initialDb } from './data/mockData';
 import { useAuth } from './auth/useAuth';
 import { permissoesPorPagina } from './auth/perfis';
@@ -130,6 +130,7 @@ export default function App() {
     tone: 'danger',
     resolver: null,
   });
+  const deniedToastRef = useRef({ permission: '', timestamp: 0 });
 
   useEffect(() => {
     const originalAlert = window.alert;
@@ -160,10 +161,13 @@ export default function App() {
     setForcarTelaLogin(false);
     setUsuarioLogado((prev) => ({
       id: user.id || prev?.id || null,
-      nome: prev?.nome || user?.user_metadata?.name || user?.user_metadata?.nome || user?.email?.split('@')[0] || 'Usuário',
+      nome: user?.nome || prev?.nome || user?.user_metadata?.name || user?.user_metadata?.nome || user?.email?.split('@')[0] || 'Usuário',
       email: user.email || prev?.email || '',
-      perfil: prev?.perfil || user?.user_metadata?.perfil || 'visualizador',
-      foto_url: prev?.foto_url ?? user?.user_metadata?.avatar_url ?? null,
+      perfil: user?.perfil || prev?.perfil || 'visualizador',
+      perfilLabel: user?.perfilLabel || prev?.perfilLabel || 'Visualizador',
+      foto_url: user?.foto_url ?? prev?.foto_url ?? user?.user_metadata?.avatar_url ?? null,
+      telefone: user?.telefone ?? prev?.telefone ?? '',
+      cargo: user?.cargo ?? prev?.cargo ?? '',
     }));
   }, [user]);
 
@@ -214,10 +218,13 @@ export default function App() {
     setUsuarioLogado((prev) => {
       const base = prev || {
         id: user?.id || null,
-        nome: user?.user_metadata?.name || user?.email?.split('@')[0] || 'Usuário',
+        nome: user?.nome || user?.user_metadata?.name || user?.email?.split('@')[0] || 'Usuário',
         email: user?.email || '',
-        perfil: user?.user_metadata?.perfil || 'visualizador',
-        foto_url: user?.user_metadata?.avatar_url || null,
+        perfil: user?.perfil || 'visualizador',
+        perfilLabel: user?.perfilLabel || 'Visualizador',
+        foto_url: user?.foto_url || user?.user_metadata?.avatar_url || null,
+        telefone: user?.telefone || '',
+        cargo: user?.cargo || '',
       };
 
       const atualizado = {
@@ -317,7 +324,15 @@ export default function App() {
       return true;
     }
 
-    showToast({ type: 'error', message: 'Acesso não autorizado para esta área.' });
+    const agora = Date.now();
+    if (
+      deniedToastRef.current.permission !== permissaoDestino ||
+      agora - deniedToastRef.current.timestamp > 1800
+    ) {
+      deniedToastRef.current = { permission: permissaoDestino, timestamp: agora };
+      showToast({ type: 'warning', message: 'Seu perfil atual nao tem acesso a esta area.' });
+    }
+
     return false;
   }
 

@@ -67,7 +67,7 @@ export default function LoginPage() {
           options: {
             data: {
               nome: nome || '',
-              perfil: 'visualizador',
+              name: nome || '',
             },
           },
         });

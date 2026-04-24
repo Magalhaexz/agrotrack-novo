@@ -1,4 +1,5 @@
-import { createContext, useEffect, useMemo, useState } from 'react';
+import { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react';
+import { mapProfileRowToUser, fetchUserProfile, isAccessModuleUnavailable } from '../services/userAccess';
 import { supabase } from '../lib/supabase';
 import { obterPerfilDoUsuario, usuarioTemPermissao } from './perfis';
 
@@ -6,11 +7,60 @@ const AuthContext = createContext(null);
 
 export function AuthProvider({ children }) {
   const [session, setSession] = useState(null);
+  const [profile, setProfile] = useState(null);
+  const [profileError, setProfileError] = useState(null);
+  const [profileReady, setProfileReady] = useState(false);
   const [loadingAuth, setLoadingAuth] = useState(true);
   const [authError, setAuthError] = useState(null);
 
   useEffect(() => {
     let ativo = true;
+
+    async function carregarProfile(userAtual) {
+      if (!userAtual?.id) {
+        if (ativo) {
+          setProfile(null);
+          setProfileError(null);
+          setProfileReady(true);
+        }
+        return;
+      }
+
+      if (ativo) {
+        setProfileReady(false);
+      }
+
+      try {
+        const { data, error } = await fetchUserProfile(userAtual.id);
+
+        if (error) {
+          if (!isAccessModuleUnavailable(error)) {
+            console.error('Erro ao carregar profile do usuario:', error);
+          }
+
+          if (ativo) {
+            setProfile(null);
+            setProfileError(error);
+            setProfileReady(true);
+          }
+          return;
+        }
+
+        if (ativo) {
+          setProfile(data || null);
+          setProfileError(null);
+          setProfileReady(true);
+        }
+      } catch (err) {
+        console.error('Erro inesperado ao carregar profile:', err);
+
+        if (ativo) {
+          setProfile(null);
+          setProfileError(err);
+          setProfileReady(true);
+        }
+      }
+    }
 
     async function carregarSessao() {
       try {
@@ -27,8 +77,10 @@ export function AuthProvider({ children }) {
         }
 
         if (ativo) {
-          setSession(data?.session ?? null);
+          const sessaoAtual = data?.session ?? null;
+          setSession(sessaoAtual);
           setAuthError(null);
+          await carregarProfile(sessaoAtual?.user ?? null);
           setLoadingAuth(false);
         }
       } catch (err) {
@@ -46,9 +98,10 @@ export function AuthProvider({ children }) {
 
     const {
       data: { subscription },
-    } = supabase.auth.onAuthStateChange((_event, sessionAtual) => {
+    } = supabase.auth.onAuthStateChange(async (_event, sessionAtual) => {
       setSession(sessionAtual ?? null);
       setAuthError(null);
+      await carregarProfile(sessionAtual?.user ?? null);
       setLoadingAuth(false);
     });
 
@@ -58,19 +111,47 @@ export function AuthProvider({ children }) {
     };
   }, []);
 
+  const refreshProfile = useCallback(async () => {
+    const userAtual = session?.user ?? null;
+    if (!userAtual?.id) {
+      setProfile(null);
+      setProfileReady(true);
+      return null;
+    }
+
+    setProfileReady(false);
+    const { data, error } = await fetchUserProfile(userAtual.id);
+
+    if (error) {
+      setProfileError(error);
+      setProfileReady(true);
+      return null;
+    }
+
+    setProfile(data || null);
+    setProfileError(null);
+    setProfileReady(true);
+    return data || null;
+  }, [session]);
+
   const value = useMemo(() => {
-    const user = session?.user ?? null;
+    const authUser = session?.user ?? null;
+    const user = mapProfileRowToUser(authUser, profile);
     const perfil = obterPerfilDoUsuario(user);
 
     return {
       session,
       user,
+      profile,
       perfil,
-      loadingAuth,
+      loadingAuth: loadingAuth || !profileReady,
       authError,
+      profileError,
+      profileReady,
+      refreshProfile,
       hasPermission: (permissao) => usuarioTemPermissao(user, permissao),
     };
-  }, [session, loadingAuth, authError]);
+  }, [session, profile, loadingAuth, authError, profileError, profileReady, refreshProfile]);
 
   return (
     <AuthContext.Provider value={value}>
