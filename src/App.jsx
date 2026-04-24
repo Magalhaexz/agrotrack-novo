@@ -1,6 +1,5 @@
 import { AnimatePresence, motion } from 'framer-motion';
 import { Suspense, lazy, useEffect, useMemo, useRef, useState } from 'react';
-import { initialDb } from './data/mockData';
 import { useAuth } from './auth/useAuth';
 import { permissoesPorPagina } from './auth/perfis';
 import AppHeader from './components/AppHeader';
@@ -18,6 +17,7 @@ import {
   gerarAlertasPesagem,
   ordenarAlertas,
 } from './domain/alertas';
+import { useOperationalData } from './hooks/useOperationalData';
 import { useToast } from './hooks/useToast';
 import { supabase } from './lib/supabase';
 import { secondaryNavItems, navSections } from './navigation/navConfig';
@@ -82,42 +82,15 @@ const pageTransitionVariants = {
 
 export default function App() {
   const [currentPage, setCurrentPage] = useState('dashboard');
-  const [db, setDb] = useState(() => ({
-    ...initialDb,
-    alertas_resolvidos: Array.isArray(initialDb?.alertas_resolvidos) ? initialDb.alertas_resolvidos : [],
-    funcionarios: Array.isArray(initialDb?.funcionarios) ? initialDb.funcionarios : [],
-    lotes: Array.isArray(initialDb?.lotes)
-      ? initialDb.lotes.map((lote) => ({
-          ...lote,
-          status: lote?.status || 'ativo',
-          data_encerramento: lote?.data_encerramento || null,
-          data_venda: lote?.data_venda || null,
-        }))
-      : [],
-    fazendas: Array.isArray(initialDb?.fazendas) ? initialDb.fazendas : [],
-    tarefas: Array.isArray(initialDb?.tarefas) ? initialDb.tarefas : [],
-    configuracoes: initialDb?.configuracoes || {
-      geral: {
-        nome_sistema: 'HERDON',
-        moeda: 'BRL',
-        formato_data: 'DD/MM/AAAA',
-        unidade_peso: 'kg',
-        rendimento_carcaca_padrao: 52,
-        preco_arroba_padrao: 290,
-      },
-      notificacoes: {
-        estoque_critico: true,
-        sanitario_vencido: true,
-        pesagem_atrasada: true,
-        lote_data_saida: true,
-        dias_antecedencia: 3,
-      },
-    },
-    usuarios: Array.isArray(initialDb?.usuarios) ? initialDb.usuarios : [],
-  }));
-
   const { toasts, showToast, removeToast } = useToast();
   const { session, user, loadingAuth, hasPermission } = useAuth();
+  const {
+    db,
+    setDb,
+    dataReady,
+    dataSource,
+    dataError,
+  } = useOperationalData(user);
   const [usuarioLogado, setUsuarioLogado] = useState(null);
   const [menuExtraAberto, setMenuExtraAberto] = useState(false);
   const [tabAtiva, setTabAtiva] = useState('geral');
@@ -151,6 +124,27 @@ export default function App() {
       window.alert = originalAlert;
     };
   }, [showToast]);
+
+  useEffect(() => {
+    if (!session || !dataReady) {
+      return;
+    }
+
+    if (dataSource === 'fallback') {
+      showToast({
+        type: 'warning',
+        message: 'Persistencia operacional indisponivel no momento. O app entrou em fallback local temporario.',
+      });
+      return;
+    }
+
+    if (dataSource === 'fallback_error' && dataError) {
+      showToast({
+        type: 'error',
+        message: dataError.message || 'Nao foi possivel carregar a base operacional persistida.',
+      });
+    }
+  }, [session, dataReady, dataSource, dataError, showToast]);
 
   useEffect(() => {
     if (!user) {
@@ -397,13 +391,13 @@ export default function App() {
     return grupos;
   }, [hasPermission]);
 
-  if (loadingAuth) {
+  if (loadingAuth || (session && !dataReady)) {
     return (
       <div className="app-loading">
         <div className="app-loading-panel">
           <span className="app-loading-pill">HERDON</span>
-          <strong>Carregando sua operação</strong>
-          <p>Preparando atalhos, alertas, lotes e relatórios.</p>
+          <strong>Carregando sua operacao</strong>
+          <p>{loadingAuth ? 'Preparando atalhos, alertas, lotes e relatorios.' : 'Sincronizando fazendas, lotes, pesagens e eventos reais.'}</p>
           <div className="app-loading-bars" aria-hidden="true">
             <span className="app-loading-bar" />
             <span className="app-loading-bar" />
