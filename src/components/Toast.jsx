@@ -1,36 +1,48 @@
-import React from 'react';
+import { X } from 'lucide-react';
 
-// Mapeamento de estilos para os tipos de toast
 const toastStylesMap = {
-  success: { bg: 'var(--color-success-bg)', border: 'var(--color-success)', color: 'var(--color-success-text)' },
-  error: { bg: 'var(--color-danger-bg)', border: 'var(--color-danger)', color: 'var(--color-danger-text)' },
-  warning: { bg: 'var(--color-warning-bg)', border: 'var(--color-warning)', color: 'var(--color-warning-text)' },
-  info: { bg: 'var(--color-info-bg)', border: 'var(--color-info)', color: 'var(--color-info-text)' },
+  success: {
+    accent: 'var(--color-success)',
+    background: 'color-mix(in srgb, var(--color-success-bg) 72%, rgba(8, 12, 10, 0.92))',
+  },
+  error: {
+    accent: 'var(--color-danger)',
+    background: 'color-mix(in srgb, var(--color-danger-bg) 72%, rgba(12, 8, 8, 0.92))',
+  },
+  warning: {
+    accent: 'var(--color-warning)',
+    background: 'color-mix(in srgb, var(--color-warning-bg) 72%, rgba(12, 10, 6, 0.92))',
+  },
+  info: {
+    accent: 'var(--color-info)',
+    background: 'color-mix(in srgb, var(--color-info-bg) 72%, rgba(7, 10, 14, 0.92))',
+  },
 };
 
 export default function Toast({ toast, onClose }) {
-  // Usa o estilo correspondente ao tipo, ou info como fallback
-  const style = toastStylesMap[toast.type] || toastStylesMap.info;
+  const variant = toast?.type || 'info';
+  const style = toastStylesMap[variant] || toastStylesMap.info;
 
   return (
     <div
-      className={`ui-toast ui-toast-${toast.type || 'info'}`} // Adiciona classes para estilização via CSS
-      role="status" // Indica que o elemento é uma atualização de status
-      aria-live="polite" // Anuncia mudanças de forma não intrusiva
+      className={`ui-toast ui-toast-${variant}`}
+      role="status"
+      aria-live="polite"
       style={{
-        background: style.bg,
-        border: `1px solid ${style.border}`,
-        color: style.color, // Usa a cor de texto definida no mapa
+        background: style.background,
+        borderColor: style.accent,
+        boxShadow: `0 20px 40px color-mix(in srgb, ${style.accent} 14%, transparent)`,
       }}
     >
-      <span className="ui-toast-message">{toast.message}</span>
+      <span className="ui-toast-accent" style={{ background: style.accent }} aria-hidden="true" />
+      <span className="ui-toast-message">{toast?.message}</span>
       <button
         type="button"
         onClick={() => onClose(toast.id)}
-        className="ui-toast-close-btn" // Classe para o botão de fechar
-        aria-label="Fechar notificação" // Descrição para leitores de tela
+        className="ui-toast-close-btn"
+        aria-label="Fechar notificacao"
       >
-        ✕
+        <X size={14} />
       </button>
     </div>
   );

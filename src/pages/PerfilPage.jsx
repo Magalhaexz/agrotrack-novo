@@ -3,8 +3,10 @@ import { FileText, LogOut } from 'lucide-react'; // Importar LogOut
 import Card from '../components/ui/Card';
 import Button from '../components/ui/Button';
 import UserAvatar from '../components/ui/UserAvatar';
+import { obterLabelPerfil } from '../auth/perfis';
 import { supabase } from '../lib/supabase';
 import { useToast } from '../hooks/useToast'; // Importar useToast
+import { upsertOwnProfile } from '../services/userAccess';
 import '../styles/perfil.css';
 
 // Helper function para calcular a força da senha
@@ -25,12 +27,12 @@ export default function PerfilPage({ db, usuarioLogado, atualizarUsuario, onConf
 
   const [usuarioLocal, setUsuarioLocal] = useState({
     id: usuarioLogado?.id || '',
-    nome: usuarioLogado?.user_metadata?.nome || '',
+    nome: usuarioLogado?.nome || usuarioLogado?.user_metadata?.nome || '',
     email: usuarioLogado?.email || '',
-    perfil: usuarioLogado?.user_metadata?.perfil || '',
-    foto_url: usuarioLogado?.user_metadata?.avatar_url ?? null,
-    telefone: usuarioLogado?.user_metadata?.telefone || '',
-    cargo: usuarioLogado?.user_metadata?.cargo || '',
+    perfil: usuarioLogado?.perfil || usuarioLogado?.user_metadata?.perfil || '',
+    foto_url: usuarioLogado?.foto_url ?? usuarioLogado?.user_metadata?.avatar_url ?? null,
+    telefone: usuarioLogado?.telefone || usuarioLogado?.user_metadata?.telefone || '',
+    cargo: usuarioLogado?.cargo || usuarioLogado?.user_metadata?.cargo || '',
   });
 
   const [senhaAtual, setSenhaAtual] = useState('');
@@ -43,17 +45,19 @@ export default function PerfilPage({ db, usuarioLogado, atualizarUsuario, onConf
     fazenda_padrao_id: usuarioLogado?.user_metadata?.fazenda_padrao_id || db?.fazendas?.[0]?.id || '',
   });
 
+  const perfilExibicao = obterLabelPerfil(usuarioLocal?.perfil);
+
   // Sincroniza o estado local do usuário com o `usuarioLogado` prop
   useEffect(() => {
     if (!usuarioLogado) return;
     setUsuarioLocal({
       id: usuarioLogado.id || '',
-      nome: usuarioLogado.user_metadata?.nome || '',
+      nome: usuarioLogado.nome || usuarioLogado.user_metadata?.nome || '',
       email: usuarioLogado.email || '',
-      perfil: usuarioLogado.user_metadata?.perfil || '',
-      foto_url: usuarioLogado.user_metadata?.avatar_url ?? null,
-      telefone: usuarioLogado.user_metadata?.telefone || '',
-      cargo: usuarioLogado.user_metadata?.cargo || '',
+      perfil: usuarioLogado.perfil || usuarioLogado.user_metadata?.perfil || '',
+      foto_url: usuarioLogado.foto_url ?? usuarioLogado.user_metadata?.avatar_url ?? null,
+      telefone: usuarioLogado.telefone || usuarioLogado.user_metadata?.telefone || '',
+      cargo: usuarioLogado.cargo || usuarioLogado.user_metadata?.cargo || '',
     });
     setPreferencias((prev) => ({
       ...prev,
@@ -94,7 +98,7 @@ export default function PerfilPage({ db, usuarioLogado, atualizarUsuario, onConf
       return;
     }
 
-    const payload = {
+    const metadataPayload = {
       nome: usuarioLocal.nome.trim(),
       telefone: usuarioLocal.telefone,
       cargo: usuarioLocal.cargo,
@@ -102,7 +106,7 @@ export default function PerfilPage({ db, usuarioLogado, atualizarUsuario, onConf
       // perfil: usuarioLocal.perfil, // Perfil geralmente não é alterado pelo próprio usuário
     };
 
-    const { error } = await supabase.auth.updateUser({ data: payload });
+    const { error } = await supabase.auth.updateUser({ data: metadataPayload });
 
     if (error) {
       showToast({ type: 'error', message: `Erro ao salvar perfil: ${error.message}` });
@@ -110,11 +114,30 @@ export default function PerfilPage({ db, usuarioLogado, atualizarUsuario, onConf
     }
 
     // Atualiza o contexto/estado global do usuário
+    const { error: profileError, data: profileAtualizado } = await upsertOwnProfile(usuarioLocal.id, {
+      email: usuarioLocal.email,
+      nome: metadataPayload.nome,
+      perfil: usuarioLocal.perfil,
+      telefone: usuarioLocal.telefone,
+      cargo: usuarioLocal.cargo,
+      foto_url: usuarioLocal.foto_url,
+    });
+
+    if (profileError) {
+      showToast({ type: 'warning', message: 'Dados salvos no login, mas o profile do banco ainda precisa da migration.' });
+    }
+
     atualizarUsuario?.({
-      ...usuarioLogado, // Mantém outras propriedades do usuarioLogado
+      ...usuarioLogado,
+      nome: metadataPayload.nome,
+      email: usuarioLocal.email,
+      perfil: profileAtualizado?.perfil || usuarioLocal.perfil,
+      foto_url: usuarioLocal.foto_url,
+      telefone: usuarioLocal.telefone,
+      cargo: usuarioLocal.cargo,
       user_metadata: {
         ...usuarioLogado?.user_metadata,
-        ...payload,
+        ...metadataPayload,
       },
     });
     showToast({ type: 'success', message: 'Perfil salvo com sucesso!' });
@@ -239,6 +262,10 @@ export default function PerfilPage({ db, usuarioLogado, atualizarUsuario, onConf
             <label className="ui-input-wrap">
               <span className="ui-input-label">E-mail</span>
               <input className="ui-input" value={usuarioLocal.email} readOnly />
+            </label>
+            <label className="ui-input-wrap">
+              <span className="ui-input-label">Perfil</span>
+              <input className="ui-input" value={perfilExibicao} readOnly />
             </label>
             <label className="ui-input-wrap">
               <span className="ui-input-label">Telefone</span>

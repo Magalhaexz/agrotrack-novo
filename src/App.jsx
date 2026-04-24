@@ -1,44 +1,36 @@
-import { Suspense, lazy, useEffect, useMemo, useState } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
-
-// Componentes da UI
-import Sidebar from './components/Sidebar';
-import Toast from './components/Toast';
-import ConfirmModal from './components/ConfirmModal';
+import { AnimatePresence, motion } from 'framer-motion';
+import { Suspense, lazy, useEffect, useMemo, useRef, useState } from 'react';
+import { initialDb } from './data/mockData';
+import { useAuth } from './auth/useAuth';
+import { permissoesPorPagina } from './auth/perfis';
 import AppHeader from './components/AppHeader';
-import LoginPage from './pages/LoginPage';
-import RotaProtegida from './components/RotaProtegida';
+import ConfirmModal from './components/ConfirmModal';
 import MobileBottomNav from './components/MobileBottomNav';
 import MobileFab from './components/MobileFab';
+import RotaProtegida from './components/RotaProtegida';
+import Sidebar from './components/Sidebar';
+import Toast from './components/Toast';
 import Modal from './components/ui/Modal';
-import Button from './components/ui/Button';
-
-// Dados e Utilitários
-import { initialDb } from './data/mockData';
-import { buildAlerts } from './utils/alerts'; // Alertas legados
 import {
   gerarAlertasCalendario,
   gerarAlertasEstoque,
   gerarAlertasLote,
   gerarAlertasPesagem,
   ordenarAlertas,
-} from './domain/alertas'; // Novos alertas de domínio
+} from './domain/alertas';
+import { useToast } from './hooks/useToast';
 import { supabase } from './lib/supabase';
-import { useAuth } from './auth/useAuth';
-import { permissoesPorPagina } from './auth/perfis';
+import { secondaryNavItems, navSections } from './navigation/navConfig';
 import {
   registrarEntradaAnimal,
   registrarEntradaEstoque,
   registrarSaidaAnimal,
   registrarSaidaEstoque,
 } from './services/movimentacoes';
-import { useToast } from './hooks/useToast';
-
-// Estilos
+import { buildAlerts } from './utils/alerts';
 import './styles/app.css';
 import './styles/ui.css';
 
-// Carregamento lazy das páginas
 const DashboardPage = lazy(() => import('./pages/DashboardPage'));
 const FazendasPage = lazy(() => import('./pages/FazendasPage'));
 const LotesPage = lazy(() => import('./pages/LotesPage'));
@@ -58,8 +50,8 @@ const FuncionariosPage = lazy(() => import('./pages/FuncionariosPage'));
 const TarefasPage = lazy(() => import('./pages/TarefasPage'));
 const PerfilPage = lazy(() => import('./pages/PerfilPage'));
 const ConfiguracoesPage = lazy(() => import('./pages/ConfiguracoesPage'));
+const LoginPage = lazy(() => import('./pages/LoginPage'));
 
-// Mapeamento de páginas para carregamento dinâmico
 const pageMap = {
   dashboard: DashboardPage,
   fazendas: FazendasPage,
@@ -82,7 +74,6 @@ const pageMap = {
   financeiro: FinanceiroPage,
 };
 
-// Variantes de animação para transição de página
 const pageTransitionVariants = {
   initial: { opacity: 0, y: 15 },
   animate: { opacity: 1, y: 0 },
@@ -91,15 +82,10 @@ const pageTransitionVariants = {
 
 export default function App() {
   const [currentPage, setCurrentPage] = useState('dashboard');
-  // Estado do banco de dados simulado, inicializado com dados mock e tratamento de valores padrão
   const [db, setDb] = useState(() => ({
     ...initialDb,
-    alertas_resolvidos: Array.isArray(initialDb?.alertas_resolvidos)
-      ? initialDb.alertas_resolvidos
-      : [],
-    funcionarios: Array.isArray(initialDb?.funcionarios)
-      ? initialDb.funcionarios
-      : [],
+    alertas_resolvidos: Array.isArray(initialDb?.alertas_resolvidos) ? initialDb.alertas_resolvidos : [],
+    funcionarios: Array.isArray(initialDb?.funcionarios) ? initialDb.funcionarios : [],
     lotes: Array.isArray(initialDb?.lotes)
       ? initialDb.lotes.map((lote) => ({
           ...lote,
@@ -108,12 +94,8 @@ export default function App() {
           data_venda: lote?.data_venda || null,
         }))
       : [],
-    fazendas: Array.isArray(initialDb?.fazendas)
-      ? initialDb.fazendas
-      : [],
-    tarefas: Array.isArray(initialDb?.tarefas)
-      ? initialDb.tarefas
-      : [],
+    fazendas: Array.isArray(initialDb?.fazendas) ? initialDb.fazendas : [],
+    tarefas: Array.isArray(initialDb?.tarefas) ? initialDb.tarefas : [],
     configuracoes: initialDb?.configuracoes || {
       geral: {
         nome_sistema: 'HERDON',
@@ -134,23 +116,22 @@ export default function App() {
     usuarios: Array.isArray(initialDb?.usuarios) ? initialDb.usuarios : [],
   }));
 
-  const { toasts, showToast, removeToast } = useToast(); // Hook para gerenciar toasts
-  const { session, user, loadingAuth, hasPermission } = useAuth(); // Hook de autenticação
+  const { toasts, showToast, removeToast } = useToast();
+  const { session, user, loadingAuth, hasPermission } = useAuth();
   const [usuarioLogado, setUsuarioLogado] = useState(null);
-  const [menuExtraAberto, setMenuExtraAberto] = useState(false); // Estado para menu mobile extra
-  const [tabAtiva, setTabAtiva] = useState('geral'); // Estado para abas em algumas páginas
-  const [fazendaSelecionada, setFazendaSelecionada] = useState(null); // Fazenda atualmente selecionada
-  const [forcarTelaLogin, setForcarTelaLogin] = useState(false); // Força a exibição da tela de login
-  // Estado para o modal de confirmação genérico
+  const [menuExtraAberto, setMenuExtraAberto] = useState(false);
+  const [tabAtiva, setTabAtiva] = useState('geral');
+  const [fazendaSelecionada, setFazendaSelecionada] = useState(null);
+  const [forcarTelaLogin, setForcarTelaLogin] = useState(false);
   const [confirmState, setConfirmState] = useState({
     open: false,
     title: '',
     message: '',
     tone: 'danger',
-    resolver: null, // Função para resolver a Promise do confirm
+    resolver: null,
   });
+  const deniedToastRef = useRef({ permission: '', timestamp: 0 });
 
-  // Efeito para substituir window.alert por toasts personalizados
   useEffect(() => {
     const originalAlert = window.alert;
     window.alert = (message) => {
@@ -160,34 +141,36 @@ export default function App() {
         ? 'success'
         : lower.includes('erro') || lower.includes('insuficiente')
           ? 'error'
-          : 'warning';
+          : lower.includes('atencao') || lower.includes('alerta')
+            ? 'warning'
+            : 'info';
       showToast({ type, message: texto });
     };
 
     return () => {
-      window.alert = originalAlert; // Restaura o alert original ao desmontar
+      window.alert = originalAlert;
     };
   }, [showToast]);
 
-  // Efeito para atualizar o usuário logado quando o `user` do Supabase muda
   useEffect(() => {
     if (!user) {
       setUsuarioLogado(null);
       return;
     }
 
-    setForcarTelaLogin(false); // Garante que a tela de login não é forçada se há um usuário
-
+    setForcarTelaLogin(false);
     setUsuarioLogado((prev) => ({
       id: user.id || prev?.id || null,
-      nome: prev?.nome || user?.user_metadata?.name || user?.user_metadata?.nome || user?.email?.split('@')[0] || 'Usuário',
+      nome: user?.nome || prev?.nome || user?.user_metadata?.name || user?.user_metadata?.nome || user?.email?.split('@')[0] || 'Usuário',
       email: user.email || prev?.email || '',
-      perfil: prev?.perfil || user?.user_metadata?.perfil || 'visualizador',
-      foto_url: prev?.foto_url ?? user?.user_metadata?.avatar_url ?? null,
+      perfil: user?.perfil || prev?.perfil || 'visualizador',
+      perfilLabel: user?.perfilLabel || prev?.perfilLabel || 'Visualizador',
+      foto_url: user?.foto_url ?? prev?.foto_url ?? user?.user_metadata?.avatar_url ?? null,
+      telefone: user?.telefone ?? prev?.telefone ?? '',
+      cargo: user?.cargo ?? prev?.cargo ?? '',
     }));
   }, [user]);
 
-  // Efeito para gerenciar a fazenda selecionada
   useEffect(() => {
     const fazendas = Array.isArray(db?.fazendas) ? db.fazendas : [];
     if (!fazendas.length) {
@@ -196,123 +179,119 @@ export default function App() {
     }
 
     setFazendaSelecionada((prev) => {
-      // Se já houver uma fazenda selecionada e ela ainda existir na lista, mantém
-      if (prev && fazendas.some((f) => Number(f.id) === Number(prev.id))) {
-        return fazendas.find((f) => Number(f.id) === Number(prev.id));
+      if (prev && fazendas.some((fazenda) => Number(fazenda.id) === Number(prev.id))) {
+        return fazendas.find((fazenda) => Number(fazenda.id) === Number(prev.id));
       }
-      // Caso contrário, seleciona a primeira fazenda
       return fazendas[0];
     });
   }, [db?.fazendas]);
 
-  // Memoiza o banco de dados filtrado pela fazenda selecionada para o Dashboard
   const dbDashboard = useMemo(() => {
-    if (!fazendaSelecionada?.id) return db; // Se nenhuma fazenda selecionada, retorna o DB completo
+    if (!fazendaSelecionada?.id) {
+      return db;
+    }
 
-    // Filtra lotes pela fazenda selecionada
-    const loteIds = new Set((db.lotes || []).filter((l) => Number(l.faz_id) === Number(fazendaSelecionada.id)).map((l) => l.id));
+    const loteIds = new Set(
+      (db.lotes || [])
+        .filter((lote) => Number(lote.faz_id) === Number(fazendaSelecionada.id))
+        .map((lote) => lote.id)
+    );
 
     return {
       ...db,
-      lotes: (db.lotes || []).filter((l) => loteIds.has(l.id)),
-      animais: (db.animais || []).filter((a) => loteIds.has(a.lote_id)),
-      custos: (db.custos || []).filter((c) => loteIds.has(c.lote_id)),
-      pesagens: (db.pesagens || []).filter((p) => loteIds.has(p.lote_id)),
-      sanitario: (db.sanitario || []).filter((s) => loteIds.has(s.lote_id)),
-      // Tarefas podem ser por fazenda ou por lote
-      tarefas: (db.tarefas || []).filter((t) => !t.fazenda_id || Number(t.fazenda_id) === Number(fazendaSelecionada.id) || loteIds.has(t.lote_id)),
-      movimentacoes_animais: (db.movimentacoes_animais || []).filter((m) => loteIds.has(m.lote_id)),
+      lotes: (db.lotes || []).filter((lote) => loteIds.has(lote.id)),
+      animais: (db.animais || []).filter((animal) => loteIds.has(animal.lote_id)),
+      custos: (db.custos || []).filter((custo) => loteIds.has(custo.lote_id)),
+      pesagens: (db.pesagens || []).filter((pesagem) => loteIds.has(pesagem.lote_id)),
+      sanitario: (db.sanitario || []).filter((item) => loteIds.has(item.lote_id)),
+      tarefas: (db.tarefas || []).filter(
+        (tarefa) =>
+          !tarefa.fazenda_id ||
+          Number(tarefa.fazenda_id) === Number(fazendaSelecionada.id) ||
+          loteIds.has(tarefa.lote_id)
+      ),
+      movimentacoes_animais: (db.movimentacoes_animais || []).filter((movimento) => loteIds.has(movimento.lote_id)),
     };
   }, [db, fazendaSelecionada]);
 
-  // Função para atualizar os dados do usuário logado
   function atualizarUsuario(dadosAtualizados) {
     setUsuarioLogado((prev) => {
       const base = prev || {
         id: user?.id || null,
-        nome: user?.user_metadata?.name || user?.email?.split('@')[0] || 'Usuário',
+        nome: user?.nome || user?.user_metadata?.name || user?.email?.split('@')[0] || 'Usuário',
         email: user?.email || '',
-        perfil: user?.user_metadata?.perfil || 'visualizador',
-        foto_url: user?.user_metadata?.avatar_url || null,
+        perfil: user?.perfil || 'visualizador',
+        perfilLabel: user?.perfilLabel || 'Visualizador',
+        foto_url: user?.foto_url || user?.user_metadata?.avatar_url || null,
+        telefone: user?.telefone || '',
+        cargo: user?.cargo || '',
       };
-      const atualizado = { ...base, ...dadosAtualizados, foto_url: dadosAtualizados?.foto_url ?? base.foto_url ?? null };
-      // Armazena no localStorage para persistência básica
+
+      const atualizado = {
+        ...base,
+        ...dadosAtualizados,
+        foto_url: dadosAtualizados?.foto_url ?? base.foto_url ?? null,
+      };
+
       localStorage.setItem('herdon_usuario', JSON.stringify(atualizado));
       return atualizado;
     });
   }
 
-  // Função para lidar com o logout do usuário
   async function handleLogout() {
-    setForcarTelaLogin(true); // Força a tela de login
+    setForcarTelaLogin(true);
     setUsuarioLogado(null);
-    // Limpa dados de sessão e autenticação
     localStorage.removeItem('herdon_usuario');
     localStorage.removeItem('herdon_user');
     localStorage.removeItem('herdon_token');
     sessionStorage.clear();
+
     try {
-      await supabase.auth.signOut(); // Chama o logout do Supabase
+      await supabase.auth.signOut();
     } catch (error) {
       console.error('Erro ao finalizar sessão:', error);
     }
-    setCurrentPage('dashboard'); // Redireciona para o dashboard após logout
+
+    setCurrentPage('dashboard');
   }
 
-  // Extrai alertas resolvidos do DB
-  const alertasResolvidos = Array.isArray(db?.alertas_resolvidos)
-    ? db.alertas_resolvidos
-    : [];
+  const alertasResolvidos = Array.isArray(db?.alertas_resolvidos) ? db.alertas_resolvidos : [];
 
-  // Memoiza a geração de alertas brutos (não filtrados por resolvidos)
   const rawAlerts = useMemo(() => {
-    const legacy = buildAlerts(db); // Alertas gerados pelo utilitário antigo
-    const auto = [ // Novos alertas gerados por domínio
+    const legacy = buildAlerts(db);
+    const automaticos = [
       ...gerarAlertasEstoque(db),
       ...gerarAlertasCalendario(db),
       ...gerarAlertasPesagem(db),
       ...gerarAlertasLote(db),
     ];
-    return ordenarAlertas([...legacy, ...auto]); // Combina e ordena todos os alertas
+    return ordenarAlertas([...legacy, ...automaticos]);
   }, [db]);
 
-  // Memoiza os alertas filtrados (apenas os não resolvidos)
-  const alerts = useMemo(() => {
-    return rawAlerts.filter(
-      (alert) => !alertasResolvidos.includes(alert.ackKey || alert.id)
-    );
-  }, [rawAlerts, alertasResolvidos]);
+  const alerts = useMemo(
+    () => rawAlerts.filter((alert) => !alertasResolvidos.includes(alert.ackKey || alert.id)),
+    [alertasResolvidos, rawAlerts]
+  );
 
-  // Função para marcar um alerta como resolvido
   function marcarAlertaComoFeito(alert) {
     const chave = alert?.ackKey || alert?.id;
-    if (!chave) return;
+    if (!chave) {
+      return;
+    }
 
     setDb((prev) => ({
       ...prev,
-      alertas_resolvidos: Array.from(
-        new Set([...(prev?.alertas_resolvidos || []), chave]) // Adiciona a chave aos alertas resolvidos
-      ),
+      alertas_resolvidos: Array.from(new Set([...(prev?.alertas_resolvidos || []), chave])),
     }));
   }
 
-  // Contexto do usuário para funções de movimentação
   const userContext = { id: user?.id || null, email: user?.email || '' };
 
-  // Handlers para registrar movimentações, atualizando o estado do DB
-  const handleRegistrarEntradaAnimal = (dados) =>
-    setDb((prev) => registrarEntradaAnimal(prev, dados, userContext));
+  const handleRegistrarEntradaAnimal = (dados) => setDb((prev) => registrarEntradaAnimal(prev, dados, userContext));
+  const handleRegistrarSaidaAnimal = (dados) => setDb((prev) => registrarSaidaAnimal(prev, dados, userContext));
+  const handleRegistrarEntradaEstoque = (dados) => setDb((prev) => registrarEntradaEstoque(prev, dados, userContext));
+  const handleRegistrarSaidaEstoque = (dados) => setDb((prev) => registrarSaidaEstoque(prev, dados, userContext));
 
-  const handleRegistrarSaidaAnimal = (dados) =>
-    setDb((prev) => registrarSaidaAnimal(prev, dados, userContext));
-
-  const handleRegistrarEntradaEstoque = (dados) =>
-    setDb((prev) => registrarEntradaEstoque(prev, dados, userContext));
-
-  const handleRegistrarSaidaEstoque = (dados) =>
-    setDb((prev) => registrarSaidaEstoque(prev, dados, userContext));
-
-  // Função para abrir o modal de confirmação e retornar uma Promise
   const onConfirmAction = ({ title, message, tone = 'danger' }) =>
     new Promise((resolve) => {
       setConfirmState({
@@ -320,15 +299,15 @@ export default function App() {
         title: title || 'Confirmar ação',
         message,
         tone,
-        resolver: resolve, // Armazena a função resolve da Promise
+        resolver: resolve,
       });
     });
 
-  // Função para fechar o modal de confirmação e resolver a Promise
   function fecharConfirmacao(resultado) {
     if (typeof confirmState.resolver === 'function') {
       confirmState.resolver(resultado);
     }
+
     setConfirmState({
       open: false,
       title: '',
@@ -338,37 +317,116 @@ export default function App() {
     });
   }
 
-  // Lógica para verificar permissões de página
+  function navigateWithPermission(pagina) {
+    const permissaoDestino = permissoesPorPagina[pagina];
+    if (!permissaoDestino || hasPermission(permissaoDestino)) {
+      setCurrentPage(pagina);
+      return true;
+    }
+
+    const agora = Date.now();
+    if (
+      deniedToastRef.current.permission !== permissaoDestino ||
+      agora - deniedToastRef.current.timestamp > 1800
+    ) {
+      deniedToastRef.current = { permission: permissaoDestino, timestamp: agora };
+      showToast({ type: 'warning', message: 'Seu perfil atual nao tem acesso a esta area.' });
+    }
+
+    return false;
+  }
+
+  function handleMobileQuickAction(acao) {
+    const action = String(acao || '').toLowerCase();
+
+    if (action.includes('pesagem')) {
+      navigateWithPermission('pesagens');
+      return;
+    }
+
+    if (action.includes('movimenta') || action.includes('lote')) {
+      navigateWithPermission('lotes');
+      return;
+    }
+
+    if (action.includes('entrada') || action.includes('saida') || action.includes('item')) {
+      navigateWithPermission('estoque');
+      return;
+    }
+
+    if (action.includes('receita') || action.includes('despesa') || action.includes('fluxo')) {
+      navigateWithPermission('financeiro');
+      return;
+    }
+
+    showToast({ type: 'info', message: `Acao rapida disponivel: ${acao}` });
+  }
+
   const paginaValida = currentPage in pageMap;
   const permissaoAtual = permissoesPorPagina[currentPage] || null;
   const podeAcessarPaginaAtual = paginaValida && (!permissaoAtual || hasPermission(permissaoAtual));
-  const pageKey = podeAcessarPaginaAtual ? currentPage : 'dashboard'; // Redireciona para dashboard se não tiver permissão
-  const ActivePage = pageMap[pageKey] || DashboardPage; // Componente da página ativa
-  const permissaoPaginaAtual = permissoesPorPagina[pageKey] || null; // Permissão da página ativa
+  const pageKey = podeAcessarPaginaAtual ? currentPage : 'dashboard';
+  const ActivePage = pageMap[pageKey] || DashboardPage;
+  const permissaoPaginaAtual = permissoesPorPagina[pageKey] || null;
 
-  // Exibe tela de carregamento de autenticação
+  const mobileNavGroups = useMemo(() => {
+    const grupos = navSections
+      .map((section) => ({
+        id: section.id,
+        title: section.title || 'Principal',
+        items: section.items.filter((item) => {
+          const permissao = permissoesPorPagina[item.id];
+          return !permissao || hasPermission(permissao);
+        }),
+      }))
+      .filter((section) => section.items.length > 0);
+
+    const conta = secondaryNavItems.filter((item) => {
+      const permissao = permissoesPorPagina[item.id];
+      return !permissao || hasPermission(permissao);
+    });
+
+    if (conta.length) {
+      grupos.push({
+        id: 'conta',
+        title: 'Conta',
+        items: conta,
+      });
+    }
+
+    return grupos;
+  }, [hasPermission]);
+
   if (loadingAuth) {
-    return <div className="app-loading">Carregando...</div>;
+    return (
+      <div className="app-loading">
+        <div className="app-loading-panel">
+          <span className="app-loading-pill">HERDON</span>
+          <strong>Carregando sua operação</strong>
+          <p>Preparando atalhos, alertas, lotes e relatórios.</p>
+          <div className="app-loading-bars" aria-hidden="true">
+            <span className="app-loading-bar" />
+            <span className="app-loading-bar" />
+            <span className="app-loading-bar" />
+          </div>
+        </div>
+      </div>
+    );
   }
 
-  // Exibe tela de login se for forçado ou não houver sessão
   if (forcarTelaLogin || !session) {
-    return <LoginPage />;
+    return (
+      <Suspense fallback={<div className="app-loading">Abrindo login...</div>}>
+        <LoginPage />
+      </Suspense>
+    );
   }
 
   return (
     <div className="app">
-      {/* Sidebar de navegação */}
       <Sidebar
         currentPage={pageKey}
-        onNavigate={(pagina) => {
-          const permissaoDestino = permissoesPorPagina[pagina];
-          if (!permissaoDestino || hasPermission(permissaoDestino)) {
-            setCurrentPage(pagina);
-            return;
-          }
-          showToast({ type: 'error', message: 'Acesso não autorizado para esta área.' });
-        }}
+        onNavigate={navigateWithPermission}
         alertCount={alerts.length}
         user={usuarioLogado}
         hasPermission={hasPermission}
@@ -376,14 +434,17 @@ export default function App() {
       />
 
       <main className="main">
-        {/* Cabeçalho da aplicação */}
         <AppHeader
           farmName={fazendaSelecionada?.nome || db?.fazendas?.[0]?.nome || 'Fazenda Atual'}
           notifications={alerts.length}
           alerts={alerts}
           onResolveAlert={marcarAlertaComoFeito}
           onSnoozeAlert={(alert) => showToast({ type: 'warning', message: `Alerta adiado: ${alert.title}` })}
-          onAlertNavigate={(alert) => alert?.route && setCurrentPage(alert.route)}
+          onAlertNavigate={(alert) => {
+            if (alert?.route) {
+              navigateWithPermission(alert.route);
+            }
+          }}
           onSignOut={handleLogout}
           onNavigateProfile={() => setCurrentPage('perfil')}
           onNavigateSettings={() => setCurrentPage('configuracoes')}
@@ -397,7 +458,6 @@ export default function App() {
           onTabChange={setTabAtiva}
         />
 
-        {/* Área de conteúdo principal com transições de página */}
         <AnimatePresence mode="wait">
           <motion.div
             key={pageKey}
@@ -408,14 +468,25 @@ export default function App() {
             transition={{ duration: 0.25, ease: 'easeOut' }}
             className="page-wrapper"
           >
-            <Suspense fallback={<div className="skeleton-page"><div className="skeleton-row" /><div className="skeleton-row" /><div className="skeleton-row" /></div>}>
-              {/* Rota Protegida verifica permissões antes de renderizar a página */}
+            <Suspense
+              fallback={(
+                <div className="skeleton-page">
+                  <div className="skeleton-banner" />
+                  <div className="skeleton-grid">
+                    <div className="skeleton-card" />
+                    <div className="skeleton-card" />
+                    <div className="skeleton-card" />
+                  </div>
+                  <div className="skeleton-table" />
+                </div>
+              )}
+            >
               <RotaProtegida permissao={permissaoPaginaAtual}>
                 <ActivePage
-                  db={pageKey === 'dashboard' ? dbDashboard : db} // DB filtrado para dashboard, completo para outras
+                  db={pageKey === 'dashboard' ? dbDashboard : db}
                   setDb={setDb}
                   alerts={alerts}
-                  onNavigate={setCurrentPage}
+                  onNavigate={navigateWithPermission}
                   onResolveAlert={marcarAlertaComoFeito}
                   onRegistrarEntradaAnimal={handleRegistrarEntradaAnimal}
                   onRegistrarSaidaAnimal={handleRegistrarSaidaAnimal}
@@ -434,54 +505,67 @@ export default function App() {
         </AnimatePresence>
       </main>
 
-      {/* Barra de navegação inferior para mobile */}
       <MobileBottomNav
         currentPage={pageKey}
         onNavigate={(pagina) => {
-          const permissaoDestino = permissoesPorPagina[pagina];
-          if (!permissaoDestino || hasPermission(permissaoDestino)) {
-            setCurrentPage(pagina);
-          }
+          navigateWithPermission(pagina);
         }}
         onOpenMore={() => setMenuExtraAberto(true)}
       />
 
-      {/* Botão de ação flutuante para mobile */}
-      <MobileFab page={pageKey} onAction={(acao) => showToast({ type: 'warning', message: `Ação rápida: ${acao}` })} />
+      <MobileFab
+        page={pageKey}
+        onAction={handleMobileQuickAction}
+      />
 
-      {/* Modal para "Mais opções" no mobile */}
       <Modal
         open={menuExtraAberto}
         onClose={() => setMenuExtraAberto(false)}
         title="Mais opções"
+        subtitle="Todos os módulos do app continuam acessíveis no mobile"
       >
-        <div style={{ display: 'grid', gap: 8 }}>
-          {Object.keys(pageMap).map((pagina) => (
-            <Button
-              key={pagina}
-              variant="outline"
-              onClick={() => {
-                const permissaoDestino = permissoesPorPagina[pagina];
-                if (!permissaoDestino || hasPermission(permissaoDestino)) {
-                  setCurrentPage(pagina);
-                  setMenuExtraAberto(false);
-                }
-              }}
-            >
-              {pagina}
-            </Button>
+        <div className="mobile-nav-modal">
+          {mobileNavGroups.map((group) => (
+            <section key={group.id} className="mobile-nav-group">
+              <p className="mobile-nav-group-title">{group.title}</p>
+              <div className="mobile-nav-options">
+                {group.items.map((item) => {
+                  const Icone = item.icon;
+                  const isActive = pageKey === item.id;
+
+                  return (
+                    <button
+                      key={item.id}
+                      type="button"
+                      className={`mobile-nav-option ${isActive ? 'active' : ''}`}
+                      onClick={() => {
+                        navigateWithPermission(item.id);
+                        setMenuExtraAberto(false);
+                      }}
+                      aria-current={isActive ? 'page' : undefined}
+                    >
+                      <div className="mobile-nav-option-icon">
+                        <Icone size={16} aria-hidden="true" />
+                      </div>
+                      <div>
+                        <strong>{item.label}</strong>
+                        <span>{group.title}</span>
+                      </div>
+                    </button>
+                  );
+                })}
+              </div>
+            </section>
           ))}
         </div>
       </Modal>
 
-      {/* Pilha de Toasts */}
       <div className="toast-stack">
         {toasts.map((toast) => (
           <Toast key={toast.id} toast={toast} onClose={removeToast} />
         ))}
       </div>
 
-      {/* Modal de Confirmação genérico */}
       <ConfirmModal
         open={confirmState.open}
         title={confirmState.title}

@@ -1,20 +1,17 @@
-
-const MEDALHAS = ['🥇', '🥈', '🥉'];
-
 function IconeRanking({ index }) {
-  if (index < 3) {
-    return <span className="ranking-medalha">{MEDALHAS[index]}</span>;
-  }
-  return <span className="ranking-posicao">{index + 1}º</span>;
+  return <span className={`ranking-badge ranking-badge--${index < 3 ? 'top' : 'default'}`}>#{index + 1}</span>;
 }
 
 export default function RankingLotes({ ranking = [] }) {
   if (!ranking.length) {
     return (
       <div className="ranking-card">
-        <h3 style={{ margin: '0 0 8px' }}>🏆 Ranking de Lotes</h3>
+        <div className="ranking-card-header">
+          <span className="ranking-kicker">Ranking</span>
+          <h3>Ranking de lotes</h3>
+        </div>
         <p style={{ color: 'var(--color-text-secondary)', fontSize: '0.85rem' }}>
-          Nenhum dado disponível para ranking.
+          Nenhum dado disponivel para ranking.
         </p>
       </div>
     );
@@ -22,7 +19,10 @@ export default function RankingLotes({ ranking = [] }) {
 
   return (
     <div className="ranking-card">
-      <h3 style={{ margin: '0 0 8px' }}>🏆 Ranking de Lotes</h3>
+      <div className="ranking-card-header">
+        <span className="ranking-kicker">Ranking</span>
+        <h3>Ranking de lotes</h3>
+      </div>
       {ranking.map((item, index) => (
         <div className="ranking-item" key={`${item.metric}-${index}`}>
           <IconeRanking index={index} />
@@ -33,5 +33,4 @@ export default function RankingLotes({ ranking = [] }) {
       ))}
     </div>
   );
-
 }

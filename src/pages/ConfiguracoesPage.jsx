@@ -1,11 +1,13 @@
-import { useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { AlertTriangle, FileText, Plus, X } from 'lucide-react';
 import Card from '../components/ui/Card';
 import Button from '../components/ui/Button';
 import Modal from '../components/ui/Modal';
+import { normalizarPerfil, obterLabelPerfil, perfilPodeGerenciarAcessos } from '../auth/perfis';
 import { supabase } from '../lib/supabase'; // Assumindo que supabase está configurado
 import { useAuth } from '../auth/useAuth';
 import { useToast } from '../hooks/useToast'; // Importa o hook de toast
+import { createInvite, deleteInvite, isAccessModuleUnavailable, listInvites, listProfiles, updateInvite } from '../services/userAccess';
 import { gerarNovoId } from '../utils/id'; // Importa a função de gerar ID
 import '../styles/configuracoes.css';
 
@@ -27,12 +29,16 @@ const TABS = [
  * @param {function} [props.onConfirmAction] - Função para exibir um modal de confirmação customizado.
  */
 export default function ConfiguracoesPage({ db, setDb, onConfirmAction }) {
-  const { perfil } = useAuth();
+  const { perfil, user } = useAuth();
   const { showToast } = useToast(); // Hook para exibir toasts
   const [tab, setTab] = useState('geral');
   const [openInvite, setOpenInvite] = useState(false);
   const [confirmText, setConfirmText] = useState('');
   const fileInputRef = useRef(null);
+  const [profilesRows, setProfilesRows] = useState([]);
+  const [invitesRows, setInvitesRows] = useState([]);
+  const [loadingAccessData, setLoadingAccessData] = useState(false);
+  const [accessModuleReady, setAccessModuleReady] = useState(false);
 
   const configGeral = db?.configuracoes?.geral || {};
   const configNotificacoes = db?.configuracoes?.notificacoes || {};
@@ -53,6 +59,44 @@ export default function ConfiguracoesPage({ db, setDb, onConfirmAction }) {
     lote_data_saida: configNotificacoes.lote_data_saida ?? true,
     dias_antecedencia: configNotificacoes.dias_antecedencia ?? 3,
   });
+  const podeGerenciarAcessos = perfilPodeGerenciarAcessos(perfil);
+  const usuariosFallback = useMemo(
+    () => (db.usuarios || []).map((item) => ({ ...item, perfil: normalizarPerfil(item.perfil) })),
+    [db.usuarios]
+  );
+
+  async function carregarDadosDeAcesso() {
+    if (!podeGerenciarAcessos) {
+      return;
+    }
+
+    setLoadingAccessData(true);
+
+    const [profilesResponse, invitesResponse] = await Promise.all([listProfiles(), listInvites()]);
+
+    if (profilesResponse.error || invitesResponse.error) {
+      const erro = profilesResponse.error || invitesResponse.error;
+
+      if (!isAccessModuleUnavailable(erro)) {
+        showToast({ type: 'error', message: erro.message || 'Nao foi possivel carregar usuarios e convites.' });
+      }
+
+      setAccessModuleReady(false);
+      setProfilesRows([]);
+      setInvitesRows([]);
+      setLoadingAccessData(false);
+      return;
+    }
+
+    setProfilesRows(profilesResponse.data || []);
+    setInvitesRows(invitesResponse.data || []);
+    setAccessModuleReady(true);
+    setLoadingAccessData(false);
+  }
+
+  useEffect(() => {
+    carregarDadosDeAcesso();
+  }, [podeGerenciarAcessos]);
 
   function salvarGeral() {
     if (!geral.nome_sistema.trim()) {
@@ -181,7 +225,7 @@ export default function ConfiguracoesPage({ db, setDb, onConfirmAction }) {
       </header>
 
       <div className="config-tabs">
-        {TABS.filter((item) => (item.id === 'acessos' ? perfil === 'proprietario' : true)).map((item) => (
+        {TABS.filter((item) => (item.id === 'acessos' ? podeGerenciarAcessos : true)).map((item) => (
           <button key={item.id} type="button" className={tab === item.id ? 'active' : ''} onClick={() => setTab(item.id)}>
             {item.label}
           </button>
@@ -245,16 +289,113 @@ export default function ConfiguracoesPage({ db, setDb, onConfirmAction }) {
         </Card>
       ) : null}
 
-      {tab === 'acessos' && perfil === 'proprietario' ? (
+      {tab === 'acessos' && podeGerenciarAcessos ? (
         <Card
           title="Usuários e Acessos"
           action={<Button size="sm" icon={<Plus size={14} />} onClick={() => setOpenInvite(true)}>+ Convidar usuário</Button>}
         >
+          <div className="config-actions-wrap" style={{ marginBottom: 16 }}>
+            <Button variant="outline" onClick={carregarDadosDeAcesso} loading={loadingAccessData}>
+              Atualizar lista
+            </Button>
+          </div>
+
+          {accessModuleReady ? (
+            <>
+              <div className="table-responsive">
+                <table className="dashboard-table">
+                  <thead><tr><th>Nome</th><th>E-mail</th><th>Perfil</th><th>Atualizado em</th></tr></thead>
+                  <tbody>
+                    {profilesRows.length === 0 ? (
+                      <tr><td colSpan="4">Nenhum profile encontrado.</td></tr>
+                    ) : (
+                      profilesRows.map((item) => (
+                        <tr key={item.id}>
+                          <td>{item.nome || 'Sem nome'}</td>
+                          <td>{item.email}</td>
+                          <td>{obterLabelPerfil(item.perfil)}</td>
+                          <td>{item.updated_at ? new Date(item.updated_at).toLocaleString('pt-BR') : '-'}</td>
+                        </tr>
+                      ))
+                    )}
+                  </tbody>
+                </table>
+              </div>
+
+              <div style={{ height: 20 }} />
+
+              <div className="table-responsive">
+                <table className="dashboard-table">
+                  <thead><tr><th>Convite</th><th>Perfil automático</th><th>Status</th><th>Uso</th><th>Ações</th></tr></thead>
+                  <tbody>
+                    {invitesRows.length === 0 ? (
+                      <tr><td colSpan="5">Nenhum convite configurado.</td></tr>
+                    ) : (
+                      invitesRows.map((invite) => (
+                        <tr key={invite.id}>
+                          <td>
+                            <strong>{invite.nome || 'Convite sem nome'}</strong>
+                            <div>{invite.email}</div>
+                          </td>
+                          <td>{obterLabelPerfil(invite.perfil)}</td>
+                          <td>{invite.status}</td>
+                          <td>{invite.used_at ? new Date(invite.used_at).toLocaleString('pt-BR') : '-'}</td>
+                          <td>
+                            <div className="config-actions-wrap">
+                              {invite.status !== 'cancelado' ? (
+                                <Button
+                                  size="sm"
+                                  variant="outline"
+                                  onClick={async () => {
+                                    const { error } = await updateInvite(invite.id, { status: 'cancelado' });
+                                    if (error) {
+                                      showToast({ type: 'error', message: error.message || 'Nao foi possivel cancelar o convite.' });
+                                      return;
+                                    }
+                                    showToast({ type: 'success', message: 'Convite cancelado com sucesso.' });
+                                    carregarDadosDeAcesso();
+                                  }}
+                                >
+                                  Cancelar
+                                </Button>
+                              ) : null}
+                              <Button
+                                size="sm"
+                                variant="danger"
+                                onClick={async () => {
+                                  const { error } = await deleteInvite(invite.id);
+                                  if (error) {
+                                    showToast({ type: 'error', message: error.message || 'Nao foi possivel remover o convite.' });
+                                    return;
+                                  }
+                                  showToast({ type: 'success', message: 'Convite removido com sucesso.' });
+                                  carregarDadosDeAcesso();
+                                }}
+                              >
+                                Remover
+                              </Button>
+                            </div>
+                          </td>
+                        </tr>
+                      ))
+                    )}
+                  </tbody>
+                </table>
+              </div>
+            </>
+          ) : (
+            <div className="empty-state empty-state--warning" style={{ marginBottom: 16 }}>
+              <strong>Módulo de acessos aguardando migration</strong>
+              <span>Rode o SQL de profiles e invites para ativar o gerenciamento automático de perfis.</span>
+            </div>
+          )}
+
+          {!accessModuleReady ? (
           <div className="table-responsive">
             <table className="dashboard-table">
               <thead><tr><th>Nome</th><th>E-mail</th><th>Perfil</th><th>Status</th><th>Ações</th></tr></thead>
               <tbody>
-                {(db.usuarios || []).map((item) => (
+                {usuariosFallback.map((item) => (
                   <tr key={item.id}>
                     <td>{item.nome}</td>
                     <td>{item.email}</td>
@@ -270,7 +411,7 @@ export default function ConfiguracoesPage({ db, setDb, onConfirmAction }) {
                           }));
                         }}
                       >
-                        <option value="proprietario">Proprietário</option>
+                        <option value="admin">Admin</option>
                         <option value="gerente">Gerente</option>
                         <option value="operador">Operador</option>
                         <option value="visualizador">Visualizador</option>
@@ -306,6 +447,7 @@ export default function ConfiguracoesPage({ db, setDb, onConfirmAction }) {
               </tbody>
             </table>
           </div>
+          ) : null}
         </Card>
       ) : null}
 
@@ -330,13 +472,34 @@ export default function ConfiguracoesPage({ db, setDb, onConfirmAction }) {
       <Modal open={openInvite} onClose={() => setOpenInvite(false)} title="Convidar usuário">
         <InviteForm
           onClose={() => setOpenInvite(false)}
-          onInvite={(payload) => {
-            setDb((prev) => ({
-              ...prev,
-              usuarios: [...(prev.usuarios || []), { ...payload, id: gerarNovoId(prev.usuarios || []) }],
-            }));
-            showToast({ type: 'success', message: 'Usuário convidado com sucesso.' });
+          onInvite={async (payload) => {
+            if (!accessModuleReady) {
+              setDb((prev) => ({
+                ...prev,
+                usuarios: [...(prev.usuarios || []), { ...payload, id: gerarNovoId(prev.usuarios || []) }],
+              }));
+              showToast({ type: 'success', message: 'Convite salvo no modo local. A migration ativa o fluxo automático.' });
+              setOpenInvite(false);
+              return;
+            }
+
+            const { error } = await createInvite({
+              email: payload.email,
+              nome: payload.nome,
+              perfil: payload.perfil,
+              status: 'pendente',
+              notes: payload.notes || null,
+              created_by: user?.id || null,
+            });
+
+            if (error) {
+              showToast({ type: 'error', message: error.message || 'Nao foi possivel criar o convite.' });
+              return;
+            }
+
+            showToast({ type: 'success', message: 'Convite criado. O perfil será aplicado automaticamente no cadastro.' });
             setOpenInvite(false);
+            carregarDadosDeAcesso();
           }}
         />
       </Modal>
@@ -352,7 +515,7 @@ export default function ConfiguracoesPage({ db, setDb, onConfirmAction }) {
  */
 function InviteForm({ onInvite, onClose }) {
   const { showToast } = useToast(); // Hook para exibir toasts
-  const [form, setForm] = useState({ nome: '', email: '', perfil: 'visualizador', status: 'ativo' });
+  const [form, setForm] = useState({ nome: '', email: '', perfil: 'visualizador', status: 'ativo', notes: '' });
 
   return (
     <form
@@ -377,11 +540,15 @@ function InviteForm({ onInvite, onClose }) {
       <label className="ui-input-wrap">
         <span className="ui-input-label">Perfil</span>
         <select className="ui-input" value={form.perfil} onChange={(e) => setForm((prev) => ({ ...prev, perfil: e.target.value }))}>
-          <option value="proprietario">Proprietário</option>
+          <option value="admin">Admin</option>
           <option value="gerente">Gerente</option>
           <option value="operador">Operador</option>
           <option value="visualizador">Visualizador</option>
         </select>
+      </label>
+      <label className="ui-input-wrap">
+        <span className="ui-input-label">Observação interna</span>
+        <input className="ui-input" value={form.notes} onChange={(e) => setForm((prev) => ({ ...prev, notes: e.target.value }))} />
       </label>
       <div className="config-actions">
         <Button type="button" variant="ghost" onClick={onClose}>Cancelar</Button>
