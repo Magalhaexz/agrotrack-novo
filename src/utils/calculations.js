@@ -6,8 +6,9 @@
  * @returns {string} O número formatado ou '—'.
  */
 export const formatNumber = (value, digits = 1) => {
-  if (value === undefined || value === null || Number.isNaN(Number(value))) return '—';
-  return Number(value).toLocaleString('pt-BR', {
+  const normalized = Number(value);
+  if (value === undefined || value === null || !Number.isFinite(normalized)) return '—';
+  return normalized.toLocaleString('pt-BR', {
     minimumFractionDigits: digits,
     maximumFractionDigits: digits,
   });
@@ -20,8 +21,9 @@ export const formatNumber = (value, digits = 1) => {
  * @returns {string} O valor formatado como moeda ou '—'.
  */
 export const formatCurrency = (value) => {
-  if (value === undefined || value === null || Number.isNaN(Number(value))) return '—';
-  return `R$ ${Number(value).toLocaleString('pt-BR', {
+  const normalized = Number(value);
+  if (value === undefined || value === null || !Number.isFinite(normalized)) return '—';
+  return `R$ ${normalized.toLocaleString('pt-BR', {
     minimumFractionDigits: 2,
     maximumFractionDigits: 2,
   })}`;

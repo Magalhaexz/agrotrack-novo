@@ -5,7 +5,8 @@ import Button from '../components/ui/Button';
 import Card from '../components/ui/Card';
 import Input from '../components/ui/Input';
 import Modal from '../components/ui/Modal';
-import { calcLote, formatCurrency, formatDate, formatNumber } from '../utils/calculations';
+import { getResumoLote } from '../domain/resumoLote';
+import { formatCurrency, formatDate, formatNumber } from '../utils/calculations';
 import { gerarNovoId } from '../utils/id';
 
 const tabs = ['dre', 'lote', 'lanc'];
@@ -53,25 +54,25 @@ export default function FinanceiroPage({ db, setDb }) {
 
   const lotesRows = useMemo(() => (
     lotes.map((lote) => {
-      const indicadores = calcLote(db, lote.id);
+      const resumo = getResumoLote(db, lote.id);
       const movs = movFinMapByLote.get(lote.id) || [];
       const deducoes = movs
         .filter((mov) => mov.tipo === 'despesa' && ['Frete', 'Comissao'].includes(mov.categoria))
         .reduce((sum, mov) => sum + Number(mov.valor || 0), 0);
-      const receitaLiquida = indicadores.receitaTotal - deducoes;
-      const custoTotal = indicadores.custoTotalLote;
-      const lucro = receitaLiquida - custoTotal;
+      const receitaLiquida = resumo.receitaTotal - deducoes;
+      const custoTotal = resumo.custoTotal;
+      const lucroTotal = receitaLiquida - custoTotal;
 
       return {
         lote,
         status: lote.status,
         custoTotal,
-        receita: indicadores.receitaTotal,
-        lucro,
-        margem: receitaLiquida ? (lucro / receitaLiquida) * 100 : 0,
-        lucroCab: lucro / Math.max(indicadores.totalAnimais, 1),
-        lucroArroba: lucro / Math.max(indicadores.arrobasProduzidas, 1),
-        custoCabDia: custoTotal / Math.max(indicadores.totalAnimais, 1) / Math.max(indicadores.dias, 1),
+        receitaTotal: resumo.receitaTotal,
+        lucroTotal,
+        margemPct: receitaLiquida ? (lucroTotal / receitaLiquida) * 100 : 0,
+        lucroPorCabeca: resumo.totalAnimais ? lucroTotal / resumo.totalAnimais : 0,
+        lucroPorArroba: resumo.arrobasProduzidas ? lucroTotal / resumo.arrobasProduzidas : 0,
+        custoPorCabecaDia: custoTotal / Math.max(resumo.totalAnimais, 1) / Math.max(resumo.dias, 1),
         deducoes,
       };
     })
@@ -115,11 +116,11 @@ export default function FinanceiroPage({ db, setDb }) {
   const dre = useMemo(() => computeDRE(db, lotesRows), [db, lotesRows]);
 
   const margemBars = useMemo(() => {
-    const ordered = lotesRows.slice().sort((a, b) => b.margem - a.margem);
+    const ordered = lotesRows.slice().sort((a, b) => b.margemPct - a.margemPct);
     return ordered.map((row, index) => ({
       nome: row.lote.nome,
-      margem: row.margem,
-      benchmark: index === 0 ? 100 : (row.margem / Math.max(ordered[0]?.margem || 1, 1)) * 100,
+      margemPct: row.margemPct,
+      benchmark: index === 0 ? 100 : (row.margemPct / Math.max(ordered[0]?.margemPct || 1, 1)) * 100,
     }));
   }, [lotesRows]);
 
@@ -136,14 +137,14 @@ export default function FinanceiroPage({ db, setDb }) {
             <p>Custo sanitario: <strong>{formatCurrency(findCategoryValue(detalheCustosCat, ['sanitario', 'sanitÃ¡rio']))}</strong></p>
             <p>Outros custos: <strong>{formatCurrency(sumOtherCategories(detalheCustosCat, ['alimentacao', 'alimentaçao', 'alimentaÃ§Ã£o', 'sanitario', 'sanitÃ¡rio']))}</strong></p>
             <p><strong>Custo total: {formatCurrency(detalhe.custoTotal)}</strong></p>
-            <p>Receita bruta: <strong>{formatCurrency(detalhe.receita)}</strong></p>
+            <p>Receita bruta: <strong>{formatCurrency(detalhe.receitaTotal)}</strong></p>
             <p>Deducoes: <strong>{formatCurrency(detalhe.deducoes)}</strong></p>
-            <p><strong>Receita liquida: {formatCurrency(detalhe.receita - detalhe.deducoes)}</strong></p>
-            <p className={detalhe.lucro >= 0 ? 'text-success' : 'text-danger'}><strong>Lucro/prejuizo: {formatCurrency(detalhe.lucro)}</strong></p>
-            <p>Margem: <strong>{formatNumber(detalhe.margem, 2)}%</strong></p>
-            <p>Lucro por cabeca: <strong>{formatCurrency(detalhe.lucroCab)}</strong></p>
-            <p>Lucro por arroba: <strong>{formatCurrency(detalhe.lucroArroba)}</strong></p>
-            <p>Custo por cabeca/dia: <strong>{formatCurrency(detalhe.custoCabDia)}</strong></p>
+            <p><strong>Receita liquida: {formatCurrency(detalhe.receitaTotal - detalhe.deducoes)}</strong></p>
+            <p className={detalhe.lucroTotal >= 0 ? 'text-success' : 'text-danger'}><strong>Lucro/prejuizo: {formatCurrency(detalhe.lucroTotal)}</strong></p>
+            <p>Margem: <strong>{formatNumber(detalhe.margemPct, 2)}%</strong></p>
+            <p>Lucro por cabeca: <strong>{formatCurrency(detalhe.lucroPorCabeca)}</strong></p>
+            <p>Lucro por arroba: <strong>{formatCurrency(detalhe.lucroPorArroba)}</strong></p>
+            <p>Custo por cabeca/dia: <strong>{formatCurrency(detalhe.custoPorCabecaDia)}</strong></p>
           </div>
         </Card>
 
@@ -276,12 +277,12 @@ export default function FinanceiroPage({ db, setDb }) {
                         <td>{row.lote.nome}</td>
                         <td><Badge variant={row.status === 'ativo' ? 'info' : 'neutral'}>{row.status}</Badge></td>
                         <td>{formatCurrency(row.custoTotal)}</td>
-                        <td>{formatCurrency(row.receita)}</td>
-                        <td className={row.lucro >= 0 ? 'text-success' : 'text-danger'}>{formatCurrency(row.lucro)}</td>
-                        <td>{formatNumber(row.margem, 2)}%</td>
-                        <td>{formatCurrency(row.lucroCab)}</td>
-                        <td>{formatCurrency(row.lucroArroba)}</td>
-                        <td>{formatCurrency(row.custoCabDia)}</td>
+                        <td>{formatCurrency(row.receitaTotal)}</td>
+                        <td className={row.lucroTotal >= 0 ? 'text-success' : 'text-danger'}>{formatCurrency(row.lucroTotal)}</td>
+                        <td>{formatNumber(row.margemPct, 2)}%</td>
+                        <td>{formatCurrency(row.lucroPorCabeca)}</td>
+                        <td>{formatCurrency(row.lucroPorArroba)}</td>
+                        <td>{formatCurrency(row.custoPorCabecaDia)}</td>
                         <td><Button size="sm" onClick={() => setDetailLoteId(row.lote.id)}>Detalhes</Button></td>
                       </tr>
                     ))
@@ -293,8 +294,8 @@ export default function FinanceiroPage({ db, setDb }) {
                       <td>Total</td>
                       <td>-</td>
                       <td>{formatCurrency(lotesRows.reduce((sum, row) => sum + row.custoTotal, 0))}</td>
-                      <td>{formatCurrency(lotesRows.reduce((sum, row) => sum + row.receita, 0))}</td>
-                      <td>{formatCurrency(lotesRows.reduce((sum, row) => sum + row.lucro, 0))}</td>
+                      <td>{formatCurrency(lotesRows.reduce((sum, row) => sum + row.receitaTotal, 0))}</td>
+                      <td>{formatCurrency(lotesRows.reduce((sum, row) => sum + row.lucroTotal, 0))}</td>
                       <td>-</td>
                       <td>-</td>
                       <td>-</td>
@@ -315,7 +316,7 @@ export default function FinanceiroPage({ db, setDb }) {
                   <XAxis dataKey="nome" />
                   <YAxis formatter={(value) => `${value}%`} />
                   <Tooltip formatter={(value) => `${formatNumber(value, 2)}%`} />
-                  <Bar dataKey="margem" fill="#82ca9d" />
+                  <Bar dataKey="margemPct" fill="#82ca9d" />
                 </BarChart>
               </ResponsiveContainer>
             </div>
@@ -500,7 +501,7 @@ function NovoLancamentoModal({ db, setDb, onClose }) {
 
 function computeDRE(db, lotesRows) {
   const movimentacoes = Array.isArray(db?.movimentacoes_financeiras) ? db.movimentacoes_financeiras : [];
-  const receitaLotes = lotesRows.reduce((sum, row) => sum + row.receita, 0);
+  const receitaLotes = lotesRows.reduce((sum, row) => sum + row.receitaTotal, 0);
   const despesaLotes = lotesRows.reduce((sum, row) => sum + row.custoTotal, 0);
   const despesasGerais = movimentacoes.filter((item) => item.tipo === 'despesa' && !item.lote_id).reduce((sum, item) => sum + Number(item.valor || 0), 0);
   const receitasGerais = movimentacoes.filter((item) => item.tipo === 'receita' && !item.lote_id).reduce((sum, item) => sum + Number(item.valor || 0), 0);
