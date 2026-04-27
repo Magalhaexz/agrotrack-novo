@@ -27,7 +27,8 @@ import {
 import Card from '../components/ui/Card';
 import Badge from '../components/ui/Badge';
 import Button from '../components/ui/Button';
-import { calcLote, formatCurrency, formatDate, formatNumber } from '../utils/calculations';
+import { getResumoLote } from '../domain/resumoLote';
+import { formatCurrency, formatDate, formatNumber } from '../utils/calculations';
 import { formatarMoeda } from '../utils/formatters';
 import '../styles/dashboard.css';
 
@@ -56,7 +57,7 @@ export default function DashboardPage({
     () =>
       lotesAtivos.map((lote) => ({
         lote,
-        indicators: calcLote(db, lote.id),
+        indicators: getResumoLote(db, lote.id),
       })),
     [db, lotesAtivos]
   );
@@ -85,8 +86,8 @@ export default function DashboardPage({
   );
 
   const custoMes = useMemo(
-    () => (db.custos || []).reduce((sum, item) => sum + Number(item.val || 0), 0),
-    [db.custos]
+    () => lotesStats.reduce((sum, item) => sum + item.indicators.custoTotal, 0),
+    [lotesStats]
   );
 
   const resultadoMes = useMemo(() => receitaMes - custoMes, [receitaMes, custoMes]);
@@ -214,7 +215,7 @@ export default function DashboardPage({
 
           const motivos = [];
           if (metaGmd > 0 && item.indicators.gmdMedio < metaGmd * 0.9) motivos.push('GMD abaixo da meta');
-          if (item.indicators.margem < 0) motivos.push('Margem negativa');
+          if (item.indicators.lucroTotal < 0) motivos.push('Margem negativa');
           if (item.indicators.diasEstoque < 7) motivos.push('Suplemento curto');
           if (deltaPesoPct < 0) motivos.push('Perda de peso');
 
@@ -270,12 +271,12 @@ export default function DashboardPage({
   );
 
   const melhorLote = useMemo(
-    () => lotesStats.slice().sort((a, b) => b.indicators.margem - a.indicators.margem)[0],
+    () => lotesStats.slice().sort((a, b) => b.indicators.lucroTotal - a.indicators.lucroTotal)[0],
     [lotesStats]
   );
 
   const piorLote = useMemo(
-    () => lotesStats.slice().sort((a, b) => a.indicators.margem - b.indicators.margem)[0],
+    () => lotesStats.slice().sort((a, b) => a.indicators.lucroTotal - b.indicators.lucroTotal)[0],
     [lotesStats]
   );
 
@@ -356,8 +357,8 @@ export default function DashboardPage({
       id: `lote-${item.lote.id}`,
       titulo: item.lote.nome,
       descricao: item.motivos.join(' · '),
-      badge: item.indicators.margem >= 0 ? 'Monitorar' : 'Critico',
-      variant: item.indicators.margem >= 0 ? 'warning' : 'danger',
+      badge: item.indicators.lucroTotal >= 0 ? 'Monitorar' : 'Critico',
+      variant: item.indicators.lucroTotal >= 0 ? 'warning' : 'danger',
       action: () => onNavigate?.('lotes'),
     }));
 
@@ -581,12 +582,12 @@ export default function DashboardPage({
                 <div className="dashboard-summary-line">
                   <span>Melhor margem</span>
                   <strong>{melhorLote?.lote?.nome || '-'}</strong>
-                  <small>{melhorLote ? formatCurrency(melhorLote.indicators.margem) : '-'}</small>
+                  <small>{melhorLote ? formatCurrency(melhorLote.indicators.lucroTotal) : '-'}</small>
                 </div>
                 <div className="dashboard-summary-line">
                   <span>Maior atencao financeira</span>
                   <strong>{piorLote?.lote?.nome || '-'}</strong>
-                  <small>{piorLote ? formatCurrency(piorLote.indicators.margem) : '-'}</small>
+                  <small>{piorLote ? formatCurrency(piorLote.indicators.lucroTotal) : '-'}</small>
                 </div>
                 <div className="dashboard-summary-line">
                   <span>Arroba media atual</span>
