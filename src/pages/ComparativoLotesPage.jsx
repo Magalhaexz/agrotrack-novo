@@ -1,5 +1,4 @@
 import { useMemo, useState } from 'react';
-<<<<<<< HEAD
 import { calcLote, formatNumber } from '../utils/calculations'; // Assuming calcLote and formatNumber are robust
 import '../styles/rebanho.css'; // Assuming this CSS file exists
 
@@ -32,22 +31,6 @@ export default function ComparativoLotesPage({ db }) {
       .filter((l) => l.status === 'encerrado' || l.status === 'vendido')
       .map((lote) => {
         const ind = calcLote(db, lote.id); // Chamada potencialmente cara
-=======
-import { calcLote, formatNumber } from '../utils/calculations';
-import '../styles/rebanho.css';
-
-export default function ComparativoLotesPage({ db }) {
-  const [sortBy, setSortBy] = useState('margem');
-  const [filtro, setFiltro] = useState({ periodo: 'todos', raca: 'todas', categoria: 'todas', sexo: 'todos' });
-
-  const rows = useMemo(() => {
-    return (db.lotes || [])
-      .filter((l) => l.status === 'encerrado' || l.status === 'vendido')
-      .filter((l) => (filtro.raca === 'todas' || l.raca === filtro.raca))
-      .filter((l) => (filtro.categoria === 'todas' || l.categoria === filtro.categoria))
-      .map((lote) => {
-        const ind = calcLote(db, lote.id);
->>>>>>> f7f6d2991c81e0a38b5e190db55c7ad82834360d
         const heads = Math.max(ind.totalAnimais, 1);
         return {
           id: lote.id,
@@ -57,7 +40,6 @@ export default function ComparativoLotesPage({ db }) {
           lucroCab: ind.margem / heads,
           margem: ind.margemPct,
           dias: ind.dias,
-<<<<<<< HEAD
           mortalidade: lote?.fechamento?.mortalidade || 0, // Assumindo que 'fechamento' existe no lote
           // Adicionar propriedades do lote para filtragem (assumindo que serão adicionadas ao db.lotes)
           raca: lote.raca || 'N/A',
@@ -112,22 +94,11 @@ export default function ComparativoLotesPage({ db }) {
   const sexoOptions = useMemo(() => getUniqueOptions(calculatedLoteData, 'sexo'), [calculatedLoteData]);
   const periodoOptions = useMemo(() => getUniqueOptions(calculatedLoteData, 'periodo'), [calculatedLoteData]);
 
-=======
-          mortalidade: lote?.fechamento?.mortalidade || 0,
-        };
-      })
-      .sort((a, b) => Number(b[sortBy] || 0) - Number(a[sortBy] || 0));
-  }, [db, filtro, sortBy]);
-
-  const cols = ['gmd', 'custoArroba', 'lucroCab', 'margem', 'dias', 'mortalidade'];
-  const extrema = Object.fromEntries(cols.map((c) => [c, { max: Math.max(...rows.map((r) => Number(r[c] || 0), -Infinity)), min: Math.min(...rows.map((r) => Number(r[c] || 0), Infinity)) }]));
->>>>>>> f7f6d2991c81e0a38b5e190db55c7ad82834360d
 
   return (
     <div className="page rebanho-page">
       <h1>Comparativo de Lotes Encerrados</h1>
       <div className="rebanho-filters">
-<<<<<<< HEAD
         <select value={sortBy} onChange={(e) => setSortBy(e.target.value)} className="filtro-select">
           {cols.map((c) => (
             <option key={c} value={c}>
@@ -190,13 +161,3 @@ export default function ComparativoLotesPage({ db }) {
     </div>
   );
 }
-=======
-        <select value={sortBy} onChange={(e) => setSortBy(e.target.value)}>{cols.map((c) => <option key={c} value={c}>{c}</option>)}</select>
-        <input placeholder="Período" value={filtro.periodo} onChange={(e) => setFiltro((p) => ({ ...p, periodo: e.target.value }))} />
-        <input placeholder="Raça" value={filtro.raca} onChange={(e) => setFiltro((p) => ({ ...p, raca: e.target.value }))} />
-      </div>
-      <table className="dashboard-table"><thead><tr><th>Lote</th><th>GMD</th><th>Custo/@</th><th>Lucro/Cab</th><th>Margem</th><th>Dias</th><th>Mortalidade</th></tr></thead><tbody>{rows.map((r) => <tr key={r.id}><td>{r.nome}</td>{cols.map((c) => <td key={c} style={{ background: r[c] === extrema[c].max ? 'var(--color-success-bg)' : r[c] === extrema[c].min ? 'var(--color-danger-bg)' : 'transparent' }}>{formatNumber(r[c], 2)}</td>)}</tr>)}</tbody></table>
-    </div>
-  );
-}
->>>>>>> f7f6d2991c81e0a38b5e190db55c7ad82834360d
