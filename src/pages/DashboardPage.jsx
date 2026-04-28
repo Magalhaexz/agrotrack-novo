@@ -27,7 +27,8 @@ import {
 import Card from '../components/ui/Card';
 import Badge from '../components/ui/Badge';
 import Button from '../components/ui/Button';
-import { calcLote, formatCurrency, formatDate, formatNumber } from '../utils/calculations';
+import { getResumoLote } from '../domain/resumoLote';
+import { formatCurrency, formatDate, formatNumber } from '../utils/calculations';
 import { formatarMoeda } from '../utils/formatters';
 import '../styles/dashboard.css';
 
@@ -53,50 +54,64 @@ export default function DashboardPage({
   const lotesAtivos = useMemo(() => (db.lotes || []).filter((lote) => lote.status === 'ativo'), [db.lotes]);
 
   const lotesStats = useMemo(
-    () =>
-      lotesAtivos.map((lote) => ({
+    () => {
+      const start = import.meta.env.DEV ? (typeof performance !== 'undefined' ? performance.now() : Date.now()) : 0;
+      const computed = lotesAtivos.map((lote) => ({
         lote,
-        indicators: calcLote(db, lote.id),
-      })),
+        indicators: getResumoLote(db, lote.id),
+      }));
+      if (import.meta.env.DEV) {
+        const end = typeof performance !== 'undefined' ? performance.now() : Date.now();
+        console.debug('[HERDON_DASHBOARD_TIMING]', {
+          stage: 'lotesStats',
+          durationMs: Number((end - start).toFixed(1)),
+          lotesAtivos: lotesAtivos.length,
+        });
+      }
+      return computed;
+    },
     [db, lotesAtivos]
   );
 
-  const totalCabecasAtivas = useMemo(
-    () => lotesStats.reduce((sum, item) => sum + item.indicators.totalAnimais, 0),
+  const lotesAggregates = useMemo(
+    () =>
+      lotesStats.reduce(
+        (acc, item) => {
+          acc.totalCabecasAtivas += item.indicators.totalAnimais;
+          acc.pesoPonderado += item.indicators.pesoAtualMedio * item.indicators.totalAnimais;
+          acc.receitaMes += item.indicators.receitaTotal;
+          acc.custoMes += item.indicators.custoTotal;
+          acc.gmdTotal += item.indicators.gmdMedio;
+          return acc;
+        },
+        {
+          totalCabecasAtivas: 0,
+          pesoPonderado: 0,
+          receitaMes: 0,
+          custoMes: 0,
+          gmdTotal: 0,
+        }
+      ),
     [lotesStats]
   );
 
+  const totalCabecasAtivas = lotesAggregates.totalCabecasAtivas;
+
   const pesoMedioAtual = useMemo(
-    () =>
-      totalCabecasAtivas
-        ? lotesStats.reduce(
-            (sum, item) => sum + item.indicators.pesoAtualMedio * item.indicators.totalAnimais,
-            0
-          ) / totalCabecasAtivas
-        : 0,
-    [lotesStats, totalCabecasAtivas]
+    () => (totalCabecasAtivas ? lotesAggregates.pesoPonderado / totalCabecasAtivas : 0),
+    [lotesAggregates.pesoPonderado, totalCabecasAtivas]
   );
 
   const arrobaMedia = useMemo(() => pesoMedioAtual / 15, [pesoMedioAtual]);
 
-  const receitaMes = useMemo(
-    () => lotesStats.reduce((sum, item) => sum + item.indicators.receitaTotal, 0),
-    [lotesStats]
-  );
-
-  const custoMes = useMemo(
-    () => (db.custos || []).reduce((sum, item) => sum + Number(item.val || 0), 0),
-    [db.custos]
-  );
+  const receitaMes = lotesAggregates.receitaMes;
+  const custoMes = lotesAggregates.custoMes;
 
   const resultadoMes = useMemo(() => receitaMes - custoMes, [receitaMes, custoMes]);
 
   const gmdMedio = useMemo(
-    () =>
-      lotesStats.length
-        ? lotesStats.reduce((sum, item) => sum + item.indicators.gmdMedio, 0) / lotesStats.length
-        : 0,
-    [lotesStats]
+    () => (lotesStats.length ? lotesAggregates.gmdTotal / lotesStats.length : 0),
+    [lotesAggregates.gmdTotal, lotesStats.length]
   );
 
   const estoqueCritico = useMemo(
@@ -168,29 +183,22 @@ export default function DashboardPage({
     [db.tarefas]
   );
 
-  const alertasFormatados = useMemo(
-    () =>
-      (alerts || []).map((alert, index) => ({
+  const { alertasFormatados, totalAlertasCriticos } = useMemo(() => {
+    let criticos = 0;
+    const formatados = (alerts || []).map((alert, index) => {
+      const urgency = urgencyVariant(alert);
+      if (urgency === 'danger') criticos += 1;
+      return {
         ...alert,
         id: alert.id || alert.ackKey || `alert-${index}`,
         titulo: alert.titulo || alert.title || 'Alerta do sistema',
         descricao: alert.descricao || alert.description || 'Sem descricao',
-        prioridade:
-          alert.prioridade ||
-          (urgencyVariant(alert) === 'danger'
-            ? 'alta'
-            : urgencyVariant(alert) === 'warning'
-              ? 'media'
-              : 'baixa'),
+        prioridade: alert.prioridade || (urgency === 'danger' ? 'alta' : urgency === 'warning' ? 'media' : 'baixa'),
         acao: alert.acao || { label: 'Abrir', rota: alert.route || 'dashboard' },
-      })),
-    [alerts]
-  );
-
-  const totalAlertasCriticos = useMemo(
-    () => alertasFormatados.filter((alert) => urgencyVariant(alert) === 'danger').length,
-    [alertasFormatados]
-  );
+      };
+    });
+    return { alertasFormatados: formatados, totalAlertasCriticos: criticos };
+  }, [alerts]);
 
   const alertasOperacionais = useMemo(
     () =>
@@ -214,7 +222,7 @@ export default function DashboardPage({
 
           const motivos = [];
           if (metaGmd > 0 && item.indicators.gmdMedio < metaGmd * 0.9) motivos.push('GMD abaixo da meta');
-          if (item.indicators.margem < 0) motivos.push('Margem negativa');
+          if (item.indicators.lucroTotal < 0) motivos.push('Margem negativa');
           if (item.indicators.diasEstoque < 7) motivos.push('Suplemento curto');
           if (deltaPesoPct < 0) motivos.push('Perda de peso');
 
@@ -238,27 +246,27 @@ export default function DashboardPage({
     [lotesEmAtencao]
   );
 
+  const activeLoteIds = useMemo(() => new Set(lotesAtivos.map((lote) => lote.id)), [lotesAtivos]);
+
   const chartRows = useMemo(() => {
     const pesagens = db.pesagens || [];
-    const activeIds = new Set(lotesAtivos.map((lote) => lote.id));
+    const sortedPesagens = pesagens.slice().sort((a, b) => new Date(a.data) - new Date(b.data));
     const timelineMap = new Map();
 
-    pesagens
-      .filter((item) => activeIds.has(item.lote_id))
-      .sort((a, b) => new Date(a.data) - new Date(b.data))
-      .forEach((item) => {
-        if (!timelineMap.has(item.data)) {
-          timelineMap.set(item.data, { data: item.data, label: formatDate(item.data) });
-        }
+    for (const item of sortedPesagens) {
+      if (!activeLoteIds.has(item.lote_id)) continue;
+      if (!timelineMap.has(item.data)) {
+        timelineMap.set(item.data, { data: item.data, label: formatDate(item.data) });
+      }
 
-        const loteNome = lotesMap.get(item.lote_id)?.nome;
-        if (loteNome) {
-          timelineMap.get(item.data)[loteNome] = Number(item.peso_medio || 0);
-        }
-      });
+      const loteNome = lotesMap.get(item.lote_id)?.nome;
+      if (loteNome) {
+        timelineMap.get(item.data)[loteNome] = Number(item.peso_medio || 0);
+      }
+    }
 
     return Array.from(timelineMap.values());
-  }, [db.pesagens, lotesAtivos, lotesMap]);
+  }, [activeLoteIds, db.pesagens, lotesMap]);
 
   const lotesColorMap = useMemo(
     () =>
@@ -269,15 +277,19 @@ export default function DashboardPage({
     [lotesAtivos]
   );
 
-  const melhorLote = useMemo(
-    () => lotesStats.slice().sort((a, b) => b.indicators.margem - a.indicators.margem)[0],
-    [lotesStats]
-  );
-
-  const piorLote = useMemo(
-    () => lotesStats.slice().sort((a, b) => a.indicators.margem - b.indicators.margem)[0],
-    [lotesStats]
-  );
+  const { melhorLote, piorLote } = useMemo(() => {
+    let melhor = null;
+    let pior = null;
+    for (const item of lotesStats) {
+      if (!melhor || item.indicators.lucroTotal > melhor.indicators.lucroTotal) {
+        melhor = item;
+      }
+      if (!pior || item.indicators.lucroTotal < pior.indicators.lucroTotal) {
+        pior = item;
+      }
+    }
+    return { melhorLote: melhor, piorLote: pior };
+  }, [lotesStats]);
 
   const kpisMain = [
     {
@@ -356,8 +368,8 @@ export default function DashboardPage({
       id: `lote-${item.lote.id}`,
       titulo: item.lote.nome,
       descricao: item.motivos.join(' · '),
-      badge: item.indicators.margem >= 0 ? 'Monitorar' : 'Critico',
-      variant: item.indicators.margem >= 0 ? 'warning' : 'danger',
+      badge: item.indicators.lucroTotal >= 0 ? 'Monitorar' : 'Critico',
+      variant: item.indicators.lucroTotal >= 0 ? 'warning' : 'danger',
       action: () => onNavigate?.('lotes'),
     }));
 
@@ -581,12 +593,12 @@ export default function DashboardPage({
                 <div className="dashboard-summary-line">
                   <span>Melhor margem</span>
                   <strong>{melhorLote?.lote?.nome || '-'}</strong>
-                  <small>{melhorLote ? formatCurrency(melhorLote.indicators.margem) : '-'}</small>
+                  <small>{melhorLote ? formatCurrency(melhorLote.indicators.lucroTotal) : '-'}</small>
                 </div>
                 <div className="dashboard-summary-line">
                   <span>Maior atencao financeira</span>
                   <strong>{piorLote?.lote?.nome || '-'}</strong>
-                  <small>{piorLote ? formatCurrency(piorLote.indicators.margem) : '-'}</small>
+                  <small>{piorLote ? formatCurrency(piorLote.indicators.lucroTotal) : '-'}</small>
                 </div>
                 <div className="dashboard-summary-line">
                   <span>Arroba media atual</span>

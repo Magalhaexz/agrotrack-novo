@@ -27,7 +27,6 @@ function normalizarInitialData(data) {
 }
 
 function validarForm(form) {
-  if (!form.lote_id) return 'Selecione o lote.';
   if (!form.desc.trim()) return 'Informe a descrição do custo.';
   if (!form.data) return 'Informe a data.';
   if (!form.val) return 'Informe o valor.';
@@ -60,7 +59,7 @@ export default function CustoForm({ initialData, lotes = [], onSave, onCancel })
 
     setErro('');
     onSave?.({
-      lote_id: Number(form.lote_id),
+      lote_id: form.lote_id ? Number(form.lote_id) : null,
       cat: form.cat,
       desc: form.desc.trim(),
       data: form.data,
@@ -84,7 +83,7 @@ export default function CustoForm({ initialData, lotes = [], onSave, onCancel })
         <label>
           Lote
           <select className="ui-input" name="lote_id" value={form.lote_id} onChange={handleChange}>
-            <option value="">Selecione</option>
+            <option value="">Opcional</option>
             {lotes.map((lote) => (
               <option key={lote.id} value={lote.id}>{lote.nome}</option>
             ))}

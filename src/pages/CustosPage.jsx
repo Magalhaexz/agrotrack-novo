@@ -3,6 +3,43 @@ import CustoForm from '../components/CustoForm';
 import { formatarNumero, formatarData } from '../utils/formatters';
 import { gerarNovoId } from '../utils/id'; // Importa a função de gerar ID
 
+function toNumber(value) {
+  const parsed = Number(value);
+  return Number.isFinite(parsed) ? parsed : 0;
+}
+
+function upsertMovimentacaoFinanceiraDeCusto(movimentacoes, custo) {
+  const lista = Array.isArray(movimentacoes) ? [...movimentacoes] : [];
+  const idx = lista.findIndex(
+    (item) => item?.origem === 'custo' && Number(item?.origem_id) === Number(custo.id)
+  );
+
+  const payload = {
+    tipo: 'despesa',
+    categoria: custo.cat || 'outros',
+    data: custo.data,
+    valor: toNumber(custo.val),
+    lote_id: custo.lote_id ? Number(custo.lote_id) : null,
+    descricao: custo.desc || '',
+    observacao: custo.desc || '',
+    origem: 'custo',
+    origem_id: custo.id,
+  };
+
+  if (idx >= 0) {
+    lista[idx] = { ...lista[idx], ...payload };
+    return lista;
+  }
+
+  return [
+    ...lista,
+    {
+      id: gerarNovoId(lista),
+      ...payload,
+    },
+  ];
+}
+
 /**
  * Página de Custos Operacionais.
  * Permite o lançamento, acompanhamento e gerenciamento de custos por lote.
@@ -91,6 +128,9 @@ export default function CustosPage({ db, setDb, onConfirmAction }) {
     setDb((prev) => ({
       ...prev,
       custos: prev.custos.filter((c) => c.id !== id),
+      movimentacoes_financeiras: (prev.movimentacoes_financeiras || []).filter(
+        (mov) => !(mov?.origem === 'custo' && Number(mov?.origem_id) === Number(id))
+      ),
     }));
   }
 
@@ -101,22 +141,30 @@ export default function CustosPage({ db, setDb, onConfirmAction }) {
   function salvarCusto(dados) {
     if (custoEditando) {
       setDb((prev) => ({
-        ...prev,
         custos: prev.custos.map((c) =>
           c.id === custoEditando.id ? { ...c, ...dados } : c
         ),
+        movimentacoes_financeiras: upsertMovimentacaoFinanceiraDeCusto(
+          prev.movimentacoes_financeiras,
+          { ...custoEditando, ...dados }
+        ),
       }));
     } else {
-      setDb((prev) => ({
-        ...prev,
-        custos: [
-          ...prev.custos,
-          {
-            id: gerarNovoId(prev.custos), // Usa a função gerarNovoId
-            ...dados,
-          },
-        ],
-      }));
+      setDb((prev) => {
+        const novoCusto = {
+          id: gerarNovoId(prev.custos), // Usa a função gerarNovoId
+          ...dados,
+        };
+
+        return {
+          ...prev,
+          custos: [...prev.custos, novoCusto],
+          movimentacoes_financeiras: upsertMovimentacaoFinanceiraDeCusto(
+            prev.movimentacoes_financeiras,
+            novoCusto
+          ),
+        };
+      });
     }
 
     setAbrirForm(false);
