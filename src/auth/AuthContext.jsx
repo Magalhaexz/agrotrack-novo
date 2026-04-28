@@ -31,7 +31,13 @@ export function AuthProvider({ children }) {
       }
 
       try {
-        const { data, error } = await fetchUserProfile(userAtual.id);
+        const timeoutPromise = new Promise((_, reject) => {
+          window.setTimeout(() => reject(new Error('Timeout ao carregar perfil do usuário.')), 6000);
+        });
+        const { data, error } = await Promise.race([
+          fetchUserProfile(userAtual.id),
+          timeoutPromise,
+        ]);
 
         if (error) {
           if (!isAccessModuleUnavailable(error)) {
@@ -64,7 +70,13 @@ export function AuthProvider({ children }) {
 
     async function carregarSessao() {
       try {
-        const { data, error } = await supabase.auth.getSession();
+        const sessionResult = await Promise.race([
+          supabase.auth.getSession(),
+          new Promise((_, reject) => {
+            window.setTimeout(() => reject(new Error('Timeout ao obter sessão de autenticação.')), 4500);
+          }),
+        ]);
+        const { data, error } = sessionResult;
 
         if (error) {
           console.error('Erro ao obter sessão:', error);
@@ -76,19 +88,20 @@ export function AuthProvider({ children }) {
           return;
         }
 
-        if (ativo) {
-          const sessaoAtual = data?.session ?? null;
-          setSession(sessaoAtual);
-          setAuthError(null);
-          await carregarProfile(sessaoAtual?.user ?? null);
-          setLoadingAuth(false);
-        }
+        if (!ativo) return;
+        const sessaoAtual = data?.session ?? null;
+        setSession(sessaoAtual);
+        setAuthError(null);
+        await carregarProfile(sessaoAtual?.user ?? null);
       } catch (err) {
         console.error('Erro inesperado ao obter sessão:', err);
 
         if (ativo) {
           setSession(null);
           setAuthError(err);
+        }
+      } finally {
+        if (ativo) {
           setLoadingAuth(false);
         }
       }
@@ -99,10 +112,17 @@ export function AuthProvider({ children }) {
     const {
       data: { subscription },
     } = supabase.auth.onAuthStateChange(async (_event, sessionAtual) => {
-      setSession(sessionAtual ?? null);
-      setAuthError(null);
-      await carregarProfile(sessionAtual?.user ?? null);
-      setLoadingAuth(false);
+      try {
+        setSession(sessionAtual ?? null);
+        setAuthError(null);
+        await carregarProfile(sessionAtual?.user ?? null);
+      } catch (error) {
+        console.error('Erro no listener de autenticação:', error);
+      } finally {
+        if (ativo) {
+          setLoadingAuth(false);
+        }
+      }
     });
 
     return () => {

@@ -18,6 +18,7 @@ import {
   gerarAlertasPesagem,
   ordenarAlertas,
 } from './domain/alertas';
+import { useOperationalData } from './hooks/useOperationalData';
 import { useToast } from './hooks/useToast';
 import { supabase } from './lib/supabase';
 import { secondaryNavItems, navSections } from './navigation/navConfig';
@@ -82,47 +83,21 @@ const pageTransitionVariants = {
 
 export default function App() {
   const [currentPage, setCurrentPage] = useState('dashboard');
-  const [db, setDb] = useState(() => ({
-    ...initialDb,
-    alertas_resolvidos: Array.isArray(initialDb?.alertas_resolvidos) ? initialDb.alertas_resolvidos : [],
-    funcionarios: Array.isArray(initialDb?.funcionarios) ? initialDb.funcionarios : [],
-    lotes: Array.isArray(initialDb?.lotes)
-      ? initialDb.lotes.map((lote) => ({
-          ...lote,
-          status: lote?.status || 'ativo',
-          data_encerramento: lote?.data_encerramento || null,
-          data_venda: lote?.data_venda || null,
-        }))
-      : [],
-    fazendas: Array.isArray(initialDb?.fazendas) ? initialDb.fazendas : [],
-    tarefas: Array.isArray(initialDb?.tarefas) ? initialDb.tarefas : [],
-    configuracoes: initialDb?.configuracoes || {
-      geral: {
-        nome_sistema: 'HERDON',
-        moeda: 'BRL',
-        formato_data: 'DD/MM/AAAA',
-        unidade_peso: 'kg',
-        rendimento_carcaca_padrao: 52,
-        preco_arroba_padrao: 290,
-      },
-      notificacoes: {
-        estoque_critico: true,
-        sanitario_vencido: true,
-        pesagem_atrasada: true,
-        lote_data_saida: true,
-        dias_antecedencia: 3,
-      },
-    },
-    usuarios: Array.isArray(initialDb?.usuarios) ? initialDb.usuarios : [],
-  }));
-
   const { toasts, showToast, removeToast } = useToast();
   const { session, user, loadingAuth, hasPermission } = useAuth();
+  const {
+    db,
+    setDb,
+    dataReady,
+    dataSource,
+    dataError,
+  } = useOperationalData(initialDb, session);
   const [usuarioLogado, setUsuarioLogado] = useState(null);
   const [menuExtraAberto, setMenuExtraAberto] = useState(false);
   const [tabAtiva, setTabAtiva] = useState('geral');
   const [fazendaSelecionada, setFazendaSelecionada] = useState(null);
   const [forcarTelaLogin, setForcarTelaLogin] = useState(false);
+  const [showBootRecovery, setShowBootRecovery] = useState(false);
   const [confirmState, setConfirmState] = useState({
     open: false,
     title: '',
@@ -131,6 +106,31 @@ export default function App() {
     resolver: null,
   });
   const deniedToastRef = useRef({ permission: '', timestamp: 0 });
+
+  if (import.meta.env.DEV) {
+    console.debug('[HERDON_BOOT]', {
+      loadingAuth,
+      hasSession: Boolean(session),
+      dataReady,
+      dataSource,
+      dataErrorMessage: dataError?.message || null,
+    });
+  }
+
+  const isBootLoading = loadingAuth || (session && !dataReady);
+
+  useEffect(() => {
+    if (!isBootLoading) {
+      setShowBootRecovery(false);
+      return undefined;
+    }
+
+    const timer = window.setTimeout(() => {
+      setShowBootRecovery(true);
+    }, 6000);
+
+    return () => window.clearTimeout(timer);
+  }, [isBootLoading]);
 
   useEffect(() => {
     const originalAlert = window.alert;
@@ -253,6 +253,20 @@ export default function App() {
     }
 
     setCurrentPage('dashboard');
+  }
+
+  async function handleClearSessionAndReload() {
+    try {
+      localStorage.clear();
+      sessionStorage.clear();
+      await supabase.auth.signOut();
+    } catch (error) {
+      if (import.meta.env.DEV) {
+        console.warn('[HERDON_CLEAR_SESSION]', error);
+      }
+    } finally {
+      window.location.reload();
+    }
   }
 
   const alertasResolvidos = Array.isArray(db?.alertas_resolvidos) ? db.alertas_resolvidos : [];
@@ -397,7 +411,7 @@ export default function App() {
     return grupos;
   }, [hasPermission]);
 
-  if (loadingAuth) {
+  if (isBootLoading) {
     return (
       <div className="app-loading">
         <div className="app-loading-panel">
@@ -409,6 +423,20 @@ export default function App() {
             <span className="app-loading-bar" />
             <span className="app-loading-bar" />
           </div>
+          {showBootRecovery ? (
+            <div style={{ display: 'grid', gap: 10, marginTop: 8 }}>
+              <strong>O carregamento está demorando mais que o normal.</strong>
+              <p>Você pode tentar novamente ou limpar a sessão local para voltar ao login.</p>
+              <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
+                <button type="button" className="ui-button ui-button--outline ui-button--sm" onClick={() => window.location.reload()}>
+                  Tentar novamente
+                </button>
+                <button type="button" className="ui-button ui-button--ghost ui-button--sm" onClick={handleClearSessionAndReload}>
+                  Limpar sessão e voltar ao login
+                </button>
+              </div>
+            </div>
+          ) : null}
         </div>
       </div>
     );
