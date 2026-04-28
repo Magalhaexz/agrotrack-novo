@@ -30,7 +30,7 @@ const TABS = [
  * @param {function} [props.onConfirmAction] - Função para exibir um modal de confirmação customizado.
  */
 export default function ConfiguracoesPage({ db, setDb, onConfirmAction }) {
-  const { perfil, user } = useAuth();
+  const { perfil, user, hasPermission } = useAuth();
   const { showToast } = useToast(); // Hook para exibir toasts
   const [tab, setTab] = useState('geral');
   const [openInvite, setOpenInvite] = useState(false);
@@ -61,10 +61,17 @@ export default function ConfiguracoesPage({ db, setDb, onConfirmAction }) {
     dias_antecedencia: configNotificacoes.dias_antecedencia ?? 3,
   });
   const podeGerenciarAcessos = perfilPodeGerenciarAcessos(perfil);
+  const mensagemSemPermissao = 'Você não tem permissão para executar esta ação.';
   const usuariosFallback = useMemo(
     () => (db.usuarios || []).map((item) => ({ ...item, perfil: normalizarPerfil(item.perfil) })),
     [db.usuarios]
   );
+
+  function validarPermissao(permissao) {
+    if (hasPermission(permissao)) return true;
+    showToast({ type: 'error', message: mensagemSemPermissao });
+    return false;
+  }
 
   function mensagemErroSegura(error, fallbackMessage) {
     const message = String(error?.message || '').toLowerCase();
@@ -117,6 +124,7 @@ export default function ConfiguracoesPage({ db, setDb, onConfirmAction }) {
   }, [podeGerenciarAcessos]);
 
   function salvarGeral() {
+    if (!validarPermissao('configuracoes:editar')) return;
     if (!geral.nome_sistema.trim()) {
       showToast({ type: 'error', message: 'Nome do sistema/empresa é obrigatório.' });
       return;
@@ -138,6 +146,7 @@ export default function ConfiguracoesPage({ db, setDb, onConfirmAction }) {
   }
 
   function salvarNotificacoes() {
+    if (!validarPermissao('configuracoes:editar')) return;
     if (Number(notificacoes.dias_antecedencia) < 0) {
       showToast({ type: 'error', message: 'Dias de antecedência deve ser maior ou igual a zero.' });
       return;
@@ -175,6 +184,10 @@ export default function ConfiguracoesPage({ db, setDb, onConfirmAction }) {
   }
 
   function importarDados(event) {
+    if (!validarPermissao('dados:importar')) {
+      event.target.value = '';
+      return;
+    }
     const file = event.target.files?.[0];
     if (!file) return;
 
@@ -214,6 +227,7 @@ export default function ConfiguracoesPage({ db, setDb, onConfirmAction }) {
   }
 
   async function limparDadosDemo() {
+    if (!validarPermissao('dados:limpar')) return;
     const ok = onConfirmAction
       ? await onConfirmAction({ title: 'Limpar demonstração', message: 'Remover dados fictícios do ambiente?', tone: 'danger' })
       : window.confirm('Remover dados fictícios do ambiente?');
@@ -391,6 +405,7 @@ export default function ConfiguracoesPage({ db, setDb, onConfirmAction }) {
                                   size="sm"
                                   variant="outline"
                                   onClick={async () => {
+                                    if (!validarPermissao('acessos:gerenciar')) return;
                                     const confirmarCancelamento = onConfirmAction
                                       ? await onConfirmAction({
                                           title: 'Cancelar convite',
@@ -417,6 +432,7 @@ export default function ConfiguracoesPage({ db, setDb, onConfirmAction }) {
                                 size="sm"
                                 variant="danger"
                                 onClick={async () => {
+                                  if (!validarPermissao('acessos:gerenciar')) return;
                                   const confirmarRemocao = onConfirmAction
                                     ? await onConfirmAction({
                                         title: 'Remover convite',
@@ -468,6 +484,7 @@ export default function ConfiguracoesPage({ db, setDb, onConfirmAction }) {
                         className="ui-input" // Adicionado classe ui-input
                         value={item.perfil}
                         onChange={(e) => {
+                          if (!validarPermissao('acessos:gerenciar')) return;
                           const novoPerfil = e.target.value;
                           setDb((prev) => ({
                             ...prev,
@@ -486,6 +503,7 @@ export default function ConfiguracoesPage({ db, setDb, onConfirmAction }) {
                         className="ui-input" // Adicionado classe ui-input
                         value={item.status}
                         onChange={(e) => {
+                          if (!validarPermissao('acessos:gerenciar')) return;
                           const novoStatus = e.target.value;
                           setDb((prev) => ({
                             ...prev,
@@ -502,6 +520,7 @@ export default function ConfiguracoesPage({ db, setDb, onConfirmAction }) {
                         size="sm"
                         variant="danger"
                         onClick={async () => {
+                          if (!validarPermissao('acessos:gerenciar')) return;
                           const confirmarRemocaoLocal = onConfirmAction
                             ? await onConfirmAction({
                                 title: 'Remover usuário',
@@ -548,6 +567,7 @@ export default function ConfiguracoesPage({ db, setDb, onConfirmAction }) {
         <InviteForm
           onClose={() => setOpenInvite(false)}
           onInvite={async (payload) => {
+            if (!validarPermissao('acessos:gerenciar')) return;
             if (!accessModuleReady) {
               setDb((prev) => ({
                 ...prev,

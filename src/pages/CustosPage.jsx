@@ -2,6 +2,8 @@ import { useMemo, useState } from 'react';
 import CustoForm from '../components/CustoForm';
 import { formatarNumero, formatarData } from '../utils/formatters';
 import { gerarNovoId } from '../utils/id'; // Importa a função de gerar ID
+import { useAuth } from '../auth/useAuth';
+import { useToast } from '../hooks/useToast';
 
 function toNumber(value) {
   const parsed = Number(value);
@@ -51,8 +53,11 @@ function upsertMovimentacaoFinanceiraDeCusto(movimentacoes, custo) {
  * @param {function} [props.onConfirmAction] - Função para exibir um modal de confirmação customizado.
  */
 export default function CustosPage({ db, setDb, onConfirmAction }) {
+  const { hasPermission } = useAuth();
+  const { showToast } = useToast();
   const [abrirForm, setAbrirForm] = useState(false);
   const [custoEditando, setCustoEditando] = useState(null);
+  const mensagemSemPermissao = 'Você não tem permissão para executar esta ação.';
 
   const lotes = db?.lotes || [];
   const custos = db?.custos || [];
@@ -98,6 +103,10 @@ export default function CustosPage({ db, setDb, onConfirmAction }) {
    * Abre o formulário para adicionar um novo custo.
    */
   function abrirNovo() {
+    if (!hasPermission('custos:editar')) {
+      showToast({ type: 'error', message: mensagemSemPermissao });
+      return;
+    }
     setCustoEditando(null);
     setAbrirForm(true);
   }
@@ -107,6 +116,10 @@ export default function CustosPage({ db, setDb, onConfirmAction }) {
    * @param {object} custo - O objeto do custo a ser editado.
    */
   function editarCusto(custo) {
+    if (!hasPermission('custos:editar')) {
+      showToast({ type: 'error', message: mensagemSemPermissao });
+      return;
+    }
     setCustoEditando(custo);
     setAbrirForm(true);
   }
@@ -116,6 +129,10 @@ export default function CustosPage({ db, setDb, onConfirmAction }) {
    * @param {number} id - O ID do custo a ser excluído.
    */
   async function excluirCusto(id) {
+    if (!hasPermission('custos:excluir')) {
+      showToast({ type: 'error', message: mensagemSemPermissao });
+      return;
+    }
     const confirmado = typeof onConfirmAction === 'function'
       ? await onConfirmAction({
           title: 'Excluir custo',
@@ -139,6 +156,10 @@ export default function CustosPage({ db, setDb, onConfirmAction }) {
    * @param {object} dados - Os dados do custo a serem salvos.
    */
   function salvarCusto(dados) {
+    if (!hasPermission('custos:editar')) {
+      showToast({ type: 'error', message: mensagemSemPermissao });
+      return;
+    }
     if (custoEditando) {
       setDb((prev) => ({
         custos: prev.custos.map((c) =>

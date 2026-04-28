@@ -6,10 +6,15 @@ import Card from '../components/ui/Card';
 import { TIPOS_SAIDA_ANIMAL } from '../utils/constantes';
 import { formatarData, formatarNumero } from '../utils/formatters';
 import { gerarNovoId } from '../utils/id';
+import { useAuth } from '../auth/useAuth';
+import { useToast } from '../hooks/useToast';
 
 export default function AnimaisPage({ db, setDb, onConfirmAction }) {
+  const { hasPermission } = useAuth();
+  const { showToast } = useToast();
   const [abrirForm, setAbrirForm] = useState(false);
   const [animalEditando, setAnimalEditando] = useState(null);
+  const mensagemSemPermissao = 'Você não tem permissão para executar esta ação.';
 
   const lotes = Array.isArray(db?.lotes) ? db.lotes : [];
   const animais = Array.isArray(db?.animais) ? db.animais : [];
@@ -75,16 +80,28 @@ export default function AnimaisPage({ db, setDb, onConfirmAction }) {
   }, [lotesMap, movimentacoesAnimais]);
 
   function abrirNovo() {
+    if (!hasPermission('animais:editar')) {
+      showToast({ type: 'error', message: mensagemSemPermissao });
+      return;
+    }
     setAnimalEditando(null);
     setAbrirForm(true);
   }
 
   function editarAnimal(animal) {
+    if (!hasPermission('animais:editar')) {
+      showToast({ type: 'error', message: mensagemSemPermissao });
+      return;
+    }
     setAnimalEditando(animal);
     setAbrirForm(true);
   }
 
   async function excluirAnimal(id) {
+    if (!hasPermission('animais:excluir')) {
+      showToast({ type: 'error', message: mensagemSemPermissao });
+      return;
+    }
     const confirmado = typeof onConfirmAction === 'function'
       ? await onConfirmAction({
           title: 'Excluir registro de animais',
@@ -104,6 +121,10 @@ export default function AnimaisPage({ db, setDb, onConfirmAction }) {
   }
 
   function salvarAnimal(dados) {
+    if (!hasPermission('animais:editar')) {
+      showToast({ type: 'error', message: mensagemSemPermissao });
+      return;
+    }
     if (animalEditando) {
       setDb((prev) => ({
         ...prev,

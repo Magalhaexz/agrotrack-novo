@@ -24,51 +24,74 @@ const PERFIL_ALIASES = {
 export const permissoesPorPerfil = {
   [PERFIS.ADMIN]: ['*'],
   [PERFIS.GERENTE]: [
+    'perfil:ver',
     'dashboard:ver',
     'fazendas:ver',
     'fazendas:editar',
     'lotes:ver',
     'lotes:editar',
+    'lotes:excluir',
     'animais:ver',
     'animais:movimentar',
+    'animais:editar',
+    'animais:excluir',
     'pesagens:ver',
     'pesagens:editar',
+    'pesagens:excluir',
     'sanitario:ver',
     'sanitario:editar',
+    'sanitario:excluir',
     'estoque:ver',
     'estoque:movimentar',
+    'estoque:editar',
+    'estoque:excluir',
     'financeiro:ver',
     'financeiro:editar',
+    'financeiro:excluir',
+    'custos:editar',
+    'custos:excluir',
     'tarefas:ver',
     'tarefas:editar',
+    'tarefas:excluir',
     'resultados:ver',
     'comparativo:ver',
     'configuracoes:ver',
     'configuracoes:editar',
+    'dados:importar',
+    'dados:limpar',
     'funcionarios:ver',
     'funcionarios:editar',
     'acessos:gerenciar',
   ],
   [PERFIS.OPERADOR]: [
+    'perfil:ver',
     'dashboard:ver',
     'lotes:ver',
     'lotes:editar',
+    'lotes:excluir',
     'animais:ver',
     'animais:movimentar',
+    'animais:editar',
+    'animais:excluir',
     'pesagens:ver',
     'pesagens:editar',
+    'pesagens:excluir',
     'sanitario:ver',
     'sanitario:editar',
+    'sanitario:excluir',
     'estoque:ver',
     'estoque:movimentar',
+    'estoque:editar',
     'tarefas:ver',
     'tarefas:editar',
+    'tarefas:excluir',
     'resultados:ver',
     'comparativo:ver',
     'suplementacao:ver',
     'suplementacao:editar',
   ],
   [PERFIS.VISUALIZADOR]: [
+    'perfil:ver',
     'dashboard:ver',
     'fazendas:ver',
     'lotes:ver',
@@ -103,6 +126,7 @@ export const permissoesPorPagina = {
   resultados: 'resultados:ver',
   financeiro: 'financeiro:ver',
   tarefas: 'tarefas:ver',
+  perfil: 'perfil:ver',
   configuracoes: 'configuracoes:ver',
 };
 
@@ -130,14 +154,19 @@ export function obterLabelPerfil(perfil) {
 }
 
 export function perfilPodeGerenciarAcessos(perfil) {
-  return normalizarPerfil(perfil) === PERFIS.ADMIN;
+  return perfilTemPermissao(perfil, 'acessos:gerenciar');
+}
+
+export function perfilTemPermissao(perfil, permissao) {
+  if (!permissao) return true;
+  const perfilNormalizado = normalizarPerfil(perfil);
+  const permissoes = permissoesPorPerfil[perfilNormalizado] || [];
+  return permissoes.includes('*') || permissoes.includes(permissao);
 }
 
 export function usuarioTemPermissao(user, permissao) {
   if (!permissao) return true;
 
   const perfil = obterPerfilDoUsuario(user);
-  const permissoes = permissoesPorPerfil[perfil] || [];
-
-  return permissoes.includes('*') || permissoes.includes(permissao);
+  return perfilTemPermissao(perfil, permissao);
 }

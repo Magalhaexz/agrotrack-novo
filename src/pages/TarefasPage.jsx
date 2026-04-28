@@ -6,6 +6,7 @@ import Button from '../components/ui/Button';
 import Modal from '../components/ui/Modal';
 import Input from '../components/ui/Input'; // Importar o componente Input
 import { useToast } from '../hooks/useToast'; // Assumindo que você tem um hook de toast
+import { useAuth } from '../auth/useAuth';
 import '../styles/tarefas.css';
 
 const STATUS_COLUMNS = [
@@ -31,6 +32,8 @@ const EMPTY_TASK = {
 
 export default function TarefasPage({ db, setDb, onConfirmAction }) {
   const { showToast } = useToast();
+  const { hasPermission } = useAuth();
+  const mensagemSemPermissao = 'Você não tem permissão para executar esta ação.';
   const tarefas = Array.isArray(db?.tarefas) ? db.tarefas : [];
   const [openModal, setOpenModal] = useState(false);
   const [editingTask, setEditingTask] = useState(null);
@@ -74,16 +77,28 @@ export default function TarefasPage({ db, setDb, onConfirmAction }) {
   }), [tarefasFiltradas]);
 
   const openNewTask = useCallback(() => {
+    if (!hasPermission('tarefas:editar')) {
+      showToast({ type: 'error', message: mensagemSemPermissao });
+      return;
+    }
     setEditingTask(null);
     setOpenModal(true);
-  }, []);
+  }, [hasPermission, showToast]);
 
   const openEditTask = useCallback((task) => {
+    if (!hasPermission('tarefas:editar')) {
+      showToast({ type: 'error', message: mensagemSemPermissao });
+      return;
+    }
     setEditingTask(task);
     setOpenModal(true);
-  }, []);
+  }, [hasPermission, showToast]);
 
   const handleSave = useCallback((formData) => {
+    if (!hasPermission('tarefas:editar')) {
+      showToast({ type: 'error', message: mensagemSemPermissao });
+      return;
+    }
     setDb((prev) => {
       const lista = Array.isArray(prev?.tarefas) ? prev.tarefas : [];
 
@@ -108,9 +123,13 @@ export default function TarefasPage({ db, setDb, onConfirmAction }) {
     });
     showToast({ type: 'success', message: `Tarefa "${formData.titulo}" salva com sucesso!` });
     setOpenModal(false);
-  }, [editingTask, setDb, showToast]);
+  }, [editingTask, hasPermission, setDb, showToast]);
 
   const handleDelete = useCallback(async (task) => {
+    if (!hasPermission('tarefas:excluir')) {
+      showToast({ type: 'error', message: mensagemSemPermissao });
+      return;
+    }
     const canDelete = onConfirmAction
       ? await onConfirmAction({
           title: 'Excluir tarefa',
@@ -126,9 +145,13 @@ export default function TarefasPage({ db, setDb, onConfirmAction }) {
       tarefas: (prev?.tarefas || []).filter((item) => item.id !== task.id),
     }));
     showToast({ type: 'success', message: `Tarefa "${task.titulo}" excluída com sucesso.` });
-  }, [onConfirmAction, setDb, showToast]);
+  }, [hasPermission, onConfirmAction, setDb, showToast]);
 
   const moveToNextStatus = useCallback((task) => {
+    if (!hasPermission('tarefas:editar')) {
+      showToast({ type: 'error', message: mensagemSemPermissao });
+      return;
+    }
     const next = nextStatus(task.status);
     if (!next) {
       showToast({ type: 'info', message: 'Esta tarefa já está no último status ou não pode avançar.' });
@@ -147,7 +170,7 @@ export default function TarefasPage({ db, setDb, onConfirmAction }) {
       ),
     }));
     showToast({ type: 'success', message: `Tarefa "${task.titulo}" movida para "${toLabel(next)}".` });
-  }, [setDb, showToast]);
+  }, [hasPermission, setDb, showToast]);
 
   return (
     <div className="tarefas-page">

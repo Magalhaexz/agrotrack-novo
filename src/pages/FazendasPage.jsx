@@ -4,8 +4,8 @@ import PageHeader from '../components/PageHeader';
 import FazendaCard from '../components/fazendas/FazendaCard';
 import FazendaModal from '../components/fazendas/FazendaModal';
 import { gerarNovoId } from '../utils/id';
-// Assuming useToast is available
-// import { useToast } from '../hooks/useToast';
+import { useToast } from '../hooks/useToast';
+import { useAuth } from '../auth/useAuth';
 
 /**
  * Página de Fazendas, para gerenciar as propriedades.
@@ -16,7 +16,9 @@ import { gerarNovoId } from '../utils/id';
  * @param {function} [props.onConfirmAction] - Callback opcional para ações de confirmação.
  */
 export default function FazendasPage({ db, setDb, onConfirmAction }) {
-  // const { showToast } = useToast(); // Se usar useToast
+  const { showToast } = useToast();
+  const { hasPermission } = useAuth();
+  const mensagemSemPermissao = 'Você não tem permissão para executar esta ação.';
 
   const [openModal, setOpenModal] = useState(false);
   const [editando, setEditando] = useState(null);
@@ -51,6 +53,10 @@ export default function FazendasPage({ db, setDb, onConfirmAction }) {
    * @param {object} payload - Os dados da fazenda a serem salvos.
    */
   function salvarFazenda(payload) {
+    if (!hasPermission('fazendas:editar')) {
+      showToast({ type: 'error', message: mensagemSemPermissao });
+      return;
+    }
     if (editando) {
       setDb((prev) => ({
         ...prev,
@@ -81,6 +87,10 @@ export default function FazendasPage({ db, setDb, onConfirmAction }) {
    * @param {number} id - O ID da fazenda a ser excluída.
    */
   async function excluirFazenda(id) {
+    if (!hasPermission('fazendas:editar')) {
+      showToast({ type: 'error', message: mensagemSemPermissao });
+      return;
+    }
     const fazenda = cards.find((f) => f.id === id); // Usar 'cards' que já tem lotesVinculados
     if (!fazenda) return;
 
@@ -112,7 +122,16 @@ export default function FazendasPage({ db, setDb, onConfirmAction }) {
       <PageHeader
         title="Fazendas"
         subtitle="Gestão completa das propriedades e suas capacidades"
-        actions={<Button onClick={() => { setEditando(null); setOpenModal(true); }}>+ Nova Fazenda</Button>}
+        actions={<Button onClick={() => {
+          if (!hasPermission('fazendas:editar')) {
+            showToast({ type: 'error', message: mensagemSemPermissao });
+            return;
+          }
+          setEditando(null); setOpenModal(true);
+        }}
+        >
+          + Nova Fazenda
+        </Button>}
       />
 
       {cards.length === 0 ? (
