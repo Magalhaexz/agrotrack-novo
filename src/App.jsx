@@ -39,6 +39,8 @@ import { buildAlerts } from './utils/alerts';
 import './styles/app.css';
 import './styles/ui.css';
 
+const MotionDiv = motion.div;
+
 const DashboardPage = lazy(() => import('./pages/DashboardPage'));
 const FazendasPage = lazy(() => import('./pages/FazendasPage'));
 const LotesPage = lazy(() => import('./pages/LotesPage'));
@@ -603,7 +605,7 @@ export default function App() {
         />
 
         <AnimatePresence mode="wait">
-          <motion.div
+          <MotionDiv
             key={pageKey}
             initial="initial"
             animate="animate"
@@ -645,7 +647,7 @@ export default function App() {
                 />
               </RotaProtegida>
             </Suspense>
-          </motion.div>
+          </MotionDiv>
         </AnimatePresence>
       </main>
 
