@@ -9,6 +9,7 @@ import { useAuth } from '../auth/useAuth';
 import { useToast } from '../hooks/useToast'; // Importa o hook de toast
 import { createInvite, deleteInvite, isAccessModuleUnavailable, listInvites, listProfiles, updateInvite } from '../services/userAccess';
 import { gerarNovoId } from '../utils/id'; // Importa a função de gerar ID
+import { normalizeBackupPayload } from '../utils/backupValidation';
 import '../styles/configuracoes.css';
 
 const TABS = [
@@ -157,7 +158,13 @@ export default function ConfiguracoesPage({ db, setDb, onConfirmAction }) {
   }
 
   function exportarDados() {
-    const blob = new Blob([JSON.stringify(db, null, 2)], { type: 'application/json' });
+    const payload = {
+      app: 'Herdon',
+      version: 1,
+      exportedAt: new Date().toISOString(),
+      data: db,
+    };
+    const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' });
     const url = URL.createObjectURL(blob);
     const anchor = document.createElement('a');
     anchor.href = url;
@@ -175,11 +182,31 @@ export default function ConfiguracoesPage({ db, setDb, onConfirmAction }) {
     reader.onload = () => {
       try {
         const parsed = JSON.parse(String(reader.result || '{}'));
-        if (!parsed || typeof parsed !== 'object') throw new Error('Arquivo inválido');
-        setDb(parsed);
+        const normalized = normalizeBackupPayload(parsed, { currentUserId: user?.id || null });
+
+        if (!normalized.ok) {
+          showToast({ type: 'error', message: 'Arquivo de backup inválido. Verifique o arquivo e tente novamente.' });
+          return;
+        }
+
+        setDb(normalized.data);
+
+        const houveImportacaoParcial = normalized.summary.invalidRecords > 0
+          || normalized.summary.skippedByOwner > 0
+          || normalized.summary.nonArrayCollections > 0
+          || normalized.summary.unknownTopLevelKeys > 0;
+
+        if (houveImportacaoParcial) {
+          showToast({
+            type: 'warning',
+            message: 'Backup importado parcialmente. Alguns registros inválidos foram ignorados.',
+          });
+          return;
+        }
+
         showToast({ type: 'success', message: 'Dados importados com sucesso.' });
-      } catch (error) {
-        showToast({ type: 'error', message: `Erro ao importar dados: ${error.message}` });
+      } catch {
+        showToast({ type: 'error', message: 'Arquivo de backup inválido. Verifique o arquivo e tente novamente.' });
       }
     };
     reader.readAsText(file);
