@@ -107,6 +107,20 @@ export default function App() {
   });
   const deniedToastRef = useRef({ permission: '', timestamp: 0 });
 
+  function limparPersistenciaSessao() {
+    const storageKeys = [
+      'herdon_usuario',
+      'herdon_user',
+      'herdon_token',
+      'supabase.auth.token',
+    ];
+
+    storageKeys.forEach((key) => {
+      localStorage.removeItem(key);
+      sessionStorage.removeItem(key);
+    });
+  }
+
   if (import.meta.env.DEV) {
     console.debug('[HERDON_AUTH_BOOT]', {
       loadingAuth,
@@ -261,10 +275,7 @@ export default function App() {
   async function handleLogout() {
     setForcarTelaLogin(true);
     setUsuarioLogado(null);
-    localStorage.removeItem('herdon_usuario');
-    localStorage.removeItem('herdon_user');
-    localStorage.removeItem('herdon_token');
-    sessionStorage.clear();
+    limparPersistenciaSessao();
 
     try {
       await supabase.auth.signOut();
@@ -277,8 +288,7 @@ export default function App() {
 
   async function handleClearSessionAndReload() {
     try {
-      localStorage.clear();
-      sessionStorage.clear();
+      limparPersistenciaSessao();
       await supabase.auth.signOut();
     } catch (error) {
       if (import.meta.env.DEV) {
@@ -509,8 +519,8 @@ export default function App() {
             }
           }}
           onSignOut={handleLogout}
-          onNavigateProfile={() => setCurrentPage('perfil')}
-          onNavigateSettings={() => setCurrentPage('configuracoes')}
+          onNavigateProfile={() => navigateWithPermission('perfil')}
+          onNavigateSettings={() => navigateWithPermission('configuracoes')}
           onConfirmAction={onConfirmAction}
           onOpenMenu={() => window.dispatchEvent(new CustomEvent('agrotrack-open-drawer'))}
           usuarioLogado={usuarioLogado}

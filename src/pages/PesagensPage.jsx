@@ -4,6 +4,69 @@ import { formatarNumero, formatarData } from '../utils/formatters';
 import { gerarNovoId } from '../utils/id';
 import { useToast } from '../hooks/useToast'; // Assuming useToast is available
 
+function toFiniteNumber(value, fallback = 0) {
+  const normalized = Number(value);
+  return Number.isFinite(normalized) ? normalized : fallback;
+}
+
+function resolveLatestPesagem(pesagens) {
+  return [...(pesagens || [])]
+    .filter((item) => item?.data)
+    .sort((a, b) => {
+      const timeA = new Date(a.data).getTime();
+      const timeB = new Date(b.data).getTime();
+      if (timeA !== timeB) return timeB - timeA;
+      return toFiniteNumber(b.id) - toFiniteNumber(a.id);
+    })[0] || null;
+}
+
+function recalculateLoteFromPesagens(prevDb, loteId, nextPesagens) {
+  const lotes = Array.isArray(prevDb?.lotes) ? prevDb.lotes : [];
+  const animais = Array.isArray(prevDb?.animais) ? prevDb.animais : [];
+  const normalizedLoteId = Number(loteId);
+
+  const pesagensLote = (nextPesagens || []).filter(
+    (item) => Number(item?.lote_id) === normalizedLoteId
+  );
+  const latestPesagem = resolveLatestPesagem(pesagensLote);
+
+  const fallbackPesoFromAnimais = (() => {
+    const grupos = animais.filter((item) => Number(item?.lote_id) === normalizedLoteId);
+    const qtd = grupos.reduce((sum, item) => sum + toFiniteNumber(item?.qtd), 0);
+    if (qtd <= 0) return 0;
+    const pesoTotal = grupos.reduce(
+      (sum, item) => sum + toFiniteNumber(item?.p_at) * toFiniteNumber(item?.qtd),
+      0
+    );
+    return qtd > 0 ? pesoTotal / qtd : 0;
+  })();
+
+  const nextPesoAtual = latestPesagem
+    ? toFiniteNumber(latestPesagem.peso_medio, fallbackPesoFromAnimais)
+    : fallbackPesoFromAnimais;
+  const nextUltimaPesagem = latestPesagem?.data || null;
+
+  const nextLotes = lotes.map((lote) => {
+    if (Number(lote?.id) !== normalizedLoteId) {
+      return lote;
+    }
+
+    return {
+      ...lote,
+      p_at: nextPesoAtual,
+      peso_atual: nextPesoAtual,
+      peso_medio_atual: nextPesoAtual,
+      ultima_pesagem: nextUltimaPesagem,
+    };
+  });
+
+  return {
+    ...prevDb,
+    pesagens: nextPesagens,
+    lotes: nextLotes,
+  };
+}
+
 export default function PesagensPage({ db, setDb, onConfirmAction }) {
   const { showToast } = useToast(); // Initialize toast hook
 
@@ -104,49 +167,46 @@ export default function PesagensPage({ db, setDb, onConfirmAction }) {
       : window.confirm('Deseja excluir esta pesagem?');
     if (!confirmado) return;
 
-    setDb((prev) => ({
-      ...prev,
-      pesagens: prev.pesagens.filter((p) => p.id !== id),
-    }));
+    setDb((prev) => {
+      const pesagensAtuais = Array.isArray(prev?.pesagens) ? prev.pesagens : [];
+      const pesagemRemovida = pesagensAtuais.find((p) => p.id === id);
+      const pesagensRestantes = pesagensAtuais.filter((p) => p.id !== id);
+
+      if (!pesagemRemovida?.lote_id) {
+        return {
+          ...prev,
+          pesagens: pesagensRestantes,
+        };
+      }
+
+      return recalculateLoteFromPesagens(prev, pesagemRemovida.lote_id, pesagensRestantes);
+    });
     showToast({ type: 'success', message: 'Pesagem excluída com sucesso!' });
   }
 
-  // Helper to update lot's current weight and last weighing date
-  const updateLotWeightAndDate = (prevLotes, loteId, pesoMedio, dataPesagem) => {
-    return (prevLotes || []).map((lote) =>
-      Number(lote.id) === Number(loteId)
-        ? {
-            ...lote,
-            p_at: Number(pesoMedio || 0),
-            ultima_pesagem: dataPesagem || lote.ultima_pesagem || null,
-          }
-        : lote
-    );
-  };
-
   function salvarPesagem(dados) {
     if (pesagemEditando) {
-      setDb((prev) => ({
-        ...prev,
-        pesagens: prev.pesagens.map((p) =>
+      setDb((prev) => {
+        const pesagensAtuais = Array.isArray(prev?.pesagens) ? prev.pesagens : [];
+        const pesagensAtualizadas = pesagensAtuais.map((p) =>
           p.id === pesagemEditando.id ? { ...p, ...dados } : p
-        ),
-        lotes: updateLotWeightAndDate(prev.lotes, dados.lote_id, dados.peso_medio, dados.data),
-      }));
+        );
+        return recalculateLoteFromPesagens(prev, dados.lote_id, pesagensAtualizadas);
+      });
       showToast({ type: 'success', message: 'Pesagem atualizada com sucesso!' });
     } else {
       const novoId = gerarNovoId(pesagens);
-      setDb((prev) => ({
-        ...prev,
-        pesagens: [
-          ...prev.pesagens,
+      setDb((prev) => {
+        const pesagensAtuais = Array.isArray(prev?.pesagens) ? prev.pesagens : [];
+        const pesagensAtualizadas = [
+          ...pesagensAtuais,
           {
             id: novoId,
             ...dados,
           },
-        ],
-        lotes: updateLotWeightAndDate(prev.lotes, dados.lote_id, dados.peso_medio, dados.data),
-      }));
+        ];
+        return recalculateLoteFromPesagens(prev, dados.lote_id, pesagensAtualizadas);
+      });
       showToast({ type: 'success', message: 'Pesagem registrada com sucesso!' });
     }
 

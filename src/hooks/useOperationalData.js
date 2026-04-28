@@ -20,6 +20,8 @@ const OPERACIONAL_TABLES = [
   'configuracoes',
 ];
 
+const OWNER_SCOPED_TABLES = new Set(OPERACIONAL_TABLES);
+
 function normalizeDb(baseDb) {
   return {
     ...baseDb,
@@ -60,10 +62,19 @@ export function createOperationalFallbackDb(initialDb) {
   return normalizeDb(initialDb || {});
 }
 
-async function loadOperationalSnapshot() {
+async function loadOperationalSnapshot(session) {
+  const userId = session?.user?.id;
+  if (!userId) {
+    return {};
+  }
+
   const entries = await Promise.all(
     OPERACIONAL_TABLES.map(async (table) => {
-      const { data, error } = await supabase.from(table).select('*');
+      let query = supabase.from(table).select('*');
+      if (OWNER_SCOPED_TABLES.has(table)) {
+        query = query.eq('owner_user_id', userId);
+      }
+      const { data, error } = await query;
       if (error) {
         throw error;
       }
@@ -121,7 +132,7 @@ export function useOperationalData(initialDb, session) {
 
       try {
         const snapshotStart = typeof performance !== 'undefined' ? performance.now() : Date.now();
-        const loadPromise = loadOperationalSnapshot();
+        const loadPromise = loadOperationalSnapshot(session);
 
         if (ativo) {
           setDataSource('syncing');

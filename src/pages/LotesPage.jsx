@@ -753,15 +753,23 @@ function MovimentacaoModal({ lote, db, setDb, onClose, onRegistrarEntradaAnimal,
 
     // Usar callbacks customizados se fornecidos
     if (onRegistrarEntradaAnimal && ['compra', 'nascimento', 'transferencia_entrada'].includes(form.tipo)) {
-      onRegistrarEntradaAnimal(mov);
-      showToast({ type: 'success', message: 'Entrada de animais registrada com sucesso!' });
-      onClose();
+      try {
+        onRegistrarEntradaAnimal(mov);
+        showToast({ type: 'success', message: 'Entrada de animais registrada com sucesso!' });
+        onClose();
+      } catch (error) {
+        showToast({ type: 'error', message: error?.message || 'Não foi possível registrar a entrada de animais.' });
+      }
       return;
     }
     if (onRegistrarSaidaAnimal && ['venda', 'morte', 'descarte', 'transferencia_saida', 'abate'].includes(form.tipo)) {
-      onRegistrarSaidaAnimal(mov);
-      showToast({ type: 'success', message: 'Saída de animais registrada com sucesso!' });
-      onClose();
+      try {
+        onRegistrarSaidaAnimal(mov);
+        showToast({ type: 'success', message: 'Saída de animais registrada com sucesso!' });
+        onClose();
+      } catch (error) {
+        showToast({ type: 'error', message: error?.message || 'Não foi possível registrar a saída de animais.' });
+      }
       return;
     }
 
