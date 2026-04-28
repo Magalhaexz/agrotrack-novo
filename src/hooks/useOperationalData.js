@@ -22,9 +22,11 @@ const OPERACIONAL_TABLES = [
 
 const OWNER_SCOPED_TABLES = new Set(OPERACIONAL_TABLES);
 const HYDRATION_CONCURRENCY_LIMIT = 3;
-const HYDRATION_MAX_ATTEMPTS = 3;
-const HYDRATION_BACKOFF_MS = 250;
-const HYDRATION_FAILURE_COOLDOWN_MS = 6000;
+const HYDRATION_MAX_ATTEMPTS = 2;
+const HYDRATION_BACKOFF_MS = 350;
+const HYDRATION_START_DELAY_MS = 1800;
+const HYDRATION_FAILURE_COOLDOWN_MS = 45000;
+const HERDON_DISABLE_SUPABASE_SYNC = 'HERDON_DISABLE_SUPABASE_SYNC';
 const inFlightSnapshots = new Map();
 const failedHydrationAt = new Map();
 
@@ -58,10 +60,21 @@ function isTransientHydrationError(error) {
   ].some((signature) => message.includes(signature));
 }
 
-function logHydrationDebug(payload, level = 'debug') {
+function shouldDisableSupabaseSync() {
+  try {
+    const raw = localStorage.getItem(HERDON_DISABLE_SUPABASE_SYNC);
+    if (!raw) return false;
+    const normalized = String(raw).toLowerCase();
+    return normalized === '1' || normalized === 'true' || normalized === 'yes' || normalized === 'on';
+  } catch {
+    return false;
+  }
+}
+
+function logSyncGuard(payload, level = 'debug') {
   if (!import.meta.env.DEV) return;
   const logger = level === 'warn' ? console.warn : console.debug;
-  logger('[HERDON_SUPABASE_HYDRATION]', payload);
+  logger('[HERDON_SYNC_GUARD]', payload);
 }
 
 function normalizeDb(baseDb) {
@@ -104,14 +117,24 @@ export function createOperationalFallbackDb(initialDb) {
   return normalizeDb(initialDb || {});
 }
 
-async function fetchOperationalTable(table, userId) {
-  for (let attempt = 1; attempt <= HYDRATION_MAX_ATTEMPTS; attempt += 1) {
+async function fetchOperationalTable(table, userId, shouldApply) {
+  for (let attempt = 1; attempt <= HYDRATION_MAX_ATTEMPTS + 1; attempt += 1) {
+    if (!shouldApply()) {
+      logSyncGuard({
+        stage: 'table_cancelled_before_request',
+        table,
+        attempt,
+      });
+      return [table, []];
+    }
+
     const startedAt = nowMs();
     try {
       let query = supabase.from(table).select('*');
       if (OWNER_SCOPED_TABLES.has(table)) {
         query = query.eq('owner_user_id', userId);
       }
+
       const { data, error } = await query;
       const durationMs = Number((nowMs() - startedAt).toFixed(1));
 
@@ -119,35 +142,43 @@ async function fetchOperationalTable(table, userId) {
         throw error;
       }
 
-      logHydrationDebug({
-        table,
-        attempt,
-        status: 'success',
-        durationMs,
-        dataSource: 'supabase',
-        rowCount: Array.isArray(data) ? data.length : 0,
-      });
+      if (!shouldApply()) {
+        logSyncGuard({
+          stage: 'table_result_ignored_stale',
+          table,
+          attempt,
+          durationMs,
+        });
+        return [table, []];
+      }
+
+      if (import.meta.env.DEV) {
+        console.debug('[HERDON_DATA_BOOT]', {
+          stage: 'table_success',
+          table,
+          attempt,
+          durationMs,
+          rows: Array.isArray(data) ? data.length : 0,
+        });
+      }
       return [table, Array.isArray(data) ? data : []];
     } catch (error) {
       const durationMs = Number((nowMs() - startedAt).toFixed(1));
       const transient = isTransientHydrationError(error);
-      const finalAttempt = attempt >= HYDRATION_MAX_ATTEMPTS || !transient;
-      const message = getErrorMessage(error) || 'Falha ao carregar tabela operacional.';
-
-      logHydrationDebug({
-        table,
-        attempt,
-        status: finalAttempt ? 'failure_final' : 'failure_retrying',
-        durationMs,
-        transient,
-        dataSource: finalAttempt ? 'fallback_table' : 'retry',
-        message,
-      }, finalAttempt ? 'warn' : 'debug');
-
-      if (finalAttempt) {
+      const canRetry = transient && attempt <= HYDRATION_MAX_ATTEMPTS && shouldApply();
+      if (import.meta.env.DEV) {
+        console.warn('[HERDON_DATA_BOOT]', {
+          stage: canRetry ? 'table_retrying' : 'table_failure',
+          table,
+          attempt,
+          durationMs,
+          transient,
+          errorType: getErrorMessage(error) || 'hydration_error',
+        });
+      }
+      if (!canRetry) {
         return [table, []];
       }
-
       await wait(HYDRATION_BACKOFF_MS * attempt);
     }
   }
@@ -173,16 +204,13 @@ async function runWithConcurrency(items, limit, worker) {
   return results;
 }
 
-async function loadOperationalSnapshotRequest(session) {
-  const userId = session?.user?.id;
-  if (!userId) {
-    return {};
-  }
-
+async function loadOperationalSnapshotRequest(userId, shouldApply, generationId) {
   const bootStart = nowMs();
   if (import.meta.env.DEV) {
     console.debug('[HERDON_DATA_BOOT]', {
       stage: 'snapshot_start',
+      generationId,
+      hasUserId: Boolean(userId),
       tables: OPERACIONAL_TABLES.length,
       concurrencyLimit: HYDRATION_CONCURRENCY_LIMIT,
     });
@@ -191,22 +219,20 @@ async function loadOperationalSnapshotRequest(session) {
   const entries = await runWithConcurrency(
     OPERACIONAL_TABLES,
     HYDRATION_CONCURRENCY_LIMIT,
-    (table) => fetchOperationalTable(table, userId)
+    (table) => fetchOperationalTable(table, userId, shouldApply)
   );
 
   if (import.meta.env.DEV) {
     console.debug('[HERDON_DATA_BOOT]', {
       stage: 'snapshot_complete',
+      generationId,
       durationMs: Number((nowMs() - bootStart).toFixed(1)),
-      finalDataSource: 'supabase',
     });
   }
-
   return Object.fromEntries(entries);
 }
 
-async function loadOperationalSnapshot(session) {
-  const userId = session?.user?.id;
+async function loadOperationalSnapshot(userId, shouldApply, generationId) {
   if (!userId) {
     return {};
   }
@@ -216,25 +242,25 @@ async function loadOperationalSnapshot(session) {
     if (import.meta.env.DEV) {
       console.debug('[HERDON_DATA_BOOT]', {
         stage: 'snapshot_skip_recent_failure',
-        userId,
-        finalDataSource: 'fallback_recent_failure',
+        generationId,
+        hasUserId: true,
       });
     }
     return {};
   }
 
-  const inFlight = inFlightSnapshots.get(userId);
-  if (inFlight) {
+  const existing = inFlightSnapshots.get(userId);
+  if (existing) {
     if (import.meta.env.DEV) {
       console.debug('[HERDON_DATA_BOOT]', {
         stage: 'snapshot_reuse_in_flight',
-        finalDataSource: 'syncing',
+        generationId,
       });
     }
-    return inFlight;
+    return existing;
   }
 
-  const request = loadOperationalSnapshotRequest(session)
+  const request = loadOperationalSnapshotRequest(userId, shouldApply, generationId)
     .then((snapshot) => {
       failedHydrationAt.delete(userId);
       return snapshot;
@@ -248,6 +274,7 @@ async function loadOperationalSnapshot(session) {
         inFlightSnapshots.delete(userId);
       }
     });
+
   inFlightSnapshots.set(userId, request);
   return request;
 }
@@ -259,8 +286,9 @@ export function useOperationalData(initialDb, session, options = {}) {
   const [dataSource, setDataSource] = useState('signed_out');
   const [dataError, setDataError] = useState(null);
   const hydratingRef = useRef(false);
-  const hydrationIdRef = useRef(0);
+  const hydrationGenerationRef = useRef(0);
   const localMutationRef = useRef(0);
+  const currentUserIdRef = useRef(null);
 
   const setDb = useCallback((updater) => {
     localMutationRef.current += 1;
@@ -268,171 +296,148 @@ export function useOperationalData(initialDb, session, options = {}) {
   }, []);
 
   useEffect(() => {
-    let ativo = true;
-    const hydrationId = hydrationIdRef.current + 1;
-    hydrationIdRef.current = hydrationId;
+    const userId = session?.user?.id || null;
+    currentUserIdRef.current = userId;
+  }, [session]);
+
+  useEffect(() => {
+    let active = true;
+    const generationId = hydrationGenerationRef.current + 1;
+    hydrationGenerationRef.current = generationId;
     hydratingRef.current = true;
 
-    const isCurrentHydration = () => ativo && hydrationIdRef.current === hydrationId;
+    const fallbackDb = createOperationalFallbackDb(initialDb);
+    const userId = session?.user?.id || null;
+    const syncDisabled = shouldDisableSupabaseSync();
 
-    async function hydrate() {
-      const hydrateStart = nowMs();
-      const hasValidSession = Boolean(session?.user?.id);
-      if (!hydrationEnabled || !hasValidSession) {
-        if (isCurrentHydration()) {
-          setDbState(createOperationalFallbackDb(initialDb));
-          setDataSource('signed_out');
-          setDataError(null);
-          setDataReady(true);
-          if (import.meta.env.DEV) {
-            console.debug('[HERDON_DATA_BOOT]', {
-              stage: 'skip_signed_out',
-              hasSession: hasValidSession,
-              hydrationEnabled,
-              signedOutSkipped: true,
-            });
-          }
-        }
+    const shouldApply = () => {
+      const isCurrentGeneration = hydrationGenerationRef.current === generationId;
+      const sameUser = currentUserIdRef.current === userId;
+      const validUser = Boolean(userId);
+      return active && isCurrentGeneration && sameUser && validUser;
+    };
+
+    if (!hydrationEnabled || !userId) {
+      setDbState(fallbackDb);
+      setDataSource('signed_out');
+      setDataError(null);
+      setDataReady(true);
+      hydratingRef.current = false;
+      if (import.meta.env.DEV) {
+        console.debug('[HERDON_DATA_BOOT]', {
+          stage: 'skip_signed_out',
+          generationId,
+          hasUserId: Boolean(userId),
+          hydrationEnabled,
+          signedOutSkipped: true,
+        });
+      }
+      return () => {
+        active = false;
+      };
+    }
+
+    if (syncDisabled) {
+      setDbState(fallbackDb);
+      setDataSource('offline_local');
+      setDataError(null);
+      setDataReady(true);
+      hydratingRef.current = false;
+      logSyncGuard({
+        stage: 'sync_disabled_by_flag',
+        generationId,
+        hasUserId: true,
+        flag: HERDON_DISABLE_SUPABASE_SYNC,
+      });
+      return () => {
+        active = false;
+      };
+    }
+
+    setDbState(fallbackDb);
+    setDataSource('fallback');
+    setDataError(null);
+    setDataReady(true);
+    logSyncGuard({
+      stage: 'fallback_published',
+      generationId,
+      hasUserId: true,
+      delayMs: HYDRATION_START_DELAY_MS,
+    });
+
+    const hydrationVersion = localMutationRef.current;
+    const timer = globalThis.setTimeout(async () => {
+      if (!shouldApply()) {
+        logSyncGuard({
+          stage: 'sync_cancelled_before_start',
+          generationId,
+          hasUserId: true,
+        });
         return;
       }
 
-      const fallbackStart = nowMs();
-      const hydrationVersion = localMutationRef.current;
-      if (isCurrentHydration()) {
-        setDbState(createOperationalFallbackDb(initialDb));
-        setDataSource('fallback');
-        setDataError(null);
-        setDataReady(true);
-      }
-      if (import.meta.env.DEV) {
-        const fallbackEnd = nowMs();
-        console.debug('[HERDON_DATA_TIMING]', {
-          stage: 'fallback_ready',
-          durationMs: Number((fallbackEnd - fallbackStart).toFixed(1)),
-          transitionTo: 'fallback',
-        });
-      }
+      setDataSource('syncing');
+      setDataError(null);
+      logSyncGuard({
+        stage: 'sync_started',
+        generationId,
+        hasUserId: true,
+      });
 
       try {
-        const snapshotStart = nowMs();
-        const loadPromise = loadOperationalSnapshot(session);
-
-        if (isCurrentHydration()) {
-          setDataSource('syncing');
-        }
-
-        const raceResult = await Promise.race([
-          loadPromise.then(
-            (snapshot) => ({ snapshot }),
-            (error) => ({ error })
-          ),
-          new Promise((resolve) => {
-            globalThis.setTimeout(() => resolve({ timeout: true }), 4500);
-          }),
-        ]);
-
-        if (!isCurrentHydration()) return;
-
-        if (raceResult?.timeout) {
-          setDataSource('fallback_timeout');
-          setDataError(new Error('Tempo limite na carga operacional (4.5s).'));
-          setDataReady(true);
-          if (import.meta.env.DEV) {
-            const snapshotEnd = nowMs();
-            console.debug('[HERDON_DATA_TIMING]', {
-              stage: 'snapshot_timeout',
-              durationMs: Number((snapshotEnd - snapshotStart).toFixed(1)),
-              transitionTo: 'fallback_timeout',
-            });
-          }
-
-          loadPromise
-            .then((lateSnapshot) => {
-              if (!isCurrentHydration()) return;
-              const lateEnd = nowMs();
-              const canApplyLateSnapshot = localMutationRef.current === hydrationVersion;
-              if (canApplyLateSnapshot) {
-                setDbState(createOperationalFallbackDb(lateSnapshot));
-                setDataSource('supabase_late');
-                setDataError(null);
-                setDataReady(true);
-              }
-              if (import.meta.env.DEV) {
-                console.debug('[HERDON_DATA_TIMING]', {
-                  stage: canApplyLateSnapshot ? 'supabase_late' : 'supabase_late_skipped_local_changes',
-                  durationMs: Number((lateEnd - snapshotStart).toFixed(1)),
-                  transitionTo: canApplyLateSnapshot ? 'supabase_late' : 'fallback_timeout',
-                });
-              }
-            })
-            .catch((lateError) => {
-              if (import.meta.env.DEV) {
-                console.warn('[HERDON_OPERATIONAL_LATE_ERROR]', lateError);
-              }
-            });
+        const snapshot = await loadOperationalSnapshot(userId, shouldApply, generationId);
+        if (!shouldApply()) {
+          logSyncGuard({
+            stage: 'sync_result_ignored_stale',
+            generationId,
+            hasUserId: true,
+          });
           return;
         }
 
-        if (raceResult?.error) {
-          throw raceResult.error;
-        }
-
         const canApplySnapshot = localMutationRef.current === hydrationVersion;
-        if (canApplySnapshot) {
-          setDbState(createOperationalFallbackDb(raceResult?.snapshot));
-          setDataSource('supabase');
-          setDataError(null);
-          setDataReady(true);
-        } else {
+        if (!canApplySnapshot) {
           setDataSource('fallback');
-        }
-        if (import.meta.env.DEV) {
-          const snapshotEnd = nowMs();
-          console.debug('[HERDON_DATA_TIMING]', {
-            stage: canApplySnapshot ? 'supabase' : 'supabase_skipped_local_changes',
-            durationMs: Number((snapshotEnd - snapshotStart).toFixed(1)),
-            transitionTo: canApplySnapshot ? 'supabase' : 'fallback',
+          logSyncGuard({
+            stage: 'sync_skipped_local_mutation',
+            generationId,
+            hasUserId: true,
           });
+          return;
         }
-      } catch (error) {
-        if (!isCurrentHydration()) return;
 
-        const snapshotEnd = nowMs();
+        setDbState(createOperationalFallbackDb(snapshot));
+        setDataSource('supabase');
+        setDataError(null);
+      } catch {
+        if (!shouldApply()) {
+          logSyncGuard({
+            stage: 'sync_error_ignored_stale',
+            generationId,
+            hasUserId: true,
+          });
+          return;
+        }
         setDataSource('fallback_error');
-        setDataError(error instanceof Error ? error : new Error('Falha ao carregar dados operacionais.'));
-        setDataReady(true);
-        if (import.meta.env.DEV) {
-          console.debug('[HERDON_DATA_TIMING]', {
-            stage: 'snapshot_error',
-            durationMs: Number((snapshotEnd - hydrateStart).toFixed(1)),
-            transitionTo: 'fallback_error',
-          });
-        }
+        setDataError(new Error('Sincronizacao instavel. Seus dados locais continuam disponiveis.'));
       } finally {
-        if (import.meta.env.DEV) {
-          const hydrateEnd = nowMs();
-          console.debug('[HERDON_DATA_TIMING]', {
-            stage: 'hydrate_finally',
-            durationMs: Number((hydrateEnd - hydrateStart).toFixed(1)),
-            hydrationId,
-          });
-        }
-        if (hydrationIdRef.current === hydrationId) {
+        if (hydrationGenerationRef.current === generationId) {
           hydratingRef.current = false;
         }
-        if (isCurrentHydration()) {
-          setDataReady((prev) => prev || true);
-        }
       }
-    }
-
-    hydrate();
+    }, HYDRATION_START_DELAY_MS);
 
     return () => {
-      ativo = false;
-      if (hydrationIdRef.current === hydrationId) {
+      active = false;
+      globalThis.clearTimeout(timer);
+      if (hydrationGenerationRef.current === generationId) {
         hydratingRef.current = false;
       }
+      logSyncGuard({
+        stage: 'sync_cancelled_cleanup',
+        generationId,
+        hasUserId: Boolean(userId),
+      });
     };
   }, [hydrationEnabled, initialDb, session]);
 

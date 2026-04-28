@@ -1,11 +1,12 @@
 import { useMemo, useState } from 'react';
 import { Eye, EyeOff } from 'lucide-react';
 import logoAgrotrack from '../assets/logo_app1.png';
-import { supabase } from '../lib/supabase';
+import { HERDON_LOGOUT_EVENT_KEY, supabase } from '../lib/supabase';
 import '../styles/login.css';
 
 const LOGIN_MAX_RETRIES = 2;
 const LOGIN_RETRY_BASE_DELAY_MS = 300;
+const LOGIN_ATTEMPT_KEY = 'HERDON_LOGIN_ATTEMPT_AT';
 
 function calcularForcaSenha(senha) {
   let pontos = 0;
@@ -114,6 +115,20 @@ export default function LoginPage() {
         setModo('login');
         setSenha('');
         return;
+      }
+
+      try {
+        localStorage.setItem(LOGIN_ATTEMPT_KEY, String(Date.now()));
+        localStorage.removeItem(HERDON_LOGOUT_EVENT_KEY);
+        localStorage.removeItem('herdon_logout_in_progress');
+        if (import.meta.env.DEV) {
+          console.debug('[HERDON_SYNC_GUARD]', {
+            stage: 'login_cleared_recent_logout',
+            hasEmail: Boolean(email.trim()),
+          });
+        }
+      } catch {
+        // Sem storage disponivel
       }
 
       let data = null;

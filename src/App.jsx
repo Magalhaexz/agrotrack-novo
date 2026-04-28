@@ -92,7 +92,6 @@ export default function App() {
     loadingAuth,
     hasPermission,
     forceLocalSignOut,
-    ultimoLogoutAt,
   } = useAuth();
   const {
     db,
@@ -117,11 +116,6 @@ export default function App() {
     resolver: null,
   });
   const deniedToastRef = useRef({ permission: '', timestamp: 0 });
-
-  const houveLogoutRecente = useMemo(() => {
-    if (!ultimoLogoutAt) return false;
-    return Date.now() - ultimoLogoutAt < 15000;
-  }, [ultimoLogoutAt]);
 
   if (import.meta.env.DEV) {
     console.debug('[HERDON_AUTH_BOOT]', {
@@ -177,7 +171,7 @@ export default function App() {
       return;
     }
 
-    if (forcarTelaLogin || houveLogoutRecente) {
+    if (forcarTelaLogin) {
       return;
     }
 
@@ -192,7 +186,7 @@ export default function App() {
       telefone: user?.telefone ?? prev?.telefone ?? '',
       cargo: user?.cargo ?? prev?.cargo ?? '',
     }));
-  }, [forcarTelaLogin, houveLogoutRecente, user]);
+  }, [forcarTelaLogin, user]);
 
   useEffect(() => {
     function aplicarLogoutForcado() {
@@ -573,6 +567,11 @@ export default function App() {
         {isOperationalSyncing ? (
           <div style={{ padding: '8px 16px 0', fontSize: 12, color: 'var(--text-secondary, #6b7280)' }}>
             Sincronizando dados da operação...
+          </div>
+        ) : null}
+        {(dataSource === 'fallback_error' || dataSource === 'fallback_timeout') ? (
+          <div style={{ padding: '8px 16px 0', fontSize: 12, color: 'var(--text-secondary, #6b7280)' }}>
+            Sincronizacao instavel. Seus dados locais continuam disponiveis.
           </div>
         ) : null}
         <AppHeader
