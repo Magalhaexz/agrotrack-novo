@@ -4,8 +4,13 @@ import PageHeader from '../components/PageHeader';
 import FazendaCard from '../components/fazendas/FazendaCard';
 import FazendaModal from '../components/fazendas/FazendaModal';
 import { gerarNovoId } from '../utils/id';
-// Assuming useToast is available
-// import { useToast } from '../hooks/useToast';
+import { useToast } from '../hooks/useToast';
+import { useAuth } from '../auth/useAuth';
+import {
+  createOperationalRecord,
+  deleteOperationalRecord,
+  updateOperationalRecord,
+} from '../services/operationalPersistence';
 
 /**
  * Página de Fazendas, para gerenciar as propriedades.
@@ -16,7 +21,9 @@ import { gerarNovoId } from '../utils/id';
  * @param {function} [props.onConfirmAction] - Callback opcional para ações de confirmação.
  */
 export default function FazendasPage({ db, setDb, onConfirmAction }) {
-  // const { showToast } = useToast(); // Se usar useToast
+  const { showToast } = useToast();
+  const { hasPermission, session } = useAuth();
+  const mensagemSemPermissao = 'Você não tem permissão para executar esta ação.';
 
   const [openModal, setOpenModal] = useState(false);
   const [editando, setEditando] = useState(null);
@@ -50,26 +57,38 @@ export default function FazendasPage({ db, setDb, onConfirmAction }) {
    * Salva uma nova fazenda ou atualiza uma existente.
    * @param {object} payload - Os dados da fazenda a serem salvos.
    */
-  function salvarFazenda(payload) {
+  async function salvarFazenda(payload) {
+    if (!hasPermission('fazendas:editar')) {
+      showToast({ type: 'error', message: mensagemSemPermissao });
+      return;
+    }
     if (editando) {
+      const persisted = await updateOperationalRecord('fazendas', editando.id, payload, session);
       setDb((prev) => ({
         ...prev,
         fazendas: prev.fazendas.map((f) =>
-          f.id === editando.id ? { ...f, ...payload } : f
+          f.id === editando.id ? { ...f, ...(persisted.data || payload) } : f
         ),
       }));
+      if (!persisted.persisted) {
+        showToast({ type: 'warning', message: 'Alteração salva apenas localmente.' });
+      }
       // showToast({ type: 'success', message: 'Fazenda atualizada com sucesso!' });
     } else {
+      const persisted = await createOperationalRecord('fazendas', payload, session);
       setDb((prev) => ({
         ...prev,
         fazendas: [
           ...prev.fazendas,
-          {
+          persisted.data || {
             id: gerarNovoId(prev.fazendas),
             ...payload,
           },
         ],
       }));
+      if (!persisted.persisted) {
+        showToast({ type: 'warning', message: 'Cadastro salvo apenas localmente.' });
+      }
       // showToast({ type: 'success', message: 'Fazenda adicionada com sucesso!' });
     }
     setOpenModal(false);
@@ -81,6 +100,10 @@ export default function FazendasPage({ db, setDb, onConfirmAction }) {
    * @param {number} id - O ID da fazenda a ser excluída.
    */
   async function excluirFazenda(id) {
+    if (!hasPermission('fazendas:editar')) {
+      showToast({ type: 'error', message: mensagemSemPermissao });
+      return;
+    }
     const fazenda = cards.find((f) => f.id === id); // Usar 'cards' que já tem lotesVinculados
     if (!fazenda) return;
 
@@ -100,10 +123,14 @@ export default function FazendasPage({ db, setDb, onConfirmAction }) {
 
     if (!confirmado) return;
 
+    const persisted = await deleteOperationalRecord('fazendas', id, session);
     setDb((prev) => ({
       ...prev,
       fazendas: prev.fazendas.filter((f) => f.id !== id),
     }));
+    if (!persisted.persisted) {
+      showToast({ type: 'warning', message: 'Exclusão aplicada apenas localmente.' });
+    }
     // showToast({ type: 'success', message: 'Fazenda excluída com sucesso!' });
   }
 
@@ -112,7 +139,16 @@ export default function FazendasPage({ db, setDb, onConfirmAction }) {
       <PageHeader
         title="Fazendas"
         subtitle="Gestão completa das propriedades e suas capacidades"
-        actions={<Button onClick={() => { setEditando(null); setOpenModal(true); }}>+ Nova Fazenda</Button>}
+        actions={<Button onClick={() => {
+          if (!hasPermission('fazendas:editar')) {
+            showToast({ type: 'error', message: mensagemSemPermissao });
+            return;
+          }
+          setEditando(null); setOpenModal(true);
+        }}
+        >
+          + Nova Fazenda
+        </Button>}
       />
 
       {cards.length === 0 ? (

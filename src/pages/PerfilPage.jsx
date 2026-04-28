@@ -48,6 +48,7 @@ export default function PerfilPage({ db, usuarioLogado, atualizarUsuario, onConf
   const perfilExibicao = obterLabelPerfil(usuarioLocal?.perfil);
 
   // Sincroniza o estado local do usuário com o `usuarioLogado` prop
+  /* eslint-disable react-hooks/set-state-in-effect */
   useEffect(() => {
     if (!usuarioLogado) return;
     setUsuarioLocal({
@@ -65,6 +66,7 @@ export default function PerfilPage({ db, usuarioLogado, atualizarUsuario, onConf
       fazenda_padrao_id: usuarioLogado.user_metadata?.fazenda_padrao_id || db?.fazendas?.[0]?.id || '',
     }));
   }, [usuarioLogado, db.fazendas]); // Adicionado db.fazendas como dependência para o default da fazenda
+  /* eslint-enable react-hooks/set-state-in-effect */
 
   const forcaSenha = useMemo(() => calcularForcaSenha(novaSenha), [novaSenha]);
 

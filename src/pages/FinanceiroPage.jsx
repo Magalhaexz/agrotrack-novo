@@ -8,6 +8,9 @@ import Modal from '../components/ui/Modal';
 import { getResumoLote } from '../domain/resumoLote';
 import { formatCurrency, formatDate, formatNumber } from '../utils/calculations';
 import { gerarNovoId } from '../utils/id';
+import { useAuth } from '../auth/useAuth';
+import { useToast } from '../hooks/useToast';
+import { createOperationalRecord } from '../services/operationalPersistence';
 
 const tabs = ['dre', 'lote', 'lanc'];
 const despCats = ['Compra Animal', 'Racao', 'Suplemento', 'Medicamento', 'Vacina', 'Frete', 'Funcionario', 'Arrendamento', 'Manutencao', 'Outro'];
@@ -15,6 +18,8 @@ const recCats = ['Venda Animal', 'Venda Produto', 'Outro'];
 const getTodayIso = () => new Date().toISOString().slice(0, 10);
 
 export default function FinanceiroPage({ db, setDb }) {
+  const { hasPermission, session } = useAuth();
+  const { showToast } = useToast();
   const [tab, setTab] = useState('dre');
   const [detailLoteId, setDetailLoteId] = useState(null);
   const [openLanc, setOpenLanc] = useState(false);
@@ -22,6 +27,12 @@ export default function FinanceiroPage({ db, setDb }) {
 
   const lotes = Array.isArray(db?.lotes) ? db.lotes : [];
   const movimentacoes = Array.isArray(db?.movimentacoes_financeiras) ? db.movimentacoes_financeiras : [];
+
+  function podeEditarFinanceiro() {
+    if (hasPermission('financeiro:editar')) return true;
+    showToast({ type: 'error', message: 'Você não tem permissão para executar esta ação.' });
+    return false;
+  }
 
   const movFinMapByLote = useMemo(() => {
     const map = new Map();
@@ -171,7 +182,13 @@ export default function FinanceiroPage({ db, setDb }) {
       <div className="rebanho-header">
         <h1>Financeiro</h1>
         <div className="lote-actions">
-          <Button onClick={() => setOpenLanc(true)}>+ Novo lancamento</Button>
+          <Button onClick={() => {
+            if (!podeEditarFinanceiro()) return;
+            setOpenLanc(true);
+          }}
+          >
+            + Novo lancamento
+          </Button>
         </div>
       </div>
 
@@ -369,12 +386,12 @@ export default function FinanceiroPage({ db, setDb }) {
         </>
       ) : null}
 
-      {openLanc ? <NovoLancamentoModal db={db} setDb={setDb} onClose={() => setOpenLanc(false)} /> : null}
+      {openLanc ? <NovoLancamentoModal db={db} setDb={setDb} onClose={() => setOpenLanc(false)} hasPermission={hasPermission} showToast={showToast} session={session} /> : null}
     </div>
   );
 }
 
-function NovoLancamentoModal({ db, setDb, onClose }) {
+function NovoLancamentoModal({ db, setDb, onClose, hasPermission, showToast, session }) {
   const [form, setForm] = useState({
     tipo: 'despesa',
     categoria: despCats[0],
@@ -390,7 +407,11 @@ function NovoLancamentoModal({ db, setDb, onClose }) {
 
   const categorias = form.tipo === 'despesa' ? despCats : recCats;
 
-  function submit() {
+  async function submit() {
+    if (!hasPermission('financeiro:editar')) {
+      showToast({ type: 'error', message: 'Você não tem permissão para executar esta ação.' });
+      return;
+    }
     if (!form.valor || !form.data) {
       alert('Valor e data sao obrigatorios.');
       return;
@@ -417,10 +438,20 @@ function NovoLancamentoModal({ db, setDb, onClose }) {
       };
     });
 
+    const persistedRows = await Promise.all(
+      novos.map((item) => createOperationalRecord('movimentacoes_financeiras', item, session))
+    );
+
     setDb((prev) => ({
       ...prev,
-      movimentacoes_financeiras: [...(prev.movimentacoes_financeiras || []), ...novos],
+      movimentacoes_financeiras: [
+        ...(prev.movimentacoes_financeiras || []),
+        ...persistedRows.map((item, index) => item.data || novos[index]),
+      ],
     }));
+    if (persistedRows.some((item) => !item.persisted)) {
+      showToast({ type: 'warning', message: 'Lançamento salvo apenas localmente para algumas parcelas.' });
+    }
 
     onClose();
   }

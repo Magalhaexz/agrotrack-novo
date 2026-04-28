@@ -1,4 +1,4 @@
-import { initialDb } from '../data/mockData';
+import { initialDb } from '../data/mockData.js';
 
 function isPlainObject(value) {
   return value !== null && typeof value === 'object' && !Array.isArray(value);

@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { AlertTriangle, FileText, Plus, X } from 'lucide-react';
 import Card from '../components/ui/Card';
 import Button from '../components/ui/Button';
@@ -10,6 +10,14 @@ import { useToast } from '../hooks/useToast'; // Importa o hook de toast
 import { createInvite, deleteInvite, isAccessModuleUnavailable, listInvites, listProfiles, updateInvite } from '../services/userAccess';
 import { gerarNovoId } from '../utils/id'; // Importa a função de gerar ID
 import { normalizeBackupPayload } from '../utils/backupValidation';
+import {
+  createAuditEvent,
+  createOperationalRecord,
+  deleteOwnerScopedCollection,
+  deleteOperationalRecord,
+  updateOperationalRecord,
+  upsertOperationalRecord,
+} from '../services/operationalPersistence';
 import '../styles/configuracoes.css';
 
 const TABS = [
@@ -30,7 +38,7 @@ const TABS = [
  * @param {function} [props.onConfirmAction] - Função para exibir um modal de confirmação customizado.
  */
 export default function ConfiguracoesPage({ db, setDb, onConfirmAction }) {
-  const { perfil, user } = useAuth();
+  const { perfil, user, session, hasPermission } = useAuth();
   const { showToast } = useToast(); // Hook para exibir toasts
   const [tab, setTab] = useState('geral');
   const [openInvite, setOpenInvite] = useState(false);
@@ -61,10 +69,17 @@ export default function ConfiguracoesPage({ db, setDb, onConfirmAction }) {
     dias_antecedencia: configNotificacoes.dias_antecedencia ?? 3,
   });
   const podeGerenciarAcessos = perfilPodeGerenciarAcessos(perfil);
+  const mensagemSemPermissao = 'Você não tem permissão para executar esta ação.';
   const usuariosFallback = useMemo(
     () => (db.usuarios || []).map((item) => ({ ...item, perfil: normalizarPerfil(item.perfil) })),
     [db.usuarios]
   );
+
+  function validarPermissao(permissao) {
+    if (hasPermission(permissao)) return true;
+    showToast({ type: 'error', message: mensagemSemPermissao });
+    return false;
+  }
 
   function mensagemErroSegura(error, fallbackMessage) {
     const message = String(error?.message || '').toLowerCase();
@@ -83,7 +98,18 @@ export default function ConfiguracoesPage({ db, setDb, onConfirmAction }) {
     return error?.message || fallbackMessage;
   }
 
-  async function carregarDadosDeAcesso() {
+  function registrarEventoAuditoria(evento) {
+    void createAuditEvent({
+      ...evento,
+      usuario_id: user?.id || null,
+    }, session).then((result) => {
+      if (!result?.persisted && import.meta.env.DEV) {
+        console.warn('[HERDON_AUDITORIA_FALLBACK]', result?.error || 'Falha ao persistir auditoria.');
+      }
+    });
+  }
+
+  const carregarDadosDeAcesso = useCallback(async () => {
     if (!podeGerenciarAcessos) {
       return;
     }
@@ -110,49 +136,89 @@ export default function ConfiguracoesPage({ db, setDb, onConfirmAction }) {
     setInvitesRows(invitesResponse.data || []);
     setAccessModuleReady(true);
     setLoadingAccessData(false);
-  }
+  }, [podeGerenciarAcessos, showToast]);
 
+  /* eslint-disable react-hooks/set-state-in-effect */
   useEffect(() => {
-    carregarDadosDeAcesso();
-  }, [podeGerenciarAcessos]);
+    void carregarDadosDeAcesso();
+  }, [carregarDadosDeAcesso]);
+  /* eslint-enable react-hooks/set-state-in-effect */
 
-  function salvarGeral() {
+  async function salvarGeral() {
+    if (!validarPermissao('configuracoes:editar')) return;
     if (!geral.nome_sistema.trim()) {
       showToast({ type: 'error', message: 'Nome do sistema/empresa é obrigatório.' });
       return;
     }
 
+    const geralPayload = {
+      ...geral,
+      rendimento_carcaca_padrao: Number(geral.rendimento_carcaca_padrao || 0),
+      preco_arroba_padrao: Number(geral.preco_arroba_padrao || 0),
+    };
+    const persisted = await upsertOperationalRecord('configuracoes', {
+      id: db?.configuracoes?.id,
+      owner_user_id: user?.id || null,
+      geral: geralPayload,
+      notificacoes: db?.configuracoes?.notificacoes || {},
+    }, user ? { user } : null);
     setDb((prev) => ({
       ...prev,
       configuracoes: {
         ...prev.configuracoes,
-        geral: {
-          ...geral,
-          rendimento_carcaca_padrao: Number(geral.rendimento_carcaca_padrao || 0),
-          preco_arroba_padrao: Number(geral.preco_arroba_padrao || 0),
-        },
+        ...(persisted.data || {}),
+        geral: geralPayload,
       },
     }));
+    if (!persisted.persisted) {
+      showToast({ type: 'warning', message: 'Configurações gerais salvas apenas localmente.' });
+    }
+    registrarEventoAuditoria({
+      acao: 'configuracoes_gerais_salvas',
+      entidade: 'configuracoes',
+      entidade_id: persisted.data?.id ?? db?.configuracoes?.id ?? null,
+      criticidade: 'media',
+      detalhes: { persistido: persisted.persisted },
+    });
 
     showToast({ type: 'success', message: 'Configurações gerais salvas com sucesso.' });
   }
 
-  function salvarNotificacoes() {
+  async function salvarNotificacoes() {
+    if (!validarPermissao('configuracoes:editar')) return;
     if (Number(notificacoes.dias_antecedencia) < 0) {
       showToast({ type: 'error', message: 'Dias de antecedência deve ser maior ou igual a zero.' });
       return;
     }
 
+    const notificacoesPayload = {
+      ...notificacoes,
+      dias_antecedencia: Number(notificacoes.dias_antecedencia || 0),
+    };
+    const persisted = await upsertOperationalRecord('configuracoes', {
+      id: db?.configuracoes?.id,
+      owner_user_id: user?.id || null,
+      geral: db?.configuracoes?.geral || {},
+      notificacoes: notificacoesPayload,
+    }, user ? { user } : null);
     setDb((prev) => ({
       ...prev,
       configuracoes: {
         ...prev.configuracoes,
-        notificacoes: {
-          ...notificacoes,
-          dias_antecedencia: Number(notificacoes.dias_antecedencia || 0),
-        },
+        ...(persisted.data || {}),
+        notificacoes: notificacoesPayload,
       },
     }));
+    if (!persisted.persisted) {
+      showToast({ type: 'warning', message: 'Notificações salvas apenas localmente.' });
+    }
+    registrarEventoAuditoria({
+      acao: 'configuracoes_notificacoes_salvas',
+      entidade: 'configuracoes',
+      entidade_id: persisted.data?.id ?? db?.configuracoes?.id ?? null,
+      criticidade: 'media',
+      detalhes: { persistido: persisted.persisted },
+    });
 
     showToast({ type: 'success', message: 'Preferências de notificação salvas com sucesso.' });
   }
@@ -174,18 +240,41 @@ export default function ConfiguracoesPage({ db, setDb, onConfirmAction }) {
     showToast({ type: 'success', message: 'Backup exportado com sucesso.' });
   }
 
-  function importarDados(event) {
+  async function importarDados(event) {
+    if (!validarPermissao('dados:importar')) {
+      event.target.value = '';
+      return;
+    }
     const file = event.target.files?.[0];
     if (!file) return;
 
     const reader = new FileReader();
-    reader.onload = () => {
+    reader.onload = async () => {
       try {
         const parsed = JSON.parse(String(reader.result || '{}'));
         const normalized = normalizeBackupPayload(parsed, { currentUserId: user?.id || null });
 
         if (!normalized.ok) {
+          registrarEventoAuditoria({
+            acao: 'backup_importado_invalido',
+            entidade: 'backup',
+            criticidade: 'alta',
+            detalhes: { motivo: 'payload_invalido' },
+          });
           showToast({ type: 'error', message: 'Arquivo de backup inválido. Verifique o arquivo e tente novamente.' });
+          return;
+        }
+
+        const confirmarImportacao = onConfirmAction
+          ? await onConfirmAction({
+              title: 'Importar backup validado',
+              message: 'O backup será aplicado localmente. A sincronização completa com a nuvem requer confirmação adicional. Deseja continuar?',
+              tone: 'danger',
+            })
+          : window.confirm('O backup será aplicado localmente. A sincronização completa com a nuvem requer confirmação adicional. Deseja continuar?');
+
+        if (!confirmarImportacao) {
+          showToast({ type: 'info', message: 'Importação cancelada pelo usuário.' });
           return;
         }
 
@@ -197,15 +286,33 @@ export default function ConfiguracoesPage({ db, setDb, onConfirmAction }) {
           || normalized.summary.unknownTopLevelKeys > 0;
 
         if (houveImportacaoParcial) {
+          registrarEventoAuditoria({
+            acao: 'backup_importado_parcial',
+            entidade: 'backup',
+            criticidade: 'media',
+            detalhes: normalized.summary,
+          });
           showToast({
             type: 'warning',
-            message: 'Backup importado parcialmente. Alguns registros inválidos foram ignorados.',
+            message: 'Backup validado localmente. Alguns registros inválidos foram ignorados. A sincronização completa com a nuvem requer confirmação adicional.',
           });
           return;
         }
 
-        showToast({ type: 'success', message: 'Dados importados com sucesso.' });
+        registrarEventoAuditoria({
+          acao: 'backup_importado_local',
+          entidade: 'backup',
+          criticidade: 'media',
+          detalhes: normalized.summary,
+        });
+        showToast({ type: 'warning', message: 'Backup validado localmente. A sincronização completa com a nuvem requer confirmação adicional.' });
       } catch {
+        registrarEventoAuditoria({
+          acao: 'backup_importado_invalido',
+          entidade: 'backup',
+          criticidade: 'alta',
+          detalhes: { motivo: 'json_invalido' },
+        });
         showToast({ type: 'error', message: 'Arquivo de backup inválido. Verifique o arquivo e tente novamente.' });
       }
     };
@@ -214,11 +321,22 @@ export default function ConfiguracoesPage({ db, setDb, onConfirmAction }) {
   }
 
   async function limparDadosDemo() {
+    if (!validarPermissao('dados:limpar')) return;
     const ok = onConfirmAction
       ? await onConfirmAction({ title: 'Limpar demonstração', message: 'Remover dados fictícios do ambiente?', tone: 'danger' })
       : window.confirm('Remover dados fictícios do ambiente?');
 
     if (!ok) return;
+
+    const confirmarLocal = onConfirmAction
+      ? await onConfirmAction({
+          title: 'Confirmar limpeza local',
+          message: 'Esta limpeza afeta apenas os dados locais em memória. Deseja continuar?',
+          tone: 'danger',
+        })
+      : window.confirm('Esta limpeza afeta apenas os dados locais em memória. Deseja continuar?');
+
+    if (!confirmarLocal) return;
 
     setDb((prev) => ({
       ...prev,
@@ -236,7 +354,43 @@ export default function ConfiguracoesPage({ db, setDb, onConfirmAction }) {
       // Manter configurações e usuários
     }));
 
-    showToast({ type: 'success', message: 'Dados de demonstração removidos.' });
+    const colecoesLimpeza = [
+      'lotes',
+      'animais',
+      'custos',
+      'estoque',
+      'sanitario',
+      'rotinas',
+      'tarefas',
+      'pesagens',
+      'movimentacoes_animais',
+      'movimentacoes_estoque',
+      'movimentacoes_financeiras',
+      'suplementacao',
+      'dietas',
+      'consumo_suplementacao',
+      'eventos_operacionais',
+    ];
+    const resultadosLimpeza = await Promise.all(
+      colecoesLimpeza.map((table) => deleteOwnerScopedCollection(table, session))
+    );
+    const houveFalhaPersistencia = resultadosLimpeza.some((item) => !item?.persisted);
+    registrarEventoAuditoria({
+      acao: 'limpeza_dados_operacionais',
+      entidade: 'dados',
+      criticidade: 'alta',
+      detalhes: {
+        escopo: 'demo_operacional',
+        tabelas: colecoesLimpeza,
+        persistido: !houveFalhaPersistencia,
+      },
+    });
+
+    if (houveFalhaPersistencia) {
+      showToast({ type: 'warning', message: 'Dados locais removidos. Parte da limpeza remota não foi concluída.' });
+      return;
+    }
+    showToast({ type: 'success', message: 'Dados de demonstração removidos localmente e na nuvem.' });
   }
 
   async function excluirConta() {
@@ -391,6 +545,7 @@ export default function ConfiguracoesPage({ db, setDb, onConfirmAction }) {
                                   size="sm"
                                   variant="outline"
                                   onClick={async () => {
+                                    if (!validarPermissao('acessos:gerenciar')) return;
                                     const confirmarCancelamento = onConfirmAction
                                       ? await onConfirmAction({
                                           title: 'Cancelar convite',
@@ -406,6 +561,13 @@ export default function ConfiguracoesPage({ db, setDb, onConfirmAction }) {
                                       showToast({ type: 'error', message: mensagemErroSegura(error, 'Nao foi possivel cancelar o convite.') });
                                       return;
                                     }
+                                    registrarEventoAuditoria({
+                                      acao: 'convite_cancelado',
+                                      entidade: 'invites',
+                                      entidade_id: invite.id,
+                                      criticidade: 'alta',
+                                      detalhes: { email: invite.email },
+                                    });
                                     showToast({ type: 'success', message: 'Convite cancelado com sucesso.' });
                                     carregarDadosDeAcesso();
                                   }}
@@ -417,6 +579,7 @@ export default function ConfiguracoesPage({ db, setDb, onConfirmAction }) {
                                 size="sm"
                                 variant="danger"
                                 onClick={async () => {
+                                  if (!validarPermissao('acessos:gerenciar')) return;
                                   const confirmarRemocao = onConfirmAction
                                     ? await onConfirmAction({
                                         title: 'Remover convite',
@@ -432,6 +595,13 @@ export default function ConfiguracoesPage({ db, setDb, onConfirmAction }) {
                                     showToast({ type: 'error', message: mensagemErroSegura(error, 'Nao foi possivel remover o convite.') });
                                     return;
                                   }
+                                  registrarEventoAuditoria({
+                                    acao: 'convite_removido',
+                                    entidade: 'invites',
+                                    entidade_id: invite.id,
+                                    criticidade: 'alta',
+                                    detalhes: { email: invite.email },
+                                  });
                                   showToast({ type: 'success', message: 'Convite removido com sucesso.' });
                                   carregarDadosDeAcesso();
                                 }}
@@ -468,7 +638,16 @@ export default function ConfiguracoesPage({ db, setDb, onConfirmAction }) {
                         className="ui-input" // Adicionado classe ui-input
                         value={item.perfil}
                         onChange={(e) => {
+                          if (!validarPermissao('acessos:gerenciar')) return;
                           const novoPerfil = e.target.value;
+                          void updateOperationalRecord('usuarios', item.id, { perfil: novoPerfil }, user ? { user } : null);
+                          registrarEventoAuditoria({
+                            acao: 'usuario_fallback_perfil_atualizado',
+                            entidade: 'usuarios',
+                            entidade_id: item.id,
+                            criticidade: 'alta',
+                            detalhes: { perfil_anterior: item.perfil, perfil_novo: novoPerfil },
+                          });
                           setDb((prev) => ({
                             ...prev,
                             usuarios: (prev.usuarios || []).map((u) => (u.id === item.id ? { ...u, perfil: novoPerfil } : u)),
@@ -486,7 +665,16 @@ export default function ConfiguracoesPage({ db, setDb, onConfirmAction }) {
                         className="ui-input" // Adicionado classe ui-input
                         value={item.status}
                         onChange={(e) => {
+                          if (!validarPermissao('acessos:gerenciar')) return;
                           const novoStatus = e.target.value;
+                          void updateOperationalRecord('usuarios', item.id, { status: novoStatus }, user ? { user } : null);
+                          registrarEventoAuditoria({
+                            acao: 'usuario_fallback_status_atualizado',
+                            entidade: 'usuarios',
+                            entidade_id: item.id,
+                            criticidade: 'alta',
+                            detalhes: { status_anterior: item.status, status_novo: novoStatus },
+                          });
                           setDb((prev) => ({
                             ...prev,
                             usuarios: (prev.usuarios || []).map((u) => (u.id === item.id ? { ...u, status: novoStatus } : u)),
@@ -502,6 +690,7 @@ export default function ConfiguracoesPage({ db, setDb, onConfirmAction }) {
                         size="sm"
                         variant="danger"
                         onClick={async () => {
+                          if (!validarPermissao('acessos:gerenciar')) return;
                           const confirmarRemocaoLocal = onConfirmAction
                             ? await onConfirmAction({
                                 title: 'Remover usuário',
@@ -511,6 +700,14 @@ export default function ConfiguracoesPage({ db, setDb, onConfirmAction }) {
                             : window.confirm(`Deseja remover ${item.nome} da base local?`);
 
                           if (!confirmarRemocaoLocal) return;
+                          void deleteOperationalRecord('usuarios', item.id, user ? { user } : null);
+                          registrarEventoAuditoria({
+                            acao: 'usuario_fallback_removido',
+                            entidade: 'usuarios',
+                            entidade_id: item.id,
+                            criticidade: 'alta',
+                            detalhes: { nome: item.nome, email: item.email },
+                          });
                           setDb((prev) => ({ ...prev, usuarios: (prev.usuarios || []).filter((u) => u.id !== item.id) }));
                         }}
                       >
@@ -548,14 +745,26 @@ export default function ConfiguracoesPage({ db, setDb, onConfirmAction }) {
         <InviteForm
           onClose={() => setOpenInvite(false)}
           onInvite={async (payload) => {
+            if (!validarPermissao('acessos:gerenciar')) return;
             if (!accessModuleReady) {
+              const persisted = await createOperationalRecord('usuarios', {
+                ...payload,
+                owner_user_id: user?.id || null,
+              }, user ? { user } : null);
               setDb((prev) => ({
                 ...prev,
                 usuarios: [
                   ...(prev.usuarios || []),
-                  { ...payload, id: gerarNovoId(prev.usuarios || []), owner_user_id: user?.id || null },
+                  { ...payload, ...(persisted.data || {}), id: persisted.data?.id ?? gerarNovoId(prev.usuarios || []), owner_user_id: user?.id || null },
                 ],
               }));
+              registrarEventoAuditoria({
+                acao: 'usuario_fallback_criado',
+                entidade: 'usuarios',
+                entidade_id: persisted.data?.id ?? null,
+                criticidade: 'alta',
+                detalhes: { email: payload.email, perfil: payload.perfil },
+              });
               showToast({ type: 'success', message: 'Convite salvo no modo local. A migration ativa o fluxo automático.' });
               setOpenInvite(false);
               return;
@@ -575,6 +784,12 @@ export default function ConfiguracoesPage({ db, setDb, onConfirmAction }) {
               showToast({ type: 'error', message: mensagemErroSegura(error, 'Nao foi possivel criar o convite.') });
               return;
             }
+            registrarEventoAuditoria({
+              acao: 'convite_criado',
+              entidade: 'invites',
+              criticidade: 'alta',
+              detalhes: { email: payload.email, perfil: payload.perfil },
+            });
 
             showToast({ type: 'success', message: 'Convite criado. O perfil será aplicado automaticamente no cadastro.' });
             setOpenInvite(false);

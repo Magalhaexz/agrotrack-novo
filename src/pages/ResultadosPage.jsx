@@ -102,6 +102,7 @@ export default function ResultadosPage({ db }) {
   const [isGenerating, setIsGenerating] = useState(false);
   const [validationError, setValidationError] = useState('');
 
+  /* eslint-disable react-hooks/set-state-in-effect */
   useEffect(() => {
     setDraftFilters((prev) => ({
       ...defaultFilters,
@@ -116,6 +117,7 @@ export default function ResultadosPage({ db }) {
       status: prev?.status || defaultFilters.status,
     }));
   }, [defaultFilters]);
+  /* eslint-enable react-hooks/set-state-in-effect */
 
   useEffect(() => () => window.clearTimeout(timerRef.current), []);
 

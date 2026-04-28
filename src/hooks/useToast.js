@@ -20,6 +20,7 @@ function removeToastFromStore(id) {
 export function useToast() {
   const [toasts, setToasts] = useState(() => toastStore);
 
+  /* eslint-disable react-hooks/set-state-in-effect */
   useEffect(() => {
     subscribers.add(setToasts);
     setToasts(toastStore);
@@ -28,6 +29,7 @@ export function useToast() {
       subscribers.delete(setToasts);
     };
   }, []);
+  /* eslint-enable react-hooks/set-state-in-effect */
 
   const removeToast = useCallback((id) => {
     removeToastFromStore(id);

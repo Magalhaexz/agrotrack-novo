@@ -6,10 +6,20 @@ import Card from '../components/ui/Card';
 import { TIPOS_SAIDA_ANIMAL } from '../utils/constantes';
 import { formatarData, formatarNumero } from '../utils/formatters';
 import { gerarNovoId } from '../utils/id';
+import { useAuth } from '../auth/useAuth';
+import { useToast } from '../hooks/useToast';
+import {
+  createOperationalRecord,
+  deleteOperationalRecord,
+  updateOperationalRecord,
+} from '../services/operationalPersistence';
 
 export default function AnimaisPage({ db, setDb, onConfirmAction }) {
+  const { hasPermission, session } = useAuth();
+  const { showToast } = useToast();
   const [abrirForm, setAbrirForm] = useState(false);
   const [animalEditando, setAnimalEditando] = useState(null);
+  const mensagemSemPermissao = 'Você não tem permissão para executar esta ação.';
 
   const lotes = Array.isArray(db?.lotes) ? db.lotes : [];
   const animais = Array.isArray(db?.animais) ? db.animais : [];
@@ -75,16 +85,28 @@ export default function AnimaisPage({ db, setDb, onConfirmAction }) {
   }, [lotesMap, movimentacoesAnimais]);
 
   function abrirNovo() {
+    if (!hasPermission('animais:editar')) {
+      showToast({ type: 'error', message: mensagemSemPermissao });
+      return;
+    }
     setAnimalEditando(null);
     setAbrirForm(true);
   }
 
   function editarAnimal(animal) {
+    if (!hasPermission('animais:editar')) {
+      showToast({ type: 'error', message: mensagemSemPermissao });
+      return;
+    }
     setAnimalEditando(animal);
     setAbrirForm(true);
   }
 
   async function excluirAnimal(id) {
+    if (!hasPermission('animais:excluir')) {
+      showToast({ type: 'error', message: mensagemSemPermissao });
+      return;
+    }
     const confirmado = typeof onConfirmAction === 'function'
       ? await onConfirmAction({
           title: 'Excluir registro de animais',
@@ -97,31 +119,47 @@ export default function AnimaisPage({ db, setDb, onConfirmAction }) {
       return;
     }
 
+    const persisted = await deleteOperationalRecord('animais', id, session);
     setDb((prev) => ({
       ...prev,
       animais: (prev.animais || []).filter((animal) => animal.id !== id),
     }));
+    if (!persisted.persisted) {
+      showToast({ type: 'warning', message: 'Exclusão aplicada apenas localmente.' });
+    }
   }
 
-  function salvarAnimal(dados) {
+  async function salvarAnimal(dados) {
+    if (!hasPermission('animais:editar')) {
+      showToast({ type: 'error', message: mensagemSemPermissao });
+      return;
+    }
     if (animalEditando) {
+      const persisted = await updateOperationalRecord('animais', animalEditando.id, dados, session);
       setDb((prev) => ({
         ...prev,
         animais: (prev.animais || []).map((animal) => (
-          animal.id === animalEditando.id ? { ...animal, ...dados } : animal
+          animal.id === animalEditando.id ? { ...animal, ...(persisted.data || dados) } : animal
         )),
       }));
+      if (!persisted.persisted) {
+        showToast({ type: 'warning', message: 'Alteração salva apenas localmente.' });
+      }
     } else {
+      const persisted = await createOperationalRecord('animais', dados, session);
       setDb((prev) => ({
         ...prev,
         animais: [
           ...(prev.animais || []),
-          {
+          persisted.data || {
             id: gerarNovoId(prev.animais || []),
             ...dados,
           },
         ],
       }));
+      if (!persisted.persisted) {
+        showToast({ type: 'warning', message: 'Cadastro salvo apenas localmente.' });
+      }
     }
 
     setAbrirForm(false);

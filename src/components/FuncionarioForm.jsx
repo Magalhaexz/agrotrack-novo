@@ -80,10 +80,12 @@ export default function FuncionarioForm({ open, onCancel, onSave, initialData, f
   const [form, setForm] = useState(() => normalizarInitialData(initialData, fazendas));
   const [erro, setErro] = useState('');
 
+  /* eslint-disable react-hooks/set-state-in-effect */
   useEffect(() => {
     setForm(normalizarInitialData(initialData, fazendas));
     setErro('');
   }, [initialData, fazendas]);
+  /* eslint-enable react-hooks/set-state-in-effect */
 
   const titulo = useMemo(
     () => (initialData ? 'Editar funcionário' : 'Cadastrar funcionário'),

@@ -5,8 +5,14 @@ import Card from '../components/ui/Card';
 import Input from '../components/ui/Input';
 import Modal from '../components/ui/Modal';
 import { useToast } from '../hooks/useToast';
+import { useAuth } from '../auth/useAuth';
 import { gerarNovoId } from '../utils/id';
 import { formatNumber } from '../utils/calculations';
+import {
+  createOperationalRecord,
+  deleteOperationalRecord,
+  updateOperationalRecord,
+} from '../services/operationalPersistence';
 
 const getTodayIso = () => new Date().toISOString().slice(0, 10);
 
@@ -69,6 +75,7 @@ function saveDietasCompat(setDb, updater) {
 
 export default function SuplementacaoPage({ db, setDb }) {
   const { showToast } = useToast();
+  const { session } = useAuth();
   const [openDieta, setOpenDieta] = useState(false);
   const [openConsumo, setOpenConsumo] = useState(false);
   const [dietaEditando, setDietaEditando] = useState(null);
@@ -149,10 +156,14 @@ export default function SuplementacaoPage({ db, setDb }) {
     setOpenDieta(true);
   }, []);
 
-  const handleDeleteDieta = useCallback((dietaId) => {
+  const handleDeleteDieta = useCallback(async (dietaId) => {
+    const persisted = await deleteOperationalRecord('suplementacao', dietaId, session);
     saveDietasCompat(setDb, (dietasAtuais) => dietasAtuais.filter((dieta) => dieta.id !== dietaId));
+    if (!persisted.persisted) {
+      showToast({ type: 'warning', message: 'Exclusão salva apenas localmente.' });
+    }
     showToast({ type: 'success', message: 'Dieta excluida com sucesso.' });
-  }, [setDb, showToast]);
+  }, [session, setDb, showToast]);
 
   return (
     <div className="page suplementacao-page">
@@ -264,6 +275,7 @@ export default function SuplementacaoPage({ db, setDb }) {
             setDietaEditando(null);
           }}
           showToast={showToast}
+          session={session}
         />
       ) : null}
 
@@ -279,7 +291,7 @@ export default function SuplementacaoPage({ db, setDb }) {
   );
 }
 
-function DietaModal({ db, setDb, initialData, onClose, showToast }) {
+function DietaModal({ db, setDb, initialData, onClose, showToast, session }) {
   const dietas = useMemo(() => getDietasNormalizadas(db), [db]);
   const estoqueItens = useMemo(() => getEstoqueSuplementacao(db), [db]);
   const [form, setForm] = useState(() => ({
@@ -310,7 +322,7 @@ function DietaModal({ db, setDb, initialData, onClose, showToast }) {
     return Object.keys(nextErrors).length === 0;
   }, [form]);
 
-  function submit() {
+  async function submit() {
     if (!validate()) {
       showToast({ type: 'error', message: 'Corrija os campos da dieta antes de salvar.' });
       return;
@@ -325,10 +337,20 @@ function DietaModal({ db, setDb, initialData, onClose, showToast }) {
       })),
     };
 
+    const persisted = initialData?.id
+      ? await updateOperationalRecord('suplementacao', initialData.id, payload, session)
+      : await createOperationalRecord('suplementacao', payload, session);
+
     saveDietasCompat(setDb, (dietasAtuais) => {
       const existe = dietasAtuais.some((dieta) => dieta.id === payload.id);
-      return existe ? dietasAtuais.map((dieta) => (dieta.id === payload.id ? payload : dieta)) : [...dietasAtuais, payload];
+      const dietaPersistida = { ...payload, ...(persisted.data || {}), id: persisted.data?.id ?? payload.id };
+      return existe
+        ? dietasAtuais.map((dieta) => (dieta.id === payload.id ? dietaPersistida : dieta))
+        : [...dietasAtuais, dietaPersistida];
     });
+    if (!persisted.persisted) {
+      showToast({ type: 'warning', message: 'Dieta salva apenas localmente.' });
+    }
 
     showToast({ type: 'success', message: `Dieta ${payload.nome} salva com sucesso.` });
     onClose();

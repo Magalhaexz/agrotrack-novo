@@ -1,6 +1,12 @@
+/* eslint-disable react-refresh/only-export-components */
 import { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react';
 import { mapProfileRowToUser, fetchUserProfile, isAccessModuleUnavailable } from '../services/userAccess';
-import { supabase } from '../lib/supabase';
+import {
+  HERDON_LOGOUT_CHANNEL,
+  HERDON_LOGOUT_EVENT_KEY,
+  limparPersistenciaSessao,
+  supabase,
+} from '../lib/supabase';
 import { obterPerfilDoUsuario, usuarioTemPermissao } from './perfis';
 
 const AuthContext = createContext(null);
@@ -12,6 +18,22 @@ export function AuthProvider({ children }) {
   const [profileReady, setProfileReady] = useState(true);
   const [loadingAuth, setLoadingAuth] = useState(true);
   const [authError, setAuthError] = useState(null);
+  const [ultimoLogoutAt, setUltimoLogoutAt] = useState(0);
+
+  const resetAuthState = useCallback(() => {
+    setSession(null);
+    setProfile(null);
+    setProfileError(null);
+    setProfileReady(true);
+    setAuthError(null);
+    setLoadingAuth(false);
+  }, []);
+
+  const registrarLogoutLocal = useCallback(() => {
+    limparPersistenciaSessao();
+    setUltimoLogoutAt(Date.now());
+    resetAuthState();
+  }, [resetAuthState]);
 
   useEffect(() => {
     let ativo = true;
@@ -102,12 +124,7 @@ export function AuthProvider({ children }) {
         if (error) {
           console.error('Erro ao obter sessão:', error);
           if (ativo) {
-            setAuthError(error);
-            setSession(null);
-            setProfile(null);
-            setProfileError(null);
-            setProfileReady(true);
-            setLoadingAuth(false);
+            resetAuthState();
           }
           if (import.meta.env.DEV) {
             console.debug('[HERDON_AUTH_TIMING]', {
@@ -146,11 +163,7 @@ export function AuthProvider({ children }) {
         console.error('Erro inesperado ao obter sessão:', err);
 
         if (ativo) {
-          setSession(null);
-          setAuthError(err);
-          setProfile(null);
-          setProfileReady(true);
-          setLoadingAuth(false);
+          resetAuthState();
         }
       } finally {
         if (import.meta.env.DEV) {
@@ -170,32 +183,68 @@ export function AuthProvider({ children }) {
       data: { subscription },
     } = supabase.auth.onAuthStateChange((_event, sessionAtual) => {
       try {
-        setSession(sessionAtual ?? null);
+        if (_event === 'SIGNED_OUT' || !sessionAtual) {
+          registrarLogoutLocal();
+          return;
+        }
+
+        setSession(sessionAtual);
         setAuthError(null);
         setLoadingAuth(false);
         if (sessionAtual?.user) {
           void carregarProfile(sessionAtual.user);
-        } else {
-          setProfile(null);
-          setProfileError(null);
-          setProfileReady(true);
         }
       } catch (error) {
         console.error('Erro no listener de autenticação:', error);
         if (ativo) {
-          setSession(null);
-          setProfile(null);
-          setProfileReady(true);
-          setLoadingAuth(false);
+          resetAuthState();
         }
       }
     });
 
+    async function validarSessaoAoRetornar() {
+      if (document.visibilityState === 'hidden') return;
+
+      const { data, error } = await supabase.auth.getSession();
+      if (error || !data?.session) {
+        registrarLogoutLocal();
+      }
+    }
+
+    function onStorage(event) {
+      if (event.key !== HERDON_LOGOUT_EVENT_KEY || !event.newValue) return;
+      registrarLogoutLocal();
+    }
+
+    let authChannel = null;
+    function onBroadcast(event) {
+      if (event?.data?.type !== 'logout') return;
+      registrarLogoutLocal();
+    }
+
+    window.addEventListener('storage', onStorage);
+    window.addEventListener('focus', validarSessaoAoRetornar);
+    document.addEventListener('visibilitychange', validarSessaoAoRetornar);
+
+    try {
+      authChannel = new BroadcastChannel(HERDON_LOGOUT_CHANNEL);
+      authChannel.addEventListener('message', onBroadcast);
+    } catch {
+      authChannel = null;
+    }
+
     return () => {
       ativo = false;
       subscription.unsubscribe();
+      window.removeEventListener('storage', onStorage);
+      window.removeEventListener('focus', validarSessaoAoRetornar);
+      document.removeEventListener('visibilitychange', validarSessaoAoRetornar);
+      if (authChannel) {
+        authChannel.removeEventListener('message', onBroadcast);
+        authChannel.close();
+      }
     };
-  }, []);
+  }, [registrarLogoutLocal, resetAuthState]);
 
   const refreshProfile = useCallback(async () => {
     const userAtual = session?.user ?? null;
@@ -235,9 +284,11 @@ export function AuthProvider({ children }) {
       profileError,
       profileReady,
       refreshProfile,
+      forceLocalSignOut: registrarLogoutLocal,
+      ultimoLogoutAt,
       hasPermission: (permissao) => usuarioTemPermissao(user, permissao),
     };
-  }, [session, profile, loadingAuth, authError, profileError, profileReady, refreshProfile]);
+  }, [session, profile, loadingAuth, authError, profileError, profileReady, refreshProfile, registrarLogoutLocal, ultimoLogoutAt]);
 
   return (
     <AuthContext.Provider value={value}>

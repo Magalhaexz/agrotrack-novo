@@ -26,3 +26,6 @@ dist-ssr
 HERDON.png
 logo_app1.png
 .DS_Store
+
+playwright-report/
+test-results/

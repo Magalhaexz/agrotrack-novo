@@ -61,10 +61,12 @@ export default function AnimalForm({ initialData, lotes = [], onSave, onCancel }
   const [form, setForm] = useState(() => normalizarInitialData(initialData));
   const [erro, setErro] = useState('');
 
+  /* eslint-disable react-hooks/set-state-in-effect */
   useEffect(() => {
     setForm(normalizarInitialData(initialData));
     setErro('');
   }, [initialData]);
+  /* eslint-enable react-hooks/set-state-in-effect */
 
   function handleChange(event) {
     const { name, value } = event.target;

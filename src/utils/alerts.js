@@ -388,5 +388,9 @@ export function buildAlerts(db = {}) {
         (b.data_sort ?? Number.MAX_SAFE_INTEGER)
       );
     })
-    .map(({ data_sort, ...item }) => item); // Remove a propriedade data_sort antes de retornar
+    .map((item) => {
+      const sanitized = { ...item };
+      delete sanitized.data_sort;
+      return sanitized;
+    }); // Remove a propriedade data_sort antes de retornar
 }
