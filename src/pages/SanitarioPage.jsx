@@ -6,9 +6,12 @@ import Card from '../components/ui/Card';
 import Button from '../components/ui/Button';
 import PageHeader from '../components/PageHeader';
 import { useToast } from '../hooks/useToast'; // Importar useToast
+import { useAuth } from '../auth/useAuth';
 
 export default function SanitarioPage({ db, setDb, onConfirmAction }) {
+  const { hasPermission } = useAuth();
   const { showToast } = useToast(); // Hook para exibir toasts
+  const mensagemSemPermissao = 'Você não tem permissão para executar esta ação.';
   const [abrirForm, setAbrirForm] = useState(false);
   const [itemEditando, setItemEditando] = useState(null);
 
@@ -26,7 +29,6 @@ export default function SanitarioPage({ db, setDb, onConfirmAction }) {
   }, [db?.funcionarios]);
 
   const sanitario = db?.sanitario || [];
-  const rotinas = db?.rotinas || [];
 
   const dadosTabela = useMemo(() => {
     return [...sanitario]
@@ -71,16 +73,28 @@ export default function SanitarioPage({ db, setDb, onConfirmAction }) {
   }, [sanitario]);
 
   const abrirNovo = useCallback(() => {
+    if (!hasPermission('sanitario:editar')) {
+      showToast({ type: 'error', message: mensagemSemPermissao });
+      return;
+    }
     setItemEditando(null);
     setAbrirForm(true);
-  }, []);
+  }, [hasPermission, showToast]);
 
   const editarItem = useCallback((item) => {
+    if (!hasPermission('sanitario:editar')) {
+      showToast({ type: 'error', message: mensagemSemPermissao });
+      return;
+    }
     setItemEditando(item);
     setAbrirForm(true);
-  }, []);
+  }, [hasPermission, showToast]);
 
   const excluirItem = useCallback(async (id) => {
+    if (!hasPermission('sanitario:excluir')) {
+      showToast({ type: 'error', message: mensagemSemPermissao });
+      return;
+    }
     const confirmado = typeof onConfirmAction === 'function'
       ? await onConfirmAction({
           title: 'Excluir manejo sanitário',
@@ -111,9 +125,13 @@ export default function SanitarioPage({ db, setDb, onConfirmAction }) {
       };
     });
     showToast({ type: 'success', message: 'Manejo sanitário excluído com sucesso!' });
-  }, [onConfirmAction, setDb, showToast]);
+  }, [hasPermission, onConfirmAction, setDb, showToast]);
 
   const salvarItem = useCallback((dados) => {
+    if (!hasPermission('sanitario:editar')) {
+      showToast({ type: 'error', message: mensagemSemPermissao });
+      return;
+    }
     setDb((prev) => {
       const currentRotinas = prev.rotinas || [];
       let novasRotinas = [...currentRotinas];
@@ -181,7 +199,7 @@ export default function SanitarioPage({ db, setDb, onConfirmAction }) {
     showToast({ type: 'success', message: `Manejo sanitário ${itemEditando ? 'atualizado' : 'criado'} com sucesso!` });
     setAbrirForm(false);
     setItemEditando(null);
-  }, [itemEditando, setDb, showToast]);
+  }, [hasPermission, itemEditando, setDb, showToast]);
 
   return (
     <div className="page">

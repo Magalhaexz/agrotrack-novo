@@ -14,6 +14,7 @@ import {
   calcularGMDMeta,
 } from '../domain/indicadores';
 import { useToast } from '../hooks/useToast'; // Importar useToast
+import { useAuth } from '../auth/useAuth';
 import '../styles/rebanho.css';
 
 const tabs = ['visao', 'mov', 'pesagens', 'financeiro', 'sanitario', 'historico'];
@@ -26,7 +27,9 @@ export default function LotesPage({
   onRegistrarEntradaAnimal,
   onRegistrarSaidaAnimal,
 }) {
+  const { hasPermission } = useAuth();
   const { showToast } = useToast(); // Usar o hook de toast
+  const mensagemSemPermissao = 'Você não tem permissão para executar esta ação.';
 
   const [filters, setFilters] = useState({ status: 'todos', fazenda: 'todas', periodo: 'todos' });
   const [activeLoteId, setActiveLoteId] = useState(null);
@@ -90,13 +93,17 @@ export default function LotesPage({
   const activeLote = useMemo(() => lotesEnriquecidos.find((item) => item.id === activeLoteId), [lotesEnriquecidos, activeLoteId]);
 
   const abrirMovimentacao = useCallback((lote) => {
+    if (!hasPermission('animais:movimentar')) {
+      showToast({ type: 'error', message: mensagemSemPermissao });
+      return;
+    }
     if (!lote) return;
     if (lote.status === 'encerrado' || lote.status === 'vendido') {
       showToast({ type: 'error', message: 'Este lote está encerrado e não aceita novas movimentações.' });
       return;
     }
     setOpenMovModal(lote);
-  }, [showToast]);
+  }, [hasPermission, showToast]);
 
   if (activeLote) {
     return (
@@ -108,8 +115,20 @@ export default function LotesPage({
         setActiveTab={setActiveTab}
         onBack={() => setActiveLoteId(null)}
         onOpenMov={() => abrirMovimentacao(activeLote)}
-        onOpenPesagem={() => setOpenPesagemModal(activeLote)}
-        onOpenFechamento={() => setOpenFechamentoModal(activeLote)}
+        onOpenPesagem={() => {
+          if (!hasPermission('pesagens:editar')) {
+            showToast({ type: 'error', message: mensagemSemPermissao });
+            return;
+          }
+          setOpenPesagemModal(activeLote);
+        }}
+        onOpenFechamento={() => {
+          if (!hasPermission('lotes:editar')) {
+            showToast({ type: 'error', message: mensagemSemPermissao });
+            return;
+          }
+          setOpenFechamentoModal(activeLote);
+        }}
         pesagensByLoteId={pesagensByLoteId}
       />
     );
@@ -119,7 +138,16 @@ export default function LotesPage({
     <div className="page rebanho-page">
       <div className="rebanho-header">
         <div><h1>Rebanho</h1><p>Gestão completa de lotes, movimentações e indicadores zootécnicos.</p></div>
-        <Button icon={<Plus size={16} />} onClick={() => setOpenLoteModal(true)}>Novo Lote</Button>
+        <Button icon={<Plus size={16} />} onClick={() => {
+          if (!hasPermission('lotes:editar')) {
+            showToast({ type: 'error', message: mensagemSemPermissao });
+            return;
+          }
+          setOpenLoteModal(true);
+        }}
+        >
+          Novo Lote
+        </Button>
       </div>
       <Card>
         <div className="rebanho-filters">
@@ -163,14 +191,23 @@ export default function LotesPage({
             <div className="lote-actions">
               <Button size="sm" variant="outline" icon={<ChevronRight size={14} />} onClick={() => { setActiveTab('visao'); setActiveLoteId(lote.id); }}>Ver Detalhes</Button>
               <Button size="sm" variant="ghost" icon={<Truck size={14} />} onClick={() => abrirMovimentacao(lote)}>Registrar Movimentação</Button>
-              <Button size="sm" variant="ghost" icon={<Scale size={14} />} onClick={() => setOpenPesagemModal(lote)}>Pesagem</Button>
+              <Button size="sm" variant="ghost" icon={<Scale size={14} />} onClick={() => {
+                if (!hasPermission('pesagens:editar')) {
+                  showToast({ type: 'error', message: mensagemSemPermissao });
+                  return;
+                }
+                setOpenPesagemModal(lote);
+              }}
+              >
+                Pesagem
+              </Button>
               <Button size="sm" variant="ghost" icon={<MoreHorizontal size={14} />} onClick={() => { setActiveTab('historico'); setActiveLoteId(lote.id); }}>Historico</Button>
             </div>
           </Card>
         ))}
       </div>
 
-      {openLoteModal && <NovoLoteModal db={db} setDb={setDb} onClose={() => setOpenLoteModal(false)} showToast={showToast} />}
+      {openLoteModal && <NovoLoteModal db={db} setDb={setDb} onClose={() => setOpenLoteModal(false)} showToast={showToast} hasPermission={hasPermission} />}
       {openMovModal && (
         <MovimentacaoModal
           lote={openMovModal}
@@ -180,10 +217,11 @@ export default function LotesPage({
           onRegistrarEntradaAnimal={onRegistrarEntradaAnimal}
           onRegistrarSaidaAnimal={onRegistrarSaidaAnimal}
           showToast={showToast}
+          hasPermission={hasPermission}
         />
       )}
-      {openPesagemModal && <PesagemModal lote={openPesagemModal} db={db} setDb={setDb} onClose={() => setOpenPesagemModal(null)} showToast={showToast} />}
-      {openFechamentoModal && <FechamentoLoteModal lote={openFechamentoModal} setDb={setDb} onClose={() => setOpenFechamentoModal(null)} showToast={showToast} />}
+      {openPesagemModal && <PesagemModal lote={openPesagemModal} db={db} setDb={setDb} onClose={() => setOpenPesagemModal(null)} showToast={showToast} hasPermission={hasPermission} />}
+      {openFechamentoModal && <FechamentoLoteModal lote={openFechamentoModal} setDb={setDb} onClose={() => setOpenFechamentoModal(null)} showToast={showToast} hasPermission={hasPermission} />}
     </div>
   );
 }
@@ -617,7 +655,7 @@ function LoteDetailView({ lote, db, activeTab, setActiveTab, onBack, onOpenMov, 
  * @param {function} props.onClose - Callback para fechar o modal.
  * @param {function} props.showToast - Função para exibir toasts.
  */
-function FechamentoLoteModal({ lote, setDb, onClose, showToast }) {
+function FechamentoLoteModal({ lote, setDb, onClose, showToast, hasPermission }) {
   const [form, setForm] = useState({
     data_saida: getTodayIso(),
     status: 'encerrado',
@@ -626,6 +664,10 @@ function FechamentoLoteModal({ lote, setDb, onClose, showToast }) {
   });
 
   function submit() {
+    if (!hasPermission('lotes:editar')) {
+      showToast({ type: 'error', message: 'Você não tem permissão para executar esta ação.' });
+      return;
+    }
     if (!form.data_saida) {
       showToast({ type: 'error', message: 'A data de saída é obrigatória.' });
       return;
@@ -684,7 +726,7 @@ function FechamentoLoteModal({ lote, setDb, onClose, showToast }) {
  * @param {function} [props.onRegistrarSaidaAnimal] - Callback opcional para registrar saída de animal.
  * @param {function} props.showToast - Função para exibir toasts.
  */
-function MovimentacaoModal({ lote, db, setDb, onClose, onRegistrarEntradaAnimal, onRegistrarSaidaAnimal, showToast }) {
+function MovimentacaoModal({ lote, db, setDb, onClose, onRegistrarEntradaAnimal, onRegistrarSaidaAnimal, showToast, hasPermission }) {
   const [form, setForm] = useState({
     tipo: 'compra',
     data: getTodayIso(),
@@ -723,6 +765,10 @@ function MovimentacaoModal({ lote, db, setDb, onClose, onRegistrarEntradaAnimal,
   const liquido = valorTotal - freteVenda - comissaoVenda;
 
   function submit() {
+    if (!hasPermission('animais:movimentar')) {
+      showToast({ type: 'error', message: 'Você não tem permissão para executar esta ação.' });
+      return;
+    }
     if (!form.data || qtd <= 0 || peso <= 0) {
       showToast({ type: 'error', message: 'Data, quantidade e peso médio são obrigatórios.' });
       return;
@@ -921,7 +967,7 @@ function MovimentacaoModal({ lote, db, setDb, onClose, onRegistrarEntradaAnimal,
  * @param {function} props.onClose - Callback para fechar o modal.
  * @param {function} props.showToast - Função para exibir toasts.
  */
-function PesagemModal({ lote, db, setDb, onClose, showToast }) {
+function PesagemModal({ lote, db, setDb, onClose, showToast, hasPermission }) {
   const ultima = useMemo(() => (db.pesagens || []).filter((p) => p.lote_id === lote.id).sort((a, b) => new Date(b.data) - new Date(a.data))[0], [db.pesagens, lote.id]);
   const [form, setForm] = useState({ data: getTodayIso(), peso_medio: '', qtd: lote.indicators.totalAnimais, obs: '' });
 
@@ -932,6 +978,10 @@ function PesagemModal({ lote, db, setDb, onClose, showToast }) {
   const valorEst = Number(form.qtd || 0) * arroba * precoArrobaPadrao;
 
   function submit() {
+    if (!hasPermission('pesagens:editar')) {
+      showToast({ type: 'error', message: 'Você não tem permissão para executar esta ação.' });
+      return;
+    }
     if (!form.data || Number(form.peso_medio) <= 0) {
       showToast({ type: 'error', message: 'Data e peso médio são obrigatórios.' });
       return;
@@ -982,7 +1032,7 @@ function PesagemModal({ lote, db, setDb, onClose, showToast }) {
  * @param {function} props.onClose - Callback para fechar o modal.
  * @param {function} props.showToast - Função para exibir toasts.
  */
-function NovoLoteModal({ db, setDb, onClose, showToast }) {
+function NovoLoteModal({ db, setDb, onClose, showToast, hasPermission }) {
   const configGeral = db.configuracoes?.geral || {};
   const [form, setForm] = useState({
     nome: '',
@@ -1013,6 +1063,10 @@ function NovoLoteModal({ db, setDb, onClose, showToast }) {
   }
 
   function submit() {
+    if (!hasPermission('lotes:editar')) {
+      showToast({ type: 'error', message: 'Você não tem permissão para executar esta ação.' });
+      return;
+    }
     if (!validate()) {
       showToast({ type: 'error', message: 'Por favor, corrija os erros no formulário.' });
       return;

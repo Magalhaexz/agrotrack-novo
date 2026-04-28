@@ -3,6 +3,7 @@ import PesagemForm from '../components/PesagemForm';
 import { formatarNumero, formatarData } from '../utils/formatters';
 import { gerarNovoId } from '../utils/id';
 import { useToast } from '../hooks/useToast'; // Assuming useToast is available
+import { useAuth } from '../auth/useAuth';
 
 function toFiniteNumber(value, fallback = 0) {
   const normalized = Number(value);
@@ -68,7 +69,9 @@ function recalculateLoteFromPesagens(prevDb, loteId, nextPesagens) {
 }
 
 export default function PesagensPage({ db, setDb, onConfirmAction }) {
+  const { hasPermission } = useAuth();
   const { showToast } = useToast(); // Initialize toast hook
+  const mensagemSemPermissao = 'Você não tem permissão para executar esta ação.';
 
   const [abrirForm, setAbrirForm] = useState(false);
   const [pesagemEditando, setPesagemEditando] = useState(null);
@@ -148,16 +151,28 @@ export default function PesagensPage({ db, setDb, onConfirmAction }) {
   }, [pesagens]);
 
   function abrirNovaPesagem() {
+    if (!hasPermission('pesagens:editar')) {
+      showToast({ type: 'error', message: mensagemSemPermissao });
+      return;
+    }
     setPesagemEditando(null);
     setAbrirForm(true);
   }
 
   function editarPesagem(item) {
+    if (!hasPermission('pesagens:editar')) {
+      showToast({ type: 'error', message: mensagemSemPermissao });
+      return;
+    }
     setPesagemEditando(item);
     setAbrirForm(true);
   }
 
   async function excluirPesagem(id) {
+    if (!hasPermission('pesagens:excluir')) {
+      showToast({ type: 'error', message: mensagemSemPermissao });
+      return;
+    }
     const confirmado = typeof onConfirmAction === 'function'
       ? await onConfirmAction({
           title: 'Excluir pesagem',
@@ -185,6 +200,10 @@ export default function PesagensPage({ db, setDb, onConfirmAction }) {
   }
 
   function salvarPesagem(dados) {
+    if (!hasPermission('pesagens:editar')) {
+      showToast({ type: 'error', message: mensagemSemPermissao });
+      return;
+    }
     if (pesagemEditando) {
       setDb((prev) => {
         const pesagensAtuais = Array.isArray(prev?.pesagens) ? prev.pesagens : [];

@@ -7,8 +7,8 @@ import Modal from '../components/ui/Modal';
 import Input from '../components/ui/Input';
 import { formatCurrency, formatDate, formatNumber } from '../utils/calculations';
 import { gerarNovoId } from '../utils/id';
-// Assuming useToast is available
-// import { useToast } from '../hooks/useToast';
+import { useToast } from '../hooks/useToast';
+import { useAuth } from '../auth/useAuth';
 
 /**
  * Página de Estoque, para gerenciamento de itens, entradas, saídas e visualização de movimentações.
@@ -19,7 +19,9 @@ import { gerarNovoId } from '../utils/id';
  * @param {function} [props.onRegistrarSaidaEstoque] - Callback opcional para registrar saída de estoque de forma customizada.
  */
 export default function EstoquePage({ db, setDb, onRegistrarSaidaEstoque }) {
-  // const { showToast } = useToast(); // Se usar useToast
+  const { showToast } = useToast();
+  const { hasPermission } = useAuth();
+  const mensagemSemPermissao = 'Você não tem permissão para executar esta ação.';
 
   const [showOnlyCrit, setShowOnlyCrit] = useState(false);
   const [openEntrada, setOpenEntrada] = useState(false);
@@ -89,8 +91,26 @@ export default function EstoquePage({ db, setDb, onRegistrarSaidaEstoque }) {
       <div className="rebanho-header">
         <h1>Estoque</h1>
         <div className="lote-actions">
-          <Button icon={<ArrowUpCircle size={14} />} onClick={() => { setSelectedItem(null); setOpenEntrada(true); }}>Entrada</Button>
-          <Button variant="outline" icon={<ArrowDownCircle size={14} />} onClick={() => { setSelectedItem(null); setOpenSaida(true); }}>Saída/Consumo</Button>
+          <Button icon={<ArrowUpCircle size={14} />} onClick={() => {
+            if (!hasPermission('estoque:editar')) {
+              showToast({ type: 'error', message: mensagemSemPermissao });
+              return;
+            }
+            setSelectedItem(null); setOpenEntrada(true);
+          }}
+          >
+            Entrada
+          </Button>
+          <Button variant="outline" icon={<ArrowDownCircle size={14} />} onClick={() => {
+            if (!hasPermission('estoque:editar')) {
+              showToast({ type: 'error', message: mensagemSemPermissao });
+              return;
+            }
+            setSelectedItem(null); setOpenSaida(true);
+          }}
+          >
+            Saída/Consumo
+          </Button>
           <Button variant={showOnlyCrit ? 'warning' : 'ghost'} onClick={() => setShowOnlyCrit((v) => !v)}>
             {showOnlyCrit ? 'Mostrar todos' : 'Mostrar apenas críticos'}
           </Button>
@@ -136,8 +156,26 @@ export default function EstoquePage({ db, setDb, onRegistrarSaidaEstoque }) {
                   <div className="estoque-detail-row"><span>Dias restantes</span><span>{item.diasRest > 900 ? '—' : `${formatNumber(item.diasRest, 0)} dias`}</span></div>
                 </div>
                 <div className="estoque-card-actions lote-actions">
-                  <button type="button" className="btn-entrada" onClick={() => { setSelectedItem(item); setOpenEntrada(true); }}>Entrada</button>
-                  <button type="button" className="btn-saida" onClick={() => { setSelectedItem(item); setOpenSaida(true); }}>Saída</button>
+                  <button type="button" className="btn-entrada" onClick={() => {
+                    if (!hasPermission('estoque:editar')) {
+                      showToast({ type: 'error', message: mensagemSemPermissao });
+                      return;
+                    }
+                    setSelectedItem(item); setOpenEntrada(true);
+                  }}
+                  >
+                    Entrada
+                  </button>
+                  <button type="button" className="btn-saida" onClick={() => {
+                    if (!hasPermission('estoque:editar')) {
+                      showToast({ type: 'error', message: mensagemSemPermissao });
+                      return;
+                    }
+                    setSelectedItem(item); setOpenSaida(true);
+                  }}
+                  >
+                    Saída
+                  </button>
                 </div>
               </Card>
             );
@@ -185,7 +223,7 @@ export default function EstoquePage({ db, setDb, onRegistrarSaidaEstoque }) {
         )}
       </Card>
 
-      {openEntrada && <EntradaModal db={db} setDb={setDb} selectedItem={selectedItem} estoqueMap={estoqueMap} onClose={() => { setSelectedItem(null); setOpenEntrada(false); }} />}
+      {openEntrada && <EntradaModal db={db} setDb={setDb} selectedItem={selectedItem} estoqueMap={estoqueMap} onClose={() => { setSelectedItem(null); setOpenEntrada(false); }} hasPermission={hasPermission} showToast={showToast} />}
       {openSaida && (
         <SaidaModal
           db={db}
@@ -193,8 +231,9 @@ export default function EstoquePage({ db, setDb, onRegistrarSaidaEstoque }) {
           selectedItem={selectedItem}
           onRegistrarSaidaEstoque={onRegistrarSaidaEstoque}
           estoqueMap={estoqueMap}
-          lotesMap={lotesMap}
           onClose={() => { setSelectedItem(null); setOpenSaida(false); }}
+          hasPermission={hasPermission}
+          showToast={showToast}
         />
       )}
     </div>
@@ -210,8 +249,7 @@ export default function EstoquePage({ db, setDb, onRegistrarSaidaEstoque }) {
  * @param {Map<number, object>} props.estoqueMap - Mapa de itens de estoque por ID.
  * @param {function} props.onClose - Callback para fechar o modal.
  */
-function EntradaModal({ db, setDb, selectedItem, estoqueMap, onClose }) {
-  // const { showToast } = useToast(); // Se usar useToast
+function EntradaModal({ db, setDb, selectedItem, estoqueMap, onClose, hasPermission, showToast }) {
 
   const [form, setForm] = useState({
     item_id: selectedItem?.id || '',
@@ -228,6 +266,10 @@ function EntradaModal({ db, setDb, selectedItem, estoqueMap, onClose }) {
   const total = Number(form.qtd || 0) * Number(form.custo || 0);
 
   function submit() {
+    if (!hasPermission('estoque:editar')) {
+      showToast({ type: 'error', message: 'Você não tem permissão para executar esta ação.' });
+      return;
+    }
     if (!form.data || !form.item_id || Number(form.qtd) <= 0) {
       // showToast({ type: 'error', message: 'Preencha todos os campos obrigatórios.' });
       alert('Preencha todos os campos obrigatórios.');
@@ -304,8 +346,7 @@ function EntradaModal({ db, setDb, selectedItem, estoqueMap, onClose }) {
  * @param {Map<number, object>} props.lotesMap - Mapa de lotes por ID.
  * @param {function} props.onClose - Callback para fechar o modal.
  */
-function SaidaModal({ db, setDb, selectedItem, onRegistrarSaidaEstoque, estoqueMap, lotesMap, onClose }) {
-  // const { showToast } = useToast(); // Se usar useToast
+function SaidaModal({ db, setDb, selectedItem, onRegistrarSaidaEstoque, estoqueMap, onClose, hasPermission, showToast }) {
 
   const [form, setForm] = useState({
     item_id: selectedItem?.id || '',
@@ -332,6 +373,10 @@ function SaidaModal({ db, setDb, selectedItem, onRegistrarSaidaEstoque, estoqueM
   }
 
   function submit() {
+    if (!hasPermission('estoque:editar')) {
+      showToast({ type: 'error', message: 'Você não tem permissão para executar esta ação.' });
+      return;
+    }
     const qtd = Number(form.qtd || 0);
     if (!form.data || !form.item_id || qtd <= 0 || qtd > saldo) {
       // showToast({ type: 'error', message: 'Verifique os campos e a quantidade.' });
