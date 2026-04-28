@@ -2,7 +2,14 @@ import { calcularResultadoLote } from './calculos';
 import { calcLote } from '../utils/calculations';
 
 function toNumber(value) {
-  return Number(value || 0);
+  const parsed = Number(value);
+  return Number.isFinite(parsed) ? parsed : 0;
+}
+
+function safeDivide(value, divisor) {
+  if (!Number.isFinite(divisor) || divisor === 0) return 0;
+  const result = value / divisor;
+  return Number.isFinite(result) ? result : 0;
 }
 
 function buildInsights({ lote, totalAnimais, lucroTotal, gmdKgDia, custoPorArroba, margemPct }) {
@@ -49,13 +56,13 @@ export function getResumoLote(db, loteId) {
 
   const custoTotal = toNumber(financeiro?.custoTotal);
   const receitaTotal = toNumber(financeiro?.receitaTotal);
-  const lucroTotal = receitaTotal - custoTotal;
-  const margemPct = receitaTotal > 0 ? (lucroTotal / receitaTotal) * 100 : 0;
+  const lucroTotal = toNumber(financeiro?.lucroTotal);
+  const margemPct = toNumber(financeiro?.margemPct);
 
-  const custoPorCabeca = totalAnimais > 0 ? custoTotal / totalAnimais : 0;
-  const custoPorArroba = arrobasProduzidas > 0 ? custoTotal / arrobasProduzidas : 0;
-  const lucroPorCabeca = totalAnimais > 0 ? lucroTotal / totalAnimais : 0;
-  const lucroPorArroba = arrobasProduzidas > 0 ? lucroTotal / arrobasProduzidas : 0;
+  const custoPorCabeca = safeDivide(custoTotal, totalAnimais);
+  const custoPorArroba = safeDivide(custoTotal, arrobasProduzidas);
+  const lucroPorCabeca = toNumber(financeiro?.lucroPorCabeca) || safeDivide(lucroTotal, totalAnimais);
+  const lucroPorArroba = toNumber(financeiro?.lucroPorArroba) || safeDivide(lucroTotal, arrobasProduzidas);
 
   const classificacao = lucroTotal > 0 ? 'lucro' : lucroTotal < 0 ? 'prejuizo' : 'empate';
 
@@ -100,4 +107,3 @@ export function getResumoLote(db, loteId) {
     custo: custoTotal,
   };
 }
-

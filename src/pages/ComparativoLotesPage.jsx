@@ -1,5 +1,6 @@
 import { useMemo, useState } from 'react';
 import { calcLote, formatNumber } from '../utils/calculations'; // Assuming calcLote and formatNumber are robust
+import { getResumoLote } from '../domain/resumoLote';
 import '../styles/rebanho.css'; // Assuming this CSS file exists
 
 // Helper para obter opções únicas para filtros
@@ -30,15 +31,16 @@ export default function ComparativoLotesPage({ db }) {
     return (db.lotes || [])
       .filter((l) => l.status === 'encerrado' || l.status === 'vendido')
       .map((lote) => {
-        const ind = calcLote(db, lote.id); // Chamada potencialmente cara
-        const heads = Math.max(ind.totalAnimais, 1);
+        const ind = calcLote(db, lote.id); // Mantido para métricas produtivas
+        const resumo = getResumoLote(db, lote.id);
+        const heads = Math.max(resumo.totalAnimais || ind.totalAnimais, 1);
         return {
           id: lote.id,
           nome: lote.nome,
           gmd: ind.gmdMedio,
-          custoArroba: ind.custoPorArroba,
-          lucroCab: ind.margem / heads,
-          margem: ind.margemPct,
+          custoArroba: resumo.custoPorArroba,
+          lucroCab: resumo.lucroTotal / heads,
+          margem: resumo.margemPct,
           dias: ind.dias,
           mortalidade: lote?.fechamento?.mortalidade || 0, // Assumindo que 'fechamento' existe no lote
           // Adicionar propriedades do lote para filtragem (assumindo que serão adicionadas ao db.lotes)

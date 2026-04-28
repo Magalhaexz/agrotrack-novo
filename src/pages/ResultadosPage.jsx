@@ -21,6 +21,7 @@ import Card from '../components/ui/Card';
 import Input from '../components/ui/Input';
 import Table from '../components/ui/Table';
 import { calcLote, formatCurrency, formatDate, formatNumber } from '../utils/calculations';
+import { getResumoLote } from '../domain/resumoLote';
 import '../styles/relatorios.css';
 
 const REPORT_TYPES = [
@@ -550,7 +551,6 @@ export default function ResultadosPage({ db }) {
 function buildReportBundle(db, filters) {
   const fazendas = Array.isArray(db?.fazendas) ? db.fazendas : [];
   const lotes = Array.isArray(db?.lotes) ? db.lotes : [];
-  const custos = Array.isArray(db?.custos) ? db.custos : [];
   const sanitario = Array.isArray(db?.sanitario) ? db.sanitario : [];
   const estoque = Array.isArray(db?.estoque) ? db.estoque : [];
   const pesagens = Array.isArray(db?.pesagens) ? db.pesagens : [];
@@ -569,10 +569,25 @@ function buildReportBundle(db, filters) {
     .filter((lote) => matchesLote(lote, filters.loteId))
     .filter((lote) => matchesStatus(lote, filters.status))
     .map((lote) => {
-      const indicadores = calcLote(db, lote.id);
+      const indicadoresProdutivos = calcLote(db, lote.id);
+      const resumo = getResumoLote(db, lote.id);
+      const indicadores = {
+        ...indicadoresProdutivos,
+        custoTotalLote: Number(resumo.custoTotal || 0),
+        receitaTotal: Number(resumo.receitaTotal || 0),
+        margem: Number(resumo.lucroTotal || 0),
+        margemPct: Number(resumo.margemPct || 0),
+        custoPorCabeca: Number(resumo.custoPorCabeca || 0),
+        custoPorArroba: Number(resumo.custoPorArroba || 0),
+        lucroPorCabeca: Number(resumo.lucroPorCabeca || 0),
+        lucroPorArroba: Number(resumo.lucroPorArroba || 0),
+      };
       const fazenda = fazendaMap.get(Number(lote.faz_id));
-      const custosPeriodo = custos.filter(
-        (item) => Number(item.lote_id) === Number(lote.id) && dateInRange(item.data, filters.dataInicio, filters.dataFim)
+      const custosPeriodo = movimentacoesFinanceiras.filter(
+        (item) =>
+          item.tipo === 'despesa' &&
+          Number(item.lote_id) === Number(lote.id) &&
+          dateInRange(item.data, filters.dataInicio, filters.dataFim)
       );
       const pesagensPeriodo = pesagens.filter(
         (item) => Number(item.lote_id) === Number(lote.id) && dateInRange(item.data, filters.dataInicio, filters.dataFim)
@@ -666,20 +681,6 @@ function buildReportBundle(db, filters) {
     }))
     .sort((a, b) => sortDateDesc(a.data, b.data));
 
-  const costRows = custos
-    .filter((item) => visibleLoteIds.has(Number(item.lote_id)))
-    .filter((item) => dateInRange(item.data, filters.dataInicio, filters.dataFim))
-    .map((item) => ({
-      id: `custo-${item.id}`,
-      categoria: capitalize(item.cat || 'outros'),
-      origem: item.desc || '-',
-      lote: loteMap.get(Number(item.lote_id))?.nome || '-',
-      fazenda: fazendaMap.get(Number(loteMap.get(Number(item.lote_id))?.faz_id))?.nome || '-',
-      tipo: 'Despesa operacional',
-      data: formatDate(item.data),
-      valor: Number(item.val || 0),
-    }));
-
   const financialRows = movimentacoesFinanceiras
     .filter((item) => dateInRange(item.data, filters.dataInicio, filters.dataFim))
     .filter((item) => {
@@ -718,7 +719,7 @@ function buildReportBundle(db, filters) {
       valor: Number(item.valor_total || 0),
     }));
 
-  const ledgerRows = [...costRows, ...financialRows, ...animalRevenueRows];
+  const ledgerRows = [...financialRows, ...animalRevenueRows];
   const ledgerExpense = ledgerRows.filter((row) => row.tipo !== 'Receita').reduce((total, row) => total + row.valor, 0);
   const ledgerRevenue = ledgerRows.filter((row) => row.tipo === 'Receita').reduce((total, row) => total + row.valor, 0);
   const potentialRevenue = visibleLotes.reduce((total, item) => total + Number(item.indicadores.receitaTotal || 0), 0);
@@ -749,7 +750,7 @@ function buildReportBundle(db, filters) {
     const margem = lotesDaFazenda.reduce((total, item) => total + Number(item.indicadores.margem || 0), 0);
     const receita = lotesDaFazenda.reduce((total, item) => total + Number(item.indicadores.receitaTotal || 0), 0);
     const custoPeriodo = lotesDaFazenda.reduce(
-      (total, item) => total + item.custosPeriodo.reduce((subtotal, custo) => subtotal + Number(custo.val || 0), 0),
+      (total, item) => total + item.custosPeriodo.reduce((subtotal, custo) => subtotal + Number(custo.valor || 0), 0),
       0
     );
     const consumoEstoque = movimentacoesEstoque
@@ -783,7 +784,7 @@ function buildReportBundle(db, filters) {
     animais: Number(item.indicadores.totalAnimais || 0),
     gmd: Number(item.indicadores.gmdMedio || 0),
     pesoAtual: Number(item.indicadores.pesoAtualMedio || 0),
-    custoPeriodo: item.custosPeriodo.reduce((total, custo) => total + Number(custo.val || 0), 0),
+    custoPeriodo: item.custosPeriodo.reduce((total, custo) => total + Number(custo.valor || 0), 0),
     margem: Number(item.indicadores.margem || 0),
     sanidadePendente: item.sanitarioPeriodo.filter((registro) => resolveSanitaryStatus(registro) !== 'Em dia').length,
   }));

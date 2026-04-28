@@ -21,22 +21,7 @@ export default function FinanceiroPage({ db, setDb }) {
   const [filters, setFilters] = useState({ tipo: 'todos', cat: 'todas', lote: 'todos' });
 
   const lotes = Array.isArray(db?.lotes) ? db.lotes : [];
-  const custos = Array.isArray(db?.custos) ? db.custos : [];
   const movimentacoes = Array.isArray(db?.movimentacoes_financeiras) ? db.movimentacoes_financeiras : [];
-
-  const custosMapByLote = useMemo(() => {
-    const map = new Map();
-    custos.forEach((custo) => {
-      if (!custo?.lote_id) {
-        return;
-      }
-      if (!map.has(custo.lote_id)) {
-        map.set(custo.lote_id, []);
-      }
-      map.get(custo.lote_id).push(custo);
-    });
-    return map;
-  }, [custos]);
 
   const movFinMapByLote = useMemo(() => {
     const map = new Map();
@@ -88,14 +73,16 @@ export default function FinanceiroPage({ db, setDb }) {
       return [];
     }
 
-    const grouped = (custosMapByLote.get(detalhe.lote.id) || []).reduce((acc, custo) => {
-      const categoria = custo?.cat || 'outros';
-      acc[categoria] = (acc[categoria] || 0) + Number(custo?.val || 0);
+    const grouped = (movFinMapByLote.get(detalhe.lote.id) || [])
+      .filter((mov) => mov.tipo === 'despesa')
+      .reduce((acc, mov) => {
+      const categoria = mov?.categoria || 'outros';
+      acc[categoria] = (acc[categoria] || 0) + Number(mov?.valor || 0);
       return acc;
     }, {});
 
     return Object.entries(grouped).map(([name, value]) => ({ name, value }));
-  }, [custosMapByLote, detalhe]);
+  }, [detalhe, movFinMapByLote]);
 
   const detalheTimeline = useMemo(
     () => (detalhe?.lote?.id ? buildFinanceTimeline(db, detalhe.lote.id) : []),
@@ -536,14 +523,14 @@ function computeDRE(db, lotesRows) {
 }
 
 function buildFinanceTimeline(db, loteId) {
-  const custos = (db.custos || [])
+  const timeline = (db.movimentacoes_financeiras || [])
     .filter((item) => Number(item.lote_id) === Number(loteId))
-    .map((item) => ({ data: item.data, tipo: 'custo', valor: Number(item.val || 0) }));
-  const receitas = (db.movimentacoes_financeiras || [])
-    .filter((item) => Number(item.lote_id) === Number(loteId) && item.tipo === 'receita')
-    .map((item) => ({ data: item.data, tipo: 'receita', valor: Number(item.valor || 0) }));
-
-  const timeline = [...custos, ...receitas].sort((a, b) => new Date(a.data) - new Date(b.data));
+    .map((item) => ({
+      data: item.data,
+      tipo: item.tipo === 'despesa' ? 'custo' : 'receita',
+      valor: Number(item.valor || 0),
+    }))
+    .sort((a, b) => new Date(a.data) - new Date(b.data));
   let acumuladoCusto = 0;
   let acumuladoReceita = 0;
 
