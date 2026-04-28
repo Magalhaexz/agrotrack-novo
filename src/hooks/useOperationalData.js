@@ -26,9 +26,11 @@ const HYDRATION_MAX_ATTEMPTS = 2;
 const HYDRATION_BACKOFF_MS = 350;
 const HYDRATION_START_DELAY_MS = 1800;
 const HYDRATION_FAILURE_COOLDOWN_MS = 45000;
+const HYDRATION_FAILURES_TO_OPEN_CIRCUIT = 4;
 const HERDON_DISABLE_SUPABASE_SYNC = 'HERDON_DISABLE_SUPABASE_SYNC';
 const inFlightSnapshots = new Map();
 const failedHydrationAt = new Map();
+const schemaWarningTables = new Set();
 
 function nowMs() {
   return typeof performance !== 'undefined' ? performance.now() : Date.now();
@@ -58,6 +60,18 @@ function isTransientHydrationError(error) {
     'network error',
     'fetch failed',
   ].some((signature) => message.includes(signature));
+}
+
+function isSchemaNotFoundError(error) {
+  const message = getErrorMessage(error).toLowerCase();
+  return (
+    error?.status === 404
+    || error?.code === '42P01'
+    || message.includes('404')
+    || message.includes('not found')
+    || message.includes('relation')
+    || message.includes('does not exist')
+  );
 }
 
 function shouldDisableSupabaseSync() {
@@ -117,14 +131,24 @@ export function createOperationalFallbackDb(initialDb) {
   return normalizeDb(initialDb || {});
 }
 
-async function fetchOperationalTable(table, userId, shouldApply) {
+async function fetchOperationalTableWithCircuit(table, userId, shouldApply, circuitState) {
+  if (!shouldApply()) {
+    return [table, []];
+  }
+  if (circuitState.open) {
+    logSyncGuard({
+      stage: 'circuit_open_skip_table',
+      table,
+      failureCount: circuitState.failures,
+    });
+    return [table, []];
+  }
+
   for (let attempt = 1; attempt <= HYDRATION_MAX_ATTEMPTS + 1; attempt += 1) {
     if (!shouldApply()) {
-      logSyncGuard({
-        stage: 'table_cancelled_before_request',
-        table,
-        attempt,
-      });
+      return [table, []];
+    }
+    if (circuitState.open) {
       return [table, []];
     }
 
@@ -136,22 +160,9 @@ async function fetchOperationalTable(table, userId, shouldApply) {
       }
 
       const { data, error } = await query;
+      if (error) throw error;
+
       const durationMs = Number((nowMs() - startedAt).toFixed(1));
-
-      if (error) {
-        throw error;
-      }
-
-      if (!shouldApply()) {
-        logSyncGuard({
-          stage: 'table_result_ignored_stale',
-          table,
-          attempt,
-          durationMs,
-        });
-        return [table, []];
-      }
-
       if (import.meta.env.DEV) {
         console.debug('[HERDON_DATA_BOOT]', {
           stage: 'table_success',
@@ -164,8 +175,20 @@ async function fetchOperationalTable(table, userId, shouldApply) {
       return [table, Array.isArray(data) ? data : []];
     } catch (error) {
       const durationMs = Number((nowMs() - startedAt).toFixed(1));
+      const schema404 = isSchemaNotFoundError(error);
       const transient = isTransientHydrationError(error);
-      const canRetry = transient && attempt <= HYDRATION_MAX_ATTEMPTS && shouldApply();
+      const canRetry = !schema404 && transient && attempt <= HYDRATION_MAX_ATTEMPTS;
+
+      if (schema404 && !schemaWarningTables.has(table) && import.meta.env.DEV) {
+        schemaWarningTables.add(table);
+        console.warn('[HERDON_SUPABASE_SCHEMA]', {
+          table,
+          status: error?.status || 404,
+          code: error?.code || null,
+          message: getErrorMessage(error) || 'schema_not_found',
+        });
+      }
+
       if (import.meta.env.DEV) {
         console.warn('[HERDON_DATA_BOOT]', {
           stage: canRetry ? 'table_retrying' : 'table_failure',
@@ -173,16 +196,33 @@ async function fetchOperationalTable(table, userId, shouldApply) {
           attempt,
           durationMs,
           transient,
+          schema404,
           errorType: getErrorMessage(error) || 'hydration_error',
         });
       }
-      if (!canRetry) {
-        return [table, []];
+
+      if (canRetry) {
+        await wait(HYDRATION_BACKOFF_MS * attempt);
+        continue;
       }
-      await wait(HYDRATION_BACKOFF_MS * attempt);
+
+      circuitState.failures += 1;
+      if (circuitState.failures >= HYDRATION_FAILURES_TO_OPEN_CIRCUIT) {
+        circuitState.open = true;
+        logSyncGuard({
+          stage: 'circuit_opened',
+          table,
+          failureCount: circuitState.failures,
+        }, 'warn');
+      }
+      return [table, []];
     }
   }
 
+  circuitState.failures += 1;
+  if (circuitState.failures >= HYDRATION_FAILURES_TO_OPEN_CIRCUIT) {
+    circuitState.open = true;
+  }
   return [table, []];
 }
 
@@ -216,10 +256,11 @@ async function loadOperationalSnapshotRequest(userId, shouldApply, generationId)
     });
   }
 
+  const circuitState = { failures: 0, open: false };
   const entries = await runWithConcurrency(
     OPERACIONAL_TABLES,
     HYDRATION_CONCURRENCY_LIMIT,
-    (table) => fetchOperationalTable(table, userId, shouldApply)
+    (table) => fetchOperationalTableWithCircuit(table, userId, shouldApply, circuitState)
   );
 
   if (import.meta.env.DEV) {
@@ -227,9 +268,14 @@ async function loadOperationalSnapshotRequest(userId, shouldApply, generationId)
       stage: 'snapshot_complete',
       generationId,
       durationMs: Number((nowMs() - bootStart).toFixed(1)),
+      circuitOpen: circuitState.open,
+      failureCount: circuitState.failures,
     });
   }
-  return Object.fromEntries(entries);
+  return {
+    snapshot: Object.fromEntries(entries),
+    circuitOpen: circuitState.open,
+  };
 }
 
 async function loadOperationalSnapshot(userId, shouldApply, generationId) {
@@ -262,7 +308,11 @@ async function loadOperationalSnapshot(userId, shouldApply, generationId) {
 
   const request = loadOperationalSnapshotRequest(userId, shouldApply, generationId)
     .then((snapshot) => {
-      failedHydrationAt.delete(userId);
+      if (snapshot?.circuitOpen) {
+        failedHydrationAt.set(userId, Date.now());
+      } else {
+        failedHydrationAt.delete(userId);
+      }
       return snapshot;
     })
     .catch((error) => {
@@ -385,7 +435,7 @@ export function useOperationalData(initialDb, session, options = {}) {
       });
 
       try {
-        const snapshot = await loadOperationalSnapshot(userId, shouldApply, generationId);
+        const snapshotResult = await loadOperationalSnapshot(userId, shouldApply, generationId);
         if (!shouldApply()) {
           logSyncGuard({
             stage: 'sync_result_ignored_stale',
@@ -406,9 +456,15 @@ export function useOperationalData(initialDb, session, options = {}) {
           return;
         }
 
+        const snapshot = snapshotResult?.snapshot || {};
         setDbState(createOperationalFallbackDb(snapshot));
-        setDataSource('supabase');
-        setDataError(null);
+        if (snapshotResult?.circuitOpen) {
+          setDataSource('offline_circuit_open');
+          setDataError(new Error('Sincronizacao com a nuvem instavel. O app continuara em modo local.'));
+        } else {
+          setDataSource('supabase');
+          setDataError(null);
+        }
       } catch {
         if (!shouldApply()) {
           logSyncGuard({

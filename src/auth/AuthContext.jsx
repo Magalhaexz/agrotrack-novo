@@ -40,6 +40,7 @@ export function AuthProvider({ children }) {
   const authGenerationRef = useRef(0);
   const activeUserIdRef = useRef(null);
   const profileFailureAtRef = useRef(new Map());
+  const profileInFlightRef = useRef(new Map());
 
   const resetAuthState = useCallback(() => {
     setSession(null);
@@ -93,11 +94,24 @@ export function AuthProvider({ children }) {
         return;
       }
 
+      const existingProfileRequest = profileInFlightRef.current.get(userId);
+      if (existingProfileRequest) {
+        if (import.meta.env.DEV) {
+          console.debug('[HERDON_PROFILE_BOOT]', {
+            stage: 'reuse_in_flight',
+            generationId,
+            hasUserId: true,
+          });
+        }
+        await existingProfileRequest;
+        return;
+      }
+
       if (ativo && authGenerationRef.current === generationId) {
         setProfileReady(false);
       }
 
-      try {
+      const request = (async () => {
         const { data, error } = await fetchUserProfile(userId);
         const isCurrent = ativo && authGenerationRef.current === generationId && activeUserIdRef.current === userId;
         if (!isCurrent) {
@@ -130,7 +144,7 @@ export function AuthProvider({ children }) {
         setProfile(data || null);
         setProfileError(null);
         setProfileReady(true);
-      } catch (error) {
+      })().catch((error) => {
         const isCurrent = ativo && authGenerationRef.current === generationId && activeUserIdRef.current === userId;
         if (!isCurrent) return;
         profileFailureAtRef.current.set(userId, Date.now());
@@ -144,6 +158,17 @@ export function AuthProvider({ children }) {
         setProfile(null);
         setProfileError(error);
         setProfileReady(true);
+      }).finally(() => {
+        if (profileInFlightRef.current.get(userId) === request) {
+          profileInFlightRef.current.delete(userId);
+        }
+      });
+
+      profileInFlightRef.current.set(userId, request);
+      try {
+        await request;
+      } catch {
+        // Erro tratado no catch interno de request
       }
     }
 
@@ -204,7 +229,7 @@ export function AuthProvider({ children }) {
       const generationId = authGenerationRef.current + 1;
       authGenerationRef.current = generationId;
 
-      if (eventName === 'SIGNED_OUT' || !sessionAtual) {
+        if (eventName === 'SIGNED_OUT' || !sessionAtual) {
         const recentLoginAttemptAt = getRecentLoginAttemptAt();
         const shouldIgnoreStaleSignOut = Date.now() - recentLoginAttemptAt < 5000;
         if (shouldIgnoreStaleSignOut) {
@@ -217,10 +242,14 @@ export function AuthProvider({ children }) {
           return;
         }
         registrarLogoutLocal();
+        profileInFlightRef.current.clear();
         return;
       }
 
       activeUserIdRef.current = sessionAtual?.user?.id || null;
+      if (activeUserIdRef.current) {
+        profileFailureAtRef.current.delete(activeUserIdRef.current);
+      }
       setSession(sessionAtual);
       setAuthError(null);
       setLoadingAuth(false);
@@ -301,8 +330,18 @@ export function AuthProvider({ children }) {
       return null;
     }
 
+    const existingProfileRequest = profileInFlightRef.current.get(userAtual.id);
+    if (existingProfileRequest) {
+      await existingProfileRequest;
+    }
     const generationId = authGenerationRef.current;
-    const { data, error } = await fetchUserProfile(userAtual.id);
+    const request = fetchUserProfile(userAtual.id).finally(() => {
+      if (profileInFlightRef.current.get(userAtual.id) === request) {
+        profileInFlightRef.current.delete(userAtual.id);
+      }
+    });
+    profileInFlightRef.current.set(userAtual.id, request);
+    const { data, error } = await request;
     const isCurrent = authGenerationRef.current === generationId && activeUserIdRef.current === userAtual.id;
     if (!isCurrent) return null;
 
