@@ -1,4 +1,3 @@
-import { AnimatePresence } from 'framer-motion';
 import { Suspense, lazy, useEffect, useMemo, useRef, useState } from 'react';
 import { initialDb } from './data/mockData';
 import { useAuth } from './auth/useAuth';
@@ -39,7 +38,6 @@ import { buildAlerts } from './utils/alerts';
 import './styles/app.css';
 import './styles/ui.css';
 
-const MotionDiv = motion.div;
 
 const DashboardPage = lazy(() => import('./pages/DashboardPage'));
 const FazendasPage = lazy(() => import('./pages/FazendasPage'));
@@ -84,11 +82,6 @@ const pageMap = {
   financeiro: FinanceiroPage,
 };
 
-const pageTransitionVariants = {
-  initial: { opacity: 0, y: 15 },
-  animate: { opacity: 1, y: 0 },
-  exit: { opacity: 0, y: -15 },
-};
 
 export default function App() {
   const [currentPage, setCurrentPage] = useState('dashboard');
@@ -604,16 +597,7 @@ export default function App() {
           onTabChange={setTabAtiva}
         />
 
-        <AnimatePresence mode="wait">
-          <MotionDiv
-            key={pageKey}
-            initial="initial"
-            animate="animate"
-            exit="exit"
-            variants={pageTransitionVariants}
-            transition={{ duration: 0.25, ease: 'easeOut' }}
-            className="page-wrapper"
-          >
+        <div key={pageKey} className="page-wrapper">
             <Suspense
               fallback={(
                 <div className="skeleton-page">
@@ -647,8 +631,7 @@ export default function App() {
                 />
               </RotaProtegida>
             </Suspense>
-          </MotionDiv>
-        </AnimatePresence>
+        </div>
       </main>
 
       <MobileBottomNav
