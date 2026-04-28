@@ -7,9 +7,16 @@ import Card from '../components/ui/Card'; // Importar Card para os resumos
 import Button from '../components/ui/Button'; // Importar Button
 import PageHeader from '../components/PageHeader'; // Importar PageHeader
 import { Plus } from 'lucide-react'; // Importar ícone
+import { useAuth } from '../auth/useAuth';
+import {
+  createOperationalRecord,
+  deleteOperationalRecord,
+  updateOperationalRecord,
+} from '../services/operationalPersistence';
 
 export default function RotinaPage({ db, setDb, onConfirmAction }) {
   const { showToast } = useToast(); // Usar o hook de toast
+  const { session } = useAuth();
 
   const [abrirForm, setAbrirForm] = useState(false);
   const [itemEditando, setItemEditando] = useState(null);
@@ -131,68 +138,93 @@ export default function RotinaPage({ db, setDb, onConfirmAction }) {
 
     if (!confirmado) return;
 
+    const persisted = await deleteOperationalRecord('rotinas', id, session);
     setDb((prev) => ({
       ...prev,
       rotinas: prev.rotinas.filter((r) => r.id !== id),
     }));
+    if (!persisted.persisted) {
+      showToast({ type: 'warning', message: 'Exclusão salva apenas localmente.' });
+    }
     showToast({ type: 'success', message: 'Tarefa excluída com sucesso!' });
-  }, [onConfirmAction, setDb, showToast]);
+  }, [onConfirmAction, session, setDb, showToast]);
 
-  const salvarItem = useCallback((dados) => {
+  const salvarItem = useCallback(async (dados) => {
     if (itemEditando) {
+      const persisted = await updateOperationalRecord('rotinas', itemEditando.id, dados, session);
       setDb((prev) => ({
         ...prev,
         rotinas: prev.rotinas.map((r) =>
-          r.id === itemEditando.id ? { ...r, ...dados } : r
+          r.id === itemEditando.id ? { ...r, ...(persisted.data || dados) } : r
         ),
       }));
+      if (!persisted.persisted) {
+        showToast({ type: 'warning', message: 'Tarefa atualizada apenas localmente.' });
+      }
       showToast({ type: 'success', message: 'Tarefa atualizada com sucesso!' });
     } else {
+      const persisted = await createOperationalRecord('rotinas', dados, session);
       setDb((prev) => ({
         ...prev,
         rotinas: [
           ...prev.rotinas,
           {
-            id: gerarNovoId(prev.rotinas),
             ...dados,
+            ...(persisted.data || {}),
+            id: persisted.data?.id ?? gerarNovoId(prev.rotinas),
           },
         ],
       }));
+      if (!persisted.persisted) {
+        showToast({ type: 'warning', message: 'Tarefa criada apenas localmente.' });
+      }
       showToast({ type: 'success', message: 'Tarefa criada com sucesso!' });
     }
 
     setAbrirForm(false);
     setItemEditando(null);
-  }, [itemEditando, setDb, showToast]);
+  }, [itemEditando, session, setDb, showToast]);
 
-  const concluirOuReabrir = useCallback((item, concluir) => {
+  const concluirOuReabrir = useCallback(async (item, concluir) => {
     if (item._instanciaRecorrente) {
+      const rotinaBase = rotinas.find((r) => r.id === item.id_base);
+      if (!rotinaBase) return;
+      const concluidoDatas = new Set(rotinaBase.concluido_datas || []);
+      if (concluir) {
+        concluidoDatas.add(item.data_exibicao);
+      } else {
+        concluidoDatas.delete(item.data_exibicao);
+      }
+      const patch = { concluido_datas: Array.from(concluidoDatas) };
+      const persisted = await updateOperationalRecord('rotinas', item.id_base, patch, session);
       setDb((prev) => ({
         ...prev,
         rotinas: prev.rotinas.map((r) => {
           if (r.id === item.id_base) {
-            const concluido_datas = new Set(r.concluido_datas || []);
-            if (concluir) {
-              concluido_datas.add(item.data_exibicao);
-            } else {
-              concluido_datas.delete(item.data_exibicao);
-            }
-            return { ...r, concluido_datas: Array.from(concluido_datas) };
+            return { ...r, ...(persisted.data || patch) };
           }
           return r;
         }),
       }));
+      if (!persisted.persisted) {
+        showToast({ type: 'warning', message: 'Atualização salva apenas localmente.' });
+      }
       showToast({ type: 'success', message: `Tarefa ${concluir ? 'concluída' : 'reaberta'} com sucesso!` });
     } else {
+      const patch = { status: concluir ? 'concluido' : 'pendente' };
+      const persisted = await updateOperationalRecord('rotinas', item.id, patch, session);
       setDb((prev) => ({
         ...prev,
         rotinas: prev.rotinas.map((r) =>
-          r.id === item.id ? { ...r, status: concluir ? 'concluido' : 'pendente' } : r
+          r.id === item.id ? { ...r, ...(persisted.data || patch) } : r
         ),
       }));
+      if (!persisted.persisted) {
+        showToast({ type: 'warning', message: 'Atualização salva apenas localmente.' });
+      }
       showToast({ type: 'success', message: `Tarefa ${concluir ? 'concluída' : 'reaberta'} com sucesso!` });
     }
-  }, [setDb, showToast]);
+  }, [rotinas, session, setDb, showToast]);
 
   return (
     <div className="page rotina-page">
@@ -385,26 +417,6 @@ function recorrenciaValeHoje(item, hoje) {
   // if (item.recorrencia_tipo === 'mensal') { ... }
 
   return false;
-}
-
-/**
- * Retorna uma descrição legível da recorrência.
- * @param {object} item - O objeto da tarefa.
- * @returns {string} A descrição da recorrência.
- */
-function descreverRecorrencia(item) {
-  if (item.recorrencia_tipo === 'diaria') return 'Diária';
-
-  if (item.recorrencia_tipo === 'semanal') {
-    const nomes = ['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb'];
-    const dias = (item.dias_semana || []).map((d) => nomes[d]).join(', ');
-    return dias ? `Semanal (${dias})` : 'Semanal';
-  }
-
-  // Adicionar descrição para outros tipos de recorrência
-  // if (item.recorrencia_tipo === 'mensal') { ... }
-
-  return '—';
 }
 
 /**

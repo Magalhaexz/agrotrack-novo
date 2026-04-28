@@ -6,8 +6,12 @@
   "scripts": {
     "dev": "vite",
     "build": "vite build --configLoader native",
+    "test": "NODE_ENV=test node --test --experimental-specifier-resolution=node",
+    "test:run": "NODE_ENV=test node --test --experimental-specifier-resolution=node",
     "lint": "eslint .",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "e2e": "node scripts/run-e2e.mjs",
+    "e2e:headed": "node scripts/run-e2e.mjs --headed"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.103.3",

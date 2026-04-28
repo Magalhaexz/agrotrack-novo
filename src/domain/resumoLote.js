@@ -1,5 +1,5 @@
-import { calcularResultadoLote } from './calculos';
-import { calcLote } from '../utils/calculations';
+import { calcularResultadoLote } from './calculos.js';
+import { calcLote } from '../utils/calculations.js';
 
 function toNumber(value) {
   const parsed = Number(value);

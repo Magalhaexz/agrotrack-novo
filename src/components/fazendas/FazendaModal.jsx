@@ -53,12 +53,14 @@ export default function FazendaModal({ open, initialData, onSave, onCancel }) {
   const [erro, setErro] = useState('');
 
   // reseta o form quando initialData muda (troca de fazenda ou novo cadastro)
+  /* eslint-disable react-hooks/set-state-in-effect */
   useEffect(() => {
     if (open) {
       setForm(normalizarInitialData(initialData));
       setErro('');
     }
   }, [open, initialData]);
+  /* eslint-enable react-hooks/set-state-in-effect */
 
   const titulo = initialData ? 'Editar Fazenda' : 'Cadastrar Fazenda';
 

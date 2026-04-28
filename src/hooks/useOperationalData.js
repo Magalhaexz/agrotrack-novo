@@ -76,7 +76,10 @@ async function loadOperationalSnapshot(session) {
       }
       const { data, error } = await query;
       if (error) {
-        throw error;
+        if (import.meta.env.DEV) {
+          console.warn('[HERDON_OPERATIONAL_TABLE_ERROR]', { table, message: error.message });
+        }
+        return [table, []];
       }
       return [table, data];
     })

@@ -87,10 +87,12 @@ export default function LoteForm({ initialData, fazendas = [], onSave, onCancel 
   const [form, setForm] = useState(() => normalizarInitialData(initialData));
   const [erro, setErro] = useState('');
 
+  /* eslint-disable react-hooks/set-state-in-effect */
   useEffect(() => {
     setForm(normalizarInitialData(initialData));
     setErro('');
   }, [initialData]);
+  /* eslint-enable react-hooks/set-state-in-effect */
 
   function handleChange(e) {
     const { name, value } = e.target;
