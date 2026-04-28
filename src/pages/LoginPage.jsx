@@ -311,6 +311,7 @@ export default function LoginPage() {
                       id="email"
                       className="login-input"
                       type="email"
+                      autoComplete="email"
                       placeholder="voce@email.com"
                       value={email}
                       onChange={(e) => setEmail(e.target.value)}
@@ -326,6 +327,7 @@ export default function LoginPage() {
                         id="senha"
                         className="login-input"
                         type={mostrarSenha ? 'text' : 'password'}
+                        autoComplete="current-password"
                         placeholder="Sua senha"
                         value={senha}
                         onChange={(e) => setSenha(e.target.value)}
@@ -403,6 +405,7 @@ export default function LoginPage() {
                         id="email-recuperacao"
                         className="login-input"
                         type="email"
+                        autoComplete="email"
                         placeholder="voce@email.com"
                         value={email}
                         onChange={(e) => setEmail(e.target.value)}

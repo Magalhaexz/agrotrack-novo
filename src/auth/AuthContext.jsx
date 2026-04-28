@@ -1,5 +1,5 @@
 /* eslint-disable react-refresh/only-export-components */
-import { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react';
+import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react';
 import { mapProfileRowToUser, fetchUserProfile, isAccessModuleUnavailable } from '../services/userAccess';
 import {
   HERDON_LOGOUT_CHANNEL,
@@ -10,6 +10,39 @@ import {
 import { obterPerfilDoUsuario, usuarioTemPermissao } from './perfis';
 
 const AuthContext = createContext(null);
+const PROFILE_RETRY_ATTEMPTS = 2;
+const PROFILE_RETRY_BASE_DELAY_MS = 300;
+const PROFILE_RECENT_FAILURE_TTL_MS = 8000;
+
+function nowMs() {
+  return typeof performance !== 'undefined' ? performance.now() : Date.now();
+}
+
+function wait(ms) {
+  return new Promise((resolve) => {
+    globalThis.setTimeout(resolve, ms);
+  });
+}
+
+function getErrorMessage(error) {
+  if (!error) return '';
+  if (typeof error === 'string') return error;
+  return error.message || error.details || error.hint || error.name || String(error);
+}
+
+function isTransientProfileError(error) {
+  const message = getErrorMessage(error).toLowerCase();
+  return [
+    'err_http2_protocol_error',
+    'err_connection_reset',
+    'err_connection_closed',
+    'failed to fetch',
+    'timeout',
+    'networkerror',
+    'network error',
+    'fetch failed',
+  ].some((signature) => message.includes(signature));
+}
 
 export function AuthProvider({ children }) {
   const [session, setSession] = useState(null);
@@ -19,6 +52,8 @@ export function AuthProvider({ children }) {
   const [loadingAuth, setLoadingAuth] = useState(true);
   const [authError, setAuthError] = useState(null);
   const [ultimoLogoutAt, setUltimoLogoutAt] = useState(0);
+  const profileInFlightRef = useRef(new Map());
+  const profileFailureAtRef = useRef(new Map());
 
   const resetAuthState = useCallback(() => {
     setSession(null);
@@ -39,8 +74,9 @@ export function AuthProvider({ children }) {
     let ativo = true;
 
     async function carregarProfile(userAtual) {
-      const profileStart = typeof performance !== 'undefined' ? performance.now() : Date.now();
-      if (!userAtual?.id) {
+      const userId = String(userAtual?.id || '');
+      const profileStart = nowMs();
+      if (!userId) {
         if (ativo) {
           setProfile(null);
           setProfileError(null);
@@ -49,80 +85,139 @@ export function AuthProvider({ children }) {
         return;
       }
 
+      const lastFailureAt = profileFailureAtRef.current.get(userId) || 0;
+      if (Date.now() - lastFailureAt < PROFILE_RECENT_FAILURE_TTL_MS) {
+        if (import.meta.env.DEV) {
+          console.warn('[HERDON_PROFILE_BOOT]', {
+            userId,
+            status: 'skip_recent_failure',
+            hasSession: true,
+            profileFallback: true,
+          });
+        }
+        if (ativo) {
+          setProfileReady(true);
+        }
+        return;
+      }
+
+      const existingRequest = profileInFlightRef.current.get(userId);
+      if (existingRequest) {
+        if (import.meta.env.DEV) {
+          console.debug('[HERDON_PROFILE_BOOT]', {
+            userId,
+            status: 'reuse_in_flight',
+            hasSession: true,
+          });
+        }
+        await existingRequest;
+        return;
+      }
+
       if (ativo) {
         setProfileReady(false);
       }
 
-      try {
-        const timeoutPromise = new Promise((_, reject) => {
-          window.setTimeout(() => reject(new Error('Timeout ao carregar perfil do usuário.')), 6000);
-        });
-        const { data, error } = await Promise.race([
-          fetchUserProfile(userAtual.id),
-          timeoutPromise,
-        ]);
+      const request = (async () => {
+        let lastError = null;
+        for (let attempt = 1; attempt <= PROFILE_RETRY_ATTEMPTS + 1; attempt += 1) {
+          const attemptStart = nowMs();
+          try {
+            const timeoutPromise = new Promise((_, reject) => {
+              globalThis.setTimeout(() => reject(new Error('Timeout ao carregar perfil do usuario.')), 6000);
+            });
+            const { data, error } = await Promise.race([
+              fetchUserProfile(userId),
+              timeoutPromise,
+            ]);
 
-        if (error) {
-          if (!isAccessModuleUnavailable(error)) {
-            console.error('Erro ao carregar profile do usuario:', error);
-          }
+            if (error) {
+              throw error;
+            }
 
-          if (ativo) {
-            setProfile(null);
-            setProfileError(error);
+            if (!ativo) return;
+            setProfile(data || null);
+            setProfileError(null);
             setProfileReady(true);
+            profileFailureAtRef.current.delete(userId);
+
+            if (import.meta.env.DEV) {
+              console.debug('[HERDON_PROFILE_BOOT]', {
+                userId,
+                attempt,
+                status: 'success',
+                hasSession: true,
+                profileFallback: false,
+                durationMs: Number((nowMs() - attemptStart).toFixed(1)),
+              });
+            }
+            return;
+          } catch (err) {
+            lastError = err;
+            const isTransient = isTransientProfileError(err);
+            const finalAttempt = attempt > PROFILE_RETRY_ATTEMPTS || !isTransient;
+            const knownAccessModuleIssue = isAccessModuleUnavailable(err);
+            if (import.meta.env.DEV) {
+              console.warn('[HERDON_PROFILE_BOOT]', {
+                userId,
+                attempt,
+                status: finalAttempt ? 'failure_final' : 'failure_retrying',
+                hasSession: true,
+                profileFallback: true,
+                transient: isTransient,
+                accessModuleUnavailable: knownAccessModuleIssue,
+                errorType: getErrorMessage(err) || 'profile_fetch_error',
+                durationMs: Number((nowMs() - attemptStart).toFixed(1)),
+              });
+            }
+            if (finalAttempt) {
+              break;
+            }
+            await wait(PROFILE_RETRY_BASE_DELAY_MS * attempt);
           }
-          return;
         }
 
-        if (ativo) {
-          setProfile(data || null);
-          setProfileError(null);
-          setProfileReady(true);
-        }
-        if (import.meta.env.DEV) {
-          const profileEnd = typeof performance !== 'undefined' ? performance.now() : Date.now();
-          console.debug('[HERDON_AUTH_TIMING]', {
-            stage: 'profile_success',
-            durationMs: Number((profileEnd - profileStart).toFixed(1)),
-          });
-        }
-      } catch (err) {
-        console.error('Erro inesperado ao carregar profile:', err);
+        if (!ativo) return;
+        profileFailureAtRef.current.set(userId, Date.now());
+        setProfile(null);
+        setProfileError(lastError);
+        setProfileReady(true);
+      })();
 
-        if (ativo) {
-          setProfile(null);
-          setProfileError(err);
-          setProfileReady(true);
-        }
+      profileInFlightRef.current.set(userId, request);
+
+      try {
+        await request;
       } finally {
+        if (profileInFlightRef.current.get(userId) === request) {
+          profileInFlightRef.current.delete(userId);
+        }
         if (import.meta.env.DEV) {
-          const profileEnd = typeof performance !== 'undefined' ? performance.now() : Date.now();
           console.debug('[HERDON_AUTH_TIMING]', {
             stage: 'profile_finally',
-            durationMs: Number((profileEnd - profileStart).toFixed(1)),
-            hasUser: Boolean(userAtual?.id),
+            durationMs: Number((nowMs() - profileStart).toFixed(1)),
+            hasUser: true,
           });
         }
       }
     }
 
     async function carregarSessao() {
-      const bootstrapStart = typeof performance !== 'undefined' ? performance.now() : Date.now();
+      const bootstrapStart = nowMs();
       let hasSession = false;
       try {
-        const getSessionStart = typeof performance !== 'undefined' ? performance.now() : Date.now();
+        const getSessionStart = nowMs();
         const sessionResult = await Promise.race([
           supabase.auth.getSession(),
           new Promise((_, reject) => {
-            window.setTimeout(() => reject(new Error('Timeout ao obter sessão de autenticação.')), 4500);
+            globalThis.setTimeout(() => reject(new Error('Timeout ao obter sessao de autenticacao.')), 4500);
           }),
         ]);
-        const getSessionEnd = typeof performance !== 'undefined' ? performance.now() : Date.now();
+        const getSessionEnd = nowMs();
         const { data, error } = sessionResult;
 
         if (error) {
-          console.error('Erro ao obter sessão:', error);
+          console.error('Erro ao obter sessao:', error);
           if (ativo) {
             resetAuthState();
           }
@@ -143,6 +238,14 @@ export function AuthProvider({ children }) {
         setSession(sessaoAtual);
         setAuthError(null);
         setLoadingAuth(false);
+        setProfileReady(true);
+        if (import.meta.env.DEV) {
+          console.debug('[HERDON_AUTH_BOOT]', {
+            stage: 'session_bootstrap',
+            hasSession,
+            loadingAuth: false,
+          });
+        }
         if (import.meta.env.DEV) {
           console.debug('[HERDON_AUTH_TIMING]', {
             stage: 'getSession',
@@ -160,14 +263,19 @@ export function AuthProvider({ children }) {
           setProfileReady(true);
         }
       } catch (err) {
-        console.error('Erro inesperado ao obter sessão:', err);
+        console.error('Erro inesperado ao obter sessao:', err);
 
         if (ativo) {
-          resetAuthState();
+          setSession(null);
+          setProfile(null);
+          setProfileError(null);
+          setProfileReady(true);
+          setAuthError(err);
+          setLoadingAuth(false);
         }
       } finally {
         if (import.meta.env.DEV) {
-          const bootstrapEnd = typeof performance !== 'undefined' ? performance.now() : Date.now();
+          const bootstrapEnd = nowMs();
           console.debug('[HERDON_AUTH_TIMING]', {
             stage: 'bootstrap_total',
             durationMs: Number((bootstrapEnd - bootstrapStart).toFixed(1)),
@@ -181,9 +289,9 @@ export function AuthProvider({ children }) {
 
     const {
       data: { subscription },
-    } = supabase.auth.onAuthStateChange((_event, sessionAtual) => {
+    } = supabase.auth.onAuthStateChange((eventName, sessionAtual) => {
       try {
-        if (_event === 'SIGNED_OUT' || !sessionAtual) {
+        if (eventName === 'SIGNED_OUT' || !sessionAtual) {
           registrarLogoutLocal();
           return;
         }
@@ -191,12 +299,21 @@ export function AuthProvider({ children }) {
         setSession(sessionAtual);
         setAuthError(null);
         setLoadingAuth(false);
+        setProfileReady(true);
+        if (import.meta.env.DEV) {
+          console.debug('[HERDON_AUTH_BOOT]', {
+            stage: 'auth_state_change',
+            event: eventName,
+            hasSession: Boolean(sessionAtual?.user),
+            loadingAuth: false,
+          });
+        }
         if (sessionAtual?.user) {
           void carregarProfile(sessionAtual.user);
         }
       } catch (error) {
-        console.error('Erro no listener de autenticação:', error);
-        if (ativo) {
+        console.error('Erro no listener de autenticacao:', error);
+        if (ativo && !sessionAtual?.user) {
           resetAuthState();
         }
       }
@@ -206,7 +323,18 @@ export function AuthProvider({ children }) {
       if (document.visibilityState === 'hidden') return;
 
       const { data, error } = await supabase.auth.getSession();
-      if (error || !data?.session) {
+      if (error) {
+        if (import.meta.env.DEV) {
+          console.warn('[HERDON_AUTH_BOOT]', {
+            stage: 'session_recheck_error',
+            hasSession: Boolean(data?.session),
+            errorType: getErrorMessage(error) || 'session_recheck_error',
+          });
+        }
+        return;
+      }
+
+      if (!data?.session) {
         registrarLogoutLocal();
       }
     }
