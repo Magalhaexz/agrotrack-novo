@@ -100,10 +100,12 @@ export default function RotinaForm({
   const [form, setForm] = useState(() => normalizarInitialData(initialData));
   const [erro, setErro] = useState('');
 
+  /* eslint-disable react-hooks/set-state-in-effect */
   useEffect(() => {
     setForm(normalizarInitialData(initialData));
     setErro('');
   }, [initialData]);
+  /* eslint-enable react-hooks/set-state-in-effect */
 
   function handleChange(e) {
     const { name, value, type, checked } = e.target;

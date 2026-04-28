@@ -1,5 +1,35 @@
-import { gerarNovoId } from '../utils/id';
-import { registrarAuditoria } from './auditoria';
+import { gerarNovoId } from '../utils/id.js';
+import { registrarAuditoria } from './auditoria.js';
+import {
+  createOperationalRecord,
+  persistCollectionMutation,
+  updateOperationalRecord,
+} from './operationalPersistence.js';
+
+function persistirComAviso(mutations, context = {}) {
+  const {
+    persist = true,
+    session = null,
+    onWarning,
+    onError,
+    source = 'movimentacoes',
+  } = context || {};
+  if (!persist || !session?.user?.id) return;
+
+  void persistCollectionMutation(mutations).then((result) => {
+    if (!result?.persisted && typeof onWarning === 'function') {
+      onWarning(`Parte da operação (${source}) foi salva apenas localmente.`);
+    }
+  }).catch((error) => {
+    if (typeof onError === 'function') {
+      onError(error);
+      return;
+    }
+    if (typeof onWarning === 'function') {
+      onWarning(error?.message || `Falha ao persistir operação (${source}) no servidor.`);
+    }
+  });
+}
 
 /**
  * Converte um valor para número, tratando nulos/indefinidos como 0.
@@ -38,6 +68,7 @@ function normalizeAnimalMovementPayload(rawDados = {}, { movementType }) {
     rawDados.custo_total
   );
   const tipoSaidaRaw = pickFirstDefined(rawDados.tipoSaida, rawDados.tipo);
+  const tipoEntradaRaw = pickFirstDefined(rawDados.tipo, rawDados.tipoEntrada);
   const observacaoRaw = pickFirstDefined(rawDados.observacao, rawDados.obs);
   const destinoLoteIdRaw = pickFirstDefined(rawDados.destinoLoteId, rawDados.destino_lote_id, rawDados.lote_destino);
 
@@ -73,6 +104,7 @@ function normalizeAnimalMovementPayload(rawDados = {}, { movementType }) {
     comprador: String(rawDados.comprador || '').trim(),
     obs: String(observacaoRaw || '').trim(),
     tipoSaida,
+    tipoEntrada: String(tipoEntradaRaw || '').trim().toLowerCase(),
     destinoLoteId,
   };
 }
@@ -127,7 +159,8 @@ function atualizarLoteComResumo(lote, qtdAtual, pesoMedioAtual) {
 export function registrarEntradaAnimal(
   db,
   dados,
-  userContext = {}
+  userContext = {},
+  persistContext = {}
 ) {
   const {
     loteId,
@@ -137,7 +170,11 @@ export function registrarEntradaAnimal(
     data,
     fornecedor,
     obs,
+    tipoEntrada,
   } = normalizeAnimalMovementPayload(dados, { movementType: 'entrada' });
+  const tipoMovimentoEntrada = ['compra', 'nascimento', 'transferencia_entrada'].includes(tipoEntrada)
+    ? tipoEntrada
+    : 'compra';
 
   const lotes = Array.isArray(db?.lotes) ? db.lotes : [];
   const loteExiste = lotes.some((item) => Number(item.id) === Number(loteId));
@@ -173,7 +210,7 @@ export function registrarEntradaAnimal(
       {
         id: novoMovAnimalId,
         lote_id: Number(loteId),
-        tipo: 'compra', // Tipo de movimentação de animal
+        tipo: tipoMovimentoEntrada,
         qtd: quantidade,
         peso_medio: peso,
         valor_total: valor,
@@ -190,19 +227,44 @@ export function registrarEntradaAnimal(
     ),
     movimentacoes_financeiras: [
       ...movimentosFinanceiros,
-      {
-        id: novoMovFinanceiroId,
-        tipo: 'despesa',
-        categoria: 'compra_animal',
-        lote_id: Number(loteId),
-        valor,
-        data,
-        descricao: `Compra de ${quantidade} animal(is) para o lote ${loteId}`,
-        origem_tipo: 'movimentacao_animal',
-        origem_id: novoMovAnimalId,
-      },
+      ...(tipoMovimentoEntrada === 'compra' && valor > 0
+        ? [{
+            id: novoMovFinanceiroId,
+            tipo: 'despesa',
+            categoria: 'compra_animal',
+            lote_id: Number(loteId),
+            valor,
+            data,
+            descricao: `Compra de ${quantidade} animal(is) para o lote ${loteId}`,
+            origem_tipo: 'movimentacao_animal',
+            origem_id: novoMovAnimalId,
+          }]
+        : []),
     ],
   };
+
+  const loteAtualizado = baseAtualizada.lotes.find((item) => Number(item.id) === Number(loteId));
+  const movAnimalCriado = baseAtualizada.movimentacoes_animais[baseAtualizada.movimentacoes_animais.length - 1];
+  const movFinanceiraCriada = tipoMovimentoEntrada === 'compra'
+    ? baseAtualizada.movimentacoes_financeiras[baseAtualizada.movimentacoes_financeiras.length - 1]
+    : null;
+  const mutations = [
+    createOperationalRecord('movimentacoes_animais', {
+      ...movAnimalCriado,
+      id: undefined,
+    }, persistContext.session),
+    updateOperationalRecord('lotes', loteId, {
+      qtd: loteAtualizado?.qtd || 0,
+      p_at: loteAtualizado?.p_at || 0,
+    }, persistContext.session),
+  ];
+  if (movFinanceiraCriada?.tipo === 'despesa') {
+    mutations.push(createOperationalRecord('movimentacoes_financeiras', {
+      ...movFinanceiraCriada,
+      id: undefined,
+    }, persistContext.session));
+  }
+  persistirComAviso(mutations, { ...persistContext, source: 'entrada_animal' });
 
   return registrarAuditoria(baseAtualizada, {
     acao: 'entrada_animal',
@@ -212,7 +274,7 @@ export function registrarEntradaAnimal(
     ator_id: userContext?.id || null,
     ator_email: userContext?.email || '',
     criticidade: 'media',
-  });
+  }, persistContext);
 }
 
 /**
@@ -227,7 +289,8 @@ export function registrarEntradaAnimal(
 export function registrarSaidaAnimal(
   db,
   dados,
-  userContext = {}
+  userContext = {},
+  persistContext = {}
 ) {
   const {
     loteId,
@@ -236,6 +299,7 @@ export function registrarSaidaAnimal(
     valorTotal,
     data,
     tipoSaida,
+    destinoLoteId,
     comprador,
     obs,
   } = normalizeAnimalMovementPayload(dados, { movementType: 'saida' });
@@ -244,6 +308,18 @@ export function registrarSaidaAnimal(
   const lote = lotes.find((item) => Number(item.id) === Number(loteId));
   if (!lote) {
     throw new Error(`Lote ${loteId} não encontrado para saída de animais.`);
+  }
+  if (tipoSaida === 'transferencia_saida') {
+    if (!destinoLoteId) {
+      throw new Error('Transferência de saída exige lote de destino válido.');
+    }
+    if (Number(destinoLoteId) === Number(loteId)) {
+      throw new Error('Lote de origem e destino devem ser diferentes na transferência.');
+    }
+    const loteDestinoExiste = lotes.some((item) => Number(item.id) === Number(destinoLoteId));
+    if (!loteDestinoExiste) {
+      throw new Error(`Lote de destino ${destinoLoteId} não encontrado para transferência.`);
+    }
   }
 
   const quantidade = qtd;
@@ -273,6 +349,24 @@ export function registrarSaidaAnimal(
   const novoMovAnimalId = gerarNovoId(movimentosAnimais);
   const novoMovFinanceiroId = gerarNovoId(movimentosFinanceiros);
 
+  let lotesAtualizados = lotes.map((l) =>
+    Number(l.id) === Number(loteId)
+      ? atualizarLoteComResumo(l, novaQtd, novoPesoMedio)
+      : l
+  );
+  if (tipoSaida === 'transferencia_saida' && destinoLoteId) {
+    const { qtdAtual: qtdDestinoAtual, pesoMedioAtual: pesoDestinoAtual } = obterResumoLote(db, destinoLoteId);
+    const novaQtdDestino = qtdDestinoAtual + quantidade;
+    const novoPesoDestino = novaQtdDestino
+      ? (qtdDestinoAtual * pesoDestinoAtual + quantidade * peso) / novaQtdDestino
+      : peso;
+    lotesAtualizados = lotesAtualizados.map((l) =>
+      Number(l.id) === Number(destinoLoteId)
+        ? atualizarLoteComResumo(l, novaQtdDestino, novoPesoDestino)
+        : l
+    );
+  }
+
   const baseAtualizada = {
     ...db,
     movimentacoes_animais: [
@@ -291,11 +385,7 @@ export function registrarSaidaAnimal(
         obs: obs || '',
       },
     ],
-    lotes: lotes.map((l) =>
-      Number(l.id) === Number(loteId)
-        ? atualizarLoteComResumo(l, novaQtd, novoPesoMedio)
-        : l
-    ),
+    lotes: lotesAtualizados,
     movimentacoes_financeiras: [
       ...movimentosFinanceiros,
       // Adiciona movimentação financeira apenas se for uma venda
@@ -317,6 +407,38 @@ export function registrarSaidaAnimal(
     ],
   };
 
+  const loteAtualizado = baseAtualizada.lotes.find((item) => Number(item.id) === Number(loteId));
+  const movAnimalCriado = baseAtualizada.movimentacoes_animais[baseAtualizada.movimentacoes_animais.length - 1];
+  const mutations = [
+    createOperationalRecord('movimentacoes_animais', {
+      ...movAnimalCriado,
+      id: undefined,
+    }, persistContext.session),
+    updateOperationalRecord('lotes', loteId, {
+      qtd: loteAtualizado?.qtd || 0,
+      p_at: loteAtualizado?.p_at || 0,
+    }, persistContext.session),
+  ];
+  if (tipoSaida === 'venda') {
+    const movFinanceiraCriada = baseAtualizada.movimentacoes_financeiras[baseAtualizada.movimentacoes_financeiras.length - 1];
+    if (movFinanceiraCriada?.tipo === 'receita') {
+      mutations.push(createOperationalRecord('movimentacoes_financeiras', {
+        ...movFinanceiraCriada,
+        id: undefined,
+      }, persistContext.session));
+    }
+  }
+  if (tipoSaida === 'transferencia_saida' && destinoLoteId) {
+    const loteDestino = baseAtualizada.lotes.find((item) => Number(item.id) === Number(destinoLoteId));
+    if (loteDestino) {
+      mutations.push(updateOperationalRecord('lotes', destinoLoteId, {
+        qtd: loteDestino?.qtd || 0,
+        p_at: loteDestino?.p_at || 0,
+      }, persistContext.session));
+    }
+  }
+  persistirComAviso(mutations, { ...persistContext, source: 'saida_animal' });
+
   return registrarAuditoria(baseAtualizada, {
     acao: 'saida_animal',
     entidade: 'movimentacoes_animais',
@@ -329,7 +451,7 @@ export function registrarSaidaAnimal(
       tipoSaida === 'descarte'
         ? 'alta'
         : 'media',
-  });
+  }, persistContext);
 }
 
 /**

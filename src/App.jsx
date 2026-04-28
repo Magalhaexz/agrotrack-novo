@@ -1,4 +1,3 @@
-import { AnimatePresence, motion } from 'framer-motion';
 import { Suspense, lazy, useEffect, useMemo, useRef, useState } from 'react';
 import { initialDb } from './data/mockData';
 import { useAuth } from './auth/useAuth';
@@ -20,7 +19,13 @@ import {
 } from './domain/alertas';
 import { useOperationalData } from './hooks/useOperationalData';
 import { useToast } from './hooks/useToast';
-import { supabase } from './lib/supabase';
+import {
+  HERDON_LOGOUT_CHANNEL,
+  HERDON_LOGOUT_EVENT_KEY,
+  limparPersistenciaSessao,
+  publicarEventoLogout,
+  supabase,
+} from './lib/supabase';
 import { secondaryNavItems, navSections } from './navigation/navConfig';
 import {
   registrarEntradaAnimal,
@@ -28,9 +33,11 @@ import {
   registrarSaidaAnimal,
   registrarSaidaEstoque,
 } from './services/movimentacoes';
+import { createOperationalRecord } from './services/operationalPersistence';
 import { buildAlerts } from './utils/alerts';
 import './styles/app.css';
 import './styles/ui.css';
+
 
 const DashboardPage = lazy(() => import('./pages/DashboardPage'));
 const FazendasPage = lazy(() => import('./pages/FazendasPage'));
@@ -75,16 +82,18 @@ const pageMap = {
   financeiro: FinanceiroPage,
 };
 
-const pageTransitionVariants = {
-  initial: { opacity: 0, y: 15 },
-  animate: { opacity: 1, y: 0 },
-  exit: { opacity: 0, y: -15 },
-};
 
 export default function App() {
   const [currentPage, setCurrentPage] = useState('dashboard');
   const { toasts, showToast, removeToast } = useToast();
-  const { session, user, loadingAuth, hasPermission } = useAuth();
+  const {
+    session,
+    user,
+    loadingAuth,
+    hasPermission,
+    forceLocalSignOut,
+    ultimoLogoutAt,
+  } = useAuth();
   const {
     db,
     setDb,
@@ -107,19 +116,10 @@ export default function App() {
   });
   const deniedToastRef = useRef({ permission: '', timestamp: 0 });
 
-  function limparPersistenciaSessao() {
-    const storageKeys = [
-      'herdon_usuario',
-      'herdon_user',
-      'herdon_token',
-      'supabase.auth.token',
-    ];
-
-    storageKeys.forEach((key) => {
-      localStorage.removeItem(key);
-      sessionStorage.removeItem(key);
-    });
-  }
+  const houveLogoutRecente = useMemo(() => {
+    if (!ultimoLogoutAt) return false;
+    return Date.now() - ultimoLogoutAt < 15000;
+  }, [ultimoLogoutAt]);
 
   if (import.meta.env.DEV) {
     console.debug('[HERDON_AUTH_BOOT]', {
@@ -175,6 +175,10 @@ export default function App() {
       return;
     }
 
+    if (forcarTelaLogin || houveLogoutRecente) {
+      return;
+    }
+
     setForcarTelaLogin(false);
     setUsuarioLogado((prev) => ({
       id: user.id || prev?.id || null,
@@ -186,7 +190,43 @@ export default function App() {
       telefone: user?.telefone ?? prev?.telefone ?? '',
       cargo: user?.cargo ?? prev?.cargo ?? '',
     }));
-  }, [user]);
+  }, [forcarTelaLogin, houveLogoutRecente, user]);
+
+  useEffect(() => {
+    function aplicarLogoutForcado() {
+      forceLocalSignOut();
+      setForcarTelaLogin(true);
+      setUsuarioLogado(null);
+      setCurrentPage('dashboard');
+    }
+
+    function onStorage(event) {
+      if (event.key !== HERDON_LOGOUT_EVENT_KEY || !event.newValue) return;
+      aplicarLogoutForcado();
+    }
+
+    let authChannel = null;
+    function onBroadcast(event) {
+      if (event?.data?.type !== 'logout') return;
+      aplicarLogoutForcado();
+    }
+
+    window.addEventListener('storage', onStorage);
+    try {
+      authChannel = new BroadcastChannel(HERDON_LOGOUT_CHANNEL);
+      authChannel.addEventListener('message', onBroadcast);
+    } catch {
+      authChannel = null;
+    }
+
+    return () => {
+      window.removeEventListener('storage', onStorage);
+      if (authChannel) {
+        authChannel.removeEventListener('message', onBroadcast);
+        authChannel.close();
+      }
+    };
+  }, [forceLocalSignOut]);
 
   useEffect(() => {
     const fazendas = Array.isArray(db?.fazendas) ? db.fazendas : [];
@@ -273,14 +313,22 @@ export default function App() {
   }
 
   async function handleLogout() {
+    forceLocalSignOut();
     setForcarTelaLogin(true);
     setUsuarioLogado(null);
-    limparPersistenciaSessao();
 
     try {
-      await supabase.auth.signOut();
+      await supabase.auth.signOut({ scope: 'global' });
     } catch (error) {
       console.error('Erro ao finalizar sessão:', error);
+      try {
+        await supabase.auth.signOut();
+      } catch (fallbackError) {
+        console.error('Erro ao finalizar sessão (fallback local):', fallbackError);
+      }
+    } finally {
+      limparPersistenciaSessao();
+      publicarEventoLogout('manual_logout');
     }
 
     setCurrentPage('dashboard');
@@ -288,13 +336,22 @@ export default function App() {
 
   async function handleClearSessionAndReload() {
     try {
+      forceLocalSignOut();
       limparPersistenciaSessao();
-      await supabase.auth.signOut();
+      await supabase.auth.signOut({ scope: 'global' });
     } catch (error) {
       if (import.meta.env.DEV) {
         console.warn('[HERDON_CLEAR_SESSION]', error);
       }
+      try {
+        await supabase.auth.signOut();
+      } catch (fallbackError) {
+        if (import.meta.env.DEV) {
+          console.warn('[HERDON_CLEAR_SESSION_FALLBACK]', fallbackError);
+        }
+      }
     } finally {
+      publicarEventoLogout('clear_session_reload');
       window.location.reload();
     }
   }
@@ -327,22 +384,31 @@ export default function App() {
     [alertasResolvidos, rawAlerts]
   );
 
-  function marcarAlertaComoFeito(alert) {
+  async function marcarAlertaComoFeito(alert) {
     const chave = alert?.ackKey || alert?.id;
     if (!chave) {
       return;
     }
 
+    const persisted = await createOperationalRecord('alertas_resolvidos', { chave }, session);
     setDb((prev) => ({
       ...prev,
       alertas_resolvidos: Array.from(new Set([...(prev?.alertas_resolvidos || []), chave])),
     }));
+    if (!persisted.persisted) {
+      showToast({ type: 'warning', message: 'Alerta resolvido apenas localmente.' });
+    }
   }
 
   const userContext = { id: user?.id || null, email: user?.email || '' };
+  const persistContext = {
+    session,
+    persist: true,
+    onWarning: (message) => showToast({ type: 'warning', message: message || 'Operação salva parcialmente apenas localmente.' }),
+  };
 
-  const handleRegistrarEntradaAnimal = (dados) => setDb((prev) => registrarEntradaAnimal(prev, dados, userContext));
-  const handleRegistrarSaidaAnimal = (dados) => setDb((prev) => registrarSaidaAnimal(prev, dados, userContext));
+  const handleRegistrarEntradaAnimal = (dados) => setDb((prev) => registrarEntradaAnimal(prev, dados, userContext, persistContext));
+  const handleRegistrarSaidaAnimal = (dados) => setDb((prev) => registrarSaidaAnimal(prev, dados, userContext, persistContext));
   const handleRegistrarEntradaEstoque = (dados) => setDb((prev) => registrarEntradaEstoque(prev, dados, userContext));
   const handleRegistrarSaidaEstoque = (dados) => setDb((prev) => registrarSaidaEstoque(prev, dados, userContext));
 
@@ -531,16 +597,7 @@ export default function App() {
           onTabChange={setTabAtiva}
         />
 
-        <AnimatePresence mode="wait">
-          <motion.div
-            key={pageKey}
-            initial="initial"
-            animate="animate"
-            exit="exit"
-            variants={pageTransitionVariants}
-            transition={{ duration: 0.25, ease: 'easeOut' }}
-            className="page-wrapper"
-          >
+        <div key={pageKey} className="page-wrapper">
             <Suspense
               fallback={(
                 <div className="skeleton-page">
@@ -574,8 +631,7 @@ export default function App() {
                 />
               </RotaProtegida>
             </Suspense>
-          </motion.div>
-        </AnimatePresence>
+        </div>
       </main>
 
       <MobileBottomNav

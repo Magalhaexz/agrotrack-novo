@@ -7,8 +7,12 @@ import Modal from '../components/ui/Modal';
 import Input from '../components/ui/Input';
 import { formatCurrency, formatDate, formatNumber } from '../utils/calculations';
 import { gerarNovoId } from '../utils/id';
-// Assuming useToast is available
-// import { useToast } from '../hooks/useToast';
+import { useToast } from '../hooks/useToast';
+import { useAuth } from '../auth/useAuth';
+import {
+  createOperationalRecord,
+  updateOperationalRecord,
+} from '../services/operationalPersistence';
 
 /**
  * Página de Estoque, para gerenciamento de itens, entradas, saídas e visualização de movimentações.
@@ -19,7 +23,9 @@ import { gerarNovoId } from '../utils/id';
  * @param {function} [props.onRegistrarSaidaEstoque] - Callback opcional para registrar saída de estoque de forma customizada.
  */
 export default function EstoquePage({ db, setDb, onRegistrarSaidaEstoque }) {
-  // const { showToast } = useToast(); // Se usar useToast
+  const { showToast } = useToast();
+  const { hasPermission, session } = useAuth();
+  const mensagemSemPermissao = 'Você não tem permissão para executar esta ação.';
 
   const [showOnlyCrit, setShowOnlyCrit] = useState(false);
   const [openEntrada, setOpenEntrada] = useState(false);
@@ -89,8 +95,26 @@ export default function EstoquePage({ db, setDb, onRegistrarSaidaEstoque }) {
       <div className="rebanho-header">
         <h1>Estoque</h1>
         <div className="lote-actions">
-          <Button icon={<ArrowUpCircle size={14} />} onClick={() => { setSelectedItem(null); setOpenEntrada(true); }}>Entrada</Button>
-          <Button variant="outline" icon={<ArrowDownCircle size={14} />} onClick={() => { setSelectedItem(null); setOpenSaida(true); }}>Saída/Consumo</Button>
+          <Button icon={<ArrowUpCircle size={14} />} onClick={() => {
+            if (!hasPermission('estoque:editar')) {
+              showToast({ type: 'error', message: mensagemSemPermissao });
+              return;
+            }
+            setSelectedItem(null); setOpenEntrada(true);
+          }}
+          >
+            Entrada
+          </Button>
+          <Button variant="outline" icon={<ArrowDownCircle size={14} />} onClick={() => {
+            if (!hasPermission('estoque:editar')) {
+              showToast({ type: 'error', message: mensagemSemPermissao });
+              return;
+            }
+            setSelectedItem(null); setOpenSaida(true);
+          }}
+          >
+            Saída/Consumo
+          </Button>
           <Button variant={showOnlyCrit ? 'warning' : 'ghost'} onClick={() => setShowOnlyCrit((v) => !v)}>
             {showOnlyCrit ? 'Mostrar todos' : 'Mostrar apenas críticos'}
           </Button>
@@ -136,8 +160,26 @@ export default function EstoquePage({ db, setDb, onRegistrarSaidaEstoque }) {
                   <div className="estoque-detail-row"><span>Dias restantes</span><span>{item.diasRest > 900 ? '—' : `${formatNumber(item.diasRest, 0)} dias`}</span></div>
                 </div>
                 <div className="estoque-card-actions lote-actions">
-                  <button type="button" className="btn-entrada" onClick={() => { setSelectedItem(item); setOpenEntrada(true); }}>Entrada</button>
-                  <button type="button" className="btn-saida" onClick={() => { setSelectedItem(item); setOpenSaida(true); }}>Saída</button>
+                  <button type="button" className="btn-entrada" onClick={() => {
+                    if (!hasPermission('estoque:editar')) {
+                      showToast({ type: 'error', message: mensagemSemPermissao });
+                      return;
+                    }
+                    setSelectedItem(item); setOpenEntrada(true);
+                  }}
+                  >
+                    Entrada
+                  </button>
+                  <button type="button" className="btn-saida" onClick={() => {
+                    if (!hasPermission('estoque:editar')) {
+                      showToast({ type: 'error', message: mensagemSemPermissao });
+                      return;
+                    }
+                    setSelectedItem(item); setOpenSaida(true);
+                  }}
+                  >
+                    Saída
+                  </button>
                 </div>
               </Card>
             );
@@ -185,7 +227,7 @@ export default function EstoquePage({ db, setDb, onRegistrarSaidaEstoque }) {
         )}
       </Card>
 
-      {openEntrada && <EntradaModal db={db} setDb={setDb} selectedItem={selectedItem} estoqueMap={estoqueMap} onClose={() => { setSelectedItem(null); setOpenEntrada(false); }} />}
+      {openEntrada && <EntradaModal db={db} setDb={setDb} selectedItem={selectedItem} estoqueMap={estoqueMap} onClose={() => { setSelectedItem(null); setOpenEntrada(false); }} hasPermission={hasPermission} showToast={showToast} session={session} />}
       {openSaida && (
         <SaidaModal
           db={db}
@@ -193,8 +235,10 @@ export default function EstoquePage({ db, setDb, onRegistrarSaidaEstoque }) {
           selectedItem={selectedItem}
           onRegistrarSaidaEstoque={onRegistrarSaidaEstoque}
           estoqueMap={estoqueMap}
-          lotesMap={lotesMap}
           onClose={() => { setSelectedItem(null); setOpenSaida(false); }}
+          hasPermission={hasPermission}
+          showToast={showToast}
+          session={session}
         />
       )}
     </div>
@@ -210,8 +254,7 @@ export default function EstoquePage({ db, setDb, onRegistrarSaidaEstoque }) {
  * @param {Map<number, object>} props.estoqueMap - Mapa de itens de estoque por ID.
  * @param {function} props.onClose - Callback para fechar o modal.
  */
-function EntradaModal({ db, setDb, selectedItem, estoqueMap, onClose }) {
-  // const { showToast } = useToast(); // Se usar useToast
+function EntradaModal({ db, setDb, selectedItem, estoqueMap, onClose, hasPermission, showToast, session }) {
 
   const [form, setForm] = useState({
     item_id: selectedItem?.id || '',
@@ -227,12 +270,34 @@ function EntradaModal({ db, setDb, selectedItem, estoqueMap, onClose }) {
   const item = estoqueMap.get(Number(form.item_id)); // Usar estoqueMap
   const total = Number(form.qtd || 0) * Number(form.custo || 0);
 
-  function submit() {
+  async function submit() {
+    if (!hasPermission('estoque:editar')) {
+      showToast({ type: 'error', message: 'Você não tem permissão para executar esta ação.' });
+      return;
+    }
     if (!form.data || !form.item_id || Number(form.qtd) <= 0) {
       // showToast({ type: 'error', message: 'Preencha todos os campos obrigatórios.' });
       alert('Preencha todos os campos obrigatórios.');
       return;
     }
+
+    const itemAtual = (db?.estoque || []).find((entry) => entry.id === Number(form.item_id));
+    const novoSaldo = Number(itemAtual?.quantidade_atual || 0) + Number(form.qtd || 0);
+    const estoquePersist = await updateOperationalRecord('estoque', Number(form.item_id), {
+      quantidade_atual: novoSaldo,
+      valor_unitario: Number(form.custo || itemAtual?.valor_unitario || 0),
+      data_validade: form.validade || itemAtual?.data_validade || null,
+    }, session);
+    const movPersist = await createOperationalRecord('movimentacoes_estoque', {
+      item_estoque_id: Number(form.item_id),
+      tipo: 'entrada',
+      quantidade: Number(form.qtd),
+      data: form.data,
+      valor_total: total,
+      obs: form.obs,
+      fornecedor: form.fornecedor,
+      numero_nf: form.nf,
+    }, session);
 
     setDb((prev) => ({
       ...prev,
@@ -240,15 +305,17 @@ function EntradaModal({ db, setDb, selectedItem, estoqueMap, onClose }) {
         i.id === Number(form.item_id)
           ? {
               ...i,
-              quantidade_atual: Number(i.quantidade_atual || 0) + Number(form.qtd),
-              valor_unitario: Number(form.custo || i.valor_unitario),
-              data_validade: form.validade || i.data_validade,
+              ...(estoquePersist.data || {
+                quantidade_atual: Number(i.quantidade_atual || 0) + Number(form.qtd),
+                valor_unitario: Number(form.custo || i.valor_unitario),
+                data_validade: form.validade || i.data_validade,
+              }),
             }
           : i
       ),
       movimentacoes_estoque: [
         ...(prev.movimentacoes_estoque || []),
-        {
+        movPersist.data || {
           id: gerarNovoId(prev.movimentacoes_estoque || []),
           item_estoque_id: Number(form.item_id),
           tipo: 'entrada',
@@ -261,6 +328,9 @@ function EntradaModal({ db, setDb, selectedItem, estoqueMap, onClose }) {
         },
       ],
     }));
+    if (!estoquePersist.persisted || !movPersist.persisted) {
+      showToast({ type: 'warning', message: 'Entrada salva apenas localmente.' });
+    }
     // showToast({ type: 'success', message: 'Entrada de estoque registrada com sucesso.' });
     onClose();
   }
@@ -304,8 +374,7 @@ function EntradaModal({ db, setDb, selectedItem, estoqueMap, onClose }) {
  * @param {Map<number, object>} props.lotesMap - Mapa de lotes por ID.
  * @param {function} props.onClose - Callback para fechar o modal.
  */
-function SaidaModal({ db, setDb, selectedItem, onRegistrarSaidaEstoque, estoqueMap, lotesMap, onClose }) {
-  // const { showToast } = useToast(); // Se usar useToast
+function SaidaModal({ db, setDb, selectedItem, onRegistrarSaidaEstoque, estoqueMap, onClose, hasPermission, showToast, session }) {
 
   const [form, setForm] = useState({
     item_id: selectedItem?.id || '',
@@ -331,7 +400,11 @@ function SaidaModal({ db, setDb, selectedItem, onRegistrarSaidaEstoque, estoqueM
     return 'Outros';
   }
 
-  function submit() {
+  async function submit() {
+    if (!hasPermission('estoque:editar')) {
+      showToast({ type: 'error', message: 'Você não tem permissão para executar esta ação.' });
+      return;
+    }
     const qtd = Number(form.qtd || 0);
     if (!form.data || !form.item_id || qtd <= 0 || qtd > saldo) {
       // showToast({ type: 'error', message: 'Verifique os campos e a quantidade.' });
@@ -361,14 +434,40 @@ function SaidaModal({ db, setDb, selectedItem, onRegistrarSaidaEstoque, estoqueM
 
     // Lógica padrão de atualização do DB
     const valor = qtd * Number(item?.valor_unitario || 0);
+    const novoSaldo = saldo - qtd;
+    const estoquePersist = await updateOperationalRecord('estoque', Number(form.item_id), {
+      quantidade_atual: novoSaldo,
+    }, session);
+    const movEstoquePersist = await createOperationalRecord('movimentacoes_estoque', {
+      item_estoque_id: Number(form.item_id),
+      tipo: form.tipo,
+      lote_id: form.lote_id ? Number(form.lote_id) : null,
+      quantidade: qtd,
+      data: form.data,
+      valor_total: valor,
+      obs: form.obs,
+    }, session);
+    const movFinancePersist = form.lote_id
+      ? await createOperationalRecord('movimentacoes_financeiras', {
+          tipo: 'despesa',
+          categoria: categoriaDespesa(item?.categoria),
+          valor,
+          data: form.data,
+          lote_id: Number(form.lote_id),
+          descricao: `Consumo de ${item?.produto}`,
+        }, session)
+      : { persisted: true, data: null };
+
     setDb((prev) => ({
       ...prev,
       estoque: prev.estoque.map((i) =>
-        i.id === Number(form.item_id) ? { ...i, quantidade_atual: Number(i.quantidade_atual || 0) - qtd } : i
+        i.id === Number(form.item_id)
+          ? { ...i, ...(estoquePersist.data || { quantidade_atual: Number(i.quantidade_atual || 0) - qtd }) }
+          : i
       ),
       movimentacoes_estoque: [
         ...(prev.movimentacoes_estoque || []),
-        {
+        movEstoquePersist.data || {
           id: gerarNovoId(prev.movimentacoes_estoque || []),
           item_estoque_id: Number(form.item_id),
           tipo: form.tipo,
@@ -382,7 +481,7 @@ function SaidaModal({ db, setDb, selectedItem, onRegistrarSaidaEstoque, estoqueM
       movimentacoes_financeiras: form.lote_id
         ? [
             ...(prev.movimentacoes_financeiras || []),
-            {
+            movFinancePersist.data || {
               id: gerarNovoId(prev.movimentacoes_financeiras || []),
               tipo: 'despesa',
               categoria: categoriaDespesa(item?.categoria),
@@ -394,6 +493,9 @@ function SaidaModal({ db, setDb, selectedItem, onRegistrarSaidaEstoque, estoqueM
           ]
         : (prev.movimentacoes_financeiras || []),
     }));
+    if (!estoquePersist.persisted || !movEstoquePersist.persisted || !movFinancePersist.persisted) {
+      showToast({ type: 'warning', message: 'Saída salva parcialmente apenas no modo local.' });
+    }
     // showToast({ type: 'success', message: 'Saída de estoque registrada com sucesso.' });
     onClose();
   }

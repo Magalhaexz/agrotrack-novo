@@ -264,7 +264,6 @@ function MonthlyCalendar({ cursorDate, selectedDate, eventsByDateMap, onSelectDa
   const month = cursorDate.getMonth();
   const firstDay = new Date(year, month, 1);
   const firstWeekDay = firstDay.getDay();
-  const daysInMonth = new Date(year, month + 1, 0).getDate();
   const cells = Array.from({ length: 42 }, (_, index) => {
     const offset = index - firstWeekDay;
     const current = new Date(year, month, offset + 1);
