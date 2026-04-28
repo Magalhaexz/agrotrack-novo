@@ -121,6 +121,8 @@ export default function LoginPage() {
         localStorage.setItem(LOGIN_ATTEMPT_KEY, String(Date.now()));
         localStorage.removeItem(HERDON_LOGOUT_EVENT_KEY);
         localStorage.removeItem('herdon_logout_in_progress');
+        sessionStorage.removeItem(HERDON_LOGOUT_EVENT_KEY);
+        sessionStorage.removeItem('herdon_logout_in_progress');
         if (import.meta.env.DEV) {
           console.debug('[HERDON_SYNC_GUARD]', {
             stage: 'login_cleared_recent_logout',
@@ -380,6 +382,7 @@ export default function LoginPage() {
                         id="nome"
                         className="login-input"
                         type="text"
+                        autoComplete="name"
                         placeholder="Seu nome"
                         value={nome}
                         onChange={(e) => setNome(e.target.value)}

@@ -10,7 +10,7 @@ import {
 import { obterPerfilDoUsuario, usuarioTemPermissao } from './perfis';
 
 const AuthContext = createContext(null);
-const PROFILE_FAILURE_COOLDOWN_MS = 45000;
+const PROFILE_FAILURE_COOLDOWN_MS = 120000;
 const LOGIN_ATTEMPT_KEY = 'HERDON_LOGIN_ATTEMPT_AT';
 
 function getErrorMessage(error) {
@@ -55,6 +55,7 @@ export function AuthProvider({ children }) {
   const registrarLogoutLocal = useCallback(() => {
     authGenerationRef.current += 1;
     limparPersistenciaSessao();
+    profileInFlightRef.current.clear();
     setUltimoLogoutAt(Date.now());
     if (import.meta.env.DEV) {
       console.debug('[HERDON_SYNC_GUARD]', {

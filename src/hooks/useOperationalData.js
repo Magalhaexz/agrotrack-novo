@@ -28,9 +28,11 @@ const HYDRATION_START_DELAY_MS = 1800;
 const HYDRATION_FAILURE_COOLDOWN_MS = 45000;
 const HYDRATION_FAILURES_TO_OPEN_CIRCUIT = 4;
 const HERDON_DISABLE_SUPABASE_SYNC = 'HERDON_DISABLE_SUPABASE_SYNC';
+const HERDON_ENABLE_SUPABASE_SYNC = 'HERDON_ENABLE_SUPABASE_SYNC';
 const inFlightSnapshots = new Map();
 const failedHydrationAt = new Map();
 const schemaWarningTables = new Set();
+let autoSyncDisabledLogged = false;
 
 function nowMs() {
   return typeof performance !== 'undefined' ? performance.now() : Date.now();
@@ -77,6 +79,17 @@ function isSchemaNotFoundError(error) {
 function shouldDisableSupabaseSync() {
   try {
     const raw = localStorage.getItem(HERDON_DISABLE_SUPABASE_SYNC);
+    if (!raw) return false;
+    const normalized = String(raw).toLowerCase();
+    return normalized === '1' || normalized === 'true' || normalized === 'yes' || normalized === 'on';
+  } catch {
+    return false;
+  }
+}
+
+function shouldEnableSupabaseSync() {
+  try {
+    const raw = localStorage.getItem(HERDON_ENABLE_SUPABASE_SYNC);
     if (!raw) return false;
     const normalized = String(raw).toLowerCase();
     return normalized === '1' || normalized === 'true' || normalized === 'yes' || normalized === 'on';
@@ -335,19 +348,29 @@ export function useOperationalData(initialDb, session, options = {}) {
   const [dataReady, setDataReady] = useState(true);
   const [dataSource, setDataSource] = useState('signed_out');
   const [dataError, setDataError] = useState(null);
+  const [manualSyncNonce, setManualSyncNonce] = useState(0);
   const hydratingRef = useRef(false);
   const hydrationGenerationRef = useRef(0);
   const localMutationRef = useRef(0);
   const currentUserIdRef = useRef(null);
+  const previousUserIdRef = useRef(null);
 
   const setDb = useCallback((updater) => {
     localMutationRef.current += 1;
     setDbState(updater);
   }, []);
 
+  const syncNow = useCallback(() => {
+    setManualSyncNonce((value) => value + 1);
+  }, []);
+
   useEffect(() => {
     const userId = session?.user?.id || null;
     currentUserIdRef.current = userId;
+    if (previousUserIdRef.current !== userId) {
+      previousUserIdRef.current = userId;
+      setManualSyncNonce(0);
+    }
   }, [session]);
 
   useEffect(() => {
@@ -359,6 +382,9 @@ export function useOperationalData(initialDb, session, options = {}) {
     const fallbackDb = createOperationalFallbackDb(initialDb);
     const userId = session?.user?.id || null;
     const syncDisabled = shouldDisableSupabaseSync();
+    const syncEnabled = shouldEnableSupabaseSync();
+    const manualSyncRequested = manualSyncNonce > 0;
+    const shouldAutoSync = syncEnabled;
 
     const shouldApply = () => {
       const isCurrentGeneration = hydrationGenerationRef.current === generationId;
@@ -389,7 +415,7 @@ export function useOperationalData(initialDb, session, options = {}) {
 
     if (syncDisabled) {
       setDbState(fallbackDb);
-      setDataSource('offline_local');
+      setDataSource('offline_disabled');
       setDataError(null);
       setDataReady(true);
       hydratingRef.current = false;
@@ -399,6 +425,24 @@ export function useOperationalData(initialDb, session, options = {}) {
         hasUserId: true,
         flag: HERDON_DISABLE_SUPABASE_SYNC,
       });
+      return () => {
+        active = false;
+      };
+    }
+
+    if (!manualSyncRequested && !shouldAutoSync) {
+      setDbState(fallbackDb);
+      setDataSource('local_offline');
+      setDataError(null);
+      setDataReady(true);
+      hydratingRef.current = false;
+      if (!autoSyncDisabledLogged && import.meta.env.DEV) {
+        autoSyncDisabledLogged = true;
+        console.debug('[HERDON_DATA_BOOT]', {
+          stage: 'auto_sync_disabled_by_default',
+          hasUserId: true,
+        });
+      }
       return () => {
         active = false;
       };
@@ -495,7 +539,7 @@ export function useOperationalData(initialDb, session, options = {}) {
         hasUserId: Boolean(userId),
       });
     };
-  }, [hydrationEnabled, initialDb, session]);
+  }, [hydrationEnabled, initialDb, manualSyncNonce, session]);
 
   return {
     db,
@@ -504,5 +548,6 @@ export function useOperationalData(initialDb, session, options = {}) {
     dataSource,
     dataError,
     hydratingRef,
+    syncNow,
   };
 }

@@ -7,6 +7,13 @@ import { createElement } from 'react';
  */
 function icon(paths) {
   return function LucideIcon({ size = 16, className = '', ...props }) {
+    const keyedPaths = paths.map((element, index) =>
+      createElement(element.type, {
+        ...element.props,
+        key: element.key ?? `${element.type}-${index}`,
+      })
+    );
+
     return createElement(
       'svg',
       {
@@ -21,7 +28,7 @@ function icon(paths) {
         className,
         ...props, // Permite passar outras props SVG
       },
-      paths // Renderiza os elementos de caminho (path, circle, etc.)
+      keyedPaths // Renderiza os elementos de caminho (path, circle, etc.)
     );
   };
 }
