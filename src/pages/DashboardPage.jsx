@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useMemo } from 'react';
 import {
   AlertTriangle,
   ArrowDown,
@@ -44,32 +44,18 @@ export default function DashboardPage({
   db,
   alerts = [],
   onNavigate = null,
-  onResolveAlert = null,
   tabAtiva = 'geral',
   setTabAtiva,
 }) {
-  const [hiddenLines, setHiddenLines] = useState({});
-
   const lotesMap = useMemo(() => new Map((db.lotes || []).map((lote) => [lote.id, lote])), [db.lotes]);
   const lotesAtivos = useMemo(() => (db.lotes || []).filter((lote) => lote.status === 'ativo'), [db.lotes]);
 
   const lotesStats = useMemo(
-    () => {
-      const start = import.meta.env.DEV ? (typeof performance !== 'undefined' ? performance.now() : Date.now()) : 0;
-      const computed = lotesAtivos.map((lote) => ({
+    () =>
+      lotesAtivos.map((lote) => ({
         lote,
         indicators: getResumoLote(db, lote.id),
-      }));
-      if (import.meta.env.DEV) {
-        const end = typeof performance !== 'undefined' ? performance.now() : Date.now();
-        console.debug('[HERDON_DASHBOARD_TIMING]', {
-          stage: 'lotesStats',
-          durationMs: Number((end - start).toFixed(1)),
-          lotesAtivos: lotesAtivos.length,
-        });
-      }
-      return computed;
-    },
+      })),
     [db, lotesAtivos]
   );
 
@@ -169,26 +155,10 @@ export default function DashboardPage({
     [db.tarefas]
   );
 
-  const tarefasResumo = useMemo(
-    () =>
-      (db.tarefas || []).reduce(
-        (acc, item) => {
-          if (item.status === 'pendente') acc.pendente += 1;
-          if (item.status === 'em_andamento') acc.em_andamento += 1;
-          if (item.status === 'concluida') acc.concluida += 1;
-          return acc;
-        },
-        { pendente: 0, em_andamento: 0, concluida: 0 }
-      ),
-    [db.tarefas]
-  );
-
   const { alertasFormatados, totalAlertasCriticos } = useMemo(() => {
-    let criticos = 0;
-    const formatados = (alerts || []).map((alert, index) => {
+    const aggregated = (alerts || []).reduce((acc, alert, index) => {
       const urgency = urgencyVariant(alert);
-      if (urgency === 'danger') criticos += 1;
-      return {
+      const formatado = {
         ...alert,
         id: alert.id || alert.ackKey || `alert-${index}`,
         titulo: alert.titulo || alert.title || 'Alerta do sistema',
@@ -196,8 +166,13 @@ export default function DashboardPage({
         prioridade: alert.prioridade || (urgency === 'danger' ? 'alta' : urgency === 'warning' ? 'media' : 'baixa'),
         acao: alert.acao || { label: 'Abrir', rota: alert.route || 'dashboard' },
       };
-    });
-    return { alertasFormatados: formatados, totalAlertasCriticos: criticos };
+      return {
+        criticos: acc.criticos + (urgency === 'danger' ? 1 : 0),
+        formatados: [...acc.formatados, formatado],
+      };
+    }, { criticos: 0, formatados: [] });
+
+    return { alertasFormatados: aggregated.formatados, totalAlertasCriticos: aggregated.criticos };
   }, [alerts]);
 
   const alertasOperacionais = useMemo(
@@ -239,42 +214,6 @@ export default function DashboardPage({
         })
         .slice(0, 5),
     [lotesStats]
-  );
-
-  const animaisEmRisco = useMemo(
-    () => lotesEmAtencao.reduce((sum, item) => sum + item.indicators.totalAnimais, 0),
-    [lotesEmAtencao]
-  );
-
-  const activeLoteIds = useMemo(() => new Set(lotesAtivos.map((lote) => lote.id)), [lotesAtivos]);
-
-  const chartRows = useMemo(() => {
-    const pesagens = db.pesagens || [];
-    const sortedPesagens = pesagens.slice().sort((a, b) => new Date(a.data) - new Date(b.data));
-    const timelineMap = new Map();
-
-    for (const item of sortedPesagens) {
-      if (!activeLoteIds.has(item.lote_id)) continue;
-      if (!timelineMap.has(item.data)) {
-        timelineMap.set(item.data, { data: item.data, label: formatDate(item.data) });
-      }
-
-      const loteNome = lotesMap.get(item.lote_id)?.nome;
-      if (loteNome) {
-        timelineMap.get(item.data)[loteNome] = Number(item.peso_medio || 0);
-      }
-    }
-
-    return Array.from(timelineMap.values());
-  }, [activeLoteIds, db.pesagens, lotesMap]);
-
-  const lotesColorMap = useMemo(
-    () =>
-      lotesAtivos.reduce((acc, lote, index) => {
-        acc[lote.nome] = ['#22c55e', '#3b82f6', '#eab308', '#ef4444', '#a855f7'][index % 5];
-        return acc;
-      }, {}),
-    [lotesAtivos]
   );
 
   const { melhorLote, piorLote } = useMemo(() => {

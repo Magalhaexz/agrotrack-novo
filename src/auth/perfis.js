@@ -13,6 +13,7 @@ export const PERFIL_LABELS = {
 };
 
 const PERFIL_ALIASES = {
+  admin: PERFIS.ADMIN,
   proprietario: PERFIS.ADMIN,
   owner: PERFIS.ADMIN,
   gerente: PERFIS.GERENTE,

@@ -50,10 +50,12 @@ export default function FazendaForm({ open, initialData, onSave, onCancel }) {
   const [form, setForm] = useState(() => normalizarInitialData(initialData));
 
   // Sincroniza o estado do formulário com initialData
+  /* eslint-disable react-hooks/set-state-in-effect */
   useEffect(() => {
     setForm(normalizarInitialData(initialData));
     setErro(''); // Limpa erros ao carregar novos dados
   }, [initialData]);
+  /* eslint-enable react-hooks/set-state-in-effect */
 
   const titulo = useMemo(() => (initialData ? 'Editar fazenda' : 'Cadastrar fazenda'), [initialData]);
 

@@ -7,6 +7,11 @@ import Modal from '../components/ui/Modal';
 import Input from '../components/ui/Input'; // Importar o componente Input
 import { useToast } from '../hooks/useToast'; // Assumindo que você tem um hook de toast
 import { useAuth } from '../auth/useAuth';
+import {
+  createOperationalRecord,
+  deleteOperationalRecord,
+  updateOperationalRecord,
+} from '../services/operationalPersistence';
 import '../styles/tarefas.css';
 
 const STATUS_COLUMNS = [
@@ -32,7 +37,7 @@ const EMPTY_TASK = {
 
 export default function TarefasPage({ db, setDb, onConfirmAction }) {
   const { showToast } = useToast();
-  const { hasPermission } = useAuth();
+  const { hasPermission, session } = useAuth();
   const mensagemSemPermissao = 'Você não tem permissão para executar esta ação.';
   const tarefas = Array.isArray(db?.tarefas) ? db.tarefas : [];
   const [openModal, setOpenModal] = useState(false);
@@ -94,36 +99,50 @@ export default function TarefasPage({ db, setDb, onConfirmAction }) {
     setOpenModal(true);
   }, [hasPermission, showToast]);
 
-  const handleSave = useCallback((formData) => {
+  const handleSave = useCallback(async (formData) => {
     if (!hasPermission('tarefas:editar')) {
       showToast({ type: 'error', message: mensagemSemPermissao });
       return;
     }
-    setDb((prev) => {
-      const lista = Array.isArray(prev?.tarefas) ? prev.tarefas : [];
-
-      if (editingTask) {
+    if (editingTask) {
+      const persisted = await updateOperationalRecord('tarefas', editingTask.id, formData, session);
+      setDb((prev) => {
+        const lista = Array.isArray(prev?.tarefas) ? prev.tarefas : [];
         return {
           ...prev,
-          tarefas: lista.map((item) => (item.id === editingTask.id ? { ...item, ...formData } : item)),
+          tarefas: lista.map((item) => (item.id === editingTask.id ? { ...item, ...(persisted.data || formData) } : item)),
         };
+      });
+      if (!persisted.persisted) {
+        showToast({ type: 'warning', message: 'Tarefa atualizada apenas localmente.' });
       }
-
-      return {
-        ...prev,
-        tarefas: [
-          ...lista,
-          {
-            ...formData,
-            id: getNextId(lista),
-            created_at: new Date().toISOString(),
-          },
-        ],
+    } else {
+      const payload = {
+        ...formData,
+        created_at: new Date().toISOString(),
       };
-    });
+      const persisted = await createOperationalRecord('tarefas', payload, session);
+      setDb((prev) => {
+        const lista = Array.isArray(prev?.tarefas) ? prev.tarefas : [];
+        return {
+          ...prev,
+          tarefas: [
+            ...lista,
+            {
+              ...payload,
+              ...(persisted.data || {}),
+              id: persisted.data?.id ?? getNextId(lista),
+            },
+          ],
+        };
+      });
+      if (!persisted.persisted) {
+        showToast({ type: 'warning', message: 'Tarefa criada apenas localmente.' });
+      }
+    }
     showToast({ type: 'success', message: `Tarefa "${formData.titulo}" salva com sucesso!` });
     setOpenModal(false);
-  }, [editingTask, hasPermission, setDb, showToast]);
+  }, [editingTask, hasPermission, session, setDb, showToast]);
 
   const handleDelete = useCallback(async (task) => {
     if (!hasPermission('tarefas:excluir')) {
@@ -140,14 +159,18 @@ export default function TarefasPage({ db, setDb, onConfirmAction }) {
 
     if (!canDelete) return;
 
+    const persisted = await deleteOperationalRecord('tarefas', task.id, session);
     setDb((prev) => ({
       ...prev,
       tarefas: (prev?.tarefas || []).filter((item) => item.id !== task.id),
     }));
+    if (!persisted.persisted) {
+      showToast({ type: 'warning', message: 'Exclusão salva apenas localmente.' });
+    }
     showToast({ type: 'success', message: `Tarefa "${task.titulo}" excluída com sucesso.` });
-  }, [hasPermission, onConfirmAction, setDb, showToast]);
+  }, [hasPermission, onConfirmAction, session, setDb, showToast]);
 
-  const moveToNextStatus = useCallback((task) => {
+  const moveToNextStatus = useCallback(async (task) => {
     if (!hasPermission('tarefas:editar')) {
       showToast({ type: 'error', message: mensagemSemPermissao });
       return;
@@ -158,19 +181,24 @@ export default function TarefasPage({ db, setDb, onConfirmAction }) {
       return;
     }
 
+    const persisted = await updateOperationalRecord('tarefas', task.id, { status: next }, session);
     setDb((prev) => ({
       ...prev,
       tarefas: (prev?.tarefas || []).map((item) =>
         item.id === task.id
           ? {
               ...item,
-              status: next,
+              ...(persisted.data || {}),
+              status: persisted.data?.status || next,
             }
           : item
       ),
     }));
+    if (!persisted.persisted) {
+      showToast({ type: 'warning', message: 'Status salvo apenas localmente.' });
+    }
     showToast({ type: 'success', message: `Tarefa "${task.titulo}" movida para "${toLabel(next)}".` });
-  }, [hasPermission, setDb, showToast]);
+  }, [hasPermission, session, setDb, showToast]);
 
   return (
     <div className="tarefas-page">
@@ -296,10 +324,12 @@ function TaskForm({ open, initialData, onSave, onCancel, funcionariosMap, lotesM
   const [form, setForm] = useState(initialData || EMPTY_TASK);
   const [errors, setErrors] = useState({});
 
+  /* eslint-disable react-hooks/set-state-in-effect */
   useEffect(() => {
     setForm(initialData || EMPTY_TASK);
     setErrors({}); // Reset errors when initialData changes
   }, [initialData]);
+  /* eslint-enable react-hooks/set-state-in-effect */
 
   const validate = useCallback(() => {
     const newErrors = {};

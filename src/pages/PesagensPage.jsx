@@ -4,6 +4,12 @@ import { formatarNumero, formatarData } from '../utils/formatters';
 import { gerarNovoId } from '../utils/id';
 import { useToast } from '../hooks/useToast'; // Assuming useToast is available
 import { useAuth } from '../auth/useAuth';
+import {
+  createOperationalRecord,
+  deleteOperationalRecord,
+  persistCollectionMutation,
+  updateOperationalRecord,
+} from '../services/operationalPersistence';
 
 function toFiniteNumber(value, fallback = 0) {
   const normalized = Number(value);
@@ -69,7 +75,7 @@ function recalculateLoteFromPesagens(prevDb, loteId, nextPesagens) {
 }
 
 export default function PesagensPage({ db, setDb, onConfirmAction }) {
-  const { hasPermission } = useAuth();
+  const { hasPermission, session } = useAuth();
   const { showToast } = useToast(); // Initialize toast hook
   const mensagemSemPermissao = 'Você não tem permissão para executar esta ação.';
 
@@ -182,6 +188,9 @@ export default function PesagensPage({ db, setDb, onConfirmAction }) {
       : window.confirm('Deseja excluir esta pesagem?');
     if (!confirmado) return;
 
+    const pesagemAlvo = pesagens.find((item) => item.id === id) || null;
+    const persistedDelete = await deleteOperationalRecord('pesagens', id, session);
+
     setDb((prev) => {
       const pesagensAtuais = Array.isArray(prev?.pesagens) ? prev.pesagens : [];
       const pesagemRemovida = pesagensAtuais.find((p) => p.id === id);
@@ -196,36 +205,83 @@ export default function PesagensPage({ db, setDb, onConfirmAction }) {
 
       return recalculateLoteFromPesagens(prev, pesagemRemovida.lote_id, pesagensRestantes);
     });
+    if (pesagemAlvo?.lote_id) {
+      const novoLote = recalculateLoteFromPesagens(db, pesagemAlvo.lote_id, pesagens.filter((p) => p.id !== id))
+        ?.lotes?.find((item) => Number(item.id) === Number(pesagemAlvo.lote_id));
+      if (novoLote) {
+        const lotePersist = await updateOperationalRecord('lotes', novoLote.id, {
+          p_at: novoLote.p_at,
+          peso_atual: novoLote.peso_atual,
+          peso_medio_atual: novoLote.peso_medio_atual,
+          ultima_pesagem: novoLote.ultima_pesagem,
+        }, session);
+        if (!persistedDelete.persisted || !lotePersist.persisted) {
+          showToast({ type: 'warning', message: 'Exclusão salva parcialmente apenas no modo local.' });
+        }
+      }
+    }
     showToast({ type: 'success', message: 'Pesagem excluída com sucesso!' });
   }
 
-  function salvarPesagem(dados) {
+  async function salvarPesagem(dados) {
     if (!hasPermission('pesagens:editar')) {
       showToast({ type: 'error', message: mensagemSemPermissao });
       return;
     }
     if (pesagemEditando) {
+      const pesagemPersistida = await updateOperationalRecord('pesagens', pesagemEditando.id, dados, session);
       setDb((prev) => {
         const pesagensAtuais = Array.isArray(prev?.pesagens) ? prev.pesagens : [];
         const pesagensAtualizadas = pesagensAtuais.map((p) =>
-          p.id === pesagemEditando.id ? { ...p, ...dados } : p
+          p.id === pesagemEditando.id ? { ...p, ...(pesagemPersistida.data || dados) } : p
         );
         return recalculateLoteFromPesagens(prev, dados.lote_id, pesagensAtualizadas);
       });
+      const loteRecalculado = recalculateLoteFromPesagens(db, dados.lote_id, pesagens.map((p) => (
+        p.id === pesagemEditando.id ? { ...p, ...(pesagemPersistida.data || dados) } : p
+      )))?.lotes?.find((item) => Number(item.id) === Number(dados.lote_id));
+      if (loteRecalculado) {
+        const lotePersist = await updateOperationalRecord('lotes', loteRecalculado.id, {
+          p_at: loteRecalculado.p_at,
+          peso_atual: loteRecalculado.peso_atual,
+          peso_medio_atual: loteRecalculado.peso_medio_atual,
+          ultima_pesagem: loteRecalculado.ultima_pesagem,
+        }, session);
+        if (!pesagemPersistida.persisted || !lotePersist.persisted) {
+          showToast({ type: 'warning', message: 'Alteração salva parcialmente apenas no modo local.' });
+        }
+      }
       showToast({ type: 'success', message: 'Pesagem atualizada com sucesso!' });
     } else {
+      const pesagemPersistida = await createOperationalRecord('pesagens', dados, session);
       const novoId = gerarNovoId(pesagens);
+      const novaPesagem = pesagemPersistida.data || {
+        id: novoId,
+        ...dados,
+      };
+
       setDb((prev) => {
         const pesagensAtuais = Array.isArray(prev?.pesagens) ? prev.pesagens : [];
         const pesagensAtualizadas = [
           ...pesagensAtuais,
-          {
-            id: novoId,
-            ...dados,
-          },
+          novaPesagem,
         ];
         return recalculateLoteFromPesagens(prev, dados.lote_id, pesagensAtualizadas);
       });
+      const loteRecalculado = recalculateLoteFromPesagens(db, dados.lote_id, [...pesagens, novaPesagem])
+        ?.lotes?.find((item) => Number(item.id) === Number(dados.lote_id));
+      if (loteRecalculado) {
+        const persistLote = updateOperationalRecord('lotes', loteRecalculado.id, {
+          p_at: loteRecalculado.p_at,
+          peso_atual: loteRecalculado.peso_atual,
+          peso_medio_atual: loteRecalculado.peso_medio_atual,
+          ultima_pesagem: loteRecalculado.ultima_pesagem,
+        }, session);
+        const persistedBatch = await persistCollectionMutation([Promise.resolve(pesagemPersistida), persistLote]);
+        if (!persistedBatch.persisted) {
+          showToast({ type: 'warning', message: 'Cadastro salvo parcialmente apenas no modo local.' });
+        }
+      }
       showToast({ type: 'success', message: 'Pesagem registrada com sucesso!' });
     }
 

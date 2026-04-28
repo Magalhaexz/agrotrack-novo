@@ -15,6 +15,10 @@ import {
 } from '../domain/indicadores';
 import { useToast } from '../hooks/useToast'; // Importar useToast
 import { useAuth } from '../auth/useAuth';
+import {
+  createOperationalRecord,
+  updateOperationalRecord,
+} from '../services/operationalPersistence';
 import '../styles/rebanho.css';
 
 const tabs = ['visao', 'mov', 'pesagens', 'financeiro', 'sanitario', 'historico'];
@@ -27,7 +31,7 @@ export default function LotesPage({
   onRegistrarEntradaAnimal,
   onRegistrarSaidaAnimal,
 }) {
-  const { hasPermission } = useAuth();
+  const { hasPermission, session } = useAuth();
   const { showToast } = useToast(); // Usar o hook de toast
   const mensagemSemPermissao = 'Você não tem permissão para executar esta ação.';
 
@@ -207,7 +211,7 @@ export default function LotesPage({
         ))}
       </div>
 
-      {openLoteModal && <NovoLoteModal db={db} setDb={setDb} onClose={() => setOpenLoteModal(false)} showToast={showToast} hasPermission={hasPermission} />}
+      {openLoteModal && <NovoLoteModal db={db} setDb={setDb} onClose={() => setOpenLoteModal(false)} showToast={showToast} hasPermission={hasPermission} session={session} />}
       {openMovModal && (
         <MovimentacaoModal
           lote={openMovModal}
@@ -221,7 +225,7 @@ export default function LotesPage({
         />
       )}
       {openPesagemModal && <PesagemModal lote={openPesagemModal} db={db} setDb={setDb} onClose={() => setOpenPesagemModal(null)} showToast={showToast} hasPermission={hasPermission} />}
-      {openFechamentoModal && <FechamentoLoteModal lote={openFechamentoModal} setDb={setDb} onClose={() => setOpenFechamentoModal(null)} showToast={showToast} hasPermission={hasPermission} />}
+      {openFechamentoModal && <FechamentoLoteModal lote={openFechamentoModal} setDb={setDb} onClose={() => setOpenFechamentoModal(null)} showToast={showToast} hasPermission={hasPermission} session={session} />}
     </div>
   );
 }
@@ -655,7 +659,7 @@ function LoteDetailView({ lote, db, activeTab, setActiveTab, onBack, onOpenMov, 
  * @param {function} props.onClose - Callback para fechar o modal.
  * @param {function} props.showToast - Função para exibir toasts.
  */
-function FechamentoLoteModal({ lote, setDb, onClose, showToast, hasPermission }) {
+function FechamentoLoteModal({ lote, setDb, onClose, showToast, hasPermission, session }) {
   const [form, setForm] = useState({
     data_saida: getTodayIso(),
     status: 'encerrado',
@@ -663,7 +667,7 @@ function FechamentoLoteModal({ lote, setDb, onClose, showToast, hasPermission })
     motivo_saida: '',
   });
 
-  function submit() {
+  async function submit() {
     if (!hasPermission('lotes:editar')) {
       showToast({ type: 'error', message: 'Você não tem permissão para executar esta ação.' });
       return;
@@ -677,22 +681,30 @@ function FechamentoLoteModal({ lote, setDb, onClose, showToast, hasPermission })
       return;
     }
 
+    const patch = {
+      status: form.status,
+      data_saida: form.data_saida,
+      fechamento: {
+        mortalidade: Number(form.mortalidade),
+        motivo_saida: form.motivo_saida,
+      },
+    };
+    const persisted = await updateOperationalRecord('lotes', lote.id, patch, session);
+
     setDb((prev) => ({
       ...prev,
       lotes: prev.lotes.map((l) =>
         l.id === lote.id
           ? {
               ...l,
-              status: form.status,
-              data_saida: form.data_saida,
-              fechamento: {
-                mortalidade: Number(form.mortalidade),
-                motivo_saida: form.motivo_saida,
-              },
+              ...(persisted.data || patch),
             }
           : l
       ),
     }));
+    if (!persisted.persisted) {
+      showToast({ type: 'warning', message: 'Fechamento salvo apenas localmente.' });
+    }
     showToast({ type: 'success', message: `Lote ${lote.nome} encerrado com sucesso!` });
     onClose();
   }
@@ -1032,7 +1044,7 @@ function PesagemModal({ lote, db, setDb, onClose, showToast, hasPermission }) {
  * @param {function} props.onClose - Callback para fechar o modal.
  * @param {function} props.showToast - Função para exibir toasts.
  */
-function NovoLoteModal({ db, setDb, onClose, showToast, hasPermission }) {
+function NovoLoteModal({ db, setDb, onClose, showToast, hasPermission, session }) {
   const configGeral = db.configuracoes?.geral || {};
   const [form, setForm] = useState({
     nome: '',
@@ -1062,7 +1074,7 @@ function NovoLoteModal({ db, setDb, onClose, showToast, hasPermission }) {
     return !Object.keys(e).length;
   }
 
-  function submit() {
+  async function submit() {
     if (!hasPermission('lotes:editar')) {
       showToast({ type: 'error', message: 'Você não tem permissão para executar esta ação.' });
       return;
@@ -1074,39 +1086,64 @@ function NovoLoteModal({ db, setDb, onClose, showToast, hasPermission }) {
 
     const novoLoteId = gerarNovoId(db.lotes);
     const custoAquisicao = Number(form.custo_aquisicao || 0);
+    const lotePayload = {
+      nome: form.nome,
+      faz_id: Number(form.faz_id),
+      entrada: form.entrada,
+      saida: form.saida_meta,
+      investimento: custoAquisicao,
+      status: 'ativo',
+      tipo: 'engorda',
+      sistema: 'confinamento',
+      gmd_meta: configGeral.gmd_meta_padrao || 1,
+      preco_arroba: configGeral.preco_arroba_padrao || 290,
+      rendimento_carcaca: configGeral.rendimento_carcaca_padrao || 52,
+      peso_alvo: Number(form.peso_alvo || 0),
+      raca: form.raca,
+      sexo: form.sexo,
+      categoria: form.categoria,
+      obs: form.obs,
+      p_ini: Number(form.peso_inicial),
+      p_at: Number(form.peso_inicial),
+      ultima_pesagem: form.entrada,
+    };
+    const lotePersist = await createOperationalRecord('lotes', lotePayload, session);
+    const loteIdFinal = lotePersist.data?.id || novoLoteId;
+    const animalPersist = await createOperationalRecord('animais', {
+      lote_id: loteIdFinal,
+      sexo: form.sexo.toLowerCase(),
+      gen: form.raca || 'Misto',
+      qtd: Number(form.qtd_inicial),
+      p_ini: Number(form.peso_inicial),
+      p_at: Number(form.peso_inicial),
+      dias: 0,
+      consumo: 0,
+    }, session);
+    let custoPersist = { persisted: true, data: null };
+    if (custoAquisicao > 0) {
+      custoPersist = await createOperationalRecord('custos', {
+        lote_id: loteIdFinal,
+        cat: 'aquisição',
+        desc: `Custo de aquisição do lote ${form.nome}`,
+        data: form.entrada,
+        val: custoAquisicao,
+      }, session);
+    }
 
     setDb((prev) => ({
       ...prev,
       lotes: [
         ...(Array.isArray(prev?.lotes) ? prev.lotes : []),
-        {
-          id: novoLoteId,
-          nome: form.nome,
-          faz_id: Number(form.faz_id),
-          entrada: form.entrada,
-          saida: form.saida_meta,
-          investimento: custoAquisicao,
-          status: 'ativo',
-          tipo: 'engorda', // Default
-          sistema: 'confinamento', // Default
-          gmd_meta: configGeral.gmd_meta_padrao || 1, // From config
-          preco_arroba: configGeral.preco_arroba_padrao || 290, // From config
-          rendimento_carcaca: configGeral.rendimento_carcaca_padrao || 52, // From config
-          peso_alvo: Number(form.peso_alvo || 0),
-          raca: form.raca,
-          sexo: form.sexo,
-          categoria: form.categoria,
-          obs: form.obs,
-          p_ini: Number(form.peso_inicial), // Peso inicial do lote
-          p_at: Number(form.peso_inicial), // Peso atual do lote (inicialmente igual ao inicial)
-          ultima_pesagem: form.entrada, // Primeira pesagem é a entrada
+        lotePersist.data || {
+          id: loteIdFinal,
+          ...lotePayload,
         },
       ],
       animais: [
         ...(Array.isArray(prev?.animais) ? prev.animais : []),
-        {
+        animalPersist.data || {
           id: gerarNovoId(prev.animais || []),
-          lote_id: novoLoteId,
+          lote_id: loteIdFinal,
           sexo: form.sexo.toLowerCase(),
           gen: form.raca || 'Misto',
           qtd: Number(form.qtd_inicial),
@@ -1120,15 +1157,20 @@ function NovoLoteModal({ db, setDb, onClose, showToast, hasPermission }) {
       custos: custoAquisicao > 0 ? [
         ...(Array.isArray(prev?.custos) ? prev.custos : []),
         {
-          id: gerarNovoId(prev.custos || []),
-          lote_id: novoLoteId,
-          cat: 'aquisição',
-          desc: `Custo de aquisição do lote ${form.nome}`,
-          data: form.entrada,
-          val: custoAquisicao,
+          ...(custoPersist.data || {
+            id: gerarNovoId(prev.custos || []),
+            lote_id: loteIdFinal,
+            cat: 'aquisição',
+            desc: `Custo de aquisição do lote ${form.nome}`,
+            data: form.entrada,
+            val: custoAquisicao,
+          }),
         }
       ] : prev.custos,
     }));
+    if (!lotePersist.persisted || !animalPersist.persisted || !custoPersist.persisted) {
+      showToast({ type: 'warning', message: 'Lote salvo parcialmente apenas no modo local.' });
+    }
     showToast({ type: 'success', message: `Lote ${form.nome} criado com sucesso!` });
     onClose();
   }

@@ -4,6 +4,11 @@ import { formatarNumero, formatarData } from '../utils/formatters';
 import { gerarNovoId } from '../utils/id'; // Importa a função de gerar ID
 import { useAuth } from '../auth/useAuth';
 import { useToast } from '../hooks/useToast';
+import {
+  createOperationalRecord,
+  deleteOperationalRecord,
+  updateOperationalRecord,
+} from '../services/operationalPersistence';
 
 function toNumber(value) {
   const parsed = Number(value);
@@ -53,7 +58,7 @@ function upsertMovimentacaoFinanceiraDeCusto(movimentacoes, custo) {
  * @param {function} [props.onConfirmAction] - Função para exibir um modal de confirmação customizado.
  */
 export default function CustosPage({ db, setDb, onConfirmAction }) {
-  const { hasPermission } = useAuth();
+  const { hasPermission, session } = useAuth();
   const { showToast } = useToast();
   const [abrirForm, setAbrirForm] = useState(false);
   const [custoEditando, setCustoEditando] = useState(null);
@@ -142,6 +147,15 @@ export default function CustosPage({ db, setDb, onConfirmAction }) {
       : window.confirm('Deseja excluir este custo?');
     if (!confirmado) return;
 
+    const movFinanceira = (db?.movimentacoes_financeiras || []).find(
+      (mov) => mov?.origem === 'custo' && Number(mov?.origem_id) === Number(id)
+    );
+    const custoPersist = await deleteOperationalRecord('custos', id, session);
+    let movPersist = { persisted: true };
+    if (movFinanceira?.id) {
+      movPersist = await deleteOperationalRecord('movimentacoes_financeiras', movFinanceira.id, session);
+    }
+
     setDb((prev) => ({
       ...prev,
       custos: prev.custos.filter((c) => c.id !== id),
@@ -149,43 +163,81 @@ export default function CustosPage({ db, setDb, onConfirmAction }) {
         (mov) => !(mov?.origem === 'custo' && Number(mov?.origem_id) === Number(id))
       ),
     }));
+    if (!custoPersist.persisted || !movPersist.persisted) {
+      showToast({ type: 'warning', message: 'Exclusão aplicada apenas localmente.' });
+    }
   }
 
   /**
    * Salva um novo custo ou atualiza um existente.
    * @param {object} dados - Os dados do custo a serem salvos.
    */
-  function salvarCusto(dados) {
+  async function salvarCusto(dados) {
     if (!hasPermission('custos:editar')) {
       showToast({ type: 'error', message: mensagemSemPermissao });
       return;
     }
     if (custoEditando) {
+      const custoPersist = await updateOperationalRecord('custos', custoEditando.id, dados, session);
+      const custoFinal = { ...custoEditando, ...(custoPersist.data || dados) };
+      const ledgerPayload = upsertMovimentacaoFinanceiraDeCusto(
+        db?.movimentacoes_financeiras,
+        custoFinal
+      ).find((mov) => mov?.origem === 'custo' && Number(mov?.origem_id) === Number(custoFinal.id));
+      let ledgerPersist = { persisted: true, data: null };
+      if (ledgerPayload) {
+        const existente = (db?.movimentacoes_financeiras || []).find(
+          (mov) => mov?.origem === 'custo' && Number(mov?.origem_id) === Number(custoFinal.id)
+        );
+        ledgerPersist = existente?.id
+          ? await updateOperationalRecord('movimentacoes_financeiras', existente.id, ledgerPayload, session)
+          : await createOperationalRecord('movimentacoes_financeiras', ledgerPayload, session);
+      }
       setDb((prev) => ({
+        ...prev,
         custos: prev.custos.map((c) =>
-          c.id === custoEditando.id ? { ...c, ...dados } : c
+          c.id === custoEditando.id ? { ...c, ...(custoPersist.data || dados) } : c
         ),
-        movimentacoes_financeiras: upsertMovimentacaoFinanceiraDeCusto(
-          prev.movimentacoes_financeiras,
-          { ...custoEditando, ...dados }
-        ),
+        movimentacoes_financeiras: (() => {
+          const atualizadas = upsertMovimentacaoFinanceiraDeCusto(
+            prev.movimentacoes_financeiras,
+            custoFinal
+          );
+          if (!ledgerPersist?.data) return atualizadas;
+          const idx = atualizadas.findIndex((mov) => mov?.origem === 'custo' && Number(mov?.origem_id) === Number(custoFinal.id));
+          if (idx < 0) return [...atualizadas, ledgerPersist.data];
+          atualizadas[idx] = { ...atualizadas[idx], ...ledgerPersist.data };
+          return atualizadas;
+        })(),
       }));
+      if (!custoPersist.persisted || !ledgerPersist.persisted) {
+        showToast({ type: 'warning', message: 'Alteração salva apenas localmente.' });
+      }
     } else {
+      const custoPersist = await createOperationalRecord('custos', dados, session);
       setDb((prev) => {
         const novoCusto = {
-          id: gerarNovoId(prev.custos), // Usa a função gerarNovoId
-          ...dados,
+          id: custoPersist.data?.id || gerarNovoId(prev.custos), // Usa a função gerarNovoId
+          ...(custoPersist.data || dados),
         };
+        const movsUpsert = upsertMovimentacaoFinanceiraDeCusto(
+          prev.movimentacoes_financeiras,
+          novoCusto
+        );
+        const movDoCusto = movsUpsert.find((mov) => mov?.origem === 'custo' && Number(mov?.origem_id) === Number(novoCusto.id));
+        if (movDoCusto) {
+          void createOperationalRecord('movimentacoes_financeiras', movDoCusto, session);
+        }
 
         return {
           ...prev,
           custos: [...prev.custos, novoCusto],
-          movimentacoes_financeiras: upsertMovimentacaoFinanceiraDeCusto(
-            prev.movimentacoes_financeiras,
-            novoCusto
-          ),
+          movimentacoes_financeiras: movsUpsert,
         };
       });
+      if (!custoPersist.persisted) {
+        showToast({ type: 'warning', message: 'Cadastro salvo apenas localmente.' });
+      }
     }
 
     setAbrirForm(false);

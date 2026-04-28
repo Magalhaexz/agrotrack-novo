@@ -10,6 +10,7 @@ import { formatCurrency, formatDate, formatNumber } from '../utils/calculations'
 import { gerarNovoId } from '../utils/id';
 import { useAuth } from '../auth/useAuth';
 import { useToast } from '../hooks/useToast';
+import { createOperationalRecord } from '../services/operationalPersistence';
 
 const tabs = ['dre', 'lote', 'lanc'];
 const despCats = ['Compra Animal', 'Racao', 'Suplemento', 'Medicamento', 'Vacina', 'Frete', 'Funcionario', 'Arrendamento', 'Manutencao', 'Outro'];
@@ -17,7 +18,7 @@ const recCats = ['Venda Animal', 'Venda Produto', 'Outro'];
 const getTodayIso = () => new Date().toISOString().slice(0, 10);
 
 export default function FinanceiroPage({ db, setDb }) {
-  const { hasPermission } = useAuth();
+  const { hasPermission, session } = useAuth();
   const { showToast } = useToast();
   const [tab, setTab] = useState('dre');
   const [detailLoteId, setDetailLoteId] = useState(null);
@@ -385,12 +386,12 @@ export default function FinanceiroPage({ db, setDb }) {
         </>
       ) : null}
 
-      {openLanc ? <NovoLancamentoModal db={db} setDb={setDb} onClose={() => setOpenLanc(false)} hasPermission={hasPermission} showToast={showToast} /> : null}
+      {openLanc ? <NovoLancamentoModal db={db} setDb={setDb} onClose={() => setOpenLanc(false)} hasPermission={hasPermission} showToast={showToast} session={session} /> : null}
     </div>
   );
 }
 
-function NovoLancamentoModal({ db, setDb, onClose, hasPermission, showToast }) {
+function NovoLancamentoModal({ db, setDb, onClose, hasPermission, showToast, session }) {
   const [form, setForm] = useState({
     tipo: 'despesa',
     categoria: despCats[0],
@@ -406,7 +407,7 @@ function NovoLancamentoModal({ db, setDb, onClose, hasPermission, showToast }) {
 
   const categorias = form.tipo === 'despesa' ? despCats : recCats;
 
-  function submit() {
+  async function submit() {
     if (!hasPermission('financeiro:editar')) {
       showToast({ type: 'error', message: 'Você não tem permissão para executar esta ação.' });
       return;
@@ -437,10 +438,20 @@ function NovoLancamentoModal({ db, setDb, onClose, hasPermission, showToast }) {
       };
     });
 
+    const persistedRows = await Promise.all(
+      novos.map((item) => createOperationalRecord('movimentacoes_financeiras', item, session))
+    );
+
     setDb((prev) => ({
       ...prev,
-      movimentacoes_financeiras: [...(prev.movimentacoes_financeiras || []), ...novos],
+      movimentacoes_financeiras: [
+        ...(prev.movimentacoes_financeiras || []),
+        ...persistedRows.map((item, index) => item.data || novos[index]),
+      ],
     }));
+    if (persistedRows.some((item) => !item.persisted)) {
+      showToast({ type: 'warning', message: 'Lançamento salvo apenas localmente para algumas parcelas.' });
+    }
 
     onClose();
   }

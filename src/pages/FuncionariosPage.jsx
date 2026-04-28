@@ -4,7 +4,13 @@ import PageHeader from '../components/PageHeader';
 import FuncionarioModal from '../components/funcionarios/FuncionarioModal';
 import FuncionarioRow from '../components/funcionarios/FuncionarioRow';
 import { gerarNovoId } from '../utils/id';
-// import { useToast } from '../hooks/useToast'; // Se usar useToast
+import { useToast } from '../hooks/useToast';
+import { useAuth } from '../auth/useAuth';
+import {
+  createOperationalRecord,
+  deleteOperationalRecord,
+  updateOperationalRecord,
+} from '../services/operationalPersistence';
 
 /**
  * Página de Funcionários, para gestão de colaboradores.
@@ -15,7 +21,8 @@ import { gerarNovoId } from '../utils/id';
  * @param {function} [props.onConfirmAction] - Callback opcional para ações de confirmação.
  */
 export default function FuncionariosPage({ db, setDb, onConfirmAction }) {
-  // const { showToast } = useToast(); // Se usar useToast
+  const { showToast } = useToast();
+  const { session } = useAuth();
 
   const [openModal, setOpenModal] = useState(false);
   const [editando, setEditando] = useState(null);
@@ -55,27 +62,36 @@ export default function FuncionariosPage({ db, setDb, onConfirmAction }) {
    * Salva um novo funcionário ou atualiza um existente.
    * @param {object} payload - Os dados do funcionário a serem salvos.
    */
-  function salvarFuncionario(payload) {
+  async function salvarFuncionario(payload) {
     if (editando) {
+      const persisted = await updateOperationalRecord('funcionarios', editando.id, payload, session);
       setDb((prev) => ({
         ...prev,
         funcionarios: prev.funcionarios.map((f) =>
-          f.id === editando.id ? { ...f, ...payload } : f
+          f.id === editando.id ? { ...f, ...(persisted.data || payload) } : f
         ),
       }));
-      // showToast({ type: 'success', message: 'Funcionário atualizado com sucesso!' });
+      if (!persisted.persisted) {
+        showToast({ type: 'warning', message: 'Funcionário atualizado apenas localmente.' });
+      }
+      showToast({ type: 'success', message: 'Funcionário atualizado com sucesso!' });
     } else {
+      const persisted = await createOperationalRecord('funcionarios', payload, session);
       setDb((prev) => ({
         ...prev,
         funcionarios: [
           ...prev.funcionarios,
           {
-            id: gerarNovoId(prev.funcionarios),
             ...payload,
+            ...(persisted.data || {}),
+            id: persisted.data?.id ?? gerarNovoId(prev.funcionarios),
           },
         ],
       }));
-      // showToast({ type: 'success', message: 'Funcionário adicionado com sucesso!' });
+      if (!persisted.persisted) {
+        showToast({ type: 'warning', message: 'Funcionário criado apenas localmente.' });
+      }
+      showToast({ type: 'success', message: 'Funcionário adicionado com sucesso!' });
     }
     setOpenModal(false);
     setEditando(null);
@@ -99,11 +115,15 @@ export default function FuncionariosPage({ db, setDb, onConfirmAction }) {
 
     if (!confirmado) return;
 
+    const persisted = await deleteOperationalRecord('funcionarios', id, session);
     setDb((prev) => ({
       ...prev,
       funcionarios: prev.funcionarios.filter((f) => f.id !== id),
     }));
-    // showToast({ type: 'success', message: 'Funcionário excluído com sucesso!' });
+    if (!persisted.persisted) {
+      showToast({ type: 'warning', message: 'Exclusão salva apenas localmente.' });
+    }
+    showToast({ type: 'success', message: 'Funcionário excluído com sucesso!' });
   }
 
   return (

@@ -49,10 +49,12 @@ export default function SuplementacaoForm({ lotes = [], estoque = [], onSave, on
     );
   }, [estoque]);
 
+  /* eslint-disable react-hooks/set-state-in-effect */
   useEffect(() => {
     setForm(normalizarInitialData(initialData));
     setErro('');
   }, [initialData]);
+  /* eslint-enable react-hooks/set-state-in-effect */
 
   function handleChange(e) {
     const { name, value } = e.target;

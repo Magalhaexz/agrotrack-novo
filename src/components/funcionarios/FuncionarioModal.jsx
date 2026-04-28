@@ -82,12 +82,14 @@ export default function FuncionarioModal({ open, initialData, fazendas = [], onS
   const [form, setForm] = useState(() => normalizarInitialData(initialData, fazendas));
   const [erro, setErro] = useState('');
 
+  /* eslint-disable react-hooks/set-state-in-effect */
   useEffect(() => {
     if (open) {
       setForm(normalizarInitialData(initialData, fazendas));
       setErro('');
     }
-  }, [open, initialData]);
+  }, [open, initialData, fazendas]);
+  /* eslint-enable react-hooks/set-state-in-effect */
 
   const titulo = initialData ? 'Editar Funcionário' : 'Cadastrar Funcionário';
 
