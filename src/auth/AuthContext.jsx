@@ -11,6 +11,12 @@ import { obterPerfilDoUsuario, usuarioTemPermissao } from './perfis';
 
 const AuthContext = createContext(null);
 
+function getErrorMessage(error) {
+  if (!error) return '';
+  if (typeof error === 'string') return error;
+  return error.message || error.details || error.hint || error.name || String(error);
+}
+
 export function AuthProvider({ children }) {
   const [session, setSession] = useState(null);
   const [profile, setProfile] = useState(null);
@@ -206,7 +212,18 @@ export function AuthProvider({ children }) {
       if (document.visibilityState === 'hidden') return;
 
       const { data, error } = await supabase.auth.getSession();
-      if (error || !data?.session) {
+      if (error) {
+        if (import.meta.env.DEV) {
+          console.warn('[HERDON_AUTH_BOOT]', {
+            stage: 'session_recheck_error',
+            hasSession: Boolean(data?.session),
+            errorType: getErrorMessage(error) || 'session_recheck_error',
+          });
+        }
+        return;
+      }
+
+      if (!data?.session) {
         registrarLogoutLocal();
       }
     }

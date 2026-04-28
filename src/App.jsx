@@ -100,7 +100,9 @@ export default function App() {
     dataReady,
     dataSource,
     dataError,
-  } = useOperationalData(initialDb, session);
+  } = useOperationalData(initialDb, session, {
+    enabled: Boolean(session?.user?.id) && !loadingAuth,
+  });
   const [usuarioLogado, setUsuarioLogado] = useState(null);
   const [menuExtraAberto, setMenuExtraAberto] = useState(false);
   const [tabAtiva, setTabAtiva] = useState('geral');

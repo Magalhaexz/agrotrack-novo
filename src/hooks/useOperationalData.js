@@ -24,7 +24,9 @@ const OWNER_SCOPED_TABLES = new Set(OPERACIONAL_TABLES);
 const HYDRATION_CONCURRENCY_LIMIT = 3;
 const HYDRATION_MAX_ATTEMPTS = 3;
 const HYDRATION_BACKOFF_MS = 250;
+const HYDRATION_FAILURE_COOLDOWN_MS = 6000;
 const inFlightSnapshots = new Map();
+const failedHydrationAt = new Map();
 
 function nowMs() {
   return typeof performance !== 'undefined' ? performance.now() : Date.now();
@@ -209,6 +211,18 @@ async function loadOperationalSnapshot(session) {
     return {};
   }
 
+  const lastFailureAt = failedHydrationAt.get(userId) || 0;
+  if (Date.now() - lastFailureAt < HYDRATION_FAILURE_COOLDOWN_MS) {
+    if (import.meta.env.DEV) {
+      console.debug('[HERDON_DATA_BOOT]', {
+        stage: 'snapshot_skip_recent_failure',
+        userId,
+        finalDataSource: 'fallback_recent_failure',
+      });
+    }
+    return {};
+  }
+
   const inFlight = inFlightSnapshots.get(userId);
   if (inFlight) {
     if (import.meta.env.DEV) {
@@ -220,16 +234,26 @@ async function loadOperationalSnapshot(session) {
     return inFlight;
   }
 
-  const request = loadOperationalSnapshotRequest(session).finally(() => {
-    if (inFlightSnapshots.get(userId) === request) {
-      inFlightSnapshots.delete(userId);
-    }
-  });
+  const request = loadOperationalSnapshotRequest(session)
+    .then((snapshot) => {
+      failedHydrationAt.delete(userId);
+      return snapshot;
+    })
+    .catch((error) => {
+      failedHydrationAt.set(userId, Date.now());
+      throw error;
+    })
+    .finally(() => {
+      if (inFlightSnapshots.get(userId) === request) {
+        inFlightSnapshots.delete(userId);
+      }
+    });
   inFlightSnapshots.set(userId, request);
   return request;
 }
 
-export function useOperationalData(initialDb, session) {
+export function useOperationalData(initialDb, session, options = {}) {
+  const hydrationEnabled = options?.enabled !== false;
   const [db, setDbState] = useState(() => createOperationalFallbackDb(initialDb));
   const [dataReady, setDataReady] = useState(true);
   const [dataSource, setDataSource] = useState('signed_out');
@@ -253,12 +277,21 @@ export function useOperationalData(initialDb, session) {
 
     async function hydrate() {
       const hydrateStart = nowMs();
-      if (!session) {
+      const hasValidSession = Boolean(session?.user?.id);
+      if (!hydrationEnabled || !hasValidSession) {
         if (isCurrentHydration()) {
           setDbState(createOperationalFallbackDb(initialDb));
           setDataSource('signed_out');
           setDataError(null);
           setDataReady(true);
+          if (import.meta.env.DEV) {
+            console.debug('[HERDON_DATA_BOOT]', {
+              stage: 'skip_signed_out',
+              hasSession: hasValidSession,
+              hydrationEnabled,
+              signedOutSkipped: true,
+            });
+          }
         }
         return;
       }
@@ -401,7 +434,7 @@ export function useOperationalData(initialDb, session) {
         hydratingRef.current = false;
       }
     };
-  }, [initialDb, session]);
+  }, [hydrationEnabled, initialDb, session]);
 
   return {
     db,

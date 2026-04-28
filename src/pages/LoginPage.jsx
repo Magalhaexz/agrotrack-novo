@@ -4,6 +4,9 @@ import logoAgrotrack from '../assets/logo_app1.png';
 import { supabase } from '../lib/supabase';
 import '../styles/login.css';
 
+const LOGIN_MAX_RETRIES = 2;
+const LOGIN_RETRY_BASE_DELAY_MS = 300;
+
 function calcularForcaSenha(senha) {
   let pontos = 0;
   if (senha.length >= 8) pontos += 1;
@@ -14,6 +17,32 @@ function calcularForcaSenha(senha) {
   if (pontos <= 1) return { label: 'Fraca', color: 'var(--color-danger)' };
   if (pontos <= 3) return { label: 'Media', color: 'var(--color-warning)' };
   return { label: 'Forte', color: 'var(--color-success)' };
+}
+
+function wait(ms) {
+  return new Promise((resolve) => {
+    globalThis.setTimeout(resolve, ms);
+  });
+}
+
+function getErrorMessage(error) {
+  if (!error) return '';
+  if (typeof error === 'string') return error;
+  return error.message || error.details || error.hint || error.name || String(error);
+}
+
+function isTransientLoginError(error) {
+  const message = getErrorMessage(error).toLowerCase();
+  return [
+    'failed to fetch',
+    'err_http2_protocol_error',
+    'err_connection_reset',
+    'err_connection_closed',
+    'timeout',
+    'networkerror',
+    'network error',
+    'fetch failed',
+  ].some((signature) => message.includes(signature));
 }
 
 export default function LoginPage() {
@@ -87,12 +116,52 @@ export default function LoginPage() {
         return;
       }
 
-      const { data, error } = await supabase.auth.signInWithPassword({
-        email: email.trim(),
-        password: senha,
-      });
+      let data = null;
+      let error = null;
+      for (let attempt = 1; attempt <= LOGIN_MAX_RETRIES + 1; attempt += 1) {
+        const response = await supabase.auth.signInWithPassword({
+          email: email.trim(),
+          password: senha,
+        });
+        data = response?.data ?? null;
+        error = response?.error ?? null;
 
-      if (error) throw error;
+        if (!error) {
+          if (import.meta.env.DEV) {
+            console.debug('[HERDON_LOGIN_BOOT]', {
+              attempt,
+              success: true,
+              retry: attempt > 1,
+              hasSession: Boolean(data?.session),
+            });
+          }
+          break;
+        }
+
+        const transient = isTransientLoginError(error);
+        const canRetry = transient && attempt <= LOGIN_MAX_RETRIES;
+        if (import.meta.env.DEV) {
+          console.warn('[HERDON_LOGIN_BOOT]', {
+            attempt,
+            success: false,
+            retry: canRetry,
+            transient,
+            errorType: getErrorMessage(error) || 'login_error',
+          });
+        }
+        if (!canRetry) {
+          break;
+        }
+        await wait(LOGIN_RETRY_BASE_DELAY_MS * attempt);
+      }
+
+      if (error) {
+        if (isTransientLoginError(error)) {
+          setErro('Não foi possível conectar ao servidor. Verifique sua internet e tente novamente.');
+          return;
+        }
+        throw error;
+      }
 
       if (!data?.session) {
         setErro(
@@ -311,6 +380,7 @@ export default function LoginPage() {
                       id="email"
                       className="login-input"
                       type="email"
+                      autoComplete="email"
                       placeholder="voce@email.com"
                       value={email}
                       onChange={(e) => setEmail(e.target.value)}
@@ -326,6 +396,7 @@ export default function LoginPage() {
                         id="senha"
                         className="login-input"
                         type={mostrarSenha ? 'text' : 'password'}
+                        autoComplete="current-password"
                         placeholder="Sua senha"
                         value={senha}
                         onChange={(e) => setSenha(e.target.value)}
@@ -403,6 +474,7 @@ export default function LoginPage() {
                         id="email-recuperacao"
                         className="login-input"
                         type="email"
+                        autoComplete="email"
                         placeholder="voce@email.com"
                         value={email}
                         onChange={(e) => setEmail(e.target.value)}
