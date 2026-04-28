@@ -9,7 +9,7 @@ export function AuthProvider({ children }) {
   const [session, setSession] = useState(null);
   const [profile, setProfile] = useState(null);
   const [profileError, setProfileError] = useState(null);
-  const [profileReady, setProfileReady] = useState(false);
+  const [profileReady, setProfileReady] = useState(true);
   const [loadingAuth, setLoadingAuth] = useState(true);
   const [authError, setAuthError] = useState(null);
 
@@ -17,6 +17,7 @@ export function AuthProvider({ children }) {
     let ativo = true;
 
     async function carregarProfile(userAtual) {
+      const profileStart = typeof performance !== 'undefined' ? performance.now() : Date.now();
       if (!userAtual?.id) {
         if (ativo) {
           setProfile(null);
@@ -31,7 +32,13 @@ export function AuthProvider({ children }) {
       }
 
       try {
-        const { data, error } = await fetchUserProfile(userAtual.id);
+        const timeoutPromise = new Promise((_, reject) => {
+          window.setTimeout(() => reject(new Error('Timeout ao carregar perfil do usuário.')), 6000);
+        });
+        const { data, error } = await Promise.race([
+          fetchUserProfile(userAtual.id),
+          timeoutPromise,
+        ]);
 
         if (error) {
           if (!isAccessModuleUnavailable(error)) {
@@ -51,6 +58,13 @@ export function AuthProvider({ children }) {
           setProfileError(null);
           setProfileReady(true);
         }
+        if (import.meta.env.DEV) {
+          const profileEnd = typeof performance !== 'undefined' ? performance.now() : Date.now();
+          console.debug('[HERDON_AUTH_TIMING]', {
+            stage: 'profile_success',
+            durationMs: Number((profileEnd - profileStart).toFixed(1)),
+          });
+        }
       } catch (err) {
         console.error('Erro inesperado ao carregar profile:', err);
 
@@ -59,29 +73,74 @@ export function AuthProvider({ children }) {
           setProfileError(err);
           setProfileReady(true);
         }
+      } finally {
+        if (import.meta.env.DEV) {
+          const profileEnd = typeof performance !== 'undefined' ? performance.now() : Date.now();
+          console.debug('[HERDON_AUTH_TIMING]', {
+            stage: 'profile_finally',
+            durationMs: Number((profileEnd - profileStart).toFixed(1)),
+            hasUser: Boolean(userAtual?.id),
+          });
+        }
       }
     }
 
     async function carregarSessao() {
+      const bootstrapStart = typeof performance !== 'undefined' ? performance.now() : Date.now();
+      let hasSession = false;
       try {
-        const { data, error } = await supabase.auth.getSession();
+        const getSessionStart = typeof performance !== 'undefined' ? performance.now() : Date.now();
+        const sessionResult = await Promise.race([
+          supabase.auth.getSession(),
+          new Promise((_, reject) => {
+            window.setTimeout(() => reject(new Error('Timeout ao obter sessão de autenticação.')), 4500);
+          }),
+        ]);
+        const getSessionEnd = typeof performance !== 'undefined' ? performance.now() : Date.now();
+        const { data, error } = sessionResult;
 
         if (error) {
           console.error('Erro ao obter sessão:', error);
           if (ativo) {
             setAuthError(error);
             setSession(null);
+            setProfile(null);
+            setProfileError(null);
+            setProfileReady(true);
             setLoadingAuth(false);
+          }
+          if (import.meta.env.DEV) {
+            console.debug('[HERDON_AUTH_TIMING]', {
+              stage: 'getSession',
+              durationMs: Number((getSessionEnd - getSessionStart).toFixed(1)),
+              hasSession: false,
+              hasError: true,
+            });
           }
           return;
         }
 
-        if (ativo) {
-          const sessaoAtual = data?.session ?? null;
-          setSession(sessaoAtual);
-          setAuthError(null);
-          await carregarProfile(sessaoAtual?.user ?? null);
-          setLoadingAuth(false);
+        if (!ativo) return;
+        const sessaoAtual = data?.session ?? null;
+        hasSession = Boolean(sessaoAtual?.user);
+        setSession(sessaoAtual);
+        setAuthError(null);
+        setLoadingAuth(false);
+        if (import.meta.env.DEV) {
+          console.debug('[HERDON_AUTH_TIMING]', {
+            stage: 'getSession',
+            durationMs: Number((getSessionEnd - getSessionStart).toFixed(1)),
+            hasSession,
+            hasError: false,
+          });
+        }
+
+        if (sessaoAtual?.user) {
+          void carregarProfile(sessaoAtual.user);
+        } else {
+          setProfile(null);
+          setProfileError(null);
+          setProfileReady(true);
         }
       } catch (err) {
         console.error('Erro inesperado ao obter sessão:', err);
@@ -89,7 +148,18 @@ export function AuthProvider({ children }) {
         if (ativo) {
           setSession(null);
           setAuthError(err);
+          setProfile(null);
+          setProfileReady(true);
           setLoadingAuth(false);
+        }
+      } finally {
+        if (import.meta.env.DEV) {
+          const bootstrapEnd = typeof performance !== 'undefined' ? performance.now() : Date.now();
+          console.debug('[HERDON_AUTH_TIMING]', {
+            stage: 'bootstrap_total',
+            durationMs: Number((bootstrapEnd - bootstrapStart).toFixed(1)),
+            hasSession,
+          });
         }
       }
     }
@@ -98,11 +168,27 @@ export function AuthProvider({ children }) {
 
     const {
       data: { subscription },
-    } = supabase.auth.onAuthStateChange(async (_event, sessionAtual) => {
-      setSession(sessionAtual ?? null);
-      setAuthError(null);
-      await carregarProfile(sessionAtual?.user ?? null);
-      setLoadingAuth(false);
+    } = supabase.auth.onAuthStateChange((_event, sessionAtual) => {
+      try {
+        setSession(sessionAtual ?? null);
+        setAuthError(null);
+        setLoadingAuth(false);
+        if (sessionAtual?.user) {
+          void carregarProfile(sessionAtual.user);
+        } else {
+          setProfile(null);
+          setProfileError(null);
+          setProfileReady(true);
+        }
+      } catch (error) {
+        console.error('Erro no listener de autenticação:', error);
+        if (ativo) {
+          setSession(null);
+          setProfile(null);
+          setProfileReady(true);
+          setLoadingAuth(false);
+        }
+      }
     });
 
     return () => {
@@ -144,7 +230,7 @@ export function AuthProvider({ children }) {
       user,
       profile,
       perfil,
-      loadingAuth: loadingAuth || !profileReady,
+      loadingAuth,
       authError,
       profileError,
       profileReady,

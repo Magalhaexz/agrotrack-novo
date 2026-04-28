@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState, useCallback } from 'react';
 import { AlertTriangle, ChevronRight, MoreHorizontal, Plus, Scale, Truck } from 'lucide-react';
-import { Line, LineChart, Pie, PieChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
+import { CartesianGrid, Line, LineChart, Pie, PieChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
 import Card from '../components/ui/Card';
 import Button from '../components/ui/Button';
 import Badge from '../components/ui/Badge';
@@ -8,6 +8,7 @@ import Modal from '../components/ui/Modal';
 import Input from '../components/ui/Input';
 import { calcLote, formatCurrency, formatDate, formatNumber } from '../utils/calculations';
 import { gerarNovoId } from '../utils/id';
+import { getResumoLote } from '../domain/resumoLote';
 import {
   calcularDesvioPorcentual,
   calcularGMDMeta,
@@ -45,12 +46,6 @@ export default function LotesPage({
     return map;
   }, [db.pesagens]);
 
-  const lotesMap = useMemo(() => {
-    const map = new Map();
-    (db.lotes || []).forEach(l => map.set(l.id, l));
-    return map;
-  }, [db.lotes]);
-
   // Pré-calcular calcLote para todos os lotes
   const allLoteIndicators = useMemo(() => {
     const indicatorsMap = new Map();
@@ -60,8 +55,17 @@ export default function LotesPage({
     return indicatorsMap;
   }, [db]);
 
+  const allLoteResumo = useMemo(() => {
+    const resumoMap = new Map();
+    (db.lotes || []).forEach((lote) => {
+      resumoMap.set(lote.id, getResumoLote(db, lote.id));
+    });
+    return resumoMap;
+  }, [db]);
+
   const lotesEnriquecidos = useMemo(() => (db.lotes || []).map((lote) => {
     const indicators = allLoteIndicators.get(lote.id) || {};
+    const resumo = allLoteResumo.get(lote.id) || {};
     const lotePesagens = pesagensByLoteId.get(lote.id) || [];
     const latestPesagem = [...lotePesagens].sort((a, b) => new Date(b.data) - new Date(a.data))[0];
     const gmd30 = calcGmd30(lotePesagens, lote.id);
@@ -72,8 +76,8 @@ export default function LotesPage({
     const diasSemPesar = ultimaPesagem
       ? Math.floor((new Date() - new Date(ultimaPesagem)) / 86400000)
       : 999;
-    return { ...lote, indicators, heads: indicators.totalAnimais, pesoAtual, ultimaPesagem, diasSemPesar, arrobaViva: pesoAtual / 15, gmd30, progressoPeso };
-  }), [db.lotes, allLoteIndicators, pesagensByLoteId]);
+    return { ...lote, indicators, resumo, heads: indicators.totalAnimais, pesoAtual, ultimaPesagem, diasSemPesar, arrobaViva: pesoAtual / 15, gmd30, progressoPeso };
+  }), [db.lotes, allLoteIndicators, allLoteResumo, pesagensByLoteId]);
 
   const lotesFiltrados = useMemo(() => lotesEnriquecidos.filter((lote) => {
     if (filters.status !== 'todos' && lote.status !== filters.status) return false;
@@ -150,12 +154,12 @@ export default function LotesPage({
               <p className="lote-metric-ultima-pesagem">{lote.ultimaPesagem ? `Última pesagem: ${formatDate(lote.ultimaPesagem)}` : 'Sem pesagens registradas'}</p>
               <p>GMD 30d: {formatNumber(lote.gmd30, 3)} kg/dia</p>
               <p>Dias em trato: {daysFrom(lote.entrada)}</p>
-              <p>Custo/cab/dia: {formatCurrency(lote.indicators.custoTotalLote / Math.max(lote.indicators.totalAnimais,1) / Math.max(daysFrom(lote.entrada),1))}</p>
+              <p>Custo/cab/dia: {formatCurrency((lote.resumo.custoTotal || 0) / Math.max(lote.resumo.totalAnimais || 0,1) / Math.max(daysFrom(lote.entrada),1))}</p>
             </div>
             <div className="progress-line">
               <span style={{ width: `${Math.max(5, Math.min(lote.progressoPeso, 100))}%` }} />
             </div>
-            <p className={lote.indicators.margem >= 0 ? 'text-success' : 'text-danger'}>Resultado parcial: {formatCurrency(lote.indicators.margem)}</p>
+            <p className={lote.resumo.lucroTotal >= 0 ? 'text-success' : 'text-danger'}>Resultado parcial: {formatCurrency(lote.resumo.lucroTotal || 0)}</p>
             <div className="lote-actions">
               <Button size="sm" variant="outline" icon={<ChevronRight size={14} />} onClick={() => { setActiveTab('visao'); setActiveLoteId(lote.id); }}>Ver Detalhes</Button>
               <Button size="sm" variant="ghost" icon={<Truck size={14} />} onClick={() => abrirMovimentacao(lote)}>Registrar Movimentação</Button>
@@ -176,11 +180,10 @@ export default function LotesPage({
           onRegistrarEntradaAnimal={onRegistrarEntradaAnimal}
           onRegistrarSaidaAnimal={onRegistrarSaidaAnimal}
           showToast={showToast}
-          lotesMap={lotesMap}
         />
       )}
       {openPesagemModal && <PesagemModal lote={openPesagemModal} db={db} setDb={setDb} onClose={() => setOpenPesagemModal(null)} showToast={showToast} />}
-      {openFechamentoModal && <FechamentoLoteModal lote={openFechamentoModal} db={db} setDb={setDb} onClose={() => setOpenFechamentoModal(null)} showToast={showToast} />}
+      {openFechamentoModal && <FechamentoLoteModal lote={openFechamentoModal} setDb={setDb} onClose={() => setOpenFechamentoModal(null)} showToast={showToast} />}
     </div>
   );
 }
@@ -189,7 +192,6 @@ export default function LotesPage({
  * Componente para exibir a visão detalhada de um lote.
  * @param {object} props - As propriedades do componente.
  * @param {object} props.lote - O objeto do lote ativo.
- * @param {object} props.db - O objeto do banco de dados.
  * @param {function} props.setDb - Função para atualizar o banco de dados.
  * @param {string} props.activeTab - A aba ativa.
  * @param {function} props.setActiveTab - Função para definir a aba ativa.
@@ -201,6 +203,7 @@ export default function LotesPage({
  * @param {Map<number, object>} props.allLoteIndicators - Mapa de indicadores pré-calculados para todos os lotes.
  */
 function LoteDetailView({ lote, db, activeTab, setActiveTab, onBack, onOpenMov, onOpenPesagem, onOpenFechamento, pesagensByLoteId }) {
+  const resumoLote = useMemo(() => getResumoLote(db, lote.id), [db, lote.id]);
   const lotePesagens = useMemo(() => (pesagensByLoteId.get(lote.id) || []).slice().sort((a, b) => new Date(a.data) - new Date(b.data)), [lote.id, pesagensByLoteId]);
   const movimentacoes = useMemo(() => (db.movimentacoes_animais || []).filter((m) => Number(m.loteId || m.lote_id) === lote.id).sort((a, b) => new Date(b.data) - new Date(a.data)), [lote.id, db.movimentacoes_animais]);
   const custos = useMemo(() => (db.custos || []).filter((c) => c.lote_id === lote.id).sort((a, b) => new Date(b.data) - new Date(a.data)), [lote.id, db.custos]);
@@ -223,8 +226,8 @@ function LoteDetailView({ lote, db, activeTab, setActiveTab, onBack, onOpenMov, 
   const indicadoresPainel = useMemo(() => [
     { nome: 'GMD', realizado: lote.indicators.gmdMedio, meta: lote.gmd_meta || metaGmd, unit: 'kg/dia' },
     { nome: '@ produzida', realizado: lote.indicators.arrobasProduzidas, meta: (lote.peso_alvo ? ((lote.peso_alvo - lote.indicators.pesoInicialMedio) * Math.max(lote.indicators.totalAnimais,1))/15 : lote.indicators.arrobasProduzidas), unit: '@' },
-    { nome: 'Margem', realizado: lote.indicators.margemPct, meta: 15, unit: '%' },
-  ], [lote.indicators.gmdMedio, lote.gmd_meta, metaGmd, lote.indicators.arrobasProduzidas, lote.peso_alvo, lote.indicators.pesoInicialMedio, lote.indicators.totalAnimais, lote.indicators.margemPct]);
+    { nome: 'Margem', realizado: resumoLote.margemPct, meta: 15, unit: '%' },
+  ], [lote.indicators.gmdMedio, lote.gmd_meta, metaGmd, lote.indicators.arrobasProduzidas, lote.peso_alvo, lote.indicators.pesoInicialMedio, lote.indicators.totalAnimais, resumoLote.margemPct]);
 
   const chartData = useMemo(() => lotePesagens.map((p) => ({
     data: formatDate(p.data),
@@ -324,6 +327,50 @@ function LoteDetailView({ lote, db, activeTab, setActiveTab, onBack, onOpenMov, 
 
       {activeTab === 'visao' && (
         <>
+          <Card title="Resumo executivo do lote">
+            <div className="dashboard-grid dashboard-grid--kpi-secondary">
+              <Card title="Receita total">{formatCurrency(resumoLote.receitaTotal)}</Card>
+              <Card title="Custo total">{formatCurrency(resumoLote.custoTotal)}</Card>
+              <Card title="Lucro total">{formatCurrency(resumoLote.lucroTotal)}</Card>
+              <Card title="Margem %">{formatNumber(resumoLote.margemPct, 2)}%</Card>
+              <Card title="Lucro por cabeça">{formatCurrency(resumoLote.lucroPorCabeca)}</Card>
+              <Card title="Lucro por arroba">{formatCurrency(resumoLote.lucroPorArroba)}</Card>
+              <Card title="GMD médio">{formatNumber(resumoLote.gmdMedio, 3)} kg/dia</Card>
+              <Card title="Arrobas produzidas">{formatNumber(resumoLote.arrobasProduzidas, 2)} @</Card>
+              <Card title="Classificação">
+                <Badge
+                  variant={
+                    resumoLote.classificacao === 'lucro'
+                      ? 'success'
+                      : resumoLote.classificacao === 'prejuizo'
+                        ? 'danger'
+                        : 'warning'
+                  }
+                >
+                  {resumoLote.classificacao === 'lucro'
+                    ? 'Lucro'
+                    : resumoLote.classificacao === 'prejuizo'
+                      ? 'Prejuízo'
+                      : 'Empate'}
+                </Badge>
+              </Card>
+            </div>
+            <p className="text-secondary">
+              Resumo calculado com base nos lançamentos financeiros, animais, custos e pesagens disponíveis.
+            </p>
+            <div style={{ marginTop: 12 }}>
+              <h4>Insights do lote</h4>
+              {(resumoLote.insights || []).length > 0 ? (
+                <ul>
+                  {resumoLote.insights.map((insight, index) => (
+                    <li key={`${insight}-${index}`}>{insight}</li>
+                  ))}
+                </ul>
+              ) : (
+                <p>Nenhum alerta relevante para este lote.</p>
+              )}
+            </div>
+          </Card>
           <div className="dashboard-grid dashboard-grid--kpi-secondary">
             <Card title="Cabeças">{lote.indicators.totalAnimais}</Card>
             <Card title="Peso Médio">{formatNumber(lote.indicators.pesoAtualMedio, 1)} kg</Card>
@@ -566,12 +613,11 @@ function LoteDetailView({ lote, db, activeTab, setActiveTab, onBack, onOpenMov, 
  * Modal para registrar o fechamento de um lote.
  * @param {object} props - As propriedades do componente.
  * @param {object} props.lote - O objeto do lote a ser fechado.
- * @param {object} props.db - O objeto do banco de dados.
  * @param {function} props.setDb - Função para atualizar o banco de dados.
  * @param {function} props.onClose - Callback para fechar o modal.
  * @param {function} props.showToast - Função para exibir toasts.
  */
-function FechamentoLoteModal({ lote, db, setDb, onClose, showToast }) {
+function FechamentoLoteModal({ lote, setDb, onClose, showToast }) {
   const [form, setForm] = useState({
     data_saida: getTodayIso(),
     status: 'encerrado',
@@ -637,9 +683,8 @@ function FechamentoLoteModal({ lote, db, setDb, onClose, showToast }) {
  * @param {function} [props.onRegistrarEntradaAnimal] - Callback opcional para registrar entrada de animal.
  * @param {function} [props.onRegistrarSaidaAnimal] - Callback opcional para registrar saída de animal.
  * @param {function} props.showToast - Função para exibir toasts.
- * @param {Map<number, object>} props.lotesMap - Mapa de lotes por ID.
  */
-function MovimentacaoModal({ lote, db, setDb, onClose, onRegistrarEntradaAnimal, onRegistrarSaidaAnimal, showToast, lotesMap }) {
+function MovimentacaoModal({ lote, db, setDb, onClose, onRegistrarEntradaAnimal, onRegistrarSaidaAnimal, showToast }) {
   const [form, setForm] = useState({
     tipo: 'compra',
     data: getTodayIso(),
@@ -707,15 +752,23 @@ function MovimentacaoModal({ lote, db, setDb, onClose, onRegistrarEntradaAnimal,
 
     // Usar callbacks customizados se fornecidos
     if (onRegistrarEntradaAnimal && ['compra', 'nascimento', 'transferencia_entrada'].includes(form.tipo)) {
-      onRegistrarEntradaAnimal(mov);
-      showToast({ type: 'success', message: 'Entrada de animais registrada com sucesso!' });
-      onClose();
+      try {
+        onRegistrarEntradaAnimal(mov);
+        showToast({ type: 'success', message: 'Entrada de animais registrada com sucesso!' });
+        onClose();
+      } catch (error) {
+        showToast({ type: 'error', message: error?.message || 'Não foi possível registrar a entrada de animais.' });
+      }
       return;
     }
     if (onRegistrarSaidaAnimal && ['venda', 'morte', 'descarte', 'transferencia_saida', 'abate'].includes(form.tipo)) {
-      onRegistrarSaidaAnimal(mov);
-      showToast({ type: 'success', message: 'Saída de animais registrada com sucesso!' });
-      onClose();
+      try {
+        onRegistrarSaidaAnimal(mov);
+        showToast({ type: 'success', message: 'Saída de animais registrada com sucesso!' });
+        onClose();
+      } catch (error) {
+        showToast({ type: 'error', message: error?.message || 'Não foi possível registrar a saída de animais.' });
+      }
       return;
     }
 
@@ -1178,10 +1231,14 @@ function groupCustos(custos) {
  * @returns {Array<object>} A linha do tempo financeira.
  */
 function buildFinanceTimeline(db, loteId) {
-  const custos = (db.custos || []).filter((c) => c.lote_id === loteId).map((c) => ({ data: c.data, tipo: 'custo', valor: Number(c.val || 0) }));
-  const receitas = (db.movimentacoes_financeiras || []).filter((m) => Number(m.lote_id) === loteId && m.tipo === 'receita').map((m) => ({ data: m.data, tipo: 'receita', valor: Number(m.valor || 0) }));
-
-  const all = [...custos, ...receitas].sort((a, b) => new Date(a.data) - new Date(b.data));
+  const all = (db.movimentacoes_financeiras || [])
+    .filter((m) => Number(m.lote_id) === Number(loteId))
+    .map((m) => ({
+      data: m.data,
+      tipo: m.tipo === 'despesa' ? 'custo' : 'receita',
+      valor: Number(m.valor || 0),
+    }))
+    .sort((a, b) => new Date(a.data) - new Date(b.data));
 
   let acC = 0, acR = 0;
   const timelineData = [];

@@ -4,7 +4,14 @@
  * @returns {number} O valor numérico.
  */
 function toNumber(value) {
-  return Number(value || 0);
+  const parsed = Number(value);
+  return Number.isFinite(parsed) ? parsed : 0;
+}
+
+function safeDivide(value, divisor) {
+  if (!Number.isFinite(divisor) || divisor === 0) return 0;
+  const result = value / divisor;
+  return Number.isFinite(result) ? result : 0;
 }
 
 /**
@@ -27,13 +34,21 @@ export function calcularCustoLote(db, loteId) {
   const movimentosFinanceiros = Array.isArray(db?.movimentacoes_financeiras)
     ? db.movimentacoes_financeiras
     : [];
+  const custos = Array.isArray(db?.custos) ? db.custos : [];
 
   const despesasLote = movimentosFinanceiros.filter(
     (mov) => mov.tipo === 'despesa' && pertenceAoLote(mov, loteId)
   );
 
+  const despesasCustosMap = new Map();
+  despesasLote.forEach((mov) => {
+    if (mov?.origem === 'custo' && mov?.origem_id != null) {
+      despesasCustosMap.set(Number(mov.origem_id), true);
+    }
+  });
+
   // Otimização: calcular todas as categorias de custo em uma única passagem
-  const { custoAnimais, custoEstoque, custoOutros } = despesasLote.reduce(
+  const baseCustos = despesasLote.reduce(
     (acc, mov) => {
       const valor = toNumber(mov.valor);
       if (mov.categoria === 'compra_animal') {
@@ -48,11 +63,21 @@ export function calcularCustoLote(db, loteId) {
     { custoAnimais: 0, custoEstoque: 0, custoOutros: 0 }
   );
 
+  const custosLegadosNaoRepresentados = custos.filter((custo) => {
+    if (!pertenceAoLote(custo, loteId)) return false;
+    if (custo?.id == null) return true;
+    return !despesasCustosMap.has(Number(custo.id));
+  });
+
+  custosLegadosNaoRepresentados.forEach((custo) => {
+    baseCustos.custoOutros += toNumber(custo?.val);
+  });
+
   return {
-    custoAnimais,
-    custoEstoque,
-    custoOutros,
-    custoTotal: custoAnimais + custoEstoque + custoOutros,
+    custoAnimais: baseCustos.custoAnimais,
+    custoEstoque: baseCustos.custoEstoque,
+    custoOutros: baseCustos.custoOutros,
+    custoTotal: baseCustos.custoAnimais + baseCustos.custoEstoque + baseCustos.custoOutros,
   };
 }
 
@@ -101,25 +126,31 @@ export function calcularReceitaLote(db, loteId) {
 export function calcularResultadoLote(db, loteId) {
   const custo = calcularCustoLote(db, loteId);
   const receita = calcularReceitaLote(db, loteId);
-  const lucroTotal = receita.receitaTotal - custo.custoTotal;
+  const custoTotal = toNumber(custo.custoTotal);
+  const receitaTotal = toNumber(receita.receitaTotal);
+  const lucroTotal = receitaTotal - custoTotal;
 
   const animais = Array.isArray(db?.animais) ? db.animais : [];
   const animaisLote = animais.filter((item) => pertenceAoLote(item, loteId));
   const qtdCabecas = animaisLote.reduce((acc, item) => acc + toNumber(item.qtd), 0);
   const pesoMedioAtual = qtdCabecas
-    ? animaisLote.reduce((acc, item) => acc + toNumber(item.p_at) * toNumber(item.qtd), 0) /
-      qtdCabecas
+    ? safeDivide(
+        animaisLote.reduce((acc, item) => acc + toNumber(item.p_at) * toNumber(item.qtd), 0),
+        qtdCabecas
+      )
     : 0;
-  const arrobaViva = pesoMedioAtual / 15;
+  const arrobaViva = safeDivide(pesoMedioAtual, 15);
 
-  const lucroPorCabeca = qtdCabecas ? lucroTotal / qtdCabecas : 0;
+  const lucroPorCabeca = safeDivide(lucroTotal, qtdCabecas);
   const arrobasTotaisVivas = qtdCabecas * arrobaViva;
-  const lucroPorArroba = arrobasTotaisVivas ? lucroTotal / arrobasTotaisVivas : 0;
+  const lucroPorArroba = safeDivide(lucroTotal, arrobasTotaisVivas);
+  const margemPct = receitaTotal > 0 ? safeDivide(lucroTotal * 100, receitaTotal) : 0;
 
   return {
-    custoTotal: custo.custoTotal,
-    receitaTotal: receita.receitaTotal,
+    custoTotal,
+    receitaTotal,
     lucroTotal,
+    margemPct,
     qtdCabecas,
     lucroPorCabeca, // Corrigido o nome da propriedade
     pesoMedioAtual,

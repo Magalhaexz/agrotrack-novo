@@ -2,6 +2,7 @@ import { useMemo, useState } from 'react';
 import { TrendingUp } from 'lucide-react';
 import Card from '../components/ui/Card';
 import { calcLote, formatNumber } from '../utils/calculations'; // Assumindo calcLote e formatNumber são robustos
+import { getResumoLote } from '../domain/resumoLote';
 import { formatarMoeda } from '../utils/formatters'; // Assumindo formatarMoeda é robusto
 import CurvasCrescimento from '../components/comparativo/CurvasCrescimento';
 import GraficoFinanceiro from '../components/comparativo/GraficoFinanceiro';
@@ -68,7 +69,8 @@ export default function ComparativoPage({ db, onNavigate }) {
   // Otimização: Calcular as métricas para TODOS os lotes ativos uma única vez
   const allActiveLoteMetrics = useMemo(() => {
     return lotesAtivos.map(lote => {
-      const calc = calcLote(db, lote.id); // Chamada potencialmente cara, feita uma vez por lote ativo
+      const calc = calcLote(db, lote.id); // Mantido para métricas produtivas
+      const resumo = getResumoLote(db, lote.id);
       const metaPeso = Number(lote.meta_peso || lote.peso_meta || 480); // Assumindo meta_peso ou peso_meta no lote
       return {
         id: lote.id,
@@ -81,11 +83,11 @@ export default function ComparativoPage({ db, onNavigate }) {
         dias: calc.dias,
         metaPeso,
         arrobasCabeca: calc.pesoAtualMedio / 15,
-        custoTotal: calc.custoTotalLote,
-        custoCabeca: calc.totalAnimais ? calc.custoTotalLote / calc.totalAnimais : 0,
-        margemPct: calc.margemPct,
-        receita: calc.receitaTotal,
-        lucro: calc.margem,
+        custoTotal: resumo.custoTotal,
+        custoCabeca: resumo.custoPorCabeca,
+        margemPct: resumo.margemPct,
+        receita: resumo.receitaTotal,
+        lucro: resumo.lucroTotal,
         // Adicionar aqui quaisquer outras métricas base que não dependam de lotesSelecionados
       };
     });

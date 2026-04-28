@@ -65,6 +65,23 @@ export default function ConfiguracoesPage({ db, setDb, onConfirmAction }) {
     [db.usuarios]
   );
 
+  function mensagemErroSegura(error, fallbackMessage) {
+    const message = String(error?.message || '').toLowerCase();
+
+    if (
+      message.includes('jwt')
+      || message.includes('token')
+      || message.includes('permission')
+      || message.includes('rls')
+      || message.includes('auth')
+      || message.includes('failed to fetch')
+    ) {
+      return fallbackMessage;
+    }
+
+    return error?.message || fallbackMessage;
+  }
+
   async function carregarDadosDeAcesso() {
     if (!podeGerenciarAcessos) {
       return;
@@ -347,9 +364,19 @@ export default function ConfiguracoesPage({ db, setDb, onConfirmAction }) {
                                   size="sm"
                                   variant="outline"
                                   onClick={async () => {
+                                    const confirmarCancelamento = onConfirmAction
+                                      ? await onConfirmAction({
+                                          title: 'Cancelar convite',
+                                          message: `Deseja cancelar o convite de ${invite.email}?`,
+                                          tone: 'danger',
+                                        })
+                                      : window.confirm(`Deseja cancelar o convite de ${invite.email}?`);
+
+                                    if (!confirmarCancelamento) return;
+
                                     const { error } = await updateInvite(invite.id, { status: 'cancelado' });
                                     if (error) {
-                                      showToast({ type: 'error', message: error.message || 'Nao foi possivel cancelar o convite.' });
+                                      showToast({ type: 'error', message: mensagemErroSegura(error, 'Nao foi possivel cancelar o convite.') });
                                       return;
                                     }
                                     showToast({ type: 'success', message: 'Convite cancelado com sucesso.' });
@@ -363,9 +390,19 @@ export default function ConfiguracoesPage({ db, setDb, onConfirmAction }) {
                                 size="sm"
                                 variant="danger"
                                 onClick={async () => {
+                                  const confirmarRemocao = onConfirmAction
+                                    ? await onConfirmAction({
+                                        title: 'Remover convite',
+                                        message: `Remover permanentemente o convite de ${invite.email}?`,
+                                        tone: 'danger',
+                                      })
+                                    : window.confirm(`Remover permanentemente o convite de ${invite.email}?`);
+
+                                  if (!confirmarRemocao) return;
+
                                   const { error } = await deleteInvite(invite.id);
                                   if (error) {
-                                    showToast({ type: 'error', message: error.message || 'Nao foi possivel remover o convite.' });
+                                    showToast({ type: 'error', message: mensagemErroSegura(error, 'Nao foi possivel remover o convite.') });
                                     return;
                                   }
                                   showToast({ type: 'success', message: 'Convite removido com sucesso.' });
@@ -437,7 +474,18 @@ export default function ConfiguracoesPage({ db, setDb, onConfirmAction }) {
                       <Button
                         size="sm"
                         variant="danger"
-                        onClick={() => setDb((prev) => ({ ...prev, usuarios: (prev.usuarios || []).filter((u) => u.id !== item.id) }))}
+                        onClick={async () => {
+                          const confirmarRemocaoLocal = onConfirmAction
+                            ? await onConfirmAction({
+                                title: 'Remover usuário',
+                                message: `Deseja remover ${item.nome} da base local?`,
+                                tone: 'danger',
+                              })
+                            : window.confirm(`Deseja remover ${item.nome} da base local?`);
+
+                          if (!confirmarRemocaoLocal) return;
+                          setDb((prev) => ({ ...prev, usuarios: (prev.usuarios || []).filter((u) => u.id !== item.id) }));
+                        }}
                       >
                         Remover
                       </Button>
@@ -476,7 +524,10 @@ export default function ConfiguracoesPage({ db, setDb, onConfirmAction }) {
             if (!accessModuleReady) {
               setDb((prev) => ({
                 ...prev,
-                usuarios: [...(prev.usuarios || []), { ...payload, id: gerarNovoId(prev.usuarios || []) }],
+                usuarios: [
+                  ...(prev.usuarios || []),
+                  { ...payload, id: gerarNovoId(prev.usuarios || []), owner_user_id: user?.id || null },
+                ],
               }));
               showToast({ type: 'success', message: 'Convite salvo no modo local. A migration ativa o fluxo automático.' });
               setOpenInvite(false);
@@ -490,10 +541,11 @@ export default function ConfiguracoesPage({ db, setDb, onConfirmAction }) {
               status: 'pendente',
               notes: payload.notes || null,
               created_by: user?.id || null,
+              owner_user_id: user?.id || null,
             });
 
             if (error) {
-              showToast({ type: 'error', message: error.message || 'Nao foi possivel criar o convite.' });
+              showToast({ type: 'error', message: mensagemErroSegura(error, 'Nao foi possivel criar o convite.') });
               return;
             }
 

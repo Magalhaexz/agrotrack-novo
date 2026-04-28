@@ -6,8 +6,9 @@
  * @returns {string} O número formatado ou '—'.
  */
 export const formatNumber = (value, digits = 1) => {
-  if (value === undefined || value === null || Number.isNaN(Number(value))) return '—';
-  return Number(value).toLocaleString('pt-BR', {
+  const normalized = Number(value);
+  if (value === undefined || value === null || !Number.isFinite(normalized)) return '—';
+  return normalized.toLocaleString('pt-BR', {
     minimumFractionDigits: digits,
     maximumFractionDigits: digits,
   });
@@ -20,8 +21,9 @@ export const formatNumber = (value, digits = 1) => {
  * @returns {string} O valor formatado como moeda ou '—'.
  */
 export const formatCurrency = (value) => {
-  if (value === undefined || value === null || Number.isNaN(Number(value))) return '—';
-  return `R$ ${Number(value).toLocaleString('pt-BR', {
+  const normalized = Number(value);
+  if (value === undefined || value === null || !Number.isFinite(normalized)) return '—';
+  return `R$ ${normalized.toLocaleString('pt-BR', {
     minimumFractionDigits: 2,
     maximumFractionDigits: 2,
   })}`;
@@ -67,6 +69,9 @@ const toNumber = (value) => Number(value || 0);
 
 /**
  * Calcula diversos indicadores financeiros e de desempenho para um lote específico.
+ * IMPORTANTE: os campos financeiros retornados por esta função são estimativas legadas
+ * baseadas em `db.custos` + parâmetros do lote e NÃO representam a fonte financeira oficial.
+ * Para KPI financeiro oficial (custo/receita/lucro/margem), prefira `getResumoLote`.
  * @param {object} db - O objeto do banco de dados.
  * @param {string|number} loteId - O ID do lote.
  * @returns {object} Um objeto contendo os indicadores calculados para o lote.
@@ -182,6 +187,7 @@ export const calcLote = (db, loteId) => {
     pesoAtualMedio,
     arrobasProduzidas,
     arrobasCarcaca,
+    // Campos financeiros abaixo são legados/estimados (não oficiais):
     receitaTotal,
     receitaPorCabeca,
     investimento,

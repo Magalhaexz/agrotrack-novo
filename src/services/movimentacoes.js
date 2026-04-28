@@ -1,5 +1,4 @@
 import { gerarNovoId } from '../utils/id';
-import { TIPOS_SAIDA_ANIMAL } from '../utils/constantes';
 import { registrarAuditoria } from './auditoria';
 
 /**
@@ -9,6 +8,73 @@ import { registrarAuditoria } from './auditoria';
  */
 function toNumber(value) {
   return Number(value || 0);
+}
+
+function pickFirstDefined(...values) {
+  return values.find((value) => value !== undefined && value !== null);
+}
+
+function ensureFiniteNumber(value, fieldName, { min = -Infinity, required = true } = {}) {
+  const normalized = Number(value);
+  if (!Number.isFinite(normalized)) {
+    if (!required && (value === undefined || value === null || value === '')) {
+      return null;
+    }
+    throw new Error(`Valor inválido para ${fieldName}.`);
+  }
+  if (normalized < min) {
+    throw new Error(`Valor inválido para ${fieldName}.`);
+  }
+  return normalized;
+}
+
+function normalizeAnimalMovementPayload(rawDados = {}, { movementType }) {
+  const loteIdRaw = pickFirstDefined(rawDados.loteId, rawDados.lote_id);
+  const quantidadeRaw = pickFirstDefined(rawDados.qtd, rawDados.quantidade);
+  const pesoMedioRaw = pickFirstDefined(rawDados.pesoMedio, rawDados.peso_medio);
+  const valorTotalRaw = pickFirstDefined(
+    rawDados.valorTotal,
+    rawDados.valor_total,
+    rawDados.custo_total
+  );
+  const tipoSaidaRaw = pickFirstDefined(rawDados.tipoSaida, rawDados.tipo);
+  const observacaoRaw = pickFirstDefined(rawDados.observacao, rawDados.obs);
+  const destinoLoteIdRaw = pickFirstDefined(rawDados.destinoLoteId, rawDados.destino_lote_id, rawDados.lote_destino);
+
+  const loteId = ensureFiniteNumber(loteIdRaw, 'lote', { min: 1 });
+  const qtd = ensureFiniteNumber(quantidadeRaw, 'quantidade', { min: 0.0000001 });
+  const pesoMedio = ensureFiniteNumber(pesoMedioRaw, 'peso médio', { min: 0.0000001 });
+  const valorTotal = ensureFiniteNumber(valorTotalRaw, 'valor total', { min: 0 });
+
+  const data = String(rawDados.data || '').trim();
+  if (!data) {
+    throw new Error('Data é obrigatória.');
+  }
+
+  const tipoSaida = movementType === 'saida'
+    ? String(tipoSaidaRaw || '').trim().toLowerCase()
+    : '';
+
+  if (movementType === 'saida' && !tipoSaida) {
+    throw new Error('Tipo de saída é obrigatório.');
+  }
+
+  const destinoLoteId = destinoLoteIdRaw !== undefined && destinoLoteIdRaw !== null && destinoLoteIdRaw !== ''
+    ? ensureFiniteNumber(destinoLoteIdRaw, 'lote destino', { min: 1 })
+    : null;
+
+  return {
+    loteId,
+    qtd,
+    pesoMedio,
+    valorTotal,
+    data,
+    fornecedor: String(rawDados.fornecedor || '').trim(),
+    comprador: String(rawDados.comprador || '').trim(),
+    obs: String(observacaoRaw || '').trim(),
+    tipoSaida,
+    destinoLoteId,
+  };
 }
 
 /**
@@ -60,24 +126,28 @@ function atualizarLoteComResumo(lote, qtdAtual, pesoMedioAtual) {
  */
 export function registrarEntradaAnimal(
   db,
-  { loteId, qtd, pesoMedio, valorTotal, data, fornecedor, obs },
+  dados,
   userContext = {}
 ) {
+  const {
+    loteId,
+    qtd,
+    pesoMedio,
+    valorTotal,
+    data,
+    fornecedor,
+    obs,
+  } = normalizeAnimalMovementPayload(dados, { movementType: 'entrada' });
+
   const lotes = Array.isArray(db?.lotes) ? db.lotes : [];
   const loteExiste = lotes.some((item) => Number(item.id) === Number(loteId));
   if (!loteExiste) {
-    console.warn(`Lote com ID ${loteId} não encontrado para entrada de animais.`);
-    return db; // Retorna o DB original se o lote não existe
+    throw new Error(`Lote ${loteId} não encontrado para entrada de animais.`);
   }
 
-  const quantidade = toNumber(qtd);
-  const peso = toNumber(pesoMedio);
-  const valor = toNumber(valorTotal);
-
-  if (quantidade <= 0 || peso <= 0 || valor < 0) {
-    console.warn('Dados de entrada de animais inválidos (quantidade, peso ou valor).');
-    return db; // Retorna o DB original se os dados são inválidos
-  }
+  const quantidade = qtd;
+  const peso = pesoMedio;
+  const valor = valorTotal;
 
   const movimentosAnimais = Array.isArray(db?.movimentacoes_animais)
     ? db.movimentacoes_animais
@@ -156,24 +226,29 @@ export function registrarEntradaAnimal(
  */
 export function registrarSaidaAnimal(
   db,
-  { loteId, qtd, pesoMedio, valorTotal, data, tipoSaida, comprador, obs },
+  dados,
   userContext = {}
 ) {
+  const {
+    loteId,
+    qtd,
+    pesoMedio,
+    valorTotal,
+    data,
+    tipoSaida,
+    comprador,
+    obs,
+  } = normalizeAnimalMovementPayload(dados, { movementType: 'saida' });
+
   const lotes = Array.isArray(db?.lotes) ? db.lotes : [];
   const lote = lotes.find((item) => Number(item.id) === Number(loteId));
   if (!lote) {
-    console.warn(`Lote com ID ${loteId} não encontrado para saída de animais.`);
-    return db;
+    throw new Error(`Lote ${loteId} não encontrado para saída de animais.`);
   }
 
-  const quantidade = toNumber(qtd);
-  const peso = toNumber(pesoMedio);
-  const valor = toNumber(valorTotal);
-
-  if (quantidade <= 0 || peso <= 0) {
-    console.warn('Dados de saída de animais inválidos (quantidade ou peso).');
-    return db;
-  }
+  const quantidade = qtd;
+  const peso = pesoMedio;
+  const valor = valorTotal;
 
   const movimentosAnimais = Array.isArray(db?.movimentacoes_animais)
     ? db.movimentacoes_animais
@@ -224,7 +299,7 @@ export function registrarSaidaAnimal(
     movimentacoes_financeiras: [
       ...movimentosFinanceiros,
       // Adiciona movimentação financeira apenas se for uma venda
-      ...(tipoSaida === TIPOS_SAIDA_ANIMAL.VENDA
+      ...(tipoSaida === 'venda'
         ? [
             {
               id: novoMovFinanceiroId,
@@ -250,8 +325,8 @@ export function registrarSaidaAnimal(
     ator_id: userContext?.id || null,
     ator_email: userContext?.email || '',
     criticidade:
-      tipoSaida === TIPOS_SAIDA_ANIMAL.MORTE ||
-      tipoSaida === TIPOS_SAIDA_ANIMAL.DESCARTE
+      tipoSaida === 'morte' ||
+      tipoSaida === 'descarte'
         ? 'alta'
         : 'media',
   });
