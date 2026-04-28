@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { supabase } from '../lib/supabase';
 
 const OPERACIONAL_TABLES = [
@@ -60,18 +60,6 @@ export function createOperationalFallbackDb(initialDb) {
   return normalizeDb(initialDb || {});
 }
 
-function isKnownOperationalModuleError(error) {
-  const text = String(error?.message || '').toLowerCase();
-  const code = String(error?.code || '');
-  return (
-    code.startsWith('PGRST') ||
-    text.includes('does not exist') ||
-    text.includes('relation') ||
-    text.includes('permission denied') ||
-    text.includes('rls')
-  );
-}
-
 async function loadOperationalSnapshot() {
   const entries = await Promise.all(
     OPERACIONAL_TABLES.map(async (table) => {
@@ -86,20 +74,27 @@ async function loadOperationalSnapshot() {
 }
 
 export function useOperationalData(initialDb, session) {
-  const [db, setDb] = useState(() => createOperationalFallbackDb(initialDb));
-  const [dataReady, setDataReady] = useState(false);
+  const [db, setDbState] = useState(() => createOperationalFallbackDb(initialDb));
+  const [dataReady, setDataReady] = useState(true);
   const [dataSource, setDataSource] = useState('signed_out');
   const [dataError, setDataError] = useState(null);
   const hydratingRef = useRef(false);
+  const localMutationRef = useRef(0);
+
+  const setDb = useCallback((updater) => {
+    localMutationRef.current += 1;
+    setDbState(updater);
+  }, []);
 
   useEffect(() => {
     let ativo = true;
     hydratingRef.current = true;
 
     async function hydrate() {
+      const hydrateStart = typeof performance !== 'undefined' ? performance.now() : Date.now();
       if (!session) {
         if (ativo) {
-          setDb(createOperationalFallbackDb(initialDb));
+          setDbState(createOperationalFallbackDb(initialDb));
           setDataSource('signed_out');
           setDataError(null);
           setDataReady(true);
@@ -107,8 +102,30 @@ export function useOperationalData(initialDb, session) {
         return;
       }
 
+      const fallbackStart = typeof performance !== 'undefined' ? performance.now() : Date.now();
+      const hydrationVersion = localMutationRef.current;
+      if (ativo) {
+        setDbState(createOperationalFallbackDb(initialDb));
+        setDataSource('fallback');
+        setDataError(null);
+        setDataReady(true);
+      }
+      if (import.meta.env.DEV) {
+        const fallbackEnd = typeof performance !== 'undefined' ? performance.now() : Date.now();
+        console.debug('[HERDON_DATA_TIMING]', {
+          stage: 'fallback_ready',
+          durationMs: Number((fallbackEnd - fallbackStart).toFixed(1)),
+          transitionTo: 'fallback',
+        });
+      }
+
       try {
+        const snapshotStart = typeof performance !== 'undefined' ? performance.now() : Date.now();
         const loadPromise = loadOperationalSnapshot();
+
+        if (ativo) {
+          setDataSource('syncing');
+        }
 
         const raceResult = await Promise.race([
           loadPromise.then((snapshot) => ({ snapshot })),
@@ -121,18 +138,36 @@ export function useOperationalData(initialDb, session) {
         if (!ativo) return;
 
         if (raceResult?.timeout) {
-          setDb(createOperationalFallbackDb(initialDb));
           setDataSource('fallback_timeout');
           setDataError(new Error('Tempo limite na carga operacional (4.5s).'));
           setDataReady(true);
+          if (import.meta.env.DEV) {
+            const snapshotEnd = typeof performance !== 'undefined' ? performance.now() : Date.now();
+            console.debug('[HERDON_DATA_TIMING]', {
+              stage: 'snapshot_timeout',
+              durationMs: Number((snapshotEnd - snapshotStart).toFixed(1)),
+              transitionTo: 'fallback_timeout',
+            });
+          }
 
           loadPromise
             .then((lateSnapshot) => {
               if (!ativo) return;
-              setDb(createOperationalFallbackDb(lateSnapshot));
-              setDataSource('supabase_late');
-              setDataError(null);
-              setDataReady(true);
+              const lateEnd = typeof performance !== 'undefined' ? performance.now() : Date.now();
+              const canApplyLateSnapshot = localMutationRef.current === hydrationVersion;
+              if (canApplyLateSnapshot) {
+                setDbState(createOperationalFallbackDb(lateSnapshot));
+                setDataSource('supabase_late');
+                setDataError(null);
+                setDataReady(true);
+              }
+              if (import.meta.env.DEV) {
+                console.debug('[HERDON_DATA_TIMING]', {
+                  stage: canApplyLateSnapshot ? 'supabase_late' : 'supabase_late_skipped_local_changes',
+                  durationMs: Number((lateEnd - snapshotStart).toFixed(1)),
+                  transitionTo: canApplyLateSnapshot ? 'supabase_late' : 'fallback_timeout',
+                });
+              }
             })
             .catch((lateError) => {
               if (import.meta.env.DEV) {
@@ -146,18 +181,46 @@ export function useOperationalData(initialDb, session) {
           throw raceResult.error;
         }
 
-        setDb(createOperationalFallbackDb(raceResult?.snapshot));
-        setDataSource('supabase');
-        setDataError(null);
-        setDataReady(true);
+        const canApplySnapshot = localMutationRef.current === hydrationVersion;
+        if (canApplySnapshot) {
+          setDbState(createOperationalFallbackDb(raceResult?.snapshot));
+          setDataSource('supabase');
+          setDataError(null);
+          setDataReady(true);
+        } else {
+          setDataSource('fallback');
+        }
+        if (import.meta.env.DEV) {
+          const snapshotEnd = typeof performance !== 'undefined' ? performance.now() : Date.now();
+          console.debug('[HERDON_DATA_TIMING]', {
+            stage: canApplySnapshot ? 'supabase' : 'supabase_skipped_local_changes',
+            durationMs: Number((snapshotEnd - snapshotStart).toFixed(1)),
+            transitionTo: canApplySnapshot ? 'supabase' : 'fallback',
+          });
+        }
       } catch (error) {
         if (!ativo) return;
 
-        setDb(createOperationalFallbackDb(initialDb));
-        setDataSource(isKnownOperationalModuleError(error) ? 'fallback' : 'fallback_error');
+        const snapshotEnd = typeof performance !== 'undefined' ? performance.now() : Date.now();
+        setDataSource('fallback_error');
         setDataError(error instanceof Error ? error : new Error('Falha ao carregar dados operacionais.'));
         setDataReady(true);
+        if (import.meta.env.DEV) {
+          console.debug('[HERDON_DATA_TIMING]', {
+            stage: 'snapshot_error',
+            durationMs: Number((snapshotEnd - hydrateStart).toFixed(1)),
+            transitionTo: 'fallback_error',
+          });
+        }
       } finally {
+        if (import.meta.env.DEV) {
+          const hydrateEnd = typeof performance !== 'undefined' ? performance.now() : Date.now();
+          console.debug('[HERDON_DATA_TIMING]', {
+            stage: 'hydrate_finally',
+            durationMs: Number((hydrateEnd - hydrateStart).toFixed(1)),
+            source: dataSource,
+          });
+        }
         hydratingRef.current = false;
         if (ativo) {
           setDataReady((prev) => prev || true);

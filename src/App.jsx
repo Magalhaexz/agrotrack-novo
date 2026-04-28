@@ -108,16 +108,19 @@ export default function App() {
   const deniedToastRef = useRef({ permission: '', timestamp: 0 });
 
   if (import.meta.env.DEV) {
-    console.debug('[HERDON_BOOT]', {
+    console.debug('[HERDON_AUTH_BOOT]', {
       loadingAuth,
       hasSession: Boolean(session),
+    });
+    console.debug('[HERDON_DATA_BOOT]', {
       dataReady,
       dataSource,
       dataErrorMessage: dataError?.message || null,
     });
   }
 
-  const isBootLoading = loadingAuth || (session && !dataReady);
+  const isBootLoading = loadingAuth;
+  const isOperationalSyncing = Boolean(session) && (dataSource === 'syncing' || (session && !dataReady));
 
   useEffect(() => {
     if (!isBootLoading) {
@@ -187,7 +190,15 @@ export default function App() {
   }, [db?.fazendas]);
 
   const dbDashboard = useMemo(() => {
+    const start = import.meta.env.DEV ? (typeof performance !== 'undefined' ? performance.now() : Date.now()) : 0;
     if (!fazendaSelecionada?.id) {
+      if (import.meta.env.DEV) {
+        const end = typeof performance !== 'undefined' ? performance.now() : Date.now();
+        console.debug('[HERDON_DASHBOARD_TIMING]', {
+          stage: 'dbDashboard_all_farms',
+          durationMs: Number((end - start).toFixed(1)),
+        });
+      }
       return db;
     }
 
@@ -197,7 +208,7 @@ export default function App() {
         .map((lote) => lote.id)
     );
 
-    return {
+    const scopedDb = {
       ...db,
       lotes: (db.lotes || []).filter((lote) => loteIds.has(lote.id)),
       animais: (db.animais || []).filter((animal) => loteIds.has(animal.lote_id)),
@@ -212,6 +223,15 @@ export default function App() {
       ),
       movimentacoes_animais: (db.movimentacoes_animais || []).filter((movimento) => loteIds.has(movimento.lote_id)),
     };
+    if (import.meta.env.DEV) {
+      const end = typeof performance !== 'undefined' ? performance.now() : Date.now();
+      console.debug('[HERDON_DASHBOARD_TIMING]', {
+        stage: 'dbDashboard_scoped',
+        durationMs: Number((end - start).toFixed(1)),
+        lotes: scopedDb.lotes?.length || 0,
+      });
+    }
+    return scopedDb;
   }, [db, fazendaSelecionada]);
 
   function atualizarUsuario(dadosAtualizados) {
@@ -272,6 +292,7 @@ export default function App() {
   const alertasResolvidos = Array.isArray(db?.alertas_resolvidos) ? db.alertas_resolvidos : [];
 
   const rawAlerts = useMemo(() => {
+    const start = import.meta.env.DEV ? (typeof performance !== 'undefined' ? performance.now() : Date.now()) : 0;
     const legacy = buildAlerts(db);
     const automaticos = [
       ...gerarAlertasEstoque(db),
@@ -279,7 +300,16 @@ export default function App() {
       ...gerarAlertasPesagem(db),
       ...gerarAlertasLote(db),
     ];
-    return ordenarAlertas([...legacy, ...automaticos]);
+    const merged = ordenarAlertas([...legacy, ...automaticos]);
+    if (import.meta.env.DEV) {
+      const end = typeof performance !== 'undefined' ? performance.now() : Date.now();
+      console.debug('[HERDON_DASHBOARD_TIMING]', {
+        stage: 'rawAlerts',
+        durationMs: Number((end - start).toFixed(1)),
+        count: merged.length,
+      });
+    }
+    return merged;
   }, [db]);
 
   const alerts = useMemo(
@@ -416,8 +446,8 @@ export default function App() {
       <div className="app-loading">
         <div className="app-loading-panel">
           <span className="app-loading-pill">HERDON</span>
-          <strong>Carregando sua operação</strong>
-          <p>Preparando atalhos, alertas, lotes e relatórios.</p>
+          <strong>Verificando seu acesso...</strong>
+          <p>Estamos validando sua sessão para iniciar o sistema.</p>
           <div className="app-loading-bars" aria-hidden="true">
             <span className="app-loading-bar" />
             <span className="app-loading-bar" />
@@ -462,6 +492,11 @@ export default function App() {
       />
 
       <main className="main">
+        {isOperationalSyncing ? (
+          <div style={{ padding: '8px 16px 0', fontSize: 12, color: 'var(--text-secondary, #6b7280)' }}>
+            Sincronizando dados da operação...
+          </div>
+        ) : null}
         <AppHeader
           farmName={fazendaSelecionada?.nome || db?.fazendas?.[0]?.nome || 'Fazenda Atual'}
           notifications={alerts.length}
