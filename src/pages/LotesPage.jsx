@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState, useCallback } from 'react';
 import { AlertTriangle, ChevronRight, MoreHorizontal, Plus, Scale, Truck } from 'lucide-react';
-import { Line, LineChart, Pie, PieChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
+import { CartesianGrid, Line, LineChart, Pie, PieChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
 import Card from '../components/ui/Card';
 import Button from '../components/ui/Button';
 import Badge from '../components/ui/Badge';
@@ -8,6 +8,7 @@ import Modal from '../components/ui/Modal';
 import Input from '../components/ui/Input';
 import { calcLote, formatCurrency, formatDate, formatNumber } from '../utils/calculations';
 import { gerarNovoId } from '../utils/id';
+import { getResumoLote } from '../domain/resumoLote';
 import {
   calcularDesvioPorcentual,
   calcularGMDMeta,
@@ -201,6 +202,7 @@ export default function LotesPage({
  * @param {Map<number, object>} props.allLoteIndicators - Mapa de indicadores pré-calculados para todos os lotes.
  */
 function LoteDetailView({ lote, db, activeTab, setActiveTab, onBack, onOpenMov, onOpenPesagem, onOpenFechamento, pesagensByLoteId }) {
+  const resumoLote = useMemo(() => getResumoLote(db, lote.id), [db, lote.id]);
   const lotePesagens = useMemo(() => (pesagensByLoteId.get(lote.id) || []).slice().sort((a, b) => new Date(a.data) - new Date(b.data)), [lote.id, pesagensByLoteId]);
   const movimentacoes = useMemo(() => (db.movimentacoes_animais || []).filter((m) => Number(m.loteId || m.lote_id) === lote.id).sort((a, b) => new Date(b.data) - new Date(a.data)), [lote.id, db.movimentacoes_animais]);
   const custos = useMemo(() => (db.custos || []).filter((c) => c.lote_id === lote.id).sort((a, b) => new Date(b.data) - new Date(a.data)), [lote.id, db.custos]);
@@ -324,6 +326,50 @@ function LoteDetailView({ lote, db, activeTab, setActiveTab, onBack, onOpenMov, 
 
       {activeTab === 'visao' && (
         <>
+          <Card title="Resumo executivo do lote">
+            <div className="dashboard-grid dashboard-grid--kpi-secondary">
+              <Card title="Receita total">{formatCurrency(resumoLote.receitaTotal)}</Card>
+              <Card title="Custo total">{formatCurrency(resumoLote.custoTotal)}</Card>
+              <Card title="Lucro total">{formatCurrency(resumoLote.lucroTotal)}</Card>
+              <Card title="Margem %">{formatNumber(resumoLote.margemPct, 2)}%</Card>
+              <Card title="Lucro por cabeça">{formatCurrency(resumoLote.lucroPorCabeca)}</Card>
+              <Card title="Lucro por arroba">{formatCurrency(resumoLote.lucroPorArroba)}</Card>
+              <Card title="GMD médio">{formatNumber(resumoLote.gmdMedio, 3)} kg/dia</Card>
+              <Card title="Arrobas produzidas">{formatNumber(resumoLote.arrobasProduzidas, 2)} @</Card>
+              <Card title="Classificação">
+                <Badge
+                  variant={
+                    resumoLote.classificacao === 'lucro'
+                      ? 'success'
+                      : resumoLote.classificacao === 'prejuizo'
+                        ? 'danger'
+                        : 'warning'
+                  }
+                >
+                  {resumoLote.classificacao === 'lucro'
+                    ? 'Lucro'
+                    : resumoLote.classificacao === 'prejuizo'
+                      ? 'Prejuízo'
+                      : 'Empate'}
+                </Badge>
+              </Card>
+            </div>
+            <p className="text-secondary">
+              Resumo calculado com base nos lançamentos financeiros, animais, custos e pesagens disponíveis.
+            </p>
+            <div style={{ marginTop: 12 }}>
+              <h4>Insights do lote</h4>
+              {(resumoLote.insights || []).length > 0 ? (
+                <ul>
+                  {resumoLote.insights.map((insight, index) => (
+                    <li key={`${insight}-${index}`}>{insight}</li>
+                  ))}
+                </ul>
+              ) : (
+                <p>Nenhum alerta relevante para este lote.</p>
+              )}
+            </div>
+          </Card>
           <div className="dashboard-grid dashboard-grid--kpi-secondary">
             <Card title="Cabeças">{lote.indicators.totalAnimais}</Card>
             <Card title="Peso Médio">{formatNumber(lote.indicators.pesoAtualMedio, 1)} kg</Card>
@@ -707,15 +753,23 @@ function MovimentacaoModal({ lote, db, setDb, onClose, onRegistrarEntradaAnimal,
 
     // Usar callbacks customizados se fornecidos
     if (onRegistrarEntradaAnimal && ['compra', 'nascimento', 'transferencia_entrada'].includes(form.tipo)) {
-      onRegistrarEntradaAnimal(mov);
-      showToast({ type: 'success', message: 'Entrada de animais registrada com sucesso!' });
-      onClose();
+      try {
+        onRegistrarEntradaAnimal(mov);
+        showToast({ type: 'success', message: 'Entrada de animais registrada com sucesso!' });
+        onClose();
+      } catch (error) {
+        showToast({ type: 'error', message: error?.message || 'Não foi possível registrar a entrada de animais.' });
+      }
       return;
     }
     if (onRegistrarSaidaAnimal && ['venda', 'morte', 'descarte', 'transferencia_saida', 'abate'].includes(form.tipo)) {
-      onRegistrarSaidaAnimal(mov);
-      showToast({ type: 'success', message: 'Saída de animais registrada com sucesso!' });
-      onClose();
+      try {
+        onRegistrarSaidaAnimal(mov);
+        showToast({ type: 'success', message: 'Saída de animais registrada com sucesso!' });
+        onClose();
+      } catch (error) {
+        showToast({ type: 'error', message: error?.message || 'Não foi possível registrar a saída de animais.' });
+      }
       return;
     }
 
