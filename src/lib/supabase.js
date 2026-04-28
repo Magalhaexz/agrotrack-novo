@@ -21,12 +21,53 @@ export const supabase = (supabaseUrl && supabaseAnonKey)
         throw new Error('Supabase não inicializado no ambiente de teste.');
       },
       auth: {
+        getSession: async () => ({ data: { session: null }, error: null }),
+        signInWithPassword: async () => ({ data: { session: null }, error: null }),
+        signInWithOAuth: async () => ({ data: null, error: null }),
+        signUp: async () => ({ data: { session: null }, error: null }),
+        resetPasswordForEmail: async () => ({ data: null, error: null }),
+        updateUser: async () => ({ data: null, error: null }),
+        onAuthStateChange: () => ({
+          data: {
+            subscription: {
+              unsubscribe() {},
+            },
+          },
+        }),
         signOut: async () => ({ error: null }),
       },
     };
 
 export const HERDON_LOGOUT_EVENT_KEY = 'herdon_logout_event';
 export const HERDON_LOGOUT_CHANNEL = 'herdon_auth_channel';
+export const HERDON_LOGOUT_IN_PROGRESS_KEY = 'herdon_logout_in_progress';
+export const HERDON_LOGIN_ATTEMPT_KEY = 'HERDON_LOGIN_ATTEMPT_AT';
+
+function wait(ms) {
+  return new Promise((resolve) => {
+    globalThis.setTimeout(resolve, ms);
+  });
+}
+
+function createTimeoutError(message) {
+  const error = new Error(message);
+  error.name = 'TimeoutError';
+  return error;
+}
+
+function withStorage(action) {
+  try {
+    action(localStorage);
+  } catch {
+    // localStorage indisponivel
+  }
+
+  try {
+    action(sessionStorage);
+  } catch {
+    // sessionStorage indisponivel
+  }
+}
 
 function removerChavesAuthDoStorage(storage) {
   const fixedKeys = new Set([
@@ -34,7 +75,7 @@ function removerChavesAuthDoStorage(storage) {
     'herdon_user',
     'herdon_token',
     'supabase.auth.token',
-    'herdon_logout_in_progress',
+    HERDON_LOGOUT_IN_PROGRESS_KEY,
   ]);
 
   const dynamicRules = [
@@ -65,6 +106,42 @@ export function limparPersistenciaSessao() {
   } catch {
     // Ignora indisponibilidade de sessionStorage
   }
+}
+
+export function limparMarcadoresFluxoAuth() {
+  withStorage((storage) => {
+    storage.removeItem(HERDON_LOGOUT_EVENT_KEY);
+    storage.removeItem(HERDON_LOGOUT_IN_PROGRESS_KEY);
+    storage.removeItem(HERDON_LOGIN_ATTEMPT_KEY);
+  });
+}
+
+export function marcarLogoutEmAndamento(ativo) {
+  withStorage((storage) => {
+    if (ativo) {
+      storage.setItem(HERDON_LOGOUT_IN_PROGRESS_KEY, String(Date.now()));
+      return;
+    }
+    storage.removeItem(HERDON_LOGOUT_IN_PROGRESS_KEY);
+  });
+}
+
+export function obterLogoutEmAndamentoAt() {
+  try {
+    const value = Number(localStorage.getItem(HERDON_LOGOUT_IN_PROGRESS_KEY));
+    return Number.isFinite(value) ? value : 0;
+  } catch {
+    return 0;
+  }
+}
+
+export async function signOutLocalSafely(timeoutMs = 5000) {
+  const signOutPromise = supabase.auth.signOut({ scope: 'local' });
+  const timeoutPromise = wait(timeoutMs).then(() => {
+    throw createTimeoutError('local_sign_out_timeout');
+  });
+
+  return Promise.race([signOutPromise, timeoutPromise]);
 }
 
 export function publicarEventoLogout(reason = 'manual_logout') {

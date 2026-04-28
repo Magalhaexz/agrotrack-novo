@@ -23,8 +23,10 @@ import {
   HERDON_LOGOUT_CHANNEL,
   HERDON_LOGOUT_EVENT_KEY,
   limparPersistenciaSessao,
+  limparMarcadoresFluxoAuth,
+  marcarLogoutEmAndamento,
   publicarEventoLogout,
-  supabase,
+  signOutLocalSafely,
 } from './lib/supabase';
 import { secondaryNavItems, navSections } from './navigation/navConfig';
 import {
@@ -312,42 +314,54 @@ export default function App() {
     forceLocalSignOut();
     setForcarTelaLogin(true);
     setUsuarioLogado(null);
+    setCurrentPage('dashboard');
+    marcarLogoutEmAndamento(true);
+    limparPersistenciaSessao();
+    publicarEventoLogout('manual_logout');
+
+    if (import.meta.env.DEV) {
+      console.debug('[HERDON_LOGOUT_BOOT]', {
+        stage: 'local_logout_completed',
+        localCleanupDone: true,
+      });
+    }
 
     try {
-      await supabase.auth.signOut({ scope: 'global' });
+      await signOutLocalSafely();
     } catch (error) {
-      console.error('Erro ao finalizar sessão:', error);
-      try {
-        await supabase.auth.signOut();
-      } catch (fallbackError) {
-        console.error('Erro ao finalizar sessão (fallback local):', fallbackError);
+      if (import.meta.env.DEV) {
+        console.warn('[HERDON_LOGOUT_BOOT]', {
+          stage: 'local_signout_failed_after_cleanup',
+          errorType: error?.message || error?.name || 'signout_error',
+          networkFailed: true,
+          localLogoutCompleted: true,
+        });
       }
     } finally {
       limparPersistenciaSessao();
-      publicarEventoLogout('manual_logout');
+      limparMarcadoresFluxoAuth();
+      marcarLogoutEmAndamento(false);
     }
-
-    setCurrentPage('dashboard');
   }
 
   async function handleClearSessionAndReload() {
+    forceLocalSignOut();
+    marcarLogoutEmAndamento(true);
+    limparPersistenciaSessao();
+    publicarEventoLogout('clear_session_reload');
     try {
-      forceLocalSignOut();
-      limparPersistenciaSessao();
-      await supabase.auth.signOut({ scope: 'global' });
+      await signOutLocalSafely();
     } catch (error) {
       if (import.meta.env.DEV) {
-        console.warn('[HERDON_CLEAR_SESSION]', error);
-      }
-      try {
-        await supabase.auth.signOut();
-      } catch (fallbackError) {
-        if (import.meta.env.DEV) {
-          console.warn('[HERDON_CLEAR_SESSION_FALLBACK]', fallbackError);
-        }
+        console.warn('[HERDON_LOGOUT_BOOT]', {
+          stage: 'clear_session_local_signout_failed',
+          errorType: error?.message || error?.name || 'signout_error',
+        });
       }
     } finally {
-      publicarEventoLogout('clear_session_reload');
+      limparPersistenciaSessao();
+      limparMarcadoresFluxoAuth();
+      marcarLogoutEmAndamento(false);
       window.location.reload();
     }
   }

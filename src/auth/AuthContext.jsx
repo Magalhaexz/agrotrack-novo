@@ -4,14 +4,16 @@ import { mapProfileRowToUser, fetchUserProfile, isAccessModuleUnavailable } from
 import {
   HERDON_LOGOUT_CHANNEL,
   HERDON_LOGOUT_EVENT_KEY,
+  HERDON_LOGIN_ATTEMPT_KEY,
   limparPersistenciaSessao,
+  obterLogoutEmAndamentoAt,
   supabase,
 } from '../lib/supabase';
 import { obterPerfilDoUsuario, usuarioTemPermissao } from './perfis';
 
 const AuthContext = createContext(null);
 const PROFILE_FAILURE_COOLDOWN_MS = 120000;
-const LOGIN_ATTEMPT_KEY = 'HERDON_LOGIN_ATTEMPT_AT';
+const LOGIN_ATTEMPT_IGNORE_WINDOW_MS = 7000;
 
 function getErrorMessage(error) {
   if (!error) return '';
@@ -21,12 +23,16 @@ function getErrorMessage(error) {
 
 function getRecentLoginAttemptAt() {
   try {
-    const raw = localStorage.getItem(LOGIN_ATTEMPT_KEY);
+    const raw = localStorage.getItem(HERDON_LOGIN_ATTEMPT_KEY);
     const value = Number(raw);
     return Number.isFinite(value) ? value : 0;
   } catch {
     return 0;
   }
+}
+
+function hasRecentLoginAttempt() {
+  return Date.now() - getRecentLoginAttemptAt() < LOGIN_ATTEMPT_IGNORE_WINDOW_MS;
 }
 
 export function AuthProvider({ children }) {
@@ -56,6 +62,7 @@ export function AuthProvider({ children }) {
     authGenerationRef.current += 1;
     limparPersistenciaSessao();
     profileInFlightRef.current.clear();
+    profileFailureAtRef.current.clear();
     setUltimoLogoutAt(Date.now());
     if (import.meta.env.DEV) {
       console.debug('[HERDON_SYNC_GUARD]', {
@@ -230,9 +237,8 @@ export function AuthProvider({ children }) {
       const generationId = authGenerationRef.current + 1;
       authGenerationRef.current = generationId;
 
-        if (eventName === 'SIGNED_OUT' || !sessionAtual) {
-        const recentLoginAttemptAt = getRecentLoginAttemptAt();
-        const shouldIgnoreStaleSignOut = Date.now() - recentLoginAttemptAt < 5000;
+      if (eventName === 'SIGNED_OUT' || !sessionAtual) {
+        const shouldIgnoreStaleSignOut = hasRecentLoginAttempt();
         if (shouldIgnoreStaleSignOut) {
           if (import.meta.env.DEV) {
             console.debug('[HERDON_AUTH_BOOT]', {
@@ -270,6 +276,22 @@ export function AuthProvider({ children }) {
 
     async function validarSessaoAoRetornar() {
       if (document.visibilityState === 'hidden') return;
+      if (hasRecentLoginAttempt()) {
+        if (import.meta.env.DEV) {
+          console.debug('[HERDON_AUTH_BOOT]', {
+            stage: 'session_recheck_skipped_login_attempt',
+          });
+        }
+        return;
+      }
+      if (Date.now() - obterLogoutEmAndamentoAt() < LOGIN_ATTEMPT_IGNORE_WINDOW_MS) {
+        if (import.meta.env.DEV) {
+          console.debug('[HERDON_AUTH_BOOT]', {
+            stage: 'session_recheck_skipped_logout_in_progress',
+          });
+        }
+        return;
+      }
 
       const { data, error } = await supabase.auth.getSession();
       if (error) {
@@ -290,18 +312,50 @@ export function AuthProvider({ children }) {
 
     function onStorage(event) {
       if (event.key !== HERDON_LOGOUT_EVENT_KEY || !event.newValue) return;
+      if (hasRecentLoginAttempt()) {
+        if (import.meta.env.DEV) {
+          console.debug('[HERDON_AUTH_BOOT]', {
+            stage: 'storage_logout_ignored_recent_login',
+          });
+        }
+        return;
+      }
       registrarLogoutLocal();
     }
 
     let authChannel = null;
     function onBroadcast(event) {
       if (event?.data?.type !== 'logout') return;
+      if (hasRecentLoginAttempt()) {
+        if (import.meta.env.DEV) {
+          console.debug('[HERDON_AUTH_BOOT]', {
+            stage: 'broadcast_logout_ignored_recent_login',
+          });
+        }
+        return;
+      }
       registrarLogoutLocal();
+    }
+
+    function onLoginAttemptReset() {
+      authGenerationRef.current += 1;
+      profileInFlightRef.current.clear();
+      profileFailureAtRef.current.clear();
+      setAuthError(null);
+      setProfileError(null);
+      setProfileReady(true);
+      if (import.meta.env.DEV) {
+        console.debug('[HERDON_AUTH_BOOT]', {
+          stage: 'login_attempt_reset',
+          generationId: authGenerationRef.current,
+        });
+      }
     }
 
     window.addEventListener('storage', onStorage);
     window.addEventListener('focus', validarSessaoAoRetornar);
     document.addEventListener('visibilitychange', validarSessaoAoRetornar);
+    window.addEventListener('herdon-login-attempt', onLoginAttemptReset);
 
     try {
       authChannel = new BroadcastChannel(HERDON_LOGOUT_CHANNEL);
@@ -316,6 +370,7 @@ export function AuthProvider({ children }) {
       window.removeEventListener('storage', onStorage);
       window.removeEventListener('focus', validarSessaoAoRetornar);
       document.removeEventListener('visibilitychange', validarSessaoAoRetornar);
+      window.removeEventListener('herdon-login-attempt', onLoginAttemptReset);
       if (authChannel) {
         authChannel.removeEventListener('message', onBroadcast);
         authChannel.close();

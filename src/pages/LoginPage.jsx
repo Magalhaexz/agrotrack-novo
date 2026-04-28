@@ -1,12 +1,18 @@
 import { useMemo, useState } from 'react';
 import { Eye, EyeOff } from 'lucide-react';
 import logoAgrotrack from '../assets/logo_app1.png';
-import { HERDON_LOGOUT_EVENT_KEY, supabase } from '../lib/supabase';
+import {
+  HERDON_LOGIN_ATTEMPT_KEY,
+  limparMarcadoresFluxoAuth,
+  limparPersistenciaSessao,
+  marcarLogoutEmAndamento,
+  supabase,
+} from '../lib/supabase';
 import '../styles/login.css';
 
-const LOGIN_MAX_RETRIES = 2;
-const LOGIN_RETRY_BASE_DELAY_MS = 300;
-const LOGIN_ATTEMPT_KEY = 'HERDON_LOGIN_ATTEMPT_AT';
+const LOGIN_MAX_ATTEMPTS = 3;
+const LOGIN_RETRY_DELAYS_MS = [300, 800, 1500];
+const LOGIN_ATTEMPT_TIMEOUT_MS = 10000;
 
 function calcularForcaSenha(senha) {
   let pontos = 0;
@@ -26,6 +32,12 @@ function wait(ms) {
   });
 }
 
+function createTimeoutError() {
+  const error = new Error('login_request_timeout');
+  error.name = 'TimeoutError';
+  return error;
+}
+
 function getErrorMessage(error) {
   if (!error) return '';
   if (typeof error === 'string') return error;
@@ -39,11 +51,90 @@ function isTransientLoginError(error) {
     'err_http2_protocol_error',
     'err_connection_reset',
     'err_connection_closed',
+    'load failed',
     'timeout',
     'networkerror',
     'network error',
     'fetch failed',
   ].some((signature) => message.includes(signature));
+}
+
+async function signInWithRetry({ email, password }) {
+  let lastError = null;
+
+  for (let attempt = 1; attempt <= LOGIN_MAX_ATTEMPTS; attempt += 1) {
+    const startedAt = Date.now();
+    let timedOut = false;
+
+    try {
+      const response = await Promise.race([
+        supabase.auth.signInWithPassword({ email, password }),
+        wait(LOGIN_ATTEMPT_TIMEOUT_MS).then(() => {
+          timedOut = true;
+          throw createTimeoutError();
+        }),
+      ]);
+
+      const data = response?.data ?? null;
+      const error = response?.error ?? null;
+      if (!error) {
+        if (import.meta.env.DEV) {
+          console.debug('[HERDON_LOGIN_BOOT]', {
+            attempt,
+            success: true,
+            retry: attempt > 1,
+            timeout: false,
+            durationMs: Date.now() - startedAt,
+            hasSession: Boolean(data?.session),
+          });
+        }
+        return { data, error: null };
+      }
+
+      const transient = isTransientLoginError(error);
+      const shouldRetry = transient && attempt < LOGIN_MAX_ATTEMPTS;
+      if (import.meta.env.DEV) {
+        console.warn('[HERDON_LOGIN_BOOT]', {
+          attempt,
+          success: false,
+          retry: shouldRetry,
+          transient,
+          timeout: false,
+          durationMs: Date.now() - startedAt,
+          errorType: getErrorMessage(error) || 'login_error',
+        });
+      }
+
+      if (!shouldRetry) {
+        return { data: null, error };
+      }
+
+      await wait(LOGIN_RETRY_DELAYS_MS[attempt - 1] || LOGIN_RETRY_DELAYS_MS.at(-1) || 300);
+    } catch (error) {
+      lastError = error;
+      const transient = isTransientLoginError(error);
+      const shouldRetry = transient && attempt < LOGIN_MAX_ATTEMPTS;
+      if (import.meta.env.DEV) {
+        console.warn('[HERDON_LOGIN_BOOT]', {
+          attempt,
+          success: false,
+          retry: shouldRetry,
+          transient,
+          timeout: timedOut,
+          durationMs: Date.now() - startedAt,
+          errorType: getErrorMessage(error) || 'login_exception',
+        });
+      }
+
+      if (!shouldRetry) {
+        return { data: null, error };
+      }
+
+      await wait(LOGIN_RETRY_DELAYS_MS[attempt - 1] || LOGIN_RETRY_DELAYS_MS.at(-1) || 300);
+    }
+  }
+
+  return { data: null, error: lastError || new Error('login_failed') };
 }
 
 export default function LoginPage() {
@@ -58,6 +149,7 @@ export default function LoginPage() {
   const [carregando, setCarregando] = useState(false);
   const [mostrarSenha, setMostrarSenha] = useState(false);
   const [mostrarNovaSenha, setMostrarNovaSenha] = useState(false);
+  const [mostrarResetLocal, setMostrarResetLocal] = useState(false);
 
   const forcaSenha = useMemo(() => calcularForcaSenha(novaSenha), [novaSenha]);
 
@@ -118,67 +210,43 @@ export default function LoginPage() {
       }
 
       try {
-        localStorage.setItem(LOGIN_ATTEMPT_KEY, String(Date.now()));
-        localStorage.removeItem(HERDON_LOGOUT_EVENT_KEY);
-        localStorage.removeItem('herdon_logout_in_progress');
-        sessionStorage.removeItem(HERDON_LOGOUT_EVENT_KEY);
-        sessionStorage.removeItem('herdon_logout_in_progress');
+        marcarLogoutEmAndamento(false);
+        limparMarcadoresFluxoAuth();
+        limparPersistenciaSessao();
+        localStorage.setItem(HERDON_LOGIN_ATTEMPT_KEY, String(Date.now()));
+        window.dispatchEvent(new CustomEvent('herdon-login-attempt'));
         if (import.meta.env.DEV) {
-          console.debug('[HERDON_SYNC_GUARD]', {
-            stage: 'login_cleared_recent_logout',
+          console.debug('[HERDON_LOGIN_BOOT]', {
+            stage: 'login_prepare_cleanup',
             hasEmail: Boolean(email.trim()),
+            localCleanupDone: true,
           });
         }
       } catch {
         // Sem storage disponivel
       }
 
-      let data = null;
-      let error = null;
-      for (let attempt = 1; attempt <= LOGIN_MAX_RETRIES + 1; attempt += 1) {
-        const response = await supabase.auth.signInWithPassword({
-          email: email.trim(),
-          password: senha,
-        });
-        data = response?.data ?? null;
-        error = response?.error ?? null;
-
-        if (!error) {
-          if (import.meta.env.DEV) {
-            console.debug('[HERDON_LOGIN_BOOT]', {
-              attempt,
-              success: true,
-              retry: attempt > 1,
-              hasSession: Boolean(data?.session),
-            });
-          }
-          break;
-        }
-
-        const transient = isTransientLoginError(error);
-        const canRetry = transient && attempt <= LOGIN_MAX_RETRIES;
-        if (import.meta.env.DEV) {
-          console.warn('[HERDON_LOGIN_BOOT]', {
-            attempt,
-            success: false,
-            retry: canRetry,
-            transient,
-            errorType: getErrorMessage(error) || 'login_error',
-          });
-        }
-        if (!canRetry) {
-          break;
-        }
-        await wait(LOGIN_RETRY_BASE_DELAY_MS * attempt);
-      }
+      const { data, error } = await signInWithRetry({
+        email: email.trim(),
+        password: senha,
+      });
 
       if (error) {
         if (isTransientLoginError(error)) {
-          setErro('Não foi possível conectar ao servidor. Verifique sua internet e tente novamente.');
+          setMostrarResetLocal(true);
+          limparPersistenciaSessao();
+          limparMarcadoresFluxoAuth();
+          marcarLogoutEmAndamento(false);
+          globalThis.setTimeout(() => {
+            void supabase.auth.getSession().catch(() => null);
+          }, 250);
+          setErro('Nao foi possivel conectar ao servidor. Verifique sua internet e tente novamente.');
           return;
         }
         throw error;
       }
+
+      setMostrarResetLocal(false);
 
       if (!data?.session) {
         setErro(
@@ -187,9 +255,31 @@ export default function LoginPage() {
       }
     } catch (err) {
       console.error('Erro de autenticacao:', err);
-      setErro(err?.message || 'Erro ao autenticar.');
+      setMostrarResetLocal(isTransientLoginError(err));
+      setErro(
+        isTransientLoginError(err)
+          ? 'Nao foi possivel conectar ao servidor. Verifique sua internet e tente novamente.'
+          : (err?.message || 'Erro ao autenticar.')
+      );
     } finally {
+      marcarLogoutEmAndamento(false);
       setCarregando(false);
+    }
+  }
+
+  function limparSessaoLocalETentarNovamente() {
+    try {
+      marcarLogoutEmAndamento(false);
+      limparPersistenciaSessao();
+      limparMarcadoresFluxoAuth();
+      if (import.meta.env.DEV) {
+        console.debug('[HERDON_LOGOUT_BOOT]', {
+          stage: 'manual_local_reset',
+          localCleanupDone: true,
+        });
+      }
+    } finally {
+      window.location.reload();
     }
   }
 
@@ -367,6 +457,15 @@ export default function LoginPage() {
               <div className="login-feedback-stack">
                 {erro ? <div className="login-error">{erro}</div> : null}
                 {mensagem ? <div className="login-success">{mensagem}</div> : null}
+                {mostrarResetLocal && modo === 'login' ? (
+                  <button
+                    type="button"
+                    className="login-link-btn"
+                    onClick={limparSessaoLocalETentarNovamente}
+                  >
+                    Limpar sessao local e tentar novamente
+                  </button>
+                ) : null}
               </div>
             )}
 
