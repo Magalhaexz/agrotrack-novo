@@ -70,7 +70,13 @@ export function AuthProvider({ children }) {
 
     async function carregarSessao() {
       try {
-        const { data, error } = await supabase.auth.getSession();
+        const sessionResult = await Promise.race([
+          supabase.auth.getSession(),
+          new Promise((_, reject) => {
+            window.setTimeout(() => reject(new Error('Timeout ao obter sessão de autenticação.')), 4500);
+          }),
+        ]);
+        const { data, error } = sessionResult;
 
         if (error) {
           console.error('Erro ao obter sessão:', error);

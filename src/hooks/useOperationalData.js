@@ -108,31 +108,50 @@ export function useOperationalData(initialDb, session) {
       }
 
       try {
-        const timeoutPromise = new Promise((_, reject) => {
-          window.setTimeout(() => reject(new Error('Operational load timeout after 8s')), 8000);
-        });
+        const loadPromise = loadOperationalSnapshot();
 
-        const snapshot = await Promise.race([loadOperationalSnapshot(), timeoutPromise]);
+        const raceResult = await Promise.race([
+          loadPromise.then((snapshot) => ({ snapshot })),
+          loadPromise.catch((error) => ({ error })),
+          new Promise((resolve) => {
+            window.setTimeout(() => resolve({ timeout: true }), 4500);
+          }),
+        ]);
 
-        if (ativo) {
-          setDb(createOperationalFallbackDb(snapshot));
-          setDataSource('supabase');
-          setDataError(null);
-          setDataReady(true);
-        }
-      } catch (error) {
         if (!ativo) return;
 
-        if (String(error?.message || '').includes('timeout')) {
-          if (import.meta.env.DEV) {
-            console.warn('[HERDON_OPERATIONAL_TIMEOUT]', error);
-          }
+        if (raceResult?.timeout) {
           setDb(createOperationalFallbackDb(initialDb));
           setDataSource('fallback_timeout');
-          setDataError(error instanceof Error ? error : new Error('Falha por timeout na carga operacional.'));
+          setDataError(new Error('Tempo limite na carga operacional (4.5s).'));
           setDataReady(true);
+
+          loadPromise
+            .then((lateSnapshot) => {
+              if (!ativo) return;
+              setDb(createOperationalFallbackDb(lateSnapshot));
+              setDataSource('supabase_late');
+              setDataError(null);
+              setDataReady(true);
+            })
+            .catch((lateError) => {
+              if (import.meta.env.DEV) {
+                console.warn('[HERDON_OPERATIONAL_LATE_ERROR]', lateError);
+              }
+            });
           return;
         }
+
+        if (raceResult?.error) {
+          throw raceResult.error;
+        }
+
+        setDb(createOperationalFallbackDb(raceResult?.snapshot));
+        setDataSource('supabase');
+        setDataError(null);
+        setDataReady(true);
+      } catch (error) {
+        if (!ativo) return;
 
         setDb(createOperationalFallbackDb(initialDb));
         setDataSource(isKnownOperationalModuleError(error) ? 'fallback' : 'fallback_error');
@@ -163,4 +182,3 @@ export function useOperationalData(initialDb, session) {
     hydratingRef,
   };
 }
-

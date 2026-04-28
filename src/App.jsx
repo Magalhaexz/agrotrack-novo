@@ -97,6 +97,7 @@ export default function App() {
   const [tabAtiva, setTabAtiva] = useState('geral');
   const [fazendaSelecionada, setFazendaSelecionada] = useState(null);
   const [forcarTelaLogin, setForcarTelaLogin] = useState(false);
+  const [showBootRecovery, setShowBootRecovery] = useState(false);
   const [confirmState, setConfirmState] = useState({
     open: false,
     title: '',
@@ -107,14 +108,29 @@ export default function App() {
   const deniedToastRef = useRef({ permission: '', timestamp: 0 });
 
   if (import.meta.env.DEV) {
-    console.debug('[HERDON_LOADING_STATE]', {
+    console.debug('[HERDON_BOOT]', {
       loadingAuth,
       hasSession: Boolean(session),
       dataReady,
       dataSource,
-      dataError,
+      dataErrorMessage: dataError?.message || null,
     });
   }
+
+  const isBootLoading = loadingAuth || (session && !dataReady);
+
+  useEffect(() => {
+    if (!isBootLoading) {
+      setShowBootRecovery(false);
+      return undefined;
+    }
+
+    const timer = window.setTimeout(() => {
+      setShowBootRecovery(true);
+    }, 6000);
+
+    return () => window.clearTimeout(timer);
+  }, [isBootLoading]);
 
   useEffect(() => {
     const originalAlert = window.alert;
@@ -237,6 +253,20 @@ export default function App() {
     }
 
     setCurrentPage('dashboard');
+  }
+
+  async function handleClearSessionAndReload() {
+    try {
+      localStorage.clear();
+      sessionStorage.clear();
+      await supabase.auth.signOut();
+    } catch (error) {
+      if (import.meta.env.DEV) {
+        console.warn('[HERDON_CLEAR_SESSION]', error);
+      }
+    } finally {
+      window.location.reload();
+    }
   }
 
   const alertasResolvidos = Array.isArray(db?.alertas_resolvidos) ? db.alertas_resolvidos : [];
@@ -381,7 +411,7 @@ export default function App() {
     return grupos;
   }, [hasPermission]);
 
-  if (loadingAuth || (session && !dataReady)) {
+  if (isBootLoading) {
     return (
       <div className="app-loading">
         <div className="app-loading-panel">
@@ -393,6 +423,20 @@ export default function App() {
             <span className="app-loading-bar" />
             <span className="app-loading-bar" />
           </div>
+          {showBootRecovery ? (
+            <div style={{ display: 'grid', gap: 10, marginTop: 8 }}>
+              <strong>O carregamento está demorando mais que o normal.</strong>
+              <p>Você pode tentar novamente ou limpar a sessão local para voltar ao login.</p>
+              <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
+                <button type="button" className="ui-button ui-button--outline ui-button--sm" onClick={() => window.location.reload()}>
+                  Tentar novamente
+                </button>
+                <button type="button" className="ui-button ui-button--ghost ui-button--sm" onClick={handleClearSessionAndReload}>
+                  Limpar sessão e voltar ao login
+                </button>
+              </div>
+            </div>
+          ) : null}
         </div>
       </div>
     );
