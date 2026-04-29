@@ -301,9 +301,23 @@ export async function deleteOwnerScopedCollection(table, session, extraFilters =
 
 
 function getSupabaseRestConfig() {
-  const url = import.meta?.env?.VITE_SUPABASE_URL || null;
-  const anonKey = import.meta?.env?.VITE_SUPABASE_ANON_KEY || null;
-  return { url, anonKey };
+  const envUrl = import.meta?.env?.VITE_SUPABASE_URL || null;
+  const envAnonKey = import.meta?.env?.VITE_SUPABASE_ANON_KEY || null;
+  const clientUrl = supabase?.supabaseUrl || supabase?.rest?.url?.replace(/\/rest\/v1\/?$/, '') || null;
+  const clientAnonKey = supabase?.supabaseKey || supabase?.anonKey || null;
+
+  const url = envUrl || clientUrl;
+  const anonKey = envAnonKey || clientAnonKey;
+
+  if (!url || !anonKey) {
+    return {
+      url: null,
+      anonKey: null,
+      error: 'Configuração da nuvem ausente. Verifique as variáveis do Supabase.',
+    };
+  }
+
+  return { url, anonKey, error: null };
 }
 
 function readLocalStorageSupabaseToken() {
@@ -346,28 +360,46 @@ function resolveSupabaseAccessToken(session) {
 }
 
 async function fetchFazendasRest(path, token, options = {}) {
-  const { url, anonKey } = getSupabaseRestConfig();
-  if (!url || !anonKey || !token) {
-    throw new Error('missing_rest_config_or_token');
+  const { url, anonKey, error: configError } = getSupabaseRestConfig();
+  const method = options.method || 'GET';
+  if (configError || !token) {
+    const error = new Error(configError || 'missing_rest_config_or_token');
+    error.code = 'CONFIG_ERROR';
+    throw error;
   }
 
-  const response = await fetch(`${url}/rest/v1/${path}`, {
-    method: options.method || 'GET',
-    headers: {
-      apikey: anonKey,
-      Authorization: `Bearer ${token}`,
-      'Content-Type': 'application/json',
-      ...(options.headers || {}),
-    },
-    body: options.body ? JSON.stringify(options.body) : undefined,
-  });
+  const baseUrl = String(url).replace(/\/$/, '');
+  const requestUrl = `${baseUrl}/rest/v1/${path}`;
+  const headers = {
+    apikey: anonKey,
+    Authorization: `Bearer ${token}`,
+    Accept: 'application/json',
+    ...(options.headers || {}),
+  };
+  if (method !== 'GET' && method !== 'HEAD') {
+    headers['Content-Type'] = 'application/json';
+  }
+
+  let response;
+  try {
+    response = await fetch(requestUrl, {
+      method,
+      headers,
+      body: options.body ? JSON.stringify(options.body) : undefined,
+    });
+  } catch (error) {
+    error.requestUrlHost = (() => {
+      try { return new URL(requestUrl).host; } catch { return null; }
+    })();
+    error.requestUrlPath = (() => {
+      try { return new URL(requestUrl).pathname; } catch { return null; }
+    })();
+    error.requestMethod = method;
+    throw error;
+  }
 
   let payload = null;
-  try {
-    payload = await response.json();
-  } catch {
-    payload = null;
-  }
+  try { payload = await response.json(); } catch { payload = null; }
 
   if (!response.ok) {
     const error = new Error(payload?.message || `rest_error_${response.status}`);
@@ -375,6 +407,9 @@ async function fetchFazendasRest(path, token, options = {}) {
     error.code = payload?.code || null;
     error.details = payload?.details || null;
     error.hint = payload?.hint || null;
+    error.requestUrlHost = (() => { try { return new URL(requestUrl).host; } catch { return null; } })();
+    error.requestUrlPath = (() => { try { return new URL(requestUrl).pathname; } catch { return null; } })();
+    error.requestMethod = method;
     throw error;
   }
 
@@ -391,7 +426,7 @@ function isAuthDebugEnabled() {
 
 function isNetworkError(error) {
   const message = String(error?.message || '').toLowerCase();
-  return message.includes('failed to fetch') || message.includes('networkerror') || message.includes('network request failed');
+  return message.includes('failed to fetch') || message.includes('networkerror') || message.includes('network request failed') || message.includes('fetch failed');
 }
 
 function classifyFazendasSyncError(error) {
@@ -440,11 +475,22 @@ export async function checkSupabaseCloudConnection({ session } = {}) {
   const sessionUserId = getSessionUserId(session);
   const resolved = resolveSupabaseAccessToken(session);
 
+  const config = getSupabaseRestConfig();
+  if (config.error) {
+    return { ok: false, stage: 'config_missing', error: 'CONFIG_ERROR', code: 'CONFIG_ERROR', status: null, message: config.error, details: null, hint: null };
+  }
+
   if (!sessionUserId || !resolved.token) {
     const message = 'Sua sessão expirou. Faça login novamente.';
     if (isAuthDebugEnabled()) {
+      const cfg = getSupabaseRestConfig();
       console.info('[HERDON_CLOUD_HEALTH]', {
         stage: 'auth_session_missing',
+        supabaseUrlPresent: Boolean(cfg.url),
+        anonKeyPresent: Boolean(cfg.anonKey),
+        requestUrlHost: null,
+        requestUrlPath: null,
+        method: 'GET',
         sessionUserIdPresent: Boolean(sessionUserId),
         acceptedSessionTokenPresent: resolved.acceptedSessionTokenPresent,
         localStorageTokenPresent: resolved.localStorageTokenPresent,
@@ -460,8 +506,15 @@ export async function checkSupabaseCloudConnection({ session } = {}) {
   try {
     await fetchFazendasRest(`fazendas?select=id&owner_user_id=eq.${encodeURIComponent(sessionUserId)}&limit=1`, resolved.token);
     if (isAuthDebugEnabled()) {
+      const cfg = getSupabaseRestConfig();
       console.info('[HERDON_CLOUD_HEALTH]', {
-        stage: 'ok', sessionUserIdPresent: true,
+        stage: 'ok',
+        supabaseUrlPresent: Boolean(cfg.url),
+        anonKeyPresent: Boolean(cfg.anonKey),
+        requestUrlHost: (() => { try { return new URL(String(cfg.url).replace(/\/$/, '')).host; } catch { return null; } })(),
+        requestUrlPath: '/rest/v1/fazendas',
+        method: 'GET',
+        sessionUserIdPresent: true,
         acceptedSessionTokenPresent: resolved.acceptedSessionTokenPresent,
         localStorageTokenPresent: resolved.localStorageTokenPresent,
         accessTokenPresent: true, status: 200, code: null, message: 'ok',
@@ -477,10 +530,12 @@ export async function checkSupabaseCloudConnection({ session } = {}) {
     if (status === 401) { stage = 'auth_session_missing'; message = 'Sua sessão expirou. Faça login novamente.'; }
     else if (status === 403 || code === '42501') { stage = 'permission_denied'; message = 'Permissão negada ao acessar a nuvem. Verifique as políticas RLS.'; }
     else if (status === 404 || code === 'PGRST204' || code === '42703' || lower.includes('schema') || lower.includes('column')) { stage = 'schema_mismatch'; message = 'A estrutura da tabela fazendas não está compatível com o app.'; }
+    else if (code === 'CONFIG_ERROR' || lower.includes('missing_rest_config_or_token')) { stage = 'config_missing'; message = 'Configuração da nuvem ausente. Verifique as variáveis do Supabase.'; }
     else if (isNetworkError(error) || (error?.name === 'TypeError' && lower.includes('failed to fetch'))) { stage = 'network_error'; message = 'Não foi possível conectar à nuvem. Verifique sua conexão e tente novamente.'; }
 
     if (isAuthDebugEnabled()) {
-      console.info('[HERDON_CLOUD_HEALTH]', { stage, sessionUserIdPresent: Boolean(sessionUserId), acceptedSessionTokenPresent: resolved.acceptedSessionTokenPresent, localStorageTokenPresent: resolved.localStorageTokenPresent, accessTokenPresent: Boolean(resolved.token), status, code, message });
+      const cfg = getSupabaseRestConfig();
+      console.info('[HERDON_CLOUD_HEALTH]', { stage, supabaseUrlPresent: Boolean(cfg.url), anonKeyPresent: Boolean(cfg.anonKey), requestUrlHost: error?.requestUrlHost || null, requestUrlPath: error?.requestUrlPath || '/rest/v1/fazendas', method: error?.requestMethod || 'GET', sessionUserIdPresent: Boolean(sessionUserId), acceptedSessionTokenPresent: resolved.acceptedSessionTokenPresent, localStorageTokenPresent: resolved.localStorageTokenPresent, accessTokenPresent: Boolean(resolved.token), status, code, message, errorName: error?.name || null, errorMessage: error?.message || null });
     }
     return { ok: false, stage, error: error?.name || 'CLOUD_HEALTH_FAILED', code, status, message, details: error?.details || null, hint: error?.hint || null };
   }
@@ -514,8 +569,9 @@ export async function syncFazendasWithCloud({ fazendas = [], session }) {
       if (status === 401) message = 'Sua sessão expirou. Faça login novamente.';
       else if (status === 403 || code === '42501') message = 'Permissão negada ao sincronizar fazendas. Verifique as políticas RLS.';
       else if (status === 404 || code === 'PGRST204' || code === '42703' || lower.includes('schema') || lower.includes('column')) message = 'A estrutura da tabela fazendas não está compatível com o app.';
+      else if (code === 'CONFIG_ERROR' || lower.includes('missing_rest_config_or_token')) message = 'Configuração da nuvem ausente. Verifique as variáveis do Supabase.';
       else if (isNetworkError(error) || (error?.name === 'TypeError' && lower.includes('failed to fetch'))) message = 'Não foi possível conectar à nuvem. Verifique sua conexão e tente novamente.';
-      logFazendasSync({ operation: 'insert', payloadKeys: Object.keys(payload), rowNome: payload.nome || null, status, code, message, level: 'warn' });
+      logFazendasSync({ operation: 'insert', payloadKeys: Object.keys(payload), rowNome: payload.nome || null, status, code, message, errorName: error?.name || null, errorMessage: error?.message || null, level: 'warn' });
       return { ok: false, data: localRows, error: code || 'SYNC_FAILED', message, syncedCount, failedCount, selectedCount: 0 };
     }
   }
