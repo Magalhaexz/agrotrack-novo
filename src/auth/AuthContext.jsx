@@ -8,18 +8,13 @@ import {
   writeCachedProfile,
 } from '../services/userAccess';
 import {
-  HERDON_LOGOUT_CHANNEL,
-  HERDON_LOGOUT_EVENT_KEY,
-  HERDON_LOGIN_ATTEMPT_KEY,
   limparPersistenciaSessao,
-  obterLogoutEmAndamentoAt,
   supabase,
 } from '../lib/supabase';
 import { obterPerfilDoUsuario, usuarioTemPermissao } from './perfis';
 
 const AuthContext = createContext(null);
 const PROFILE_FAILURE_COOLDOWN_MS = 120000;
-const LOGIN_ATTEMPT_IGNORE_WINDOW_MS = 7000;
 const HERDON_ENABLE_PROFILE_SYNC = 'HERDON_ENABLE_PROFILE_SYNC';
 const profileBootLogs = new Set();
 
@@ -27,20 +22,6 @@ function getErrorMessage(error) {
   if (!error) return '';
   if (typeof error === 'string') return error;
   return error.message || error.details || error.hint || error.name || String(error);
-}
-
-function getRecentLoginAttemptAt() {
-  try {
-    const raw = localStorage.getItem(HERDON_LOGIN_ATTEMPT_KEY);
-    const value = Number(raw);
-    return Number.isFinite(value) ? value : 0;
-  } catch {
-    return 0;
-  }
-}
-
-function hasRecentLoginAttempt() {
-  return Date.now() - getRecentLoginAttemptAt() < LOGIN_ATTEMPT_IGNORE_WINDOW_MS;
 }
 
 function shouldEnableProfileSync() {
@@ -97,8 +78,6 @@ export function AuthProvider({ children }) {
   const profileFailureAtRef = useRef(new Map());
   const profileInFlightRef = useRef(new Map());
   const profileSyncEnabledRef = useRef(shouldEnableProfileSync());
-  const acceptedSessionAtRef = useRef(0);
-  const logoutRequestedAtRef = useRef(0);
 
   const resetAuthState = useCallback(() => {
     setSession(null);
@@ -112,8 +91,6 @@ export function AuthProvider({ children }) {
 
   const registrarLogoutLocal = useCallback(() => {
     authGenerationRef.current += 1;
-    logoutRequestedAtRef.current = Date.now();
-    acceptedSessionAtRef.current = 0;
     limparPersistenciaSessao();
     profileInFlightRef.current.clear();
     profileFailureAtRef.current.clear();
@@ -156,8 +133,6 @@ export function AuthProvider({ children }) {
     const userId = authUser?.id || null;
 
     activeUserIdRef.current = userId;
-    acceptedSessionAtRef.current = Date.now();
-    logoutRequestedAtRef.current = 0;
     if (userId) {
       profileFailureAtRef.current.delete(userId);
     }
@@ -349,149 +324,8 @@ export function AuthProvider({ children }) {
 
     carregarSessao();
 
-    const {
-      data: { subscription },
-    } = supabase.auth.onAuthStateChange((eventName, sessionAtual) => {
-      const generationId = authGenerationRef.current + 1;
-      authGenerationRef.current = generationId;
-
-      if (eventName === 'SIGNED_OUT' || !sessionAtual) {
-        const shouldIgnoreStaleSignOut =
-          hasRecentLoginAttempt()
-          || (acceptedSessionAtRef.current > 0 && Date.now() - acceptedSessionAtRef.current < LOGIN_ATTEMPT_IGNORE_WINDOW_MS && !logoutRequestedAtRef.current);
-        if (shouldIgnoreStaleSignOut) {
-          if (import.meta.env.DEV) {
-            console.debug('[HERDON_AUTH_BOOT]', {
-              stage: 'ignore_stale_signed_out',
-              generationId,
-              staleSignOutIgnored: true,
-            });
-          }
-          return;
-        }
-        registrarLogoutLocal();
-        profileInFlightRef.current.clear();
-        return;
-      }
-
-      if (import.meta.env.DEV) {
-        console.debug('[HERDON_AUTH_BOOT]', {
-          stage: 'auth_state_change',
-          generationId,
-          eventName,
-          hasSession: Boolean(sessionAtual?.user),
-        });
-      }
-      acceptSession(sessionAtual, {
-        source: `auth_event_${eventName || 'unknown'}`,
-        deferProfileSync: carregarProfile,
-      });
-    });
-
-    async function validarSessaoAoRetornar() {
-      if (document.visibilityState === 'hidden') return;
-      if (hasRecentLoginAttempt()) {
-        if (import.meta.env.DEV) {
-          console.debug('[HERDON_AUTH_BOOT]', {
-            stage: 'session_recheck_skipped_login_attempt',
-          });
-        }
-        return;
-      }
-      if (Date.now() - obterLogoutEmAndamentoAt() < LOGIN_ATTEMPT_IGNORE_WINDOW_MS) {
-        if (import.meta.env.DEV) {
-          console.debug('[HERDON_AUTH_BOOT]', {
-            stage: 'session_recheck_skipped_logout_in_progress',
-          });
-        }
-        return;
-      }
-
-      const { data, error } = await supabase.auth.getSession();
-      if (error) {
-        if (import.meta.env.DEV) {
-          console.warn('[HERDON_AUTH_BOOT]', {
-            stage: 'session_recheck_error',
-            hasSession: Boolean(activeUserIdRef.current),
-            errorType: getErrorMessage(error) || 'session_recheck_error',
-          });
-        }
-        return;
-      }
-
-      if (!data?.session) {
-        registrarLogoutLocal();
-      }
-    }
-
-    function onStorage(event) {
-      if (event.key !== HERDON_LOGOUT_EVENT_KEY || !event.newValue) return;
-      if (hasRecentLoginAttempt()) {
-        if (import.meta.env.DEV) {
-          console.debug('[HERDON_AUTH_BOOT]', {
-            stage: 'storage_logout_ignored_recent_login',
-          });
-        }
-        return;
-      }
-      registrarLogoutLocal();
-    }
-
-    let authChannel = null;
-    function onBroadcast(event) {
-      if (event?.data?.type !== 'logout') return;
-      if (hasRecentLoginAttempt()) {
-        if (import.meta.env.DEV) {
-          console.debug('[HERDON_AUTH_BOOT]', {
-            stage: 'broadcast_logout_ignored_recent_login',
-          });
-        }
-        return;
-      }
-      registrarLogoutLocal();
-    }
-
-    function onLoginAttemptReset() {
-      authGenerationRef.current += 1;
-      acceptedSessionAtRef.current = 0;
-      logoutRequestedAtRef.current = 0;
-      profileInFlightRef.current.clear();
-      profileFailureAtRef.current.clear();
-      profileSyncEnabledRef.current = shouldEnableProfileSync();
-      setAuthError(null);
-      setProfileError(null);
-      setProfileReady(true);
-      if (import.meta.env.DEV) {
-        console.debug('[HERDON_AUTH_BOOT]', {
-          stage: 'login_attempt_reset',
-          generationId: authGenerationRef.current,
-        });
-      }
-    }
-
-    window.addEventListener('storage', onStorage);
-    window.addEventListener('focus', validarSessaoAoRetornar);
-    document.addEventListener('visibilitychange', validarSessaoAoRetornar);
-    window.addEventListener('herdon-login-attempt', onLoginAttemptReset);
-
-    try {
-      authChannel = new BroadcastChannel(HERDON_LOGOUT_CHANNEL);
-      authChannel.addEventListener('message', onBroadcast);
-    } catch {
-      authChannel = null;
-    }
-
     return () => {
       ativo = false;
-      subscription.unsubscribe();
-      window.removeEventListener('storage', onStorage);
-      window.removeEventListener('focus', validarSessaoAoRetornar);
-      document.removeEventListener('visibilitychange', validarSessaoAoRetornar);
-      window.removeEventListener('herdon-login-attempt', onLoginAttemptReset);
-      if (authChannel) {
-        authChannel.removeEventListener('message', onBroadcast);
-        authChannel.close();
-      }
     };
   }, [acceptSession, aplicarProfileFallback, registrarLogoutLocal, resetAuthState]);
 

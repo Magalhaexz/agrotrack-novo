@@ -42,6 +42,7 @@ export const HERDON_LOGOUT_EVENT_KEY = 'herdon_logout_event';
 export const HERDON_LOGOUT_CHANNEL = 'herdon_auth_channel';
 export const HERDON_LOGOUT_IN_PROGRESS_KEY = 'herdon_logout_in_progress';
 export const HERDON_LOGIN_ATTEMPT_KEY = 'HERDON_LOGIN_ATTEMPT_AT';
+export const HERDON_LOGIN_ACCEPTED_AT = 'HERDON_LOGIN_ACCEPTED_AT';
 
 function wait(ms) {
   return new Promise((resolve) => {
@@ -113,6 +114,7 @@ export function limparMarcadoresFluxoAuth() {
     storage.removeItem(HERDON_LOGOUT_EVENT_KEY);
     storage.removeItem(HERDON_LOGOUT_IN_PROGRESS_KEY);
     storage.removeItem(HERDON_LOGIN_ATTEMPT_KEY);
+    storage.removeItem(HERDON_LOGIN_ACCEPTED_AT);
   });
 }
 

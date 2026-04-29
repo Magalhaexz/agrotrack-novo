@@ -20,13 +20,8 @@ import {
 import { useOperationalData } from './hooks/useOperationalData';
 import { useToast } from './hooks/useToast';
 import {
-  HERDON_LOGIN_ATTEMPT_KEY,
-  HERDON_LOGOUT_CHANNEL,
-  HERDON_LOGOUT_EVENT_KEY,
   limparPersistenciaSessao,
   limparMarcadoresFluxoAuth,
-  marcarLogoutEmAndamento,
-  publicarEventoLogout,
   signOutLocalSafely,
 } from './lib/supabase';
 import { secondaryNavItems, navSections } from './navigation/navConfig';
@@ -85,17 +80,6 @@ const pageMap = {
   financeiro: FinanceiroPage,
 };
 
-function getRecentLoginAttemptAt() {
-  try {
-    const raw = localStorage.getItem(HERDON_LOGIN_ATTEMPT_KEY);
-    const value = Number(raw);
-    return Number.isFinite(value) ? value : 0;
-  } catch {
-    return 0;
-  }
-}
-
-
 export default function App() {
   const [currentPage, setCurrentPage] = useState('dashboard');
   const { toasts, showToast, removeToast } = useToast();
@@ -147,7 +131,6 @@ export default function App() {
 
   useEffect(() => {
     if (!isBootLoading) {
-      setShowBootRecovery(false);
       return undefined;
     }
 
@@ -179,112 +162,53 @@ export default function App() {
   }, [showToast]);
 
   useEffect(() => {
-    if (!user) {
-      setUsuarioLogado(null);
-      return;
-    }
+    const timer = window.setTimeout(() => {
+      if (!user) {
+        setUsuarioLogado(null);
+        return;
+      }
 
-    if (forcarTelaLogin) {
-      return;
-    }
+      if (forcarTelaLogin) {
+        return;
+      }
 
-    setForcarTelaLogin(false);
-    setUsuarioLogado((prev) => ({
-      id: user.id || prev?.id || null,
-      nome: user?.nome || prev?.nome || user?.user_metadata?.name || user?.user_metadata?.nome || user?.email?.split('@')[0] || 'Usuário',
-      email: user.email || prev?.email || '',
-      perfil: user?.perfil || prev?.perfil || 'visualizador',
-      perfilLabel: user?.perfilLabel || prev?.perfilLabel || 'Visualizador',
-      foto_url: user?.foto_url ?? prev?.foto_url ?? user?.user_metadata?.avatar_url ?? null,
-      telefone: user?.telefone ?? prev?.telefone ?? '',
-      cargo: user?.cargo ?? prev?.cargo ?? '',
-    }));
+      setForcarTelaLogin(false);
+      setUsuarioLogado((prev) => ({
+        id: user.id || prev?.id || null,
+        nome: user?.nome || prev?.nome || user?.user_metadata?.name || user?.user_metadata?.nome || user?.email?.split('@')[0] || 'Usuário',
+        email: user.email || prev?.email || '',
+        perfil: user?.perfil || prev?.perfil || 'visualizador',
+        perfilLabel: user?.perfilLabel || prev?.perfilLabel || 'Visualizador',
+        foto_url: user?.foto_url ?? prev?.foto_url ?? user?.user_metadata?.avatar_url ?? null,
+        telefone: user?.telefone ?? prev?.telefone ?? '',
+        cargo: user?.cargo ?? prev?.cargo ?? '',
+      }));
+    }, 0);
+
+    return () => window.clearTimeout(timer);
   }, [forcarTelaLogin, user]);
 
   useEffect(() => {
-    function shouldIgnoreStaleLogoutEvent() {
-      const recentLoginAttemptAt = getRecentLoginAttemptAt();
-      return Date.now() - recentLoginAttemptAt < 7000;
-    }
-
-    function aplicarLogoutForcado() {
-      forceLocalSignOut();
-      setForcarTelaLogin(true);
-      setUsuarioLogado(null);
-      setCurrentPage('dashboard');
-    }
-
-    function onStorage(event) {
-      if (event.key !== HERDON_LOGOUT_EVENT_KEY || !event.newValue) return;
-      if (shouldIgnoreStaleLogoutEvent()) {
-        if (import.meta.env.DEV) {
-          console.debug('[HERDON_AUTH_BOOT]', {
-            stage: 'app_storage_logout_ignored_recent_login',
-            hasSession: Boolean(session),
-          });
-        }
+    const timer = window.setTimeout(() => {
+      const fazendas = Array.isArray(db?.fazendas) ? db.fazendas : [];
+      if (!fazendas.length) {
+        setFazendaSelecionada(null);
         return;
       }
-      aplicarLogoutForcado();
-    }
 
-    let authChannel = null;
-    function onBroadcast(event) {
-      if (event?.data?.type !== 'logout') return;
-      if (shouldIgnoreStaleLogoutEvent()) {
-        if (import.meta.env.DEV) {
-          console.debug('[HERDON_AUTH_BOOT]', {
-            stage: 'app_broadcast_logout_ignored_recent_login',
-            hasSession: Boolean(session),
-          });
+      setFazendaSelecionada((prev) => {
+        if (prev && fazendas.some((fazenda) => Number(fazenda.id) === Number(prev.id))) {
+          return fazendas.find((fazenda) => Number(fazenda.id) === Number(prev.id));
         }
-        return;
-      }
-      aplicarLogoutForcado();
-    }
+        return fazendas[0];
+      });
+    }, 0);
 
-    window.addEventListener('storage', onStorage);
-    try {
-      authChannel = new BroadcastChannel(HERDON_LOGOUT_CHANNEL);
-      authChannel.addEventListener('message', onBroadcast);
-    } catch {
-      authChannel = null;
-    }
-
-    return () => {
-      window.removeEventListener('storage', onStorage);
-      if (authChannel) {
-        authChannel.removeEventListener('message', onBroadcast);
-        authChannel.close();
-      }
-    };
-  }, [forceLocalSignOut, session]);
-
-  useEffect(() => {
-    const fazendas = Array.isArray(db?.fazendas) ? db.fazendas : [];
-    if (!fazendas.length) {
-      setFazendaSelecionada(null);
-      return;
-    }
-
-    setFazendaSelecionada((prev) => {
-      if (prev && fazendas.some((fazenda) => Number(fazenda.id) === Number(prev.id))) {
-        return fazendas.find((fazenda) => Number(fazenda.id) === Number(prev.id));
-      }
-      return fazendas[0];
-    });
+    return () => window.clearTimeout(timer);
   }, [db?.fazendas]);
 
   const dbDashboard = useMemo(() => {
-    const start = import.meta.env.DEV ? (typeof performance !== 'undefined' ? performance.now() : Date.now()) : 0;
     if (!fazendaSelecionada?.id) {
-      if (import.meta.env.DEV) {
-        const end = typeof performance !== 'undefined' ? performance.now() : Date.now();
-        console.debug('[HERDON_DASHBOARD_TIMING]', {
-          stage: 'dbDashboard_all_farms',
-          durationMs: Number((end - start).toFixed(1)),
-        });
-      }
       return db;
     }
 
@@ -309,14 +233,6 @@ export default function App() {
       ),
       movimentacoes_animais: (db.movimentacoes_animais || []).filter((movimento) => loteIds.has(movimento.lote_id)),
     };
-    if (import.meta.env.DEV) {
-      const end = typeof performance !== 'undefined' ? performance.now() : Date.now();
-      console.debug('[HERDON_DASHBOARD_TIMING]', {
-        stage: 'dbDashboard_scoped',
-        durationMs: Number((end - start).toFixed(1)),
-        lotes: scopedDb.lotes?.length || 0,
-      });
-    }
     return scopedDb;
   }, [db, fazendaSelecionada]);
 
@@ -349,9 +265,7 @@ export default function App() {
     setForcarTelaLogin(true);
     setUsuarioLogado(null);
     setCurrentPage('dashboard');
-    marcarLogoutEmAndamento(true);
     limparPersistenciaSessao();
-    publicarEventoLogout('manual_logout');
 
     if (import.meta.env.DEV) {
       console.debug('[HERDON_LOGOUT_BOOT]', {
@@ -360,50 +274,22 @@ export default function App() {
       });
     }
 
-    try {
-      await signOutLocalSafely();
-    } catch (error) {
-      if (import.meta.env.DEV) {
-        console.warn('[HERDON_LOGOUT_BOOT]', {
-          stage: 'local_signout_failed_after_cleanup',
-          errorType: error?.message || error?.name || 'signout_error',
-          networkFailed: true,
-          localLogoutCompleted: true,
-        });
-      }
-    } finally {
-      limparPersistenciaSessao();
-      limparMarcadoresFluxoAuth();
-      marcarLogoutEmAndamento(false);
-    }
+    void signOutLocalSafely().catch(() => null);
+    limparMarcadoresFluxoAuth();
+    window.location.replace('/');
   }
 
   async function handleClearSessionAndReload() {
     forceLocalSignOut();
-    marcarLogoutEmAndamento(true);
     limparPersistenciaSessao();
-    publicarEventoLogout('clear_session_reload');
-    try {
-      await signOutLocalSafely();
-    } catch (error) {
-      if (import.meta.env.DEV) {
-        console.warn('[HERDON_LOGOUT_BOOT]', {
-          stage: 'clear_session_local_signout_failed',
-          errorType: error?.message || error?.name || 'signout_error',
-        });
-      }
-    } finally {
-      limparPersistenciaSessao();
-      limparMarcadoresFluxoAuth();
-      marcarLogoutEmAndamento(false);
-      window.location.reload();
-    }
+    limparMarcadoresFluxoAuth();
+    void signOutLocalSafely().catch(() => null);
+    window.location.replace('/');
   }
 
   const alertasResolvidos = Array.isArray(db?.alertas_resolvidos) ? db.alertas_resolvidos : [];
 
   const rawAlerts = useMemo(() => {
-    const start = import.meta.env.DEV ? (typeof performance !== 'undefined' ? performance.now() : Date.now()) : 0;
     const legacy = buildAlerts(db);
     const automaticos = [
       ...gerarAlertasEstoque(db),
@@ -411,16 +297,7 @@ export default function App() {
       ...gerarAlertasPesagem(db),
       ...gerarAlertasLote(db),
     ];
-    const merged = ordenarAlertas([...legacy, ...automaticos]);
-    if (import.meta.env.DEV) {
-      const end = typeof performance !== 'undefined' ? performance.now() : Date.now();
-      console.debug('[HERDON_DASHBOARD_TIMING]', {
-        stage: 'rawAlerts',
-        durationMs: Number((end - start).toFixed(1)),
-        count: merged.length,
-      });
-    }
-    return merged;
+    return ordenarAlertas([...legacy, ...automaticos]);
   }, [db]);
 
   const alerts = useMemo(

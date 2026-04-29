@@ -4,6 +4,7 @@ import logoAgrotrack from '../assets/logo_app1.png';
 import { useAuth } from '../auth/useAuth';
 import {
   HERDON_LOGIN_ATTEMPT_KEY,
+  HERDON_LOGIN_ACCEPTED_AT,
   limparMarcadoresFluxoAuth,
   limparPersistenciaSessao,
   marcarLogoutEmAndamento,
@@ -252,6 +253,7 @@ export default function LoginPage() {
       if (data?.session) {
         try {
           localStorage.setItem(HERDON_LOGIN_ATTEMPT_KEY, String(Date.now()));
+          localStorage.setItem(HERDON_LOGIN_ACCEPTED_AT, String(Date.now()));
         } catch {
           // storage indisponivel
         }
@@ -268,6 +270,10 @@ export default function LoginPage() {
             hasUserId: Boolean(data?.session?.user?.id),
           });
         }
+        globalThis.setTimeout(() => {
+          window.location.replace('/');
+        }, 50);
+        return;
       }
 
       if (!data?.session) {
