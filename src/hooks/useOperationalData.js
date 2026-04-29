@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { supabase } from '../lib/supabase';
+import { ensureSupabaseRequestReadiness } from '../services/operationalPersistence';
 
 const OPERACIONAL_TABLES = [
   'fazendas',
@@ -348,6 +349,7 @@ export function useOperationalData(initialDb, session, options = {}) {
   const [dataReady, setDataReady] = useState(true);
   const [dataSource, setDataSource] = useState('signed_out');
   const [dataError, setDataError] = useState(null);
+  const [lastSyncAt, setLastSyncAt] = useState(null);
   const [manualSyncNonce, setManualSyncNonce] = useState(0);
   const hydratingRef = useRef(false);
   const hydrationGenerationRef = useRef(0);
@@ -479,6 +481,17 @@ export function useOperationalData(initialDb, session, options = {}) {
       });
 
       try {
+        const readiness = await ensureSupabaseRequestReadiness(session, {
+          stage: 'operational_hydration',
+          action: 'select',
+          table: 'operacional_snapshot',
+        });
+        if (!readiness.ok) {
+          setDataSource('fallback_error');
+          setDataError(new Error(readiness.message || 'Sincronizacao indisponivel no momento.'));
+          return;
+        }
+
         const snapshotResult = await loadOperationalSnapshot(userId, shouldApply, generationId);
         if (!shouldApply()) {
           logSyncGuard({
@@ -508,6 +521,7 @@ export function useOperationalData(initialDb, session, options = {}) {
         } else {
           setDataSource('supabase');
           setDataError(null);
+          setLastSyncAt(new Date().toISOString());
         }
       } catch {
         if (!shouldApply()) {
@@ -547,6 +561,7 @@ export function useOperationalData(initialDb, session, options = {}) {
     dataReady,
     dataSource,
     dataError,
+    lastSyncAt,
     hydratingRef,
     syncNow,
   };

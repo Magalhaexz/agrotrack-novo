@@ -74,12 +74,13 @@ function recalculateLoteFromPesagens(prevDb, loteId, nextPesagens) {
   };
 }
 
-export default function PesagensPage({ db, setDb, onConfirmAction }) {
+export default function PesagensPage({ db, setDb, onConfirmAction, navigationIntent = null }) {
   const { hasPermission, session } = useAuth();
   const { showToast } = useToast(); // Initialize toast hook
   const mensagemSemPermissao = 'Você não tem permissão para executar esta ação.';
 
-  const [abrirForm, setAbrirForm] = useState(false);
+  const shouldStartWithNewPesagem = navigationIntent?.page === 'pesagens' && navigationIntent?.action === 'novo';
+  const [abrirForm, setAbrirForm] = useState(shouldStartWithNewPesagem);
   const [pesagemEditando, setPesagemEditando] = useState(null);
 
   const lotes = db?.lotes || [];

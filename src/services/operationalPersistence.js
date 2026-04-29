@@ -1,7 +1,127 @@
-import { supabase } from '../lib/supabase.js';
+import { getSupabaseEnvStatus, supabase } from '../lib/supabase.js';
 
 function getSessionUserId(session) {
   return session?.user?.id || null;
+}
+
+function getErrorMessage(error) {
+  if (!error) return '';
+  if (typeof error === 'string') return error;
+  return error.message || error.details || error.hint || error.name || String(error);
+}
+
+function isNetworkError(error) {
+  const message = String(getErrorMessage(error) || '').toLowerCase();
+  return message.includes('failed to fetch')
+    || message.includes('networkerror')
+    || message.includes('network request failed')
+    || message.includes('fetch failed')
+    || message.includes('err_connection')
+    || message.includes('timeout');
+}
+
+function classifyOperationalError(error, fallbackMessage) {
+  const message = String(getErrorMessage(error) || '').toLowerCase();
+  const code = String(error?.code || '').toUpperCase();
+  if (isNetworkError(error)) {
+    return 'Sem conexao com a nuvem no momento. Seus dados locais continuam disponiveis.';
+  }
+  if (code === '42501' || message.includes('row-level security') || message.includes('permission denied')) {
+    return 'Permissao insuficiente para gravar na nuvem. Verifique o perfil de acesso.';
+  }
+  if (code === 'PGRST204' || code === '42703' || code === '42P01' || message.includes('schema') || message.includes('column') || message.includes('relation')) {
+    return 'Estrutura da base nao compativel com o app. Use o modo local e valide a configuracao.';
+  }
+  return fallbackMessage;
+}
+
+function logOperationalSync(event = {}, level = 'debug') {
+  if (!import.meta.env.DEV) return;
+  const logger = level === 'warn' ? console.warn : console.debug;
+  logger('[HERDON_OPERATIONAL_SYNC]', {
+    stage: event.stage || null,
+    action: event.action || null,
+    table: event.table || null,
+    hasSessionUser: Boolean(event.hasSessionUser),
+    hasAccessToken: Boolean(event.hasAccessToken),
+    envConfigured: Boolean(event.envConfigured),
+    errorType: event.errorType || null,
+    errorCode: event.errorCode || null,
+  });
+}
+
+export async function ensureSupabaseRequestReadiness(session, context = {}) {
+  const envStatus = getSupabaseEnvStatus();
+  if (!envStatus.configured) {
+    logOperationalSync({
+      stage: 'env_missing',
+      ...context,
+      envConfigured: false,
+    }, 'warn');
+    return {
+      ok: false,
+      code: 'SUPABASE_ENV_MISSING',
+      message: envStatus.message || 'Configuracao da nuvem ausente neste ambiente.',
+    };
+  }
+
+  const sessionUserId = getSessionUserId(session);
+  if (!sessionUserId) {
+    logOperationalSync({
+      stage: 'session_missing',
+      ...context,
+      hasSessionUser: false,
+      envConfigured: true,
+    }, 'warn');
+    return {
+      ok: false,
+      code: 'SESSION_MISSING',
+      message: 'Sua sessao nao esta pronta para sincronizar. Faca login novamente.',
+    };
+  }
+
+  try {
+    const { data, error } = await supabase.auth.getSession();
+    if (error) {
+      throw error;
+    }
+    const activeSession = data?.session ?? null;
+    const activeUserId = activeSession?.user?.id || null;
+    const hasAccessToken = Boolean(activeSession?.access_token);
+    if (!activeUserId || !hasAccessToken || String(activeUserId) !== String(sessionUserId)) {
+      logOperationalSync({
+        stage: 'session_stale',
+        ...context,
+        hasSessionUser: true,
+        hasAccessToken,
+        envConfigured: true,
+      }, 'warn');
+      return {
+        ok: false,
+        code: 'SESSION_STALE',
+        message: 'Sua sessao esta sendo atualizada. Aguarde alguns segundos e tente novamente.',
+      };
+    }
+    return {
+      ok: true,
+      code: null,
+      message: null,
+      activeSession,
+    };
+  } catch (error) {
+    logOperationalSync({
+      stage: 'session_read_error',
+      ...context,
+      hasSessionUser: true,
+      envConfigured: true,
+      errorType: getErrorMessage(error),
+    }, 'warn');
+    return {
+      ok: false,
+      code: 'SESSION_READ_ERROR',
+      message: classifyOperationalError(error, 'Falha ao validar sessao com a nuvem. Seus dados locais continuam disponiveis.'),
+    };
+  }
 }
 
 function buildFallback(message, data = null) {
@@ -166,10 +286,11 @@ function sanitizeAuditDetails(input) {
 }
 
 export async function createOperationalRecord(table, record, session) {
-  const userId = getSessionUserId(session);
-  if (!userId) {
-    return buildFallback('Sessão indisponível para persistir dados.', sanitizeRecord(record));
+  const readiness = await ensureSupabaseRequestReadiness(session, { action: 'create', table });
+  if (!readiness.ok) {
+    return buildFallback(readiness.message, sanitizeRecord(record));
   }
+  const userId = getSessionUserId(session);
 
   try {
     const payload = {
@@ -188,15 +309,29 @@ export async function createOperationalRecord(table, record, session) {
 
     return { persisted: true, data, error: null };
   } catch (error) {
-    return buildFallback(error?.message || 'Falha ao persistir criação.', sanitizeRecord(record));
+    logOperationalSync({
+      stage: 'create_error',
+      action: 'create',
+      table,
+      hasSessionUser: Boolean(userId),
+      hasAccessToken: true,
+      envConfigured: true,
+      errorType: getErrorMessage(error),
+      errorCode: error?.code || null,
+    }, 'warn');
+    return buildFallback(
+      classifyOperationalError(error, 'Falha ao persistir cadastro na nuvem. Dados locais mantidos.'),
+      sanitizeRecord(record)
+    );
   }
 }
 
 export async function updateOperationalRecord(table, id, patch, session) {
-  const userId = getSessionUserId(session);
-  if (!userId) {
-    return buildFallback('Sessão indisponível para persistir atualização.', sanitizeRecord(patch));
+  const readiness = await ensureSupabaseRequestReadiness(session, { action: 'update', table });
+  if (!readiness.ok) {
+    return buildFallback(readiness.message, sanitizeRecord(patch));
   }
+  const userId = getSessionUserId(session);
 
   try {
     const payload = sanitizeRecord(patch);
@@ -214,15 +349,29 @@ export async function updateOperationalRecord(table, id, patch, session) {
 
     return { persisted: true, data, error: null };
   } catch (error) {
-    return buildFallback(error?.message || 'Falha ao persistir atualização.', sanitizeRecord(patch));
+    logOperationalSync({
+      stage: 'update_error',
+      action: 'update',
+      table,
+      hasSessionUser: Boolean(userId),
+      hasAccessToken: true,
+      envConfigured: true,
+      errorType: getErrorMessage(error),
+      errorCode: error?.code || null,
+    }, 'warn');
+    return buildFallback(
+      classifyOperationalError(error, 'Falha ao persistir atualizacao na nuvem. Dados locais mantidos.'),
+      sanitizeRecord(patch)
+    );
   }
 }
 
 export async function deleteOperationalRecord(table, id, session) {
-  const userId = getSessionUserId(session);
-  if (!userId) {
-    return buildFallback('Sessão indisponível para persistir exclusão.');
+  const readiness = await ensureSupabaseRequestReadiness(session, { action: 'delete', table });
+  if (!readiness.ok) {
+    return buildFallback(readiness.message);
   }
+  const userId = getSessionUserId(session);
 
   try {
     const { error } = await supabase
@@ -237,7 +386,19 @@ export async function deleteOperationalRecord(table, id, session) {
 
     return { persisted: true, data: null, error: null };
   } catch (error) {
-    return buildFallback(error?.message || 'Falha ao persistir exclusão.');
+    logOperationalSync({
+      stage: 'delete_error',
+      action: 'delete',
+      table,
+      hasSessionUser: Boolean(userId),
+      hasAccessToken: true,
+      envConfigured: true,
+      errorType: getErrorMessage(error),
+      errorCode: error?.code || null,
+    }, 'warn');
+    return buildFallback(
+      classifyOperationalError(error, 'Falha ao persistir exclusao na nuvem. Dados locais mantidos.')
+    );
   }
 }
 
@@ -301,6 +462,7 @@ export async function deleteOwnerScopedCollection(table, session, extraFilters =
 
 
 function getSupabaseRestConfig() {
+  const envStatus = getSupabaseEnvStatus();
   const envUrl = import.meta?.env?.VITE_SUPABASE_URL || null;
   const envAnonKey = import.meta?.env?.VITE_SUPABASE_ANON_KEY || null;
   const clientUrl = supabase?.supabaseUrl || supabase?.rest?.url?.replace(/\/rest\/v1\/?$/, '') || null;
@@ -313,7 +475,7 @@ function getSupabaseRestConfig() {
     return {
       url: null,
       anonKey: null,
-      error: 'Configuração da nuvem ausente. Verifique as variáveis do Supabase.',
+      error: envStatus.message || 'Configuracao da nuvem ausente. Verifique as variaveis do Supabase.',
     };
   }
 
@@ -424,11 +586,6 @@ function isAuthDebugEnabled() {
   }
 }
 
-function isNetworkError(error) {
-  const message = String(error?.message || '').toLowerCase();
-  return message.includes('failed to fetch') || message.includes('networkerror') || message.includes('network request failed') || message.includes('fetch failed');
-}
-
 function classifyFazendasSyncError(error) {
   const code = String(error?.code || '').toUpperCase();
   const message = String(error?.message || '').toLowerCase();
@@ -473,6 +630,23 @@ function logFazendasSync(event = {}) {
 
 export async function checkSupabaseCloudConnection({ session } = {}) {
   const sessionUserId = getSessionUserId(session);
+  const readiness = await ensureSupabaseRequestReadiness(session, {
+    stage: 'cloud_health_check',
+    action: 'select',
+    table: 'fazendas',
+  });
+  if (!readiness.ok) {
+    return {
+      ok: false,
+      stage: readiness.code === 'SUPABASE_ENV_MISSING' ? 'config_missing' : 'auth_session_missing',
+      error: readiness.code,
+      code: readiness.code,
+      status: readiness.code === 'SUPABASE_ENV_MISSING' ? null : 401,
+      message: readiness.message,
+      details: null,
+      hint: null,
+    };
+  }
   const resolved = resolveSupabaseAccessToken(session);
 
   const config = getSupabaseRestConfig();
@@ -542,6 +716,22 @@ export async function checkSupabaseCloudConnection({ session } = {}) {
 }
 
 export async function syncFazendasWithCloud({ fazendas = [], session }) {
+  const readiness = await ensureSupabaseRequestReadiness(session, {
+    stage: 'cloud_sync_fazendas',
+    action: 'upsert',
+    table: 'fazendas',
+  });
+  if (!readiness.ok) {
+    return {
+      ok: false,
+      data: Array.isArray(fazendas) ? fazendas : [],
+      error: readiness.code || 'SYNC_NOT_READY',
+      message: readiness.message || 'Sincronizacao indisponivel no momento.',
+      syncedCount: 0,
+      failedCount: 0,
+      selectedCount: 0,
+    };
+  }
   const userId = getSessionUserId(session);
   const localRows = Array.isArray(fazendas) ? fazendas : [];
   const resolved = resolveSupabaseAccessToken(session);
@@ -584,3 +774,6 @@ export async function syncFazendasWithCloud({ fazendas = [], session }) {
     return { ok: false, data: localRows, error: error?.code || 'REMOTE_FETCH_FAILED', message: msg, syncedCount, failedCount, selectedCount: 0 };
   }
 }
+
+
+

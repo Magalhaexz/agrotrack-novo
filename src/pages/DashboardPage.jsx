@@ -353,7 +353,7 @@ export default function DashboardPage({
           <Button variant="outline" onClick={() => onNavigate?.('lotes')}>
             Novo lote
           </Button>
-          <Button variant="outline" onClick={() => onNavigate?.('pesagens')}>
+          <Button variant="outline" onClick={() => onNavigate?.('pesagens', { action: 'novo' })}>
             Nova pesagem
           </Button>
           <Button variant="outline" onClick={() => onNavigate?.('sanitario')}>
@@ -455,7 +455,7 @@ export default function DashboardPage({
               subtitle="Atalhos diretos para os fluxos que mais importam em uma demo."
             >
               <div className="dashboard-action-grid">
-                <Button fullWidth onClick={() => onNavigate?.('pesagens')}>
+                <Button fullWidth onClick={() => onNavigate?.('pesagens', { action: 'novo' })}>
                   Nova pesagem
                 </Button>
                 <Button fullWidth variant="outline" onClick={() => onNavigate?.('lotes')}>

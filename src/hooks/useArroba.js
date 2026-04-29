@@ -1,5 +1,5 @@
 import { useMemo } from 'react';
-import { parseNumeroEntrada } from '../utils/formatters';
+import { calcularIndicadoresArroba } from '../domain/arroba';
 
 /**
  * Hook para calcular valores relacionados à arroba (viva, carcaça e valor estimado).
@@ -11,26 +11,10 @@ import { parseNumeroEntrada } from '../utils/formatters';
  * @returns {{arrobaViva: string, arrobaCarcaca: string, valorEstimado: string}} Um objeto com os valores calculados formatados para duas casas decimais.
  */
 export function useArroba({ peso, rendimento = 52, precoPorArroba = 0 }) {
-  const { arrobaViva, arrobaCarcaca, valorEstimado, temPesoValido } = useMemo(() => {
-    const pesoNormalizado = parseNumeroEntrada(peso);
-    const rendimentoNormalizado = parseNumeroEntrada(rendimento);
-    const precoNormalizado = parseNumeroEntrada(precoPorArroba);
-
-    const p = Number.isFinite(pesoNormalizado) ? pesoNormalizado : 0;
-    const rend = Number.isFinite(rendimentoNormalizado) ? rendimentoNormalizado / 100 : 0;
-    const preco = Number.isFinite(precoNormalizado) ? precoNormalizado : 0;
-
-    const calcArrobaViva = p / 15; // 1 arroba = 15 kg
-    const calcArrobaCarcaca = (p * rend) / 15;
-    const calcValorEstimado = calcArrobaCarcaca * preco;
-
-    return {
-      temPesoValido: p > 0,
-      arrobaViva: calcArrobaViva.toFixed(2),
-      arrobaCarcaca: calcArrobaCarcaca.toFixed(2),
-      valorEstimado: calcValorEstimado.toFixed(2),
-    };
-  }, [peso, rendimento, precoPorArroba]);
+  const { arrobaViva, arrobaCarcaca, valorEstimado, temPesoValido } = useMemo(
+    () => calcularIndicadoresArroba({ peso, rendimento, precoPorArroba }),
+    [peso, rendimento, precoPorArroba]
+  );
 
   return {
     temPesoValido,

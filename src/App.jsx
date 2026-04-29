@@ -82,6 +82,7 @@ const pageMap = {
 
 export default function App() {
   const [currentPage, setCurrentPage] = useState('dashboard');
+  const [navigationIntent, setNavigationIntent] = useState(null);
   const { toasts, showToast, removeToast } = useToast();
   const {
     session,
@@ -96,6 +97,8 @@ export default function App() {
     dataReady,
     dataSource,
     dataError,
+    lastSyncAt,
+    syncNow,
   } = useOperationalData(initialDb, session, {
     enabled: Boolean(session?.user?.id) && !loadingAuth,
   });
@@ -114,7 +117,6 @@ export default function App() {
   });
   const deniedToastRef = useRef({ permission: '', timestamp: 0 });
   const showAuthDebug = useMemo(() => {
-    if (import.meta.env.DEV) return true;
     try {
       return localStorage.getItem('HERDON_SHOW_AUTH_DEBUG') === 'true';
     } catch {
@@ -366,10 +368,11 @@ export default function App() {
     });
   }
 
-  function navigateWithPermission(pagina) {
+  function navigateWithPermission(pagina, intent = null) {
     const permissaoDestino = permissoesPorPagina[pagina];
     if (!permissaoDestino || hasPermission(permissaoDestino)) {
       setCurrentPage(pagina);
+      setNavigationIntent(intent ? { ...intent, page: pagina, at: Date.now() } : null);
       return true;
     }
 
@@ -531,6 +534,14 @@ export default function App() {
           farmName={fazendaSelecionada?.nome || db?.fazendas?.[0]?.nome || 'Fazenda Atual'}
           notifications={alerts.length}
           alerts={alerts}
+          syncStatus={{
+            dataSource,
+            dataError,
+            dataReady,
+            isSyncing: isOperationalSyncing,
+            lastSyncAt,
+            onSyncNow: syncNow,
+          }}
           onResolveAlert={marcarAlertaComoFeito}
           onSnoozeAlert={(alert) => showToast({ type: 'warning', message: `Alerta adiado: ${alert.title}` })}
           onAlertNavigate={(alert) => {
@@ -569,6 +580,7 @@ export default function App() {
                 <ActivePage
                   db={pageKey === 'dashboard' ? dbDashboard : db}
                   setDb={setDb}
+                  navigationIntent={navigationIntent}
                   alerts={alerts}
                   onNavigate={navigateWithPermission}
                   onResolveAlert={marcarAlertaComoFeito}

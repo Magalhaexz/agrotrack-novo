@@ -43,5 +43,8 @@ export const formatarData = (data) => {
   return new Date(`${data}T00:00:00`).toLocaleDateString('pt-BR');
 };
 
-export const formatarArroba = (valor) =>
-  `${formatarNumero(valor)} @`;
+export const formatarArroba = (valor) => {
+  const numero = parseNumeroEntrada(valor);
+  if (!Number.isFinite(numero)) return '—';
+  return `${formatarNumero(numero)} @`;
+};

@@ -27,6 +27,7 @@ import '../styles/relatorios.css';
 const REPORT_TYPES = [
   {
     id: 'lote',
+    group: 'Lotes',
     title: 'Relatórios por lote',
     description: 'Indicadores produtivos, financeiros e operacionais por lote.',
     purpose: 'Ideal para fechar leitura de lote, conferir custo e acompanhar peso e margem.',
@@ -35,6 +36,7 @@ const REPORT_TYPES = [
   },
   {
     id: 'fazenda',
+    group: 'Rebanho',
     title: 'Relatórios por fazenda',
     description: 'Consolidação dos resultados por fazenda e capacidade operacional.',
     purpose: 'Bom para comparar unidades, capacidade operacional e concentracao do rebanho.',
@@ -43,6 +45,7 @@ const REPORT_TYPES = [
   },
   {
     id: 'sanitario',
+    group: 'Sanitário',
     title: 'Relatórios sanitários',
     description: 'Protocolos aplicados, pendências, responsáveis e agenda de manejo.',
     purpose: 'Ajuda a priorizar vencimentos, proximos manejos e gargalos sanitarios.',
@@ -51,6 +54,7 @@ const REPORT_TYPES = [
   },
   {
     id: 'estoque',
+    group: 'Operacional',
     title: 'Relatórios de estoque',
     description: 'Saldo, criticidade, movimentações e cobertura operacional.',
     purpose: 'Serve para compras, reposicao, leitura de saldo e monitoramento de validade.',
@@ -59,6 +63,7 @@ const REPORT_TYPES = [
   },
   {
     id: 'financeiro',
+    group: 'Financeiro',
     title: 'Relatórios financeiros',
     description: 'Despesas, receitas, categorias e visão pronta para DRE.',
     purpose: 'Apoia fechamento operacional, leitura de caixa e preparacao para DRE.',
@@ -67,6 +72,7 @@ const REPORT_TYPES = [
   },
   {
     id: 'desempenho',
+    group: 'Pesagens',
     title: 'Relatórios de desempenho',
     description: 'Ranking zootécnico, metas de GMD e evolução recente de peso.',
     purpose: 'Facilita priorizacao dos lotes acima ou abaixo da meta de desempenho.',
@@ -74,6 +80,8 @@ const REPORT_TYPES = [
     icon: TrendingUp,
   },
 ];
+
+const REPORT_CATEGORIES = ['Rebanho', 'Lotes', 'Pesagens', 'Financeiro', 'Sanitário', 'Operacional'];
 
 const STATUS_OPTIONS = [
   { value: 'todos', label: 'Todos os status' },
@@ -187,6 +195,14 @@ export default function ResultadosPage({ db }) {
       },
     ],
     [selectedReportMeta.purpose]
+  );
+  const reportGroups = useMemo(
+    () =>
+      REPORT_CATEGORIES.map((category) => ({
+        category,
+        reports: REPORT_TYPES.filter((report) => report.group === category),
+      })),
+    []
   );
 
   function applyFilters() {
@@ -372,38 +388,58 @@ export default function ResultadosPage({ db }) {
         </Card>
 
         <div className="reports-content">
-          <div className="reports-type-grid">
-            {REPORT_TYPES.map((report) => {
-              const Icon = report.icon;
-              const data = reportBundle[report.id];
-              const active = selectedReport === report.id;
+          <div className="reports-catalog-grid">
+            {reportGroups.map((group) => (
+              <section key={group.category} className="reports-category-block">
+                <div className="reports-category-head">
+                  <h3>{group.category}</h3>
+                  <span>{group.reports.length} relatório(s)</span>
+                </div>
 
-              return (
-                <button
-                  key={report.id}
-                  type="button"
-                  className={`report-type-card ${active ? 'active' : ''}`}
-                  onClick={() => setSelectedReport(report.id)}
-                >
-                  <div className="report-type-card-head">
-                    <div className="report-type-icon">
-                      <Icon size={18} aria-hidden="true" />
-                    </div>
-                    <Badge variant={data.catalogTone}>{data.catalogBadge}</Badge>
+                {group.reports.length === 0 ? (
+                  <div className="reports-category-empty">
+                    <strong>Nenhum relatório nesta categoria.</strong>
+                    <span>Assim que houver base operacional, esta categoria será habilitada.</span>
                   </div>
-                  <strong>{report.title}</strong>
-                  <p>{report.description}</p>
-                  <div className="report-type-card-copy">
-                    <span>Serve para</span>
-                    <small>{report.purpose}</small>
+                ) : (
+                  <div className="reports-type-grid">
+                    {group.reports.map((report) => {
+                      const Icon = report.icon;
+                      const data = reportBundle[report.id];
+                      const active = selectedReport === report.id;
+
+                      return (
+                        <article
+                          key={report.id}
+                          className={`report-type-card ${active ? 'active' : ''}`}
+                        >
+                          <div className="report-type-card-head">
+                            <div className="report-type-icon">
+                              <Icon size={18} aria-hidden="true" />
+                            </div>
+                            <Badge variant={data.catalogTone}>{data.catalogBadge}</Badge>
+                          </div>
+                          <span className="report-type-group">{report.group}</span>
+                          <strong>{report.title}</strong>
+                          <p>{report.description}</p>
+                          <div className="report-type-card-copy">
+                            <span>Serve para</span>
+                            <small>{report.purpose}</small>
+                          </div>
+                          <div className="report-type-card-foot">
+                            <span>{data.catalogMetric}</span>
+                            <small>{report.output}</small>
+                          </div>
+                          <Button size="sm" variant={active ? 'primary' : 'outline'} onClick={() => setSelectedReport(report.id)}>
+                            {active ? 'Relatório ativo' : 'Abrir relatório'}
+                          </Button>
+                        </article>
+                      );
+                    })}
                   </div>
-                  <div className="report-type-card-foot">
-                    <span>{data.catalogMetric}</span>
-                    <small>{report.output}</small>
-                  </div>
-                </button>
-              );
-            })}
+                )}
+              </section>
+            ))}
           </div>
 
           <div className="reports-context-band">

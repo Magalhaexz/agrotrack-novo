@@ -1,5 +1,5 @@
 import { useArroba } from '../hooks/useArroba';
-import { formatarNumero, parseNumeroEntrada } from '../utils/formatters';
+import { formatarArroba, formatarNumero, parseNumeroEntrada } from '../utils/formatters';
 
 export default function ArrobaPreview({
   peso,
@@ -19,20 +19,18 @@ export default function ArrobaPreview({
     <div className="arroba-preview-card">
       <div className="arroba-preview-title">Indicadores em tempo real</div>
 
+      <div className="arroba-preview-item">
+        <strong>@ Viva:</strong> {formatarArroba(arrobaViva)}
+      </div>
+      <div className="arroba-preview-item">
+        <strong>@ Carcaca:</strong> {formatarArroba(arrobaCarcaca)}
+      </div>
+
       {!temPesoValido ? (
         <div className="arroba-preview-empty">
           Informe um peso inicial ou atual valido para calcular as arrobas.
         </div>
-      ) : (
-        <>
-          <div className="arroba-preview-item">
-            <strong>@ Viva:</strong> {arrobaViva} arroba
-          </div>
-          <div className="arroba-preview-item">
-            <strong>@ Carcaca:</strong> {arrobaCarcaca} arroba
-          </div>
-        </>
-      )}
+      ) : null}
 
       {temPrecoValido && temPesoValido ? (
         <div className="arroba-preview-value">

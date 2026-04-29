@@ -7,18 +7,26 @@ const processEnv = globalThis?.process?.env || {};
 const supabaseUrl = runtimeEnv.VITE_SUPABASE_URL || processEnv.VITE_SUPABASE_URL;
 const supabaseAnonKey = runtimeEnv.VITE_SUPABASE_ANON_KEY || processEnv.VITE_SUPABASE_ANON_KEY;
 const isTestEnvironment = processEnv.NODE_ENV === 'test';
+const supabaseEnvConfigured = Boolean(supabaseUrl && supabaseAnonKey);
 
-if ((!supabaseUrl || !supabaseAnonKey) && !isTestEnvironment) {
-  throw new Error(
-    'Variáveis do Supabase não carregadas. Confira o arquivo .env e reinicie o Vite.'
-  );
+export function getSupabaseEnvStatus() {
+  return {
+    configured: supabaseEnvConfigured,
+    urlPresent: Boolean(supabaseUrl),
+    anonKeyPresent: Boolean(supabaseAnonKey),
+    isTestEnvironment,
+    message: supabaseEnvConfigured
+      ? null
+      : 'Configuracao do Supabase ausente. Verifique VITE_SUPABASE_URL e VITE_SUPABASE_ANON_KEY.',
+  };
 }
 
-export const supabase = (supabaseUrl && supabaseAnonKey)
+export const supabase = supabaseEnvConfigured
   ? createClient(supabaseUrl, supabaseAnonKey)
   : {
       from() {
-        throw new Error('Supabase não inicializado no ambiente de teste.');
+        const envStatus = getSupabaseEnvStatus();
+        throw new Error(envStatus.message || 'Supabase nao inicializado.');
       },
       auth: {
         getSession: async () => ({ data: { session: null }, error: null }),
@@ -155,7 +163,7 @@ export function publicarEventoLogout(reason = 'manual_logout') {
   try {
     localStorage.setItem(HERDON_LOGOUT_EVENT_KEY, payload);
   } catch {
-    // Sem storage disponível
+    // Sem storage disponivel
   }
 
   try {
@@ -163,6 +171,6 @@ export function publicarEventoLogout(reason = 'manual_logout') {
     channel.postMessage({ type: 'logout', payload });
     channel.close();
   } catch {
-    // BroadcastChannel indisponível
+    // BroadcastChannel indisponivel
   }
 }
