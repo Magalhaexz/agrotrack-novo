@@ -299,6 +299,15 @@ export async function deleteOwnerScopedCollection(table, session, extraFilters =
 }
 
 
+function isAuthDebugEnabled() {
+  if (import.meta.env.DEV) return true;
+  try {
+    return String(localStorage.getItem('HERDON_SHOW_AUTH_DEBUG') || '').toLowerCase() === 'true';
+  } catch {
+    return false;
+  }
+}
+
 function isNetworkError(error) {
   const message = String(error?.message || '').toLowerCase();
   return message.includes('failed to fetch') || message.includes('networkerror') || message.includes('network request failed');
@@ -325,7 +334,7 @@ function classifyFazendasSyncError(error) {
 }
 
 function logFazendasSync(event = {}) {
-  if (!import.meta.env.DEV) return;
+  if (!isAuthDebugEnabled()) return;
   const payload = {
     sessionUserIdPresent: Boolean(event.sessionUserId),
     authSessionPresent: event.authSessionPresent ?? null,
@@ -348,27 +357,14 @@ function logFazendasSync(event = {}) {
 
 export async function checkSupabaseCloudConnection({ session } = {}) {
   const sessionUserId = getSessionUserId(session);
-  if (!session) {
-    logFazendasSync({ operation: 'health_check_session', level: 'warn' });
-    return {
-      ok: false,
-      stage: 'session_missing',
-      error: 'AUTH_REQUIRED',
-      code: null,
-      message: 'Faça login para sincronizar com a nuvem.',
-      details: null,
-      hint: null,
-    };
-  }
-
   if (!sessionUserId) {
-    logFazendasSync({ operation: 'health_check_session_user', level: 'warn' });
     return {
       ok: false,
-      stage: 'session_user_missing',
+      stage: 'auth_session_missing',
       error: 'AUTH_REQUIRED',
       code: null,
-      message: 'Faça login para sincronizar com a nuvem.',
+      status: null,
+      message: 'Sua sessão expirou. Faça login novamente.',
       details: null,
       hint: null,
     };
@@ -376,22 +372,31 @@ export async function checkSupabaseCloudConnection({ session } = {}) {
 
   try {
     const { data: authData, error: authError } = await supabase.auth.getSession();
-    const authSession = authData?.session || null;
-    const authSessionUserId = authSession?.user?.id || null;
-
     if (authError) throw authError;
 
-    if (!authSession || !authSessionUserId) {
-      logFazendasSync({
-        sessionUserId,
-        operation: 'health_check_auth_session',
-        level: 'warn',
-      });
+    const authSession = authData?.session || null;
+    const accessTokenPresent = Boolean(authSession?.access_token);
+    const authSessionPresent = Boolean(authSession?.user?.id);
+
+    if (!authSessionPresent || !accessTokenPresent) {
+      const payload = {
+        stage: 'auth_session_missing',
+        sessionUserIdPresent: Boolean(sessionUserId),
+        authSessionPresent,
+        accessTokenPresent,
+        status: null,
+        code: null,
+        message: 'Sua sessão expirou. Faça login novamente.',
+      };
+      if (isAuthDebugEnabled()) {
+        console.info('[HERDON_CLOUD_HEALTH]', payload);
+      }
       return {
         ok: false,
         stage: 'auth_session_missing',
         error: 'AUTH_SESSION_MISSING',
         code: null,
+        status: null,
         message: 'Sua sessão expirou. Faça login novamente.',
         details: null,
         hint: null,
@@ -401,51 +406,56 @@ export async function checkSupabaseCloudConnection({ session } = {}) {
     const { error } = await supabase
       .from('fazendas')
       .select('id')
-      .eq('owner_user_id', authSessionUserId)
+      .eq('owner_user_id', authSession.user.id)
       .limit(1);
 
     if (error) throw error;
 
-    if (import.meta.env.DEV) {
-      console.debug('[HERDON_CLOUD_HEALTH]', {
+    if (isAuthDebugEnabled()) {
+      console.info('[HERDON_CLOUD_HEALTH]', {
         stage: 'ok',
         sessionUserIdPresent: Boolean(sessionUserId),
-        authSessionPresent: Boolean(authSession),
+        authSessionPresent,
+        accessTokenPresent,
+        status: 200,
+        code: null,
+        message: 'ok',
       });
     }
 
-    return { ok: true, stage: 'ok', error: null, code: null, message: null, details: null, hint: null };
+    return { ok: true, stage: 'ok', error: null, code: null, status: 200, message: null, details: null, hint: null };
   } catch (error) {
     const code = String(error?.code || '').toUpperCase() || null;
+    const status = Number(error?.status) || null;
     const messageLower = String(error?.message || '').toLowerCase();
     const detailsLower = String(error?.details || '').toLowerCase();
-    let stage = 'unknown_error';
-    let message = 'Não foi possível conectar à nuvem. Verifique sua conexão e tente novamente.';
 
-    if (isNetworkError(error)) {
-      stage = 'network_error';
-      message = 'Não foi possível conectar à nuvem. Verifique sua conexão e tente novamente.';
-    } else if (code === '42501' || messageLower.includes('permission denied') || messageLower.includes('row-level security') || detailsLower.includes('row-level security')) {
+    let stage = 'unknown_error';
+    let message = 'Não foi possível sincronizar fazendas. Seus dados locais continuam disponíveis.';
+
+    if (status == 401 || messageLower.includes('jwt') || messageLower.includes('invalid token') || messageLower.includes('auth')) {
+      stage = 'auth_session_missing';
+      message = 'Sua sessão expirou. Faça login novamente.';
+    } else if (status == 403 || code === '42501' || messageLower.includes('permission denied') || messageLower.includes('row-level security') || detailsLower.includes('row-level security')) {
       stage = 'permission_denied';
       message = 'Permissão negada ao acessar a nuvem. Verifique as políticas RLS.';
     } else if (code === '42703' || code === 'PGRST204' || messageLower.includes('column') || messageLower.includes('schema') || detailsLower.includes('column') || detailsLower.includes('schema')) {
       stage = 'schema_mismatch';
       message = 'A estrutura da tabela fazendas não está compatível com o app.';
-    } else if (messageLower.includes('jwt') || messageLower.includes('session')) {
-      stage = 'auth_session_missing';
-      message = 'Sua sessão expirou. Faça login novamente.';
+    } else if (isNetworkError(error) || (error?.name === 'TypeError' && messageLower.includes('failed to fetch'))) {
+      stage = 'network_error';
+      message = 'Não foi possível conectar à nuvem. Verifique sua conexão e tente novamente.';
     }
 
-    if (import.meta.env.DEV) {
-      console.warn('[HERDON_CLOUD_HEALTH]', {
+    if (isAuthDebugEnabled()) {
+      console.info('[HERDON_CLOUD_HEALTH]', {
         stage,
         sessionUserIdPresent: Boolean(sessionUserId),
-        authSessionPresent: true,
-        errorName: error?.name || null,
-        errorCode: error?.code || null,
-        errorMessage: error?.message || null,
-        errorDetails: error?.details || null,
-        errorHint: error?.hint || null,
+        authSessionPresent: null,
+        accessTokenPresent: null,
+        status,
+        code,
+        message,
       });
     }
 
@@ -454,6 +464,7 @@ export async function checkSupabaseCloudConnection({ session } = {}) {
       stage,
       error: error?.name || 'CLOUD_HEALTH_FAILED',
       code,
+      status,
       message,
       details: error?.details || null,
       hint: error?.hint || null,
