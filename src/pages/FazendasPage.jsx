@@ -7,6 +7,7 @@ import { gerarNovoId } from '../utils/id';
 import { useToast } from '../hooks/useToast';
 import { useAuth } from '../auth/useAuth';
 import {
+  checkSupabaseCloudConnection,
   createOperationalRecord,
   deleteOperationalRecord,
   syncFazendasWithCloud,
@@ -149,6 +150,15 @@ export default function FazendasPage({ db, setDb, onConfirmAction }) {
     setSincronizandoFazendas(true);
     showToast({ type: 'info', message: 'Sincronizando fazendas...' });
     try {
+      const health = await checkSupabaseCloudConnection({ session });
+      if (!health?.ok) {
+        showToast({
+          type: 'warning',
+          message: health?.message || 'Não foi possível conectar à nuvem. Verifique sua conexão e tente novamente.',
+        });
+        return;
+      }
+
       const result = await syncFazendasWithCloud({
         fazendas,
         session,
