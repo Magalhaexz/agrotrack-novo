@@ -488,7 +488,7 @@ function classifyFazendasSyncError(error) {
   }
 
   if (code === '42703' || code === 'PGRST204' || message.includes('column') || message.includes('schema') || details.includes('column') || details.includes('schema')) {
-    return 'Estrutura da nuvem incompleta. Verifique a tabela fazendas no Supabase.';
+    return 'Tabela de fazendas não encontrada na nuvem. Verifique a estrutura do Supabase.';
   }
 
   if (isNetworkError(error)) {
@@ -587,7 +587,7 @@ export async function checkSupabaseCloudConnection({ session } = {}) {
     let message = 'Não foi possível sincronizar fazendas. Seus dados locais continuam disponíveis.';
     if (status === 401) { stage = 'auth_session_missing'; message = 'Sessão expirada. Entre novamente para sincronizar com a nuvem.'; }
     else if (status === 403 || code === '42501') { stage = 'permission_denied'; message = 'Sem permissão para acessar estes dados na nuvem.'; }
-    else if (status === 404 || code === 'PGRST204' || code === '42703' || lower.includes('schema') || lower.includes('column')) { stage = 'schema_mismatch'; message = 'Estrutura da nuvem incompleta. Verifique a tabela fazendas no Supabase.'; }
+    else if (status === 404 || code === 'PGRST205' || code === 'PGRST204' || code === '42703' || lower.includes('schema') || lower.includes('column')) { stage = 'schema_mismatch'; message = 'Tabela de fazendas não encontrada na nuvem. Verifique a estrutura do Supabase.'; }
     else if (code === 'CONFIG_ERROR' || lower.includes('missing_rest_config_or_token')) { stage = 'config_missing'; message = 'Configuração da nuvem ausente. Verifique as variáveis do Supabase.'; }
     else if (isNetworkError(error) || (error?.name === 'TypeError' && lower.includes('failed to fetch'))) { stage = 'network_error'; message = 'Projeto Supabase inacessível pela rede.'; }
 
@@ -657,7 +657,7 @@ export async function syncFazendasWithCloud({ fazendas = [], session }) {
       let message = 'Não foi possível sincronizar fazendas. Seus dados locais continuam disponíveis.';
       if (status === 401) message = 'Sessão expirada. Entre novamente para sincronizar com a nuvem.';
       else if (status === 403 || code === '42501') message = 'Sem permissão para acessar estes dados na nuvem.';
-      else if (status === 404 || code === 'PGRST204' || code === '42703' || lower.includes('schema') || lower.includes('column')) message = 'Estrutura da nuvem incompleta. Verifique a tabela fazendas no Supabase.';
+      else if (status === 404 || code === 'PGRST205' || code === 'PGRST204' || code === '42703' || lower.includes('schema') || lower.includes('column')) message = 'Tabela de fazendas não encontrada na nuvem. Verifique a estrutura do Supabase.';
       else if (code === 'CONFIG_ERROR' || lower.includes('missing_rest_config_or_token')) message = 'Configuração da nuvem ausente. Verifique as variáveis do Supabase.';
       else if (isNetworkError(error) || (error?.name === 'TypeError' && lower.includes('failed to fetch'))) message = 'Projeto Supabase inacessível pela rede.';
       logFazendasSync({ operation: 'insert', payloadKeys: Object.keys(payload), rowNome: payload.nome || null, status, code, message, errorName: error?.name || null, errorMessage: error?.message || null, level: 'warn' });
