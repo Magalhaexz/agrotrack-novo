@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react';
-import { Leaf, Plus, Scale, Users } from 'lucide-react';
+import { CheckCircle2, Leaf, Plus, Scale, Users } from 'lucide-react';
 import AnimalForm from '../components/AnimalForm';
 import Button from '../components/ui/Button';
 import Card from '../components/ui/Card';
@@ -68,8 +68,8 @@ export default function AnimaisPage({ db, setDb, onConfirmAction }) {
     }
 
     return {
-      titulo: 'Adicionar grupo ficou visivel e centralizado',
-      descricao: 'Use o CTA principal para registrar rapidamente novos grupos e manter o rebanho atualizado.',
+      titulo: 'Cadastro alinhado com a rotina',
+      descricao: 'Use o CTA principal para registrar rapidamente novos grupos e manter a leitura do rebanho atualizada.',
     };
   }, [dadosTabela.length]);
 
@@ -197,6 +197,10 @@ export default function AnimaisPage({ db, setDb, onConfirmAction }) {
           <div className="animais-kpi-value">{formatarNumero(resumo.pesoAtualMedio)} kg</div>
           <p className="animais-kpi-sub">Media ponderada pelo tamanho dos grupos</p>
         </Card>
+        <Card title="Lotes cobertos">
+          <div className="animais-kpi-value">{resumo.lotesCobertos}</div>
+          <p className="animais-kpi-sub">Lotes com grupos vinculados ao rebanho</p>
+        </Card>
       </div>
 
       <section className="animais-workspace-shell">
@@ -268,6 +272,13 @@ export default function AnimaisPage({ db, setDb, onConfirmAction }) {
                 <div className="animais-side-metric">
                   <span>Peso medio</span>
                   <strong>{formatarNumero(resumo.pesoAtualMedio)} kg</strong>
+                </div>
+              </div>
+              <div className="animais-add-point animais-add-point--highlight">
+                <CheckCircle2 size={18} />
+                <div>
+                  <strong>Indicadores alinhados</strong>
+                  <span>Quantidade, peso, consumo e GMD alimentam dashboard, lotes e relatorios.</span>
                 </div>
               </div>
 

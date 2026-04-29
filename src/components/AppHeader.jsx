@@ -1,4 +1,4 @@
-import { Bell, ChevronDown, Clock3, LogOut, Menu, Settings, User } from 'lucide-react';
+import { Activity, AlertTriangle, Bell, ChevronDown, Clock3, Loader2, LogOut, Menu, Package, Settings, User } from 'lucide-react';
 import { createPortal } from 'react-dom';
 import { useEffect, useRef, useState } from 'react';
 import herdonLogo from '../assets/logo_app1.png';
@@ -35,6 +35,76 @@ function useDropdown(initialState = false) {
   return [ref, isOpen, setIsOpen];
 }
 
+function formatSyncTime(value) {
+  if (!value) return 'Aguardando nuvem';
+  try {
+    return new Intl.DateTimeFormat('pt-BR', {
+      hour: '2-digit',
+      minute: '2-digit',
+    }).format(new Date(value));
+  } catch {
+    return 'Sincronizado';
+  }
+}
+
+function getCloudState(syncStatus) {
+  const source = syncStatus?.dataSource || 'signed_out';
+  const message = syncStatus?.dataError?.message || '';
+
+  if (syncStatus?.isSyncing || source === 'syncing') {
+    return {
+      tone: 'syncing',
+      icon: 'loading',
+      label: 'Sincronizando',
+      detail: 'Atualizando dados',
+      title: 'Sincronizacao em andamento',
+      disabled: true,
+    };
+  }
+
+  if (source === 'supabase') {
+    return {
+      tone: 'online',
+      icon: 'cloud',
+      label: 'Nuvem ativa',
+      detail: formatSyncTime(syncStatus?.lastSyncAt),
+      title: 'Dados carregados do Supabase',
+      disabled: false,
+    };
+  }
+
+  if (source === 'offline_circuit_open' || source === 'fallback_error' || source === 'fallback_timeout') {
+    return {
+      tone: 'warning',
+      icon: 'warning',
+      label: 'Modo local',
+      detail: message || 'Nuvem instavel',
+      title: message || 'Sincronizacao instavel. Dados locais disponiveis.',
+      disabled: false,
+    };
+  }
+
+  if (source === 'offline_disabled') {
+    return {
+      tone: 'muted',
+      icon: 'local',
+      label: 'Nuvem pausada',
+      detail: 'Sincronizacao desativada',
+      title: 'A sincronizacao com Supabase esta desativada neste navegador',
+      disabled: false,
+    };
+  }
+
+  return {
+    tone: 'local',
+    icon: 'local',
+    label: 'Dados locais',
+    detail: 'Clique para sincronizar',
+    title: 'Sincronizacao manual disponivel',
+    disabled: false,
+  };
+}
+
 export default function AppHeader({
   farmName = 'Fazenda Santa Rita',
   usuarioLogado = null,
@@ -53,6 +123,7 @@ export default function AppHeader({
   fazendas = [],
   fazendaSelecionada = null,
   onSelectFazenda,
+  syncStatus = null,
 }) {
   const [userMenuRef, openUserMenu, setOpenUserMenu] = useDropdown(false);
   const [notifRef, openNotif, setOpenNotif] = useDropdown(false);
@@ -92,6 +163,7 @@ export default function AppHeader({
 
   const nomeExibicao = usuarioLogado?.nome || 'Usuario';
   const perfilExibicao = obterLabelPerfil(usuarioLogado?.perfilLabel || usuarioLogado?.perfil);
+  const cloudState = getCloudState(syncStatus);
 
   useEffect(() => {
     if (!openNotif) return undefined;
@@ -209,6 +281,33 @@ export default function AppHeader({
       </nav>
 
       <div className="top-header-actions">
+        <div className={`header-sync-chip header-sync-chip--${cloudState.tone}`} title={cloudState.title}>
+          <span className="header-sync-icon" aria-hidden="true">
+            {cloudState.icon === 'loading' ? (
+              <Loader2 size={15} className="ui-spin" />
+            ) : cloudState.icon === 'warning' ? (
+              <AlertTriangle size={15} />
+            ) : cloudState.icon === 'local' ? (
+              <Package size={15} />
+            ) : (
+              <Activity size={15} />
+            )}
+          </span>
+          <span className="header-sync-copy">
+            <strong>{cloudState.label}</strong>
+            <small>{cloudState.detail}</small>
+          </span>
+          <button
+            type="button"
+            className="header-sync-refresh"
+            onClick={syncStatus?.onSyncNow}
+            disabled={cloudState.disabled}
+            aria-label="Sincronizar agora"
+          >
+            <Clock3 size={13} className={cloudState.disabled ? 'ui-spin' : ''} />
+          </button>
+        </div>
+
         <div className="user-menu-wrap" ref={notifRef}>
           <button
             type="button"
