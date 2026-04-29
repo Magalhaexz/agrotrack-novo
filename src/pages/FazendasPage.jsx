@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+﻿import { useMemo, useState } from 'react';
 import Button from '../components/ui/Button';
 import PageHeader from '../components/PageHeader';
 import FazendaCard from '../components/fazendas/FazendaCard';
@@ -161,8 +161,13 @@ export default function FazendasPage({ db, setDb, onConfirmAction }) {
         }));
       }
 
-      if (result?.ok) {
+      if (result?.ok && ((result?.syncedCount || 0) > 0 || (result?.selectedCount || 0) > 0)) {
         showToast({ type: 'success', message: 'Fazendas sincronizadas com sucesso.' });
+      } else if ((result?.failedCount || 0) > 0 && (result?.syncedCount || 0) > 0) {
+        showToast({
+          type: 'warning',
+          message: 'Algumas fazendas não foram sincronizadas. Seus dados locais continuam disponíveis.',
+        });
       } else {
         showToast({
           type: 'warning',
