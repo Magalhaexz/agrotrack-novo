@@ -3,91 +3,46 @@ import assert from 'node:assert/strict';
 import { mapProfileRowToUser } from '../src/services/userAccess.js';
 import { perfilPodeGerenciarAcessos } from '../src/auth/perfis.js';
 
-test('metadata perfil=admin prevalece sobre cache visualizador', () => {
+test('bootstrap owner email resolves admin', () => {
   const user = {
-    id: 'u1',
-    email: 'admin@herdon.app',
-    user_metadata: { perfil: 'admin' },
-  };
-  const profile = { perfil: 'visualizador', nome: 'Cache Antigo' };
-
-  const mapped = mapProfileRowToUser(user, profile);
-  assert.equal(mapped.perfil, 'admin');
-});
-
-test('metadata role=admin é aceito como admin', () => {
-  const user = {
-    id: 'u2',
-    email: 'admin-role@herdon.app',
-    user_metadata: { role: 'admin' },
-  };
-
-  const mapped = mapProfileRowToUser(user, null);
-  assert.equal(mapped.perfil, 'admin');
-});
-
-test('metadata role=admin prevalece sobre cache visualizador', () => {
-  const user = {
-    id: 'u2b',
-    email: 'admin-role-cache@herdon.app',
-    user_metadata: { role: 'admin' },
-  };
-  const profile = { perfil: 'visualizador', nome: 'Cache Antigo' };
-
-  const mapped = mapProfileRowToUser(user, profile);
-  assert.equal(mapped.perfil, 'admin');
-});
-
-test('metadata perfil=gerente é aceito', () => {
-  const user = {
-    id: 'u3',
-    email: 'gerente@herdon.app',
-    user_metadata: { perfil: 'gerente' },
-  };
-
-  const mapped = mapProfileRowToUser(user, null);
-  assert.equal(mapped.perfil, 'gerente');
-});
-
-test('metadata cargo=admin prevalece sobre cache visualizador', () => {
-  const user = {
-    id: 'u3b',
-    email: 'cargo-admin@herdon.app',
-    user_metadata: { cargo: 'admin' },
-  };
-  const profile = { perfil: 'visualizador', nome: 'Cache Antigo' };
-
-  const mapped = mapProfileRowToUser(user, profile);
-  assert.equal(mapped.perfil, 'admin');
-});
-
-test('cache admin é usado quando metadata ausente', () => {
-  const user = {
-    id: 'u3c',
-    email: 'cache-admin@herdon.app',
+    id: 'owner-1',
+    email: 'magalhaesh617@gmail.com',
     user_metadata: {},
   };
-  const profile = { perfil: 'admin', nome: 'Cache Admin' };
 
-  const mapped = mapProfileRowToUser(user, profile);
+  const mapped = mapProfileRowToUser(user, null);
   assert.equal(mapped.perfil, 'admin');
+  assert.equal(mapped.roleSource, 'bootstrap_owner_email');
 });
 
-test('metadata desconhecido cai para visualizador', () => {
+test('non-owner email without metadata resolves visualizador', () => {
   const user = {
     id: 'u4',
     email: 'unknown@herdon.app',
-    user_metadata: { role: 'qualquer_coisa' },
+    user_metadata: {},
   };
 
   const mapped = mapProfileRowToUser(user, null);
   assert.equal(mapped.perfil, 'visualizador');
 });
 
-test('visualizador não pode gerenciar acessos', () => {
+test('metadata admin still resolves admin', () => {
+  const user = {
+    id: 'u2',
+    email: 'admin-role@herdon.app',
+    user_metadata: { role: 'admin' },
+  };
+  const profile = { perfil: 'visualizador', nome: 'Cache Antigo' };
+
+  const mapped = mapProfileRowToUser(user, profile);
+  assert.equal(mapped.perfil, 'admin');
+  assert.equal(mapped.roleSource, 'auth_metadata');
+});
+
+test('visualizador cannot manage access', () => {
   assert.equal(perfilPodeGerenciarAcessos('visualizador'), false);
 });
 
-test('admin pode gerenciar acessos', () => {
+test('admin can manage access', () => {
   assert.equal(perfilPodeGerenciarAcessos('admin'), true);
 });
