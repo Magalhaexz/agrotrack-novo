@@ -97,6 +97,8 @@ export function AuthProvider({ children }) {
   const profileFailureAtRef = useRef(new Map());
   const profileInFlightRef = useRef(new Map());
   const profileSyncEnabledRef = useRef(shouldEnableProfileSync());
+  const acceptedSessionAtRef = useRef(0);
+  const logoutRequestedAtRef = useRef(0);
 
   const resetAuthState = useCallback(() => {
     setSession(null);
@@ -110,6 +112,8 @@ export function AuthProvider({ children }) {
 
   const registrarLogoutLocal = useCallback(() => {
     authGenerationRef.current += 1;
+    logoutRequestedAtRef.current = Date.now();
+    acceptedSessionAtRef.current = 0;
     limparPersistenciaSessao();
     profileInFlightRef.current.clear();
     profileFailureAtRef.current.clear();
@@ -144,6 +148,49 @@ export function AuthProvider({ children }) {
     setProfileError(null);
     setProfileReady(true);
   }, []);
+
+  const acceptSession = useCallback((sessionAtual, options = {}) => {
+    const generationId = authGenerationRef.current + 1;
+    authGenerationRef.current = generationId;
+    const authUser = sessionAtual?.user ?? null;
+    const userId = authUser?.id || null;
+
+    activeUserIdRef.current = userId;
+    acceptedSessionAtRef.current = Date.now();
+    logoutRequestedAtRef.current = 0;
+    if (userId) {
+      profileFailureAtRef.current.delete(userId);
+    }
+
+    setSession(sessionAtual || null);
+    setAuthError(null);
+    setLoadingAuth(false);
+    setProfileReady(true);
+
+    if (import.meta.env.DEV) {
+      console.debug('[HERDON_AUTH_BOOT]', {
+        stage: 'accept_session',
+        generationId,
+        hasSession: Boolean(authUser),
+        hasUserId: Boolean(userId),
+        source: options?.source || 'manual',
+      });
+    }
+
+    if (authUser) {
+      aplicarProfileFallback(authUser, generationId);
+      if (shouldEnableProfileSync()) {
+        void options?.deferProfileSync?.(authUser, generationId);
+      }
+      return;
+    }
+
+    setProfile(null);
+    setProfileError(null);
+    logProfileBootOnce('profile_sync_skipped_signed_out', {
+      generationId,
+    });
+  }, [aplicarProfileFallback]);
 
   useEffect(() => {
     let ativo = true;
@@ -281,12 +328,6 @@ export function AuthProvider({ children }) {
         }
 
         const sessaoAtual = data?.session ?? null;
-        activeUserIdRef.current = sessaoAtual?.user?.id || null;
-        setSession(sessaoAtual);
-        setAuthError(null);
-        setLoadingAuth(false);
-        setProfileReady(true);
-
         if (import.meta.env.DEV) {
           console.debug('[HERDON_AUTH_BOOT]', {
             stage: 'session_bootstrap',
@@ -295,19 +336,10 @@ export function AuthProvider({ children }) {
           });
         }
 
-        if (sessaoAtual?.user) {
-          aplicarProfileFallback(sessaoAtual.user, generationId);
-          if (shouldEnableProfileSync()) {
-            void carregarProfile(sessaoAtual.user, generationId);
-          }
-        } else {
-          setProfile(null);
-          setProfileError(null);
-          setProfileReady(true);
-          logProfileBootOnce('profile_sync_skipped_signed_out', {
-            generationId,
-          });
-        }
+        acceptSession(sessaoAtual, {
+          source: 'session_bootstrap',
+          deferProfileSync: carregarProfile,
+        });
       } catch (error) {
         if (!ativo || authGenerationRef.current !== generationId) return;
         resetAuthState();
@@ -324,12 +356,15 @@ export function AuthProvider({ children }) {
       authGenerationRef.current = generationId;
 
       if (eventName === 'SIGNED_OUT' || !sessionAtual) {
-        const shouldIgnoreStaleSignOut = hasRecentLoginAttempt();
+        const shouldIgnoreStaleSignOut =
+          hasRecentLoginAttempt()
+          || (acceptedSessionAtRef.current > 0 && Date.now() - acceptedSessionAtRef.current < LOGIN_ATTEMPT_IGNORE_WINDOW_MS && !logoutRequestedAtRef.current);
         if (shouldIgnoreStaleSignOut) {
           if (import.meta.env.DEV) {
             console.debug('[HERDON_AUTH_BOOT]', {
               stage: 'ignore_stale_signed_out',
               generationId,
+              staleSignOutIgnored: true,
             });
           }
           return;
@@ -339,14 +374,6 @@ export function AuthProvider({ children }) {
         return;
       }
 
-      activeUserIdRef.current = sessionAtual?.user?.id || null;
-      if (activeUserIdRef.current) {
-        profileFailureAtRef.current.delete(activeUserIdRef.current);
-      }
-      setSession(sessionAtual);
-      setAuthError(null);
-      setLoadingAuth(false);
-      setProfileReady(true);
       if (import.meta.env.DEV) {
         console.debug('[HERDON_AUTH_BOOT]', {
           stage: 'auth_state_change',
@@ -355,12 +382,10 @@ export function AuthProvider({ children }) {
           hasSession: Boolean(sessionAtual?.user),
         });
       }
-      if (sessionAtual?.user) {
-        aplicarProfileFallback(sessionAtual.user, generationId);
-        if (shouldEnableProfileSync()) {
-          void carregarProfile(sessionAtual.user, generationId);
-        }
-      }
+      acceptSession(sessionAtual, {
+        source: `auth_event_${eventName || 'unknown'}`,
+        deferProfileSync: carregarProfile,
+      });
     });
 
     async function validarSessaoAoRetornar() {
@@ -428,6 +453,8 @@ export function AuthProvider({ children }) {
 
     function onLoginAttemptReset() {
       authGenerationRef.current += 1;
+      acceptedSessionAtRef.current = 0;
+      logoutRequestedAtRef.current = 0;
       profileInFlightRef.current.clear();
       profileFailureAtRef.current.clear();
       profileSyncEnabledRef.current = shouldEnableProfileSync();
@@ -466,7 +493,7 @@ export function AuthProvider({ children }) {
         authChannel.close();
       }
     };
-  }, [aplicarProfileFallback, registrarLogoutLocal, resetAuthState]);
+  }, [acceptSession, aplicarProfileFallback, registrarLogoutLocal, resetAuthState]);
 
   const refreshProfile = useCallback(async () => {
     const userAtual = session?.user ?? null;
@@ -546,11 +573,12 @@ export function AuthProvider({ children }) {
       profileError,
       profileReady,
       refreshProfile,
+      acceptSession,
       forceLocalSignOut: registrarLogoutLocal,
       ultimoLogoutAt,
       hasPermission: (permissao) => usuarioTemPermissao(user, permissao),
     };
-  }, [session, profile, loadingAuth, authError, profileError, profileReady, refreshProfile, registrarLogoutLocal, ultimoLogoutAt]);
+  }, [session, profile, loadingAuth, authError, profileError, profileReady, refreshProfile, acceptSession, registrarLogoutLocal, ultimoLogoutAt]);
 
   return (
     <AuthContext.Provider value={value}>

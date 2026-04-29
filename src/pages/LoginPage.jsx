@@ -1,6 +1,7 @@
 import { useMemo, useState } from 'react';
 import { Eye, EyeOff } from 'lucide-react';
 import logoAgrotrack from '../assets/logo_app1.png';
+import { useAuth } from '../auth/useAuth';
 import {
   HERDON_LOGIN_ATTEMPT_KEY,
   limparMarcadoresFluxoAuth,
@@ -138,6 +139,7 @@ async function signInWithRetry({ email, password }) {
 }
 
 export default function LoginPage() {
+  const { acceptSession } = useAuth();
   const [modo, setModo] = useState('login');
   const [etapaRecuperacao, setEtapaRecuperacao] = useState(1);
   const [nome, setNome] = useState('');
@@ -247,6 +249,26 @@ export default function LoginPage() {
       }
 
       setMostrarResetLocal(false);
+      if (data?.session) {
+        try {
+          localStorage.setItem(HERDON_LOGIN_ATTEMPT_KEY, String(Date.now()));
+        } catch {
+          // storage indisponivel
+        }
+        limparMarcadoresFluxoAuth();
+        marcarLogoutEmAndamento(false);
+        acceptSession(data.session, {
+          source: 'login_submit_success',
+        });
+        if (import.meta.env.DEV) {
+          console.debug('[HERDON_LOGIN_BOOT]', {
+            stage: 'login_session_accepted',
+            signInSuccess: true,
+            hasSession: Boolean(data?.session),
+            hasUserId: Boolean(data?.session?.user?.id),
+          });
+        }
+      }
 
       if (!data?.session) {
         setErro(

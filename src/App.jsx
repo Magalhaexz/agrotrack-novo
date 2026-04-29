@@ -20,6 +20,7 @@ import {
 import { useOperationalData } from './hooks/useOperationalData';
 import { useToast } from './hooks/useToast';
 import {
+  HERDON_LOGIN_ATTEMPT_KEY,
   HERDON_LOGOUT_CHANNEL,
   HERDON_LOGOUT_EVENT_KEY,
   limparPersistenciaSessao,
@@ -83,6 +84,16 @@ const pageMap = {
   resultados: ResultadosPage,
   financeiro: FinanceiroPage,
 };
+
+function getRecentLoginAttemptAt() {
+  try {
+    const raw = localStorage.getItem(HERDON_LOGIN_ATTEMPT_KEY);
+    const value = Number(raw);
+    return Number.isFinite(value) ? value : 0;
+  } catch {
+    return 0;
+  }
+}
 
 
 export default function App() {
@@ -191,6 +202,11 @@ export default function App() {
   }, [forcarTelaLogin, user]);
 
   useEffect(() => {
+    function shouldIgnoreStaleLogoutEvent() {
+      const recentLoginAttemptAt = getRecentLoginAttemptAt();
+      return Date.now() - recentLoginAttemptAt < 7000;
+    }
+
     function aplicarLogoutForcado() {
       forceLocalSignOut();
       setForcarTelaLogin(true);
@@ -200,12 +216,30 @@ export default function App() {
 
     function onStorage(event) {
       if (event.key !== HERDON_LOGOUT_EVENT_KEY || !event.newValue) return;
+      if (shouldIgnoreStaleLogoutEvent()) {
+        if (import.meta.env.DEV) {
+          console.debug('[HERDON_AUTH_BOOT]', {
+            stage: 'app_storage_logout_ignored_recent_login',
+            hasSession: Boolean(session),
+          });
+        }
+        return;
+      }
       aplicarLogoutForcado();
     }
 
     let authChannel = null;
     function onBroadcast(event) {
       if (event?.data?.type !== 'logout') return;
+      if (shouldIgnoreStaleLogoutEvent()) {
+        if (import.meta.env.DEV) {
+          console.debug('[HERDON_AUTH_BOOT]', {
+            stage: 'app_broadcast_logout_ignored_recent_login',
+            hasSession: Boolean(session),
+          });
+        }
+        return;
+      }
       aplicarLogoutForcado();
     }
 
@@ -224,7 +258,7 @@ export default function App() {
         authChannel.close();
       }
     };
-  }, [forceLocalSignOut]);
+  }, [forceLocalSignOut, session]);
 
   useEffect(() => {
     const fazendas = Array.isArray(db?.fazendas) ? db.fazendas : [];
