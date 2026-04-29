@@ -298,163 +298,296 @@ export async function deleteOwnerScopedCollection(table, session, extraFilters =
   }
 }
 
-export async function syncFazendasWithCloud({ fazendas = [], session }) {
-  const userId = getSessionUserId(session);
-  if (!userId) {
+
+function isAuthDebugEnabled() {
+  if (import.meta.env.DEV) return true;
+  try {
+    return String(localStorage.getItem('HERDON_SHOW_AUTH_DEBUG') || '').toLowerCase() === 'true';
+  } catch {
+    return false;
+  }
+}
+
+function isNetworkError(error) {
+  const message = String(error?.message || '').toLowerCase();
+  return message.includes('failed to fetch') || message.includes('networkerror') || message.includes('network request failed');
+}
+
+function classifyFazendasSyncError(error) {
+  const code = String(error?.code || '').toUpperCase();
+  const message = String(error?.message || '').toLowerCase();
+  const details = String(error?.details || '').toLowerCase();
+
+  if (code === '42501' || message.includes('permission denied') || message.includes('row-level security') || details.includes('row-level security')) {
+    return 'Permissão negada ao sincronizar fazendas. Verifique as políticas RLS.';
+  }
+
+  if (code === '42703' || code === 'PGRST204' || message.includes('column') || message.includes('schema') || details.includes('column') || details.includes('schema')) {
+    return 'A estrutura da tabela fazendas não está compatível com o app.';
+  }
+
+  if (isNetworkError(error)) {
+    return 'Não foi possível conectar à nuvem. Seus dados locais continuam disponíveis.';
+  }
+
+  return 'Não foi possível sincronizar fazendas. Seus dados locais continuam disponíveis.';
+}
+
+function logFazendasSync(event = {}) {
+  if (!isAuthDebugEnabled()) return;
+  const payload = {
+    sessionUserIdPresent: Boolean(event.sessionUserId),
+    authSessionPresent: event.authSessionPresent ?? null,
+    localCount: event.localCount ?? null,
+    operation: event.operation ?? null,
+    payloadKeys: Array.isArray(event.payloadKeys) ? event.payloadKeys : null,
+    rowNome: event.rowNome ?? null,
+    errorName: event.errorName ?? null,
+    errorCode: event.errorCode ?? null,
+    errorMessage: event.errorMessage ?? null,
+    details: event.details ?? null,
+    hint: event.hint ?? null,
+  };
+
+  const logger = event.level === 'warn' ? console.warn : console.debug;
+  logger('[HERDON_FAZENDAS_SYNC]', payload);
+}
+
+
+
+export async function checkSupabaseCloudConnection({ session } = {}) {
+  const sessionUserId = getSessionUserId(session);
+  if (!sessionUserId) {
     return {
       ok: false,
-      data: Array.isArray(fazendas) ? fazendas : [],
+      stage: 'auth_session_missing',
       error: 'AUTH_REQUIRED',
-      syncedCount: 0,
-      failedCount: 0,
+      code: null,
+      status: null,
+      message: 'Sua sessão expirou. Faça login novamente.',
+      details: null,
+      hint: null,
     };
   }
 
+  try {
+    const { data: authData, error: authError } = await supabase.auth.getSession();
+    if (authError) throw authError;
+
+    const authSession = authData?.session || null;
+    const accessTokenPresent = Boolean(authSession?.access_token);
+    const authSessionPresent = Boolean(authSession?.user?.id);
+
+    if (!authSessionPresent || !accessTokenPresent) {
+      const payload = {
+        stage: 'auth_session_missing',
+        sessionUserIdPresent: Boolean(sessionUserId),
+        authSessionPresent,
+        accessTokenPresent,
+        status: null,
+        code: null,
+        message: 'Sua sessão expirou. Faça login novamente.',
+      };
+      if (isAuthDebugEnabled()) {
+        console.info('[HERDON_CLOUD_HEALTH]', payload);
+      }
+      return {
+        ok: false,
+        stage: 'auth_session_missing',
+        error: 'AUTH_SESSION_MISSING',
+        code: null,
+        status: null,
+        message: 'Sua sessão expirou. Faça login novamente.',
+        details: null,
+        hint: null,
+      };
+    }
+
+    const { error } = await supabase
+      .from('fazendas')
+      .select('id')
+      .eq('owner_user_id', authSession.user.id)
+      .limit(1);
+
+    if (error) throw error;
+
+    if (isAuthDebugEnabled()) {
+      console.info('[HERDON_CLOUD_HEALTH]', {
+        stage: 'ok',
+        sessionUserIdPresent: Boolean(sessionUserId),
+        authSessionPresent,
+        accessTokenPresent,
+        status: 200,
+        code: null,
+        message: 'ok',
+      });
+    }
+
+    return { ok: true, stage: 'ok', error: null, code: null, status: 200, message: null, details: null, hint: null };
+  } catch (error) {
+    const code = String(error?.code || '').toUpperCase() || null;
+    const status = Number(error?.status) || null;
+    const messageLower = String(error?.message || '').toLowerCase();
+    const detailsLower = String(error?.details || '').toLowerCase();
+
+    let stage = 'unknown_error';
+    let message = 'Não foi possível sincronizar fazendas. Seus dados locais continuam disponíveis.';
+
+    if (status == 401 || messageLower.includes('jwt') || messageLower.includes('invalid token') || messageLower.includes('auth')) {
+      stage = 'auth_session_missing';
+      message = 'Sua sessão expirou. Faça login novamente.';
+    } else if (status == 403 || code === '42501' || messageLower.includes('permission denied') || messageLower.includes('row-level security') || detailsLower.includes('row-level security')) {
+      stage = 'permission_denied';
+      message = 'Permissão negada ao acessar a nuvem. Verifique as políticas RLS.';
+    } else if (code === '42703' || code === 'PGRST204' || messageLower.includes('column') || messageLower.includes('schema') || detailsLower.includes('column') || detailsLower.includes('schema')) {
+      stage = 'schema_mismatch';
+      message = 'A estrutura da tabela fazendas não está compatível com o app.';
+    } else if (isNetworkError(error) || (error?.name === 'TypeError' && messageLower.includes('failed to fetch'))) {
+      stage = 'network_error';
+      message = 'Não foi possível conectar à nuvem. Verifique sua conexão e tente novamente.';
+    }
+
+    if (isAuthDebugEnabled()) {
+      console.info('[HERDON_CLOUD_HEALTH]', {
+        stage,
+        sessionUserIdPresent: Boolean(sessionUserId),
+        authSessionPresent: null,
+        accessTokenPresent: null,
+        status,
+        code,
+        message,
+      });
+    }
+
+    return {
+      ok: false,
+      stage,
+      error: error?.name || 'CLOUD_HEALTH_FAILED',
+      code,
+      status,
+      message,
+      details: error?.details || null,
+      hint: error?.hint || null,
+    };
+  }
+}
+export async function syncFazendasWithCloud({ fazendas = [], session }) {
+  const userId = getSessionUserId(session);
   const localRows = Array.isArray(fazendas) ? fazendas : [];
-  const errors = [];
+
+  if (!userId) {
+    logFazendasSync({ operation: 'guard', localCount: localRows.length, level: 'warn' });
+    return {
+      ok: false,
+      data: localRows,
+      error: 'AUTH_REQUIRED',
+      message: 'Faça login para sincronizar com a nuvem.',
+      syncedCount: 0,
+      failedCount: 0,
+      selectedCount: 0,
+    };
+  }
+
   let syncedCount = 0;
   let failedCount = 0;
-  let selectedCount = 0;
 
   for (const localRow of localRows) {
-    const { localId, payload } = mapFazendaToCloudPayload(localRow, userId);
-    const cloudId = getCloudIdMarker(localRow);
+    if (getCloudIdMarker(localRow) !== null) {
+      continue;
+    }
+
+    const { payload } = mapFazendaToCloudPayload(localRow, userId);
 
     try {
-      let result = null;
-      if (cloudId !== null && cloudId !== undefined && cloudId !== '') {
-        result = await supabase
-          .from('fazendas')
-          .update(payload)
-          .eq('id', cloudId)
-          .eq('owner_user_id', userId)
-          .select('*')
-          .maybeSingle();
-        if (result.error) throw result.error;
-        if (!result.data) {
-          result = await supabase
-            .from('fazendas')
-            .insert(payload)
-            .select('*')
-            .single();
-        }
-      } else {
-        result = await supabase
-          .from('fazendas')
-          .insert(payload)
-          .select('*')
-          .single();
-      }
+      logFazendasSync({
+        sessionUserId: userId,
+        localCount: localRows.length,
+        operation: 'insert',
+        payloadKeys: Object.keys(payload),
+        rowNome: payload.nome || null,
+      });
 
-      const { error } = result || {};
-      if (error) {
-        failedCount += 1;
-        errors.push(error);
-        if (import.meta.env.DEV) {
-          console.warn('[HERDON_FAZENDAS_SYNC]', {
-            stage: 'row_push_error',
-            localId,
-            errorCode: error?.code || null,
-            errorMessage: error?.message || 'push_error',
-            payloadKeys: Object.keys(payload),
-          });
-        }
-      } else {
-        syncedCount += 1;
-        if (import.meta.env.DEV) {
-          console.debug('[HERDON_FAZENDAS_SYNC]', {
-            stage: 'row_push_success',
-            localId,
-            payloadKeys: Object.keys(payload),
-          });
-        }
-      }
+      const { error } = await supabase
+        .from('fazendas')
+        .insert(payload)
+        .select('id')
+        .single();
+
+      if (error) throw error;
+      syncedCount += 1;
     } catch (error) {
       failedCount += 1;
-      errors.push(error);
-      if (import.meta.env.DEV) {
-        console.warn('[HERDON_FAZENDAS_SYNC]', {
-          stage: 'row_push_exception',
-          localId,
-          errorCode: error?.code || null,
-          errorMessage: error?.message || String(error),
-          payloadKeys: Object.keys(payload),
-        });
-      }
+      logFazendasSync({
+        sessionUserId: userId,
+        localCount: localRows.length,
+        operation: 'insert',
+        payloadKeys: Object.keys(payload),
+        rowNome: payload.nome || null,
+        errorCode: error?.code || null,
+        errorMessage: error?.message || null,
+        details: error?.details || null,
+        hint: error?.hint || null,
+        level: 'warn',
+      });
+
+      return {
+        ok: false,
+        data: localRows,
+        error: error?.code || 'SYNC_FAILED',
+        message: classifyFazendasSyncError(error),
+        syncedCount,
+        failedCount,
+        selectedCount: 0,
+      };
     }
   }
 
   try {
+    logFazendasSync({
+      sessionUserId: userId,
+      localCount: localRows.length,
+      operation: 'select',
+    });
+
     const { data: remoteRows, error: fetchError } = await supabase
       .from('fazendas')
       .select('*')
       .eq('owner_user_id', userId);
 
-    if (fetchError) {
-      if (import.meta.env.DEV) {
-        console.warn('[HERDON_FAZENDAS_SYNC]', {
-          stage: 'remote_fetch_error',
-          localCount: localRows.length,
-          syncedCount,
-          failedCount,
-          selectCount: 0,
-          errorCode: fetchError?.code || null,
-          errorMessage: fetchError?.message || 'fetch_error',
-        });
-      }
-      return {
-        ok: false,
-        data: localRows,
-        error: 'REMOTE_FETCH_FAILED',
-        syncedCount,
-        failedCount,
-      };
-    }
+    if (fetchError) throw fetchError;
 
     const remoteList = Array.isArray(remoteRows) ? remoteRows : [];
-    selectedCount = remoteList.length;
     const merged = mergeFazendasSafe(localRows, remoteList);
-    const fetchedSuccessfully = true;
-    const ok = (syncedCount > 0 || fetchedSuccessfully) && failedCount === 0;
-
-    if (import.meta.env.DEV) {
-      console.debug('[HERDON_FAZENDAS_SYNC]', {
-        stage: 'sync_completed',
-        localCount: localRows.length,
-        syncedCount,
-        failedCount,
-        selectCount: selectedCount,
-        hasErrors: errors.length > 0,
-      });
-    }
 
     return {
-      ok,
+      ok: true,
       data: merged,
-      error: failedCount > 0 ? 'PARTIAL_SYNC_FAILED' : null,
+      error: null,
+      message: null,
       syncedCount,
       failedCount,
-      selectedCount,
+      selectedCount: remoteList.length,
     };
   } catch (error) {
-    if (import.meta.env.DEV) {
-      console.warn('[HERDON_FAZENDAS_SYNC]', {
-        stage: 'sync_exception',
-        localCount: localRows.length,
-        syncedCount,
-        failedCount,
-        selectCount: selectedCount,
-        errorCode: error?.code || null,
-        errorMessage: error?.message || String(error),
-      });
-    }
+    logFazendasSync({
+      sessionUserId: userId,
+      localCount: localRows.length,
+      operation: 'select',
+      errorCode: error?.code || null,
+      errorMessage: error?.message || null,
+      details: error?.details || null,
+      hint: error?.hint || null,
+      level: 'warn',
+    });
+
     return {
       ok: false,
       data: localRows,
-      error: 'REMOTE_FETCH_FAILED',
+      error: error?.code || 'REMOTE_FETCH_FAILED',
+      message: classifyFazendasSyncError(error),
       syncedCount,
       failedCount,
-      selectedCount,
+      selectedCount: 0,
     };
   }
 }
