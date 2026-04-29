@@ -18,6 +18,41 @@ function sanitizeRecord(record = {}) {
   return safeRecord;
 }
 
+function normalizeFazendaRecord(record = {}) {
+  const safe = sanitizeRecord(record);
+  return {
+    ...safe,
+    id: safe?.id ?? null,
+  };
+}
+
+function mergeFazendasSafe(localRows = [], remoteRows = []) {
+  const mergedById = new Map();
+  const pendingLocalRows = [];
+
+  localRows.forEach((row) => {
+    const normalized = normalizeFazendaRecord(row);
+    if (normalized?.id === null || normalized?.id === undefined) {
+      pendingLocalRows.push(normalized);
+      return;
+    }
+    mergedById.set(String(normalized.id), normalized);
+  });
+
+  remoteRows.forEach((row) => {
+    const normalized = normalizeFazendaRecord(row);
+    if (normalized?.id === null || normalized?.id === undefined) {
+      return;
+    }
+    mergedById.set(String(normalized.id), {
+      ...(mergedById.get(String(normalized.id)) || {}),
+      ...normalized,
+    });
+  });
+
+  return [...mergedById.values(), ...pendingLocalRows];
+}
+
 function sanitizeAuditDetails(input) {
   if (Array.isArray(input)) {
     return input.map(sanitizeAuditDetails);
@@ -171,5 +206,81 @@ export async function deleteOwnerScopedCollection(table, session, extraFilters =
     return { persisted: true, data: null, error: null };
   } catch (error) {
     return buildFallback(error?.message || 'Falha ao persistir limpeza da coleção.');
+  }
+}
+
+export async function syncFazendasWithCloud({ fazendas = [], session }) {
+  const userId = getSessionUserId(session);
+  if (!userId) {
+    return {
+      ok: false,
+      data: Array.isArray(fazendas) ? fazendas : [],
+      error: 'AUTH_REQUIRED',
+      syncedCount: 0,
+      failedCount: 0,
+    };
+  }
+
+  const localRows = Array.isArray(fazendas) ? fazendas : [];
+  let syncedCount = 0;
+  let failedCount = 0;
+
+  for (const localRow of localRows) {
+    const payload = {
+      ...sanitizeRecord(localRow),
+      owner_user_id: userId,
+    };
+
+    try {
+      const hasId = payload?.id !== undefined && payload?.id !== null;
+      let query = supabase.from('fazendas');
+      if (hasId) {
+        query = query.upsert(payload, { onConflict: 'id' });
+      } else {
+        query = query.insert(payload);
+      }
+      const { error } = await query.select('*').single();
+      if (error) {
+        failedCount += 1;
+      } else {
+        syncedCount += 1;
+      }
+    } catch {
+      failedCount += 1;
+    }
+  }
+
+  try {
+    const { data: remoteRows, error: fetchError } = await supabase
+      .from('fazendas')
+      .select('*')
+      .eq('owner_user_id', userId);
+
+    if (fetchError) {
+      return {
+        ok: false,
+        data: localRows,
+        error: 'REMOTE_FETCH_FAILED',
+        syncedCount,
+        failedCount: failedCount + 1,
+      };
+    }
+
+    const merged = mergeFazendasSafe(localRows, Array.isArray(remoteRows) ? remoteRows : []);
+    return {
+      ok: failedCount === 0,
+      data: merged,
+      error: failedCount > 0 ? 'PARTIAL_SYNC_FAILED' : null,
+      syncedCount,
+      failedCount,
+    };
+  } catch {
+    return {
+      ok: false,
+      data: localRows,
+      error: 'REMOTE_FETCH_FAILED',
+      syncedCount,
+      failedCount: failedCount + 1,
+    };
   }
 }

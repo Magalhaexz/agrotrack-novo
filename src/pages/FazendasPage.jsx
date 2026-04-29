@@ -9,6 +9,7 @@ import { useAuth } from '../auth/useAuth';
 import {
   createOperationalRecord,
   deleteOperationalRecord,
+  syncFazendasWithCloud,
   updateOperationalRecord,
 } from '../services/operationalPersistence';
 
@@ -27,6 +28,7 @@ export default function FazendasPage({ db, setDb, onConfirmAction }) {
 
   const [openModal, setOpenModal] = useState(false);
   const [editando, setEditando] = useState(null);
+  const [sincronizandoFazendas, setSincronizandoFazendas] = useState(false);
 
   const fazendas = Array.isArray(db?.fazendas) ? db.fazendas : [];
   const lotes = Array.isArray(db?.lotes) ? db.lotes : [];
@@ -134,21 +136,75 @@ export default function FazendasPage({ db, setDb, onConfirmAction }) {
     // showToast({ type: 'success', message: 'Fazenda excluída com sucesso!' });
   }
 
+  async function sincronizarFazendasComNuvem() {
+    if (sincronizandoFazendas) {
+      return;
+    }
+
+    if (!session?.user?.id) {
+      showToast({ type: 'warning', message: 'Faça login para sincronizar com a nuvem.' });
+      return;
+    }
+
+    setSincronizandoFazendas(true);
+    showToast({ type: 'info', message: 'Sincronizando fazendas...' });
+    try {
+      const result = await syncFazendasWithCloud({
+        fazendas,
+        session,
+      });
+
+      if (Array.isArray(result?.data)) {
+        setDb((prev) => ({
+          ...prev,
+          fazendas: result.data,
+        }));
+      }
+
+      if (result?.ok) {
+        showToast({ type: 'success', message: 'Fazendas sincronizadas com sucesso.' });
+      } else {
+        showToast({
+          type: 'warning',
+          message: 'Não foi possível sincronizar fazendas. Seus dados locais continuam disponíveis.',
+        });
+      }
+    } catch {
+      showToast({
+        type: 'warning',
+        message: 'Não foi possível sincronizar fazendas. Seus dados locais continuam disponíveis.',
+      });
+    } finally {
+      setSincronizandoFazendas(false);
+    }
+  }
+
   return (
     <div className="page">
       <PageHeader
         title="Fazendas"
         subtitle="Gestão completa das propriedades e suas capacidades"
-        actions={<Button onClick={() => {
-          if (!hasPermission('fazendas:editar')) {
-            showToast({ type: 'error', message: mensagemSemPermissao });
-            return;
-          }
-          setEditando(null); setOpenModal(true);
-        }}
-        >
-          + Nova Fazenda
-        </Button>}
+        actions={(
+          <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+            <Button
+              variant="secondary"
+              onClick={sincronizarFazendasComNuvem}
+              disabled={sincronizandoFazendas}
+            >
+              {sincronizandoFazendas ? 'Sincronizando fazendas...' : 'Sincronizar fazendas com a nuvem'}
+            </Button>
+            <Button onClick={() => {
+              if (!hasPermission('fazendas:editar')) {
+                showToast({ type: 'error', message: mensagemSemPermissao });
+                return;
+              }
+              setEditando(null); setOpenModal(true);
+            }}
+            >
+              + Nova Fazenda
+            </Button>
+          </div>
+        )}
       />
 
       {cards.length === 0 ? (
