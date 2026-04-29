@@ -8,7 +8,7 @@ function broadcast() {
 }
 
 function addToastToStore(toast) {
-  toastStore = [...toastStore, toast];
+  toastStore = [...toastStore.filter((item) => item.id !== toast.id), toast];
   broadcast();
 }
 
@@ -35,18 +35,27 @@ export function useToast() {
     removeToastFromStore(id);
   }, []);
 
-  const showToast = useCallback(({ type = 'info', message = '' }) => {
-    const id = `${Date.now()}-${Math.random().toString(16).slice(2)}`;
-    addToastToStore({ id, type, message });
+  const showToast = useCallback(({ type = 'info', message = '', id = null, durationMs = 4000, persist = false }) => {
+    const resolvedId = id || `${Date.now()}-${Math.random().toString(16).slice(2)}`;
+    const ttl = Number(durationMs);
+    const shouldAutoClose = !persist && Number.isFinite(ttl) && ttl > 0;
 
-    setTimeout(() => {
-      removeToastFromStore(id);
-    }, 4000);
+    removeToastFromStore(resolvedId);
+    addToastToStore({ id: resolvedId, type, message });
+
+    if (shouldAutoClose) {
+      setTimeout(() => {
+        removeToastFromStore(resolvedId);
+      }, ttl);
+    }
+
+    return resolvedId;
   }, []);
 
   return {
     toasts,
     showToast,
     removeToast,
+    dismissToast: removeToast,
   };
 }

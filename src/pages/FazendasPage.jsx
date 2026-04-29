@@ -1,4 +1,4 @@
-﻿import { useMemo, useState } from 'react';
+import { useMemo, useRef, useState } from 'react';
 import Button from '../components/ui/Button';
 import PageHeader from '../components/PageHeader';
 import FazendaCard from '../components/fazendas/FazendaCard';
@@ -14,30 +14,22 @@ import {
   updateOperationalRecord,
 } from '../services/operationalPersistence';
 
-/**
- * Página de Fazendas, para gerenciar as propriedades.
- *
- * @param {object} props - As propriedades do componente.
- * @param {object} props.db - O objeto do banco de dados.
- * @param {function} props.setDb - Função para atualizar o banco de dados.
- * @param {function} [props.onConfirmAction] - Callback opcional para ações de confirmação.
- */
 export default function FazendasPage({ db, setDb, onConfirmAction }) {
-  const { showToast } = useToast();
+  const { showToast, dismissToast } = useToast();
   const { hasPermission, session } = useAuth();
   const mensagemSemPermissao = 'Você não tem permissão para executar esta ação.';
 
   const [openModal, setOpenModal] = useState(false);
   const [editando, setEditando] = useState(null);
   const [sincronizandoFazendas, setSincronizandoFazendas] = useState(false);
+  const loadingToastRef = useRef(null);
 
   const fazendas = Array.isArray(db?.fazendas) ? db.fazendas : [];
   const lotes = Array.isArray(db?.lotes) ? db.lotes : [];
 
-  // Pré-indexar lotes por fazenda_id para busca eficiente
   const lotesByFazendaMap = useMemo(() => {
     const map = new Map();
-    lotes.forEach(lote => {
+    lotes.forEach((lote) => {
       const fazendaId = Number(lote.faz_id);
       if (!map.has(fazendaId)) {
         map.set(fazendaId, []);
@@ -47,7 +39,6 @@ export default function FazendasPage({ db, setDb, onConfirmAction }) {
     return map;
   }, [lotes]);
 
-  // Calcular cards de fazenda com lotes vinculados (MEMOIZADO)
   const cards = useMemo(
     () => fazendas.map((fazenda) => ({
       ...fazenda,
@@ -56,10 +47,6 @@ export default function FazendasPage({ db, setDb, onConfirmAction }) {
     [fazendas, lotesByFazendaMap]
   );
 
-  /**
-   * Salva uma nova fazenda ou atualiza uma existente.
-   * @param {object} payload - Os dados da fazenda a serem salvos.
-   */
   async function salvarFazenda(payload) {
     if (!hasPermission('fazendas:editar')) {
       showToast({ type: 'error', message: mensagemSemPermissao });
@@ -76,7 +63,6 @@ export default function FazendasPage({ db, setDb, onConfirmAction }) {
       if (!persisted.persisted) {
         showToast({ type: 'warning', message: 'Alteração salva apenas localmente.' });
       }
-      // showToast({ type: 'success', message: 'Fazenda atualizada com sucesso!' });
     } else {
       const persisted = await createOperationalRecord('fazendas', payload, session);
       setDb((prev) => ({
@@ -92,26 +78,20 @@ export default function FazendasPage({ db, setDb, onConfirmAction }) {
       if (!persisted.persisted) {
         showToast({ type: 'warning', message: 'Cadastro salvo apenas localmente.' });
       }
-      // showToast({ type: 'success', message: 'Fazenda adicionada com sucesso!' });
     }
     setOpenModal(false);
     setEditando(null);
   }
 
-  /**
-   * Exclui uma fazenda após confirmação.
-   * @param {number} id - O ID da fazenda a ser excluída.
-   */
   async function excluirFazenda(id) {
     if (!hasPermission('fazendas:editar')) {
       showToast({ type: 'error', message: mensagemSemPermissao });
       return;
     }
-    const fazenda = cards.find((f) => f.id === id); // Usar 'cards' que já tem lotesVinculados
+    const fazenda = cards.find((f) => f.id === id);
     if (!fazenda) return;
 
     if (fazenda.lotesVinculados > 0) {
-      // showToast({ type: 'error', message: 'Não é possível excluir uma fazenda com lotes vinculados.' });
       alert('Não é possível excluir uma fazenda com lotes vinculados.');
       return;
     }
@@ -134,13 +114,10 @@ export default function FazendasPage({ db, setDb, onConfirmAction }) {
     if (!persisted.persisted) {
       showToast({ type: 'warning', message: 'Exclusão aplicada apenas localmente.' });
     }
-    // showToast({ type: 'success', message: 'Fazenda excluída com sucesso!' });
   }
 
   async function sincronizarFazendasComNuvem() {
-    if (sincronizandoFazendas) {
-      return;
-    }
+    if (sincronizandoFazendas) return;
 
     if (!session?.user?.id) {
       showToast({ type: 'warning', message: 'Faça login para sincronizar com a nuvem.' });
@@ -148,7 +125,13 @@ export default function FazendasPage({ db, setDb, onConfirmAction }) {
     }
 
     setSincronizandoFazendas(true);
-    showToast({ type: 'info', message: 'Sincronizando fazendas...' });
+    loadingToastRef.current = showToast({
+      id: 'fazendas-sync-loading',
+      type: 'info',
+      message: 'Sincronizando fazendas...',
+      persist: true,
+    });
+
     try {
       const health = await checkSupabaseCloudConnection({ session });
       if (!health?.ok) {
@@ -190,6 +173,10 @@ export default function FazendasPage({ db, setDb, onConfirmAction }) {
         message: 'Não foi possível sincronizar fazendas. Seus dados locais continuam disponíveis.',
       });
     } finally {
+      if (loadingToastRef.current) {
+        dismissToast(loadingToastRef.current);
+        loadingToastRef.current = null;
+      }
       setSincronizandoFazendas(false);
     }
   }
@@ -223,9 +210,9 @@ export default function FazendasPage({ db, setDb, onConfirmAction }) {
       />
 
       {cards.length === 0 ? (
-        <div className="ui-card empty-state"> {/* Adicionada classe empty-state para estilo */}
+        <div className="ui-card empty-state">
           <strong>Nenhuma fazenda cadastrada.</strong>
-          <span>Use o botão "Nova Fazenda" para começar.</span> {/* Adicionada uma descrição */}
+          <span>Use o botão "Nova Fazenda" para começar.</span>
         </div>
       ) : (
         <div className="grid-3">
@@ -235,7 +222,7 @@ export default function FazendasPage({ db, setDb, onConfirmAction }) {
               fazenda={fazenda}
               lotesVinculados={fazenda.lotesVinculados}
               onClick={() => { setEditando(fazenda); setOpenModal(true); }}
-              onDelete={() => excluirFazenda(fazenda.id)} // Passa a função de exclusão
+              onDelete={() => excluirFazenda(fazenda.id)}
             />
           ))}
         </div>
