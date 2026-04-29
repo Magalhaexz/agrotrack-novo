@@ -657,21 +657,16 @@ export async function checkSupabaseCloudConnection({ session } = {}) {
   if (!sessionUserId || !resolved.token) {
     const message = 'Sua sessão expirou. Faça login novamente.';
     if (isAuthDebugEnabled()) {
-      const cfg = getSupabaseRestConfig();
       console.info('[HERDON_CLOUD_HEALTH]', {
         stage: 'auth_session_missing',
-        supabaseUrlPresent: Boolean(cfg.url),
-        anonKeyPresent: Boolean(cfg.anonKey),
+        action: 'select',
+        table: 'fazendas',
         requestUrlHost: null,
         requestUrlPath: null,
         method: 'GET',
-        sessionUserIdPresent: Boolean(sessionUserId),
-        acceptedSessionTokenPresent: resolved.acceptedSessionTokenPresent,
-        localStorageTokenPresent: resolved.localStorageTokenPresent,
-        accessTokenPresent: Boolean(resolved.token),
         status: 401,
-        code: null,
-        message,
+        errorName: 'AUTH_SESSION_MISSING',
+        errorMessage: message,
       });
     }
     return { ok: false, stage: 'auth_session_missing', error: 'AUTH_SESSION_MISSING', code: null, status: 401, message, details: null, hint: null };
@@ -683,15 +678,14 @@ export async function checkSupabaseCloudConnection({ session } = {}) {
       const cfg = getSupabaseRestConfig();
       console.info('[HERDON_CLOUD_HEALTH]', {
         stage: 'ok',
-        supabaseUrlPresent: Boolean(cfg.url),
-        anonKeyPresent: Boolean(cfg.anonKey),
+        action: 'select',
+        table: 'fazendas',
         requestUrlHost: (() => { try { return new URL(String(cfg.url).replace(/\/$/, '')).host; } catch { return null; } })(),
         requestUrlPath: '/rest/v1/fazendas',
         method: 'GET',
-        sessionUserIdPresent: true,
-        acceptedSessionTokenPresent: resolved.acceptedSessionTokenPresent,
-        localStorageTokenPresent: resolved.localStorageTokenPresent,
-        accessTokenPresent: true, status: 200, code: null, message: 'ok',
+        status: 200,
+        errorName: null,
+        errorMessage: 'ok',
       });
     }
     return { ok: true, stage: 'ok', error: null, code: null, status: 200, message: null, details: null, hint: null };
@@ -708,8 +702,17 @@ export async function checkSupabaseCloudConnection({ session } = {}) {
     else if (isNetworkError(error) || (error?.name === 'TypeError' && lower.includes('failed to fetch'))) { stage = 'network_error'; message = 'Não foi possível conectar à nuvem. Verifique sua conexão e tente novamente.'; }
 
     if (isAuthDebugEnabled()) {
-      const cfg = getSupabaseRestConfig();
-      console.info('[HERDON_CLOUD_HEALTH]', { stage, supabaseUrlPresent: Boolean(cfg.url), anonKeyPresent: Boolean(cfg.anonKey), requestUrlHost: error?.requestUrlHost || null, requestUrlPath: error?.requestUrlPath || '/rest/v1/fazendas', method: error?.requestMethod || 'GET', sessionUserIdPresent: Boolean(sessionUserId), acceptedSessionTokenPresent: resolved.acceptedSessionTokenPresent, localStorageTokenPresent: resolved.localStorageTokenPresent, accessTokenPresent: Boolean(resolved.token), status, code, message, errorName: error?.name || null, errorMessage: error?.message || null });
+      console.info('[HERDON_CLOUD_HEALTH]', {
+        stage,
+        action: 'select',
+        table: 'fazendas',
+        method: error?.requestMethod || 'GET',
+        requestUrlHost: error?.requestUrlHost || null,
+        requestUrlPath: error?.requestUrlPath || '/rest/v1/fazendas',
+        status,
+        errorName: error?.name || code || null,
+        errorMessage: error?.message || message || null,
+      });
     }
     return { ok: false, stage, error: error?.name || 'CLOUD_HEALTH_FAILED', code, status, message, details: error?.details || null, hint: error?.hint || null };
   }
