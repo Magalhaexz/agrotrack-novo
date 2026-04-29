@@ -4,6 +4,32 @@ import { supabase } from '../lib/supabase.js';
 const PROFILE_COLUMNS = 'id, email, nome, perfil, telefone, cargo, foto_url, created_at, updated_at';
 const INVITE_COLUMNS = 'id, email, nome, perfil, status, notes, created_by, used_by, used_at, created_at, updated_at';
 const PROFILE_CACHE_PREFIX = 'HERDON_PROFILE_CACHE::';
+const DEFAULT_BOOTSTRAP_ADMIN_EMAILS = ['magalhaesh617@gmail.com'];
+
+function normalizeEmail(value) {
+  return String(value || '').trim().toLowerCase();
+}
+
+function getBootstrapAdminEmails() {
+  const envValue = import.meta?.env?.VITE_HERDON_BOOTSTRAP_ADMIN_EMAILS;
+  const configured = String(envValue || '')
+    .split(',')
+    .map((email) => normalizeEmail(email))
+    .filter(Boolean);
+
+  if (configured.length > 0) {
+    return configured;
+  }
+
+  return DEFAULT_BOOTSTRAP_ADMIN_EMAILS;
+}
+
+function isBootstrapOwnerEmail(user) {
+  const userEmail = normalizeEmail(user?.email);
+  if (!userEmail) return false;
+
+  return getBootstrapAdminEmails().includes(userEmail);
+}
 
 function isMissingTableError(error) {
   const message = String(error?.message || '').toLowerCase();
@@ -48,6 +74,9 @@ export function resolveUserRoleFromAuthAndCache(user, profile) {
   // 3) fallback final permanece visualizador.
   if (metadataExplicitRole) {
     return { perfil: metadataPerfil, source: 'auth_metadata' };
+  }
+  if (isBootstrapOwnerEmail(user)) {
+    return { perfil: PERFIS.ADMIN, source: 'bootstrap_owner_email' };
   }
   if (hasProfilePerfil) {
     return { perfil: profilePerfil, source: 'cached_profile' };
