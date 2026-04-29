@@ -3,6 +3,7 @@ import { supabase } from '../lib/supabase';
 
 const PROFILE_COLUMNS = 'id, email, nome, perfil, telefone, cargo, foto_url, created_at, updated_at';
 const INVITE_COLUMNS = 'id, email, nome, perfil, status, notes, created_by, used_by, used_at, created_at, updated_at';
+const PROFILE_CACHE_PREFIX = 'HERDON_PROFILE_CACHE::';
 
 function isMissingTableError(error) {
   const message = String(error?.message || '').toLowerCase();
@@ -40,6 +41,43 @@ export function mapProfileRowToUser(user, profile) {
     cargo: profile?.cargo ?? user?.user_metadata?.cargo ?? '',
     profile: profile || null,
   };
+}
+
+export function getProfileCacheKey(userId) {
+  return `${PROFILE_CACHE_PREFIX}${userId}`;
+}
+
+export function readCachedProfile(userId) {
+  if (!userId) return null;
+
+  try {
+    const raw = localStorage.getItem(getProfileCacheKey(userId));
+    if (!raw) return null;
+    const parsed = JSON.parse(raw);
+    return parsed && typeof parsed === 'object' ? parsed : null;
+  } catch {
+    return null;
+  }
+}
+
+export function writeCachedProfile(userId, profile) {
+  if (!userId || !profile) return;
+
+  try {
+    localStorage.setItem(getProfileCacheKey(userId), JSON.stringify(profile));
+  } catch {
+    // Cache local indisponivel
+  }
+}
+
+export function clearCachedProfile(userId) {
+  if (!userId) return;
+
+  try {
+    localStorage.removeItem(getProfileCacheKey(userId));
+  } catch {
+    // Cache local indisponivel
+  }
 }
 
 export async function fetchUserProfile(userId) {
