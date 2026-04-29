@@ -31,7 +31,7 @@ function getAuthMetadataRoleRaw(user) {
   );
 }
 
-function getResolvedRoleFromUserAndProfile(user, profile) {
+export function resolveUserRoleFromAuthAndCache(user, profile) {
   const metadataRawPerfil = getAuthMetadataRoleRaw(user);
   const metadataRawHasValue = Boolean(String(metadataRawPerfil || '').trim());
   const metadataPerfil = normalizarPerfil(metadataRawPerfil);
@@ -64,7 +64,7 @@ export function mapProfileRowToUser(user, profile) {
     user?.email?.split('@')[0] ||
     'Usuario';
 
-  const resolved = getResolvedRoleFromUserAndProfile(user, profile);
+  const resolved = resolveUserRoleFromAuthAndCache(user, profile);
   const perfil = resolved.perfil;
   if (import.meta?.env?.DEV) {
     console.debug('[HERDON_ROLE_BOOT]', {
@@ -81,6 +81,7 @@ export function mapProfileRowToUser(user, profile) {
     email: profile?.email || user?.email || '',
     perfil,
     perfilLabel: obterLabelPerfil(perfil),
+    roleSource: resolved.source,
     foto_url: profile?.foto_url ?? user?.user_metadata?.avatar_url ?? null,
     telefone: profile?.telefone ?? user?.user_metadata?.telefone ?? '',
     cargo: profile?.cargo ?? user?.user_metadata?.cargo ?? '',

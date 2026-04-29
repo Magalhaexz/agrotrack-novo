@@ -1,6 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { mapProfileRowToUser } from '../src/services/userAccess.js';
+import { perfilPodeGerenciarAcessos } from '../src/auth/perfis.js';
 
 test('metadata perfil=admin prevalece sobre cache visualizador', () => {
   const user = {
@@ -22,6 +23,18 @@ test('metadata role=admin é aceito como admin', () => {
   };
 
   const mapped = mapProfileRowToUser(user, null);
+  assert.equal(mapped.perfil, 'admin');
+});
+
+test('metadata role=admin prevalece sobre cache visualizador', () => {
+  const user = {
+    id: 'u2b',
+    email: 'admin-role-cache@herdon.app',
+    user_metadata: { role: 'admin' },
+  };
+  const profile = { perfil: 'visualizador', nome: 'Cache Antigo' };
+
+  const mapped = mapProfileRowToUser(user, profile);
   assert.equal(mapped.perfil, 'admin');
 });
 
@@ -69,4 +82,12 @@ test('metadata desconhecido cai para visualizador', () => {
 
   const mapped = mapProfileRowToUser(user, null);
   assert.equal(mapped.perfil, 'visualizador');
+});
+
+test('visualizador não pode gerenciar acessos', () => {
+  assert.equal(perfilPodeGerenciarAcessos('visualizador'), false);
+});
+
+test('admin pode gerenciar acessos', () => {
+  assert.equal(perfilPodeGerenciarAcessos('admin'), true);
 });

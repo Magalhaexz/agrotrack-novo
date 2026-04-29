@@ -113,6 +113,14 @@ export default function App() {
     resolver: null,
   });
   const deniedToastRef = useRef({ permission: '', timestamp: 0 });
+  const showAuthDebug = useMemo(() => {
+    if (import.meta.env.DEV) return true;
+    try {
+      return localStorage.getItem('HERDON_SHOW_AUTH_DEBUG') === 'true';
+    } catch {
+      return false;
+    }
+  }, []);
 
   if (import.meta.env.DEV) {
     console.debug('[HERDON_AUTH_BOOT]', {
@@ -479,6 +487,26 @@ export default function App() {
 
   return (
     <div className="app">
+      {showAuthDebug && session ? (
+        <div
+          style={{
+            position: 'fixed',
+            right: 12,
+            bottom: 12,
+            zIndex: 9999,
+            padding: '8px 10px',
+            borderRadius: 8,
+            background: 'rgba(17,24,39,0.9)',
+            color: '#f9fafb',
+            fontSize: 12,
+            lineHeight: 1.4,
+            boxShadow: '0 6px 18px rgba(0,0,0,0.25)',
+            maxWidth: 320,
+          }}
+        >
+          Debug Auth: perfil={user?.perfil || 'visualizador'} fonte={user?.roleSource || 'fallback'} email={user?.email || 'sem-email'}
+        </div>
+      ) : null}
       <Sidebar
         currentPage={pageKey}
         onNavigate={navigateWithPermission}

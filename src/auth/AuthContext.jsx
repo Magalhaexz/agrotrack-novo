@@ -2,6 +2,7 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react';
 import {
   mapProfileRowToUser,
+  resolveUserRoleFromAuthAndCache,
   fetchUserProfile,
   isAccessModuleUnavailable,
   readCachedProfile,
@@ -46,6 +47,7 @@ function logProfileBootOnce(stage, payload = {}, level = 'debug') {
 
 function buildFallbackProfile(userAtual, cachedProfile = null) {
   if (!userAtual) return null;
+  const resolvedRole = resolveUserRoleFromAuthAndCache(userAtual, cachedProfile);
 
   return {
     id: userAtual.id || cachedProfile?.id || null,
@@ -57,7 +59,8 @@ function buildFallbackProfile(userAtual, cachedProfile = null) {
       || userAtual?.user_metadata?.name
       || userAtual?.email?.split('@')[0]
       || 'Usuario',
-    perfil: cachedProfile?.perfil || userAtual?.user_metadata?.perfil || userAtual?.perfil || 'visualizador',
+    perfil: resolvedRole.perfil,
+    roleSource: resolvedRole.source,
     foto_url: cachedProfile?.foto_url ?? userAtual?.user_metadata?.avatar_url ?? null,
     telefone: cachedProfile?.telefone ?? userAtual?.user_metadata?.telefone ?? '',
     cargo: cachedProfile?.cargo ?? userAtual?.user_metadata?.cargo ?? '',
@@ -108,6 +111,7 @@ export function AuthProvider({ children }) {
     const userId = String(userAtual?.id || '');
     const cachedProfile = readCachedProfile(userId);
     const fallbackProfile = buildFallbackProfile(userAtual, cachedProfile);
+    const resolvedRole = resolveUserRoleFromAuthAndCache(userAtual, cachedProfile);
 
     if (cachedProfile) {
       logProfileBootOnce('using_cached_profile', {
@@ -118,6 +122,13 @@ export function AuthProvider({ children }) {
       logProfileBootOnce('using_auth_metadata_profile', {
         userId,
         generationId,
+      });
+    }
+    if (import.meta.env.DEV) {
+      console.debug('[HERDON_ROLE_BOOT]', {
+        source: resolvedRole.source,
+        resolvedPerfil: resolvedRole.perfil,
+        userEmail: userAtual?.email || null,
       });
     }
 
