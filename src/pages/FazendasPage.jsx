@@ -7,6 +7,7 @@ import { gerarNovoId } from '../utils/id';
 import { useToast } from '../hooks/useToast';
 import { useAuth } from '../auth/useAuth';
 import {
+  checkSupabaseCloudConnection,
   createOperationalRecord,
   deleteOperationalRecord,
   syncFazendasWithCloud,
@@ -149,6 +150,15 @@ export default function FazendasPage({ db, setDb, onConfirmAction }) {
     setSincronizandoFazendas(true);
     showToast({ type: 'info', message: 'Sincronizando fazendas...' });
     try {
+      const health = await checkSupabaseCloudConnection({ session });
+      if (!health?.ok) {
+        showToast({
+          type: 'warning',
+          message: health?.message || 'Não foi possível conectar à nuvem. Verifique sua conexão e tente novamente.',
+        });
+        return;
+      }
+
       const result = await syncFazendasWithCloud({
         fazendas,
         session,
@@ -166,12 +176,12 @@ export default function FazendasPage({ db, setDb, onConfirmAction }) {
       } else if ((result?.failedCount || 0) > 0 && (result?.syncedCount || 0) > 0) {
         showToast({
           type: 'warning',
-          message: 'Algumas fazendas não foram sincronizadas. Seus dados locais continuam disponíveis.',
+          message: result?.message || 'Algumas fazendas não foram sincronizadas. Seus dados locais continuam disponíveis.',
         });
       } else {
         showToast({
           type: 'warning',
-          message: 'Não foi possível sincronizar fazendas. Seus dados locais continuam disponíveis.',
+          message: result?.message || 'Não foi possível sincronizar fazendas. Seus dados locais continuam disponíveis.',
         });
       }
     } catch {
