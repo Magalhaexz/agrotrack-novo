@@ -36,6 +36,30 @@ test('metadata perfil=gerente é aceito', () => {
   assert.equal(mapped.perfil, 'gerente');
 });
 
+test('metadata cargo=admin prevalece sobre cache visualizador', () => {
+  const user = {
+    id: 'u3b',
+    email: 'cargo-admin@herdon.app',
+    user_metadata: { cargo: 'admin' },
+  };
+  const profile = { perfil: 'visualizador', nome: 'Cache Antigo' };
+
+  const mapped = mapProfileRowToUser(user, profile);
+  assert.equal(mapped.perfil, 'admin');
+});
+
+test('cache admin é usado quando metadata ausente', () => {
+  const user = {
+    id: 'u3c',
+    email: 'cache-admin@herdon.app',
+    user_metadata: {},
+  };
+  const profile = { perfil: 'admin', nome: 'Cache Admin' };
+
+  const mapped = mapProfileRowToUser(user, profile);
+  assert.equal(mapped.perfil, 'admin');
+});
+
 test('metadata desconhecido cai para visualizador', () => {
   const user = {
     id: 'u4',
@@ -46,4 +70,3 @@ test('metadata desconhecido cai para visualizador', () => {
   const mapped = mapProfileRowToUser(user, null);
   assert.equal(mapped.perfil, 'visualizador');
 });
-

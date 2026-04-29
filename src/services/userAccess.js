@@ -19,6 +19,42 @@ export function isAccessModuleUnavailable(error) {
   return isMissingTableError(error) || isRlsError(error);
 }
 
+function getAuthMetadataRoleRaw(user) {
+  return (
+    user?.user_metadata?.perfil
+    ?? user?.user_metadata?.role
+    ?? user?.user_metadata?.cargo
+    ?? user?.raw_user_meta_data?.perfil
+    ?? user?.raw_user_meta_data?.role
+    ?? user?.raw_user_meta_data?.cargo
+    ?? null
+  );
+}
+
+function getResolvedRoleFromUserAndProfile(user, profile) {
+  const metadataRawPerfil = getAuthMetadataRoleRaw(user);
+  const metadataRawHasValue = Boolean(String(metadataRawPerfil || '').trim());
+  const metadataPerfil = normalizarPerfil(metadataRawPerfil);
+  const metadataExplicitRole =
+    metadataRawHasValue
+    && (metadataPerfil === PERFIS.ADMIN || metadataPerfil === PERFIS.GERENTE || metadataPerfil === PERFIS.OPERADOR);
+
+  const profilePerfil = normalizarPerfil(profile?.perfil || null);
+  const hasProfilePerfil = Boolean(String(profile?.perfil || '').trim());
+
+  // Regra de segurança:
+  // 1) metadata explícita admin/gerente/operador sempre vence cache stale visualizador.
+  // 2) se metadata não for explícita, perfil válido em cache/profile pode ser usado.
+  // 3) fallback final permanece visualizador.
+  if (metadataExplicitRole) {
+    return { perfil: metadataPerfil, source: 'auth_metadata' };
+  }
+  if (hasProfilePerfil) {
+    return { perfil: profilePerfil, source: 'cached_profile' };
+  }
+  return { perfil: obterPerfilDoUsuario(user), source: 'fallback' };
+}
+
 export function mapProfileRowToUser(user, profile) {
   if (!user) return null;
 
@@ -28,24 +64,15 @@ export function mapProfileRowToUser(user, profile) {
     user?.email?.split('@')[0] ||
     'Usuario';
 
-  const metadataRawPerfil =
-    user?.user_metadata?.perfil
-    ?? user?.user_metadata?.role
-    ?? user?.user_metadata?.cargo
-    ?? user?.user_metadata?.tipo
-    ?? user?.raw_user_meta_data?.perfil
-    ?? user?.raw_user_meta_data?.role
-    ?? user?.raw_user_meta_data?.cargo
-    ?? user?.raw_user_meta_data?.tipo
-    ?? null;
-  const hasMetadataPerfil = Boolean(String(metadataRawPerfil || '').trim());
-  const metadataPerfil = normalizarPerfil(metadataRawPerfil);
-  const profilePerfil = normalizarPerfil(profile?.perfil || null);
-  const hasProfilePerfil = Boolean(String(profile?.perfil || '').trim());
-
-  let perfil = hasProfilePerfil ? profilePerfil : obterPerfilDoUsuario(user);
-  if (hasMetadataPerfil && (!hasProfilePerfil || profilePerfil === PERFIS.VISUALIZADOR)) {
-    perfil = metadataPerfil;
+  const resolved = getResolvedRoleFromUserAndProfile(user, profile);
+  const perfil = resolved.perfil;
+  if (import.meta?.env?.DEV) {
+    console.debug('[HERDON_ROLE_BOOT]', {
+      source: resolved.source,
+      hasProfile: Boolean(profile),
+      hasMetadataRole: Boolean(String(getAuthMetadataRoleRaw(user) || '').trim()),
+      resolvedPerfil: perfil,
+    });
   }
 
   return {
