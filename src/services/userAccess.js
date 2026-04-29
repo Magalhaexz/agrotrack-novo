@@ -1,5 +1,5 @@
-import { obterLabelPerfil, normalizarPerfil } from '../auth/perfis';
-import { supabase } from '../lib/supabase';
+import { obterLabelPerfil, obterPerfilDoUsuario, PERFIS, normalizarPerfil } from '../auth/perfis.js';
+import { supabase } from '../lib/supabase.js';
 
 const PROFILE_COLUMNS = 'id, email, nome, perfil, telefone, cargo, foto_url, created_at, updated_at';
 const INVITE_COLUMNS = 'id, email, nome, perfil, status, notes, created_by, used_by, used_at, created_at, updated_at';
@@ -28,7 +28,25 @@ export function mapProfileRowToUser(user, profile) {
     user?.email?.split('@')[0] ||
     'Usuario';
 
-  const perfil = normalizarPerfil(profile?.perfil || user?.perfil);
+  const metadataRawPerfil =
+    user?.user_metadata?.perfil
+    ?? user?.user_metadata?.role
+    ?? user?.user_metadata?.cargo
+    ?? user?.user_metadata?.tipo
+    ?? user?.raw_user_meta_data?.perfil
+    ?? user?.raw_user_meta_data?.role
+    ?? user?.raw_user_meta_data?.cargo
+    ?? user?.raw_user_meta_data?.tipo
+    ?? null;
+  const hasMetadataPerfil = Boolean(String(metadataRawPerfil || '').trim());
+  const metadataPerfil = normalizarPerfil(metadataRawPerfil);
+  const profilePerfil = normalizarPerfil(profile?.perfil || null);
+  const hasProfilePerfil = Boolean(String(profile?.perfil || '').trim());
+
+  let perfil = hasProfilePerfil ? profilePerfil : obterPerfilDoUsuario(user);
+  if (hasMetadataPerfil && (!hasProfilePerfil || profilePerfil === PERFIS.VISUALIZADOR)) {
+    perfil = metadataPerfil;
+  }
 
   return {
     ...user,

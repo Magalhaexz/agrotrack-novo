@@ -14,10 +14,13 @@ export const PERFIL_LABELS = {
 
 const PERFIL_ALIASES = {
   admin: PERFIS.ADMIN,
+  administrador: PERFIS.ADMIN,
   proprietario: PERFIS.ADMIN,
   owner: PERFIS.ADMIN,
   gerente: PERFIS.GERENTE,
+  gestor: PERFIS.GERENTE,
   operador: PERFIS.OPERADOR,
+  funcionario: PERFIS.OPERADOR,
   visualizador: PERFIS.VISUALIZADOR,
   viewer: PERFIS.VISUALIZADOR,
 };
@@ -142,9 +145,15 @@ export function obterPerfilDoUsuario(user) {
     user?.profile?.perfil ||
     user?.perfil ||
     user?.user_metadata?.perfil ||
+    user?.user_metadata?.cargo ||
+    user?.user_metadata?.tipo ||
     user?.app_metadata?.perfil ||
     user?.user_metadata?.role ||
-    user?.app_metadata?.role;
+    user?.app_metadata?.role ||
+    user?.raw_user_meta_data?.perfil ||
+    user?.raw_user_meta_data?.role ||
+    user?.raw_user_meta_data?.cargo ||
+    user?.raw_user_meta_data?.tipo;
 
   return normalizarPerfil(bruto);
 }
