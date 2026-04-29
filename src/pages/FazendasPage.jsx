@@ -166,12 +166,12 @@ export default function FazendasPage({ db, setDb, onConfirmAction }) {
       } else if ((result?.failedCount || 0) > 0 && (result?.syncedCount || 0) > 0) {
         showToast({
           type: 'warning',
-          message: 'Algumas fazendas não foram sincronizadas. Seus dados locais continuam disponíveis.',
+          message: result?.message || 'Algumas fazendas não foram sincronizadas. Seus dados locais continuam disponíveis.',
         });
       } else {
         showToast({
           type: 'warning',
-          message: 'Não foi possível sincronizar fazendas. Seus dados locais continuam disponíveis.',
+          message: result?.message || 'Não foi possível sincronizar fazendas. Seus dados locais continuam disponíveis.',
         });
       }
     } catch {
