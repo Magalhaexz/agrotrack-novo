@@ -77,7 +77,7 @@ function getCloudState(syncStatus) {
     return {
       tone: 'warning',
       icon: 'warning',
-      label: 'Modo local',
+      label: 'Dados locais',
       detail: message || 'Nuvem instavel',
       title: message || 'Sincronizacao instavel. Dados locais disponiveis.',
       disabled: false,

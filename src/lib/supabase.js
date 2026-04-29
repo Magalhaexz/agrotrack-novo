@@ -1,11 +1,24 @@
 import { createClient } from '@supabase/supabase-js';
 
+function normalizeEnvValue(value) {
+  if (value === undefined || value === null) return '';
+  const text = String(value).trim();
+  if (!text) return '';
+  if (
+    (text.startsWith('"') && text.endsWith('"'))
+    || (text.startsWith("'") && text.endsWith("'"))
+  ) {
+    return text.slice(1, -1).trim();
+  }
+  return text;
+}
+
 const runtimeEnv = (typeof import.meta !== 'undefined' && import.meta?.env)
   ? import.meta.env
   : {};
 const processEnv = globalThis?.process?.env || {};
-const supabaseUrl = runtimeEnv.VITE_SUPABASE_URL || processEnv.VITE_SUPABASE_URL;
-const supabaseAnonKey = runtimeEnv.VITE_SUPABASE_ANON_KEY || processEnv.VITE_SUPABASE_ANON_KEY;
+const supabaseUrl = normalizeEnvValue(runtimeEnv.VITE_SUPABASE_URL || processEnv.VITE_SUPABASE_URL);
+const supabaseAnonKey = normalizeEnvValue(runtimeEnv.VITE_SUPABASE_ANON_KEY || processEnv.VITE_SUPABASE_ANON_KEY);
 const isTestEnvironment = processEnv.NODE_ENV === 'test';
 const supabaseEnvConfigured = Boolean(supabaseUrl && supabaseAnonKey);
 

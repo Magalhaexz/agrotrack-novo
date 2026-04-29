@@ -24,7 +24,7 @@ function classifyOperationalError(error, fallbackMessage) {
   const message = String(getErrorMessage(error) || '').toLowerCase();
   const code = String(error?.code || '').toUpperCase();
   if (isNetworkError(error)) {
-    return 'Sem conexao com a nuvem no momento. Seus dados locais continuam disponiveis.';
+    return 'A nuvem está indisponível neste momento. Você pode continuar usando os dados locais e tentar sincronizar novamente depois.';
   }
   if (code === '42501' || message.includes('row-level security') || message.includes('permission denied')) {
     return 'Permissao insuficiente para gravar na nuvem. Verifique o perfil de acesso.';
@@ -85,9 +85,17 @@ export async function ensureSupabaseRequestReadiness(session, context = {}) {
     if (error) {
       throw error;
     }
-    const activeSession = data?.session ?? null;
-    const activeUserId = activeSession?.user?.id || null;
-    const hasAccessToken = Boolean(activeSession?.access_token);
+    let activeSession = data?.session ?? null;
+    let activeUserId = activeSession?.user?.id || null;
+    let hasAccessToken = Boolean(activeSession?.access_token);
+    if (!activeUserId || !hasAccessToken || String(activeUserId) !== String(sessionUserId)) {
+      const { data: refreshedData, error: refreshError } = await supabase.auth.refreshSession();
+      if (!refreshError) {
+        activeSession = refreshedData?.session ?? null;
+        activeUserId = activeSession?.user?.id || null;
+        hasAccessToken = Boolean(activeSession?.access_token);
+      }
+    }
     if (!activeUserId || !hasAccessToken || String(activeUserId) !== String(sessionUserId)) {
       logOperationalSync({
         stage: 'session_stale',
@@ -99,7 +107,7 @@ export async function ensureSupabaseRequestReadiness(session, context = {}) {
       return {
         ok: false,
         code: 'SESSION_STALE',
-        message: 'Sua sessao esta sendo atualizada. Aguarde alguns segundos e tente novamente.',
+        message: 'Sessao expirada ou invalida. Entre novamente para sincronizar com a nuvem.',
       };
     }
     return {
@@ -461,122 +469,6 @@ export async function deleteOwnerScopedCollection(table, session, extraFilters =
 
 
 
-function getSupabaseRestConfig() {
-  const envStatus = getSupabaseEnvStatus();
-  const envUrl = import.meta?.env?.VITE_SUPABASE_URL || null;
-  const envAnonKey = import.meta?.env?.VITE_SUPABASE_ANON_KEY || null;
-  const clientUrl = supabase?.supabaseUrl || supabase?.rest?.url?.replace(/\/rest\/v1\/?$/, '') || null;
-  const clientAnonKey = supabase?.supabaseKey || supabase?.anonKey || null;
-
-  const url = envUrl || clientUrl;
-  const anonKey = envAnonKey || clientAnonKey;
-
-  if (!url || !anonKey) {
-    return {
-      url: null,
-      anonKey: null,
-      error: envStatus.message || 'Configuracao da nuvem ausente. Verifique as variaveis do Supabase.',
-    };
-  }
-
-  return { url, anonKey, error: null };
-}
-
-function readLocalStorageSupabaseToken() {
-  try {
-    const keys = Object.keys(localStorage).filter((key) => key.startsWith('sb-') && key.endsWith('-auth-token'));
-    for (const key of keys) {
-      const raw = localStorage.getItem(key);
-      if (!raw) continue;
-      const parsed = JSON.parse(raw);
-      const accessToken = parsed?.access_token || parsed?.currentSession?.access_token || null;
-      const userId = parsed?.user?.id || parsed?.currentSession?.user?.id || null;
-      const email = parsed?.user?.email || parsed?.currentSession?.user?.email || null;
-      if (accessToken) {
-        return { token: accessToken, userId, email };
-      }
-    }
-  } catch {
-    return { token: null, userId: null, email: null };
-  }
-  return { token: null, userId: null, email: null };
-}
-
-function resolveSupabaseAccessToken(session) {
-  const sessionUserId = getSessionUserId(session);
-  const sessionEmail = session?.user?.email || null;
-  const acceptedSessionToken = session?.access_token || session?.session?.access_token || null;
-
-  if (acceptedSessionToken) {
-    return { token: acceptedSessionToken, source: 'accepted_session', acceptedSessionTokenPresent: true, localStorageTokenPresent: false };
-  }
-
-  const localToken = readLocalStorageSupabaseToken();
-  const sameUser = !sessionUserId || !localToken.userId || String(localToken.userId) === String(sessionUserId);
-  const sameEmail = !sessionEmail || !localToken.email || String(localToken.email).toLowerCase() === String(sessionEmail).toLowerCase();
-  if (localToken.token && sameUser && sameEmail) {
-    return { token: localToken.token, source: 'local_storage', acceptedSessionTokenPresent: false, localStorageTokenPresent: true };
-  }
-
-  return { token: null, source: null, acceptedSessionTokenPresent: Boolean(acceptedSessionToken), localStorageTokenPresent: Boolean(localToken.token) };
-}
-
-async function fetchFazendasRest(path, token, options = {}) {
-  const { url, anonKey, error: configError } = getSupabaseRestConfig();
-  const method = options.method || 'GET';
-  if (configError || !token) {
-    const error = new Error(configError || 'missing_rest_config_or_token');
-    error.code = 'CONFIG_ERROR';
-    throw error;
-  }
-
-  const baseUrl = String(url).replace(/\/$/, '');
-  const requestUrl = `${baseUrl}/rest/v1/${path}`;
-  const headers = {
-    apikey: anonKey,
-    Authorization: `Bearer ${token}`,
-    Accept: 'application/json',
-    ...(options.headers || {}),
-  };
-  if (method !== 'GET' && method !== 'HEAD') {
-    headers['Content-Type'] = 'application/json';
-  }
-
-  let response;
-  try {
-    response = await fetch(requestUrl, {
-      method,
-      headers,
-      body: options.body ? JSON.stringify(options.body) : undefined,
-    });
-  } catch (error) {
-    error.requestUrlHost = (() => {
-      try { return new URL(requestUrl).host; } catch { return null; }
-    })();
-    error.requestUrlPath = (() => {
-      try { return new URL(requestUrl).pathname; } catch { return null; }
-    })();
-    error.requestMethod = method;
-    throw error;
-  }
-
-  let payload = null;
-  try { payload = await response.json(); } catch { payload = null; }
-
-  if (!response.ok) {
-    const error = new Error(payload?.message || `rest_error_${response.status}`);
-    error.status = response.status;
-    error.code = payload?.code || null;
-    error.details = payload?.details || null;
-    error.hint = payload?.hint || null;
-    error.requestUrlHost = (() => { try { return new URL(requestUrl).host; } catch { return null; } })();
-    error.requestUrlPath = (() => { try { return new URL(requestUrl).pathname; } catch { return null; } })();
-    error.requestMethod = method;
-    throw error;
-  }
-
-  return payload;
-}
 function isAuthDebugEnabled() {
   if (import.meta.env.DEV) return true;
   try {
@@ -600,7 +492,7 @@ function classifyFazendasSyncError(error) {
   }
 
   if (isNetworkError(error)) {
-    return 'Não foi possível conectar à nuvem. Seus dados locais continuam disponíveis.';
+    return 'A nuvem está indisponível neste momento. Você pode continuar usando os dados locais e tentar sincronizar novamente depois.';
   }
 
   return 'Não foi possível sincronizar fazendas. Seus dados locais continuam disponíveis.';
@@ -647,14 +539,7 @@ export async function checkSupabaseCloudConnection({ session } = {}) {
       hint: null,
     };
   }
-  const resolved = resolveSupabaseAccessToken(session);
-
-  const config = getSupabaseRestConfig();
-  if (config.error) {
-    return { ok: false, stage: 'config_missing', error: 'CONFIG_ERROR', code: 'CONFIG_ERROR', status: null, message: config.error, details: null, hint: null };
-  }
-
-  if (!sessionUserId || !resolved.token) {
+  if (!sessionUserId) {
     const message = 'Sua sessão expirou. Faça login novamente.';
     if (isAuthDebugEnabled()) {
       console.info('[HERDON_CLOUD_HEALTH]', {
@@ -663,7 +548,7 @@ export async function checkSupabaseCloudConnection({ session } = {}) {
         table: 'fazendas',
         requestUrlHost: null,
         requestUrlPath: null,
-        method: 'GET',
+        method: 'SDK_SELECT',
         status: 401,
         errorName: 'AUTH_SESSION_MISSING',
         errorMessage: message,
@@ -673,16 +558,20 @@ export async function checkSupabaseCloudConnection({ session } = {}) {
   }
 
   try {
-    await fetchFazendasRest(`fazendas?select=id&owner_user_id=eq.${encodeURIComponent(sessionUserId)}&limit=1`, resolved.token);
+    const { error } = await supabase
+      .from('fazendas')
+      .select('id')
+      .eq('owner_user_id', sessionUserId)
+      .limit(1);
+    if (error) throw error;
     if (isAuthDebugEnabled()) {
-      const cfg = getSupabaseRestConfig();
       console.info('[HERDON_CLOUD_HEALTH]', {
         stage: 'ok',
         action: 'select',
         table: 'fazendas',
-        requestUrlHost: (() => { try { return new URL(String(cfg.url).replace(/\/$/, '')).host; } catch { return null; } })(),
+        requestUrlHost: null,
         requestUrlPath: '/rest/v1/fazendas',
-        method: 'GET',
+        method: 'SDK_SELECT',
         status: 200,
         errorName: null,
         errorMessage: 'ok',
@@ -690,6 +579,7 @@ export async function checkSupabaseCloudConnection({ session } = {}) {
     }
     return { ok: true, stage: 'ok', error: null, code: null, status: 200, message: null, details: null, hint: null };
   } catch (error) {
+
     const status = Number(error?.status) || null;
     const code = String(error?.code || '').toUpperCase() || null;
     const lower = String(error?.message || '').toLowerCase();
@@ -699,16 +589,16 @@ export async function checkSupabaseCloudConnection({ session } = {}) {
     else if (status === 403 || code === '42501') { stage = 'permission_denied'; message = 'Permissão negada ao acessar a nuvem. Verifique as políticas RLS.'; }
     else if (status === 404 || code === 'PGRST204' || code === '42703' || lower.includes('schema') || lower.includes('column')) { stage = 'schema_mismatch'; message = 'A estrutura da tabela fazendas não está compatível com o app.'; }
     else if (code === 'CONFIG_ERROR' || lower.includes('missing_rest_config_or_token')) { stage = 'config_missing'; message = 'Configuração da nuvem ausente. Verifique as variáveis do Supabase.'; }
-    else if (isNetworkError(error) || (error?.name === 'TypeError' && lower.includes('failed to fetch'))) { stage = 'network_error'; message = 'Não foi possível conectar à nuvem. Verifique sua conexão e tente novamente.'; }
+    else if (isNetworkError(error) || (error?.name === 'TypeError' && lower.includes('failed to fetch'))) { stage = 'network_error'; message = 'A nuvem está indisponível neste momento. Você pode continuar usando os dados locais e tentar sincronizar novamente depois.'; }
 
     if (isAuthDebugEnabled()) {
       console.info('[HERDON_CLOUD_HEALTH]', {
         stage,
         action: 'select',
         table: 'fazendas',
-        method: error?.requestMethod || 'GET',
-        requestUrlHost: error?.requestUrlHost || null,
-        requestUrlPath: error?.requestUrlPath || '/rest/v1/fazendas',
+        method: 'SDK_SELECT',
+        requestUrlHost: null,
+        requestUrlPath: '/rest/v1/fazendas',
         status,
         errorName: error?.name || code || null,
         errorMessage: error?.message || message || null,
@@ -737,9 +627,8 @@ export async function syncFazendasWithCloud({ fazendas = [], session }) {
   }
   const userId = getSessionUserId(session);
   const localRows = Array.isArray(fazendas) ? fazendas : [];
-  const resolved = resolveSupabaseAccessToken(session);
 
-  if (!userId || !resolved.token) {
+  if (!userId) {
     return { ok: false, data: localRows, error: 'AUTH_REQUIRED', message: 'Faça login para sincronizar com a nuvem.', syncedCount: 0, failedCount: 0, selectedCount: 0 };
   }
 
@@ -750,7 +639,14 @@ export async function syncFazendasWithCloud({ fazendas = [], session }) {
     if (getCloudIdMarker(localRow) !== null) continue;
     const { payload } = mapFazendaToCloudPayload(localRow, userId);
     try {
-      await fetchFazendasRest('fazendas', resolved.token, { method: 'POST', headers: { Prefer: 'return=representation' }, body: payload });
+      const { error } = await supabase
+        .from('fazendas')
+        .insert(payload)
+        .select('id')
+        .single();
+      if (error) {
+        throw error;
+      }
       syncedCount += 1;
       logFazendasSync({ operation: 'insert', payloadKeys: Object.keys(payload), rowNome: payload.nome || null, status: 201, message: 'ok' });
     } catch (error) {
@@ -763,14 +659,20 @@ export async function syncFazendasWithCloud({ fazendas = [], session }) {
       else if (status === 403 || code === '42501') message = 'Permissão negada ao sincronizar fazendas. Verifique as políticas RLS.';
       else if (status === 404 || code === 'PGRST204' || code === '42703' || lower.includes('schema') || lower.includes('column')) message = 'A estrutura da tabela fazendas não está compatível com o app.';
       else if (code === 'CONFIG_ERROR' || lower.includes('missing_rest_config_or_token')) message = 'Configuração da nuvem ausente. Verifique as variáveis do Supabase.';
-      else if (isNetworkError(error) || (error?.name === 'TypeError' && lower.includes('failed to fetch'))) message = 'Não foi possível conectar à nuvem. Verifique sua conexão e tente novamente.';
+      else if (isNetworkError(error) || (error?.name === 'TypeError' && lower.includes('failed to fetch'))) message = 'A nuvem está indisponível neste momento. Você pode continuar usando os dados locais e tentar sincronizar novamente depois.';
       logFazendasSync({ operation: 'insert', payloadKeys: Object.keys(payload), rowNome: payload.nome || null, status, code, message, errorName: error?.name || null, errorMessage: error?.message || null, level: 'warn' });
       return { ok: false, data: localRows, error: code || 'SYNC_FAILED', message, syncedCount, failedCount, selectedCount: 0 };
     }
   }
 
   try {
-    const remoteList = await fetchFazendasRest(`fazendas?select=*&owner_user_id=eq.${encodeURIComponent(userId)}`, resolved.token);
+    const { data: remoteList, error } = await supabase
+      .from('fazendas')
+      .select('*')
+      .eq('owner_user_id', userId);
+    if (error) {
+      throw error;
+    }
     return { ok: true, data: mergeFazendasSafe(localRows, Array.isArray(remoteList) ? remoteList : []), error: null, message: null, syncedCount, failedCount, selectedCount: Array.isArray(remoteList) ? remoteList.length : 0 };
   } catch (error) {
     const msg = classifyFazendasSyncError(error);

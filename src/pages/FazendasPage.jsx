@@ -13,16 +13,20 @@ import {
   syncFazendasWithCloud,
   updateOperationalRecord,
 } from '../services/operationalPersistence';
+import { runSupabaseConnectivityDiagnostics } from '../services/supabaseDiagnostics';
 
 export default function FazendasPage({ db, setDb, onConfirmAction }) {
   const { showToast, dismissToast } = useToast();
-  const { hasPermission, session } = useAuth();
+  const { hasPermission, session, user } = useAuth();
   const mensagemSemPermissao = 'Você não tem permissão para executar esta ação.';
 
   const [openModal, setOpenModal] = useState(false);
   const [editando, setEditando] = useState(null);
   const [sincronizandoFazendas, setSincronizandoFazendas] = useState(false);
+  const [diagnosticandoNuvem, setDiagnosticandoNuvem] = useState(false);
   const loadingToastRef = useRef(null);
+  const isAdmin = String(user?.perfil || '').toLowerCase() === 'admin' || hasPermission('configuracoes:editar');
+  const podeVerDiagnostico = Boolean(import.meta.env.DEV || isAdmin);
 
   const fazendas = Array.isArray(db?.fazendas) ? db.fazendas : [];
   const lotes = Array.isArray(db?.lotes) ? db.lotes : [];
@@ -116,6 +120,64 @@ export default function FazendasPage({ db, setDb, onConfirmAction }) {
     }
   }
 
+  function getResumoDiagnostico(classification) {
+    switch (classification) {
+      case 'env_missing':
+        return 'Ambiente Supabase nao configurado.';
+      case 'invalid_url':
+        return 'URL do Supabase invalida no ambiente.';
+      case 'auth_error':
+        return 'Sessao expirada. Entre novamente.';
+      case 'schema_error':
+      case 'rls_or_policy_error':
+        return 'Tabela fazendas nao encontrada ou sem permissao.';
+      case 'network_error':
+      case 'timeout':
+      case 'cors_or_fetch_blocked':
+        return 'Projeto Supabase inacessivel pela rede.';
+      case 'ok':
+        return 'Conexao com a nuvem validada.';
+      default:
+        return 'Nao foi possivel validar a conectividade com a nuvem.';
+    }
+  }
+
+  async function executarDiagnosticoNuvem() {
+    if (!podeVerDiagnostico || diagnosticandoNuvem) return;
+    setDiagnosticandoNuvem(true);
+    try {
+      const result = await runSupabaseConnectivityDiagnostics({ session });
+      showToast({
+        type: result?.ok ? 'success' : 'warning',
+        message: getResumoDiagnostico(result?.classification),
+      });
+
+      if (import.meta.env.DEV || isAdmin) {
+        console.info('[HERDON_CLOUD_DIAGNOSTIC]', {
+          stage: result?.stage || null,
+          classification: result?.classification || null,
+          ok: Boolean(result?.ok),
+          safeDetails: result?.safeDetails || null,
+        });
+      }
+    } catch (error) {
+      showToast({
+        type: 'warning',
+        message: 'Nao foi possivel executar o diagnostico da nuvem.',
+      });
+      if (import.meta.env.DEV) {
+        console.warn('[HERDON_CLOUD_DIAGNOSTIC]', {
+          stage: 'diagnostic_exception',
+          classification: 'unknown_error',
+          errorName: error?.name || null,
+          errorMessage: error?.message || null,
+        });
+      }
+    } finally {
+      setDiagnosticandoNuvem(false);
+    }
+  }
+
   async function sincronizarFazendasComNuvem() {
     if (sincronizandoFazendas) return;
 
@@ -191,10 +253,19 @@ export default function FazendasPage({ db, setDb, onConfirmAction }) {
             <Button
               variant="secondary"
               onClick={sincronizarFazendasComNuvem}
-              disabled={sincronizandoFazendas}
+              disabled={sincronizandoFazendas || diagnosticandoNuvem}
             >
               {sincronizandoFazendas ? 'Sincronizando fazendas...' : 'Sincronizar fazendas com a nuvem'}
             </Button>
+            {podeVerDiagnostico ? (
+              <Button
+                variant="ghost"
+                onClick={executarDiagnosticoNuvem}
+                disabled={sincronizandoFazendas || diagnosticandoNuvem}
+              >
+                {diagnosticandoNuvem ? 'Diagnosticando nuvem...' : 'Diagnosticar nuvem'}
+              </Button>
+            ) : null}
             <Button onClick={() => {
               if (!hasPermission('fazendas:editar')) {
                 showToast({ type: 'error', message: mensagemSemPermissao });

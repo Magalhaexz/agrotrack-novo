@@ -242,6 +242,7 @@ async function fetchOperationalTableWithCircuit(table, userId, shouldApply, circ
       }
 
       circuitState.failures += 1;
+      circuitState.hadFailures = true;
       if (circuitState.failures >= HYDRATION_FAILURES_TO_OPEN_CIRCUIT) {
         circuitState.open = true;
         logSyncGuard({
@@ -255,6 +256,7 @@ async function fetchOperationalTableWithCircuit(table, userId, shouldApply, circ
   }
 
   circuitState.failures += 1;
+  circuitState.hadFailures = true;
   if (circuitState.failures >= HYDRATION_FAILURES_TO_OPEN_CIRCUIT) {
     circuitState.open = true;
   }
@@ -291,7 +293,7 @@ async function loadOperationalSnapshotRequest(userId, shouldApply, generationId)
     });
   }
 
-  const circuitState = { failures: 0, open: false };
+  const circuitState = { failures: 0, open: false, hadFailures: false };
   const entries = await runWithConcurrency(
     OPERACIONAL_TABLES,
     HYDRATION_CONCURRENCY_LIMIT,
@@ -310,6 +312,7 @@ async function loadOperationalSnapshotRequest(userId, shouldApply, generationId)
   return {
     snapshot: Object.fromEntries(entries),
     circuitOpen: circuitState.open,
+    hadFailures: circuitState.hadFailures,
   };
 }
 
@@ -574,6 +577,16 @@ export function useOperationalData(initialDb, session, options = {}) {
             status: 'error',
             errorName: 'CIRCUIT_OPEN',
             errorMessage: 'Sincronizacao com a nuvem instavel. O app continuara em modo local.',
+          }, 'warn');
+        } else if (snapshotResult?.hadFailures) {
+          setDataSource('fallback_error');
+          setDataError(new Error('A nuvem apresentou falhas nesta sincronizacao. O app segue em dados locais.'));
+          logSyncGuard({
+            stage: 'sync_finished_partial_failure',
+            action: manualSyncRequested ? 'manual_sync' : 'auto_sync',
+            status: 'error',
+            errorName: 'PARTIAL_SYNC_FAILURE',
+            errorMessage: 'A nuvem apresentou falhas nesta sincronizacao. O app segue em dados locais.',
           }, 'warn');
         } else {
           setDataSource('supabase');
