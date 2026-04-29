@@ -28,6 +28,7 @@ const HYDRATION_BACKOFF_MS = 350;
 const HYDRATION_START_DELAY_MS = 1800;
 const HYDRATION_FAILURE_COOLDOWN_MS = 45000;
 const HYDRATION_FAILURES_TO_OPEN_CIRCUIT = 4;
+const MANUAL_SYNC_TIMEOUT_MS = 15000;
 const HERDON_DISABLE_SUPABASE_SYNC = 'HERDON_DISABLE_SUPABASE_SYNC';
 const HERDON_ENABLE_SUPABASE_SYNC = 'HERDON_ENABLE_SUPABASE_SYNC';
 const inFlightSnapshots = new Map();
@@ -42,6 +43,26 @@ function nowMs() {
 function wait(ms) {
   return new Promise((resolve) => {
     globalThis.setTimeout(resolve, ms);
+  });
+}
+
+function withTimeout(promise, timeoutMs, timeoutMessage = 'sync_timeout') {
+  return new Promise((resolve, reject) => {
+    const timer = globalThis.setTimeout(() => {
+      const error = new Error(timeoutMessage);
+      error.name = 'TimeoutError';
+      reject(error);
+    }, timeoutMs);
+
+    Promise.resolve(promise)
+      .then((value) => {
+        globalThis.clearTimeout(timer);
+        resolve(value);
+      })
+      .catch((error) => {
+        globalThis.clearTimeout(timer);
+        reject(error);
+      });
   });
 }
 
@@ -351,6 +372,7 @@ export function useOperationalData(initialDb, session, options = {}) {
   const [dataError, setDataError] = useState(null);
   const [lastSyncAt, setLastSyncAt] = useState(null);
   const [manualSyncNonce, setManualSyncNonce] = useState(0);
+  const [manualSyncInFlight, setManualSyncInFlight] = useState(false);
   const hydratingRef = useRef(false);
   const hydrationGenerationRef = useRef(0);
   const localMutationRef = useRef(0);
@@ -363,8 +385,17 @@ export function useOperationalData(initialDb, session, options = {}) {
   }, []);
 
   const syncNow = useCallback(() => {
+    if (hydratingRef.current || manualSyncInFlight) {
+      logSyncGuard({
+        stage: 'manual_sync_ignored_already_syncing',
+        action: 'manual_sync',
+        status: 'ignored',
+      });
+      return false;
+    }
     setManualSyncNonce((value) => value + 1);
-  }, []);
+    return true;
+  }, [manualSyncInFlight]);
 
   useEffect(() => {
     const userId = session?.user?.id || null;
@@ -451,15 +482,18 @@ export function useOperationalData(initialDb, session, options = {}) {
     }
 
     setDbState(fallbackDb);
-    setDataSource('fallback');
-    setDataError(null);
-    setDataReady(true);
-    logSyncGuard({
-      stage: 'fallback_published',
-      generationId,
-      hasUserId: true,
-      delayMs: HYDRATION_START_DELAY_MS,
-    });
+      setDataSource('fallback');
+      setDataError(null);
+      setDataReady(true);
+      setManualSyncInFlight(false);
+      logSyncGuard({
+        stage: 'fallback_published',
+        action: manualSyncRequested ? 'manual_sync' : 'auto_sync',
+        status: 'fallback_ready',
+        generationId,
+        hasUserId: true,
+        delayMs: HYDRATION_START_DELAY_MS,
+      });
 
     const hydrationVersion = localMutationRef.current;
     const timer = globalThis.setTimeout(async () => {
@@ -474,25 +508,39 @@ export function useOperationalData(initialDb, session, options = {}) {
 
       setDataSource('syncing');
       setDataError(null);
+      setManualSyncInFlight(true);
       logSyncGuard({
         stage: 'sync_started',
+        action: manualSyncRequested ? 'manual_sync' : 'auto_sync',
+        status: 'syncing',
         generationId,
         hasUserId: true,
       });
 
       try {
-        const readiness = await ensureSupabaseRequestReadiness(session, {
+        const readiness = await withTimeout(ensureSupabaseRequestReadiness(session, {
           stage: 'operational_hydration',
           action: 'select',
           table: 'operacional_snapshot',
-        });
+        }), MANUAL_SYNC_TIMEOUT_MS, 'readiness_timeout');
         if (!readiness.ok) {
-          setDataSource('fallback_error');
+          setDataSource('offline_circuit_open');
           setDataError(new Error(readiness.message || 'Sincronizacao indisponivel no momento.'));
+          logSyncGuard({
+            stage: 'sync_finished_not_ready',
+            action: manualSyncRequested ? 'manual_sync' : 'auto_sync',
+            status: 'error',
+            errorName: readiness.code || 'SYNC_NOT_READY',
+            errorMessage: readiness.message || 'Sincronizacao indisponivel no momento.',
+          }, 'warn');
           return;
         }
 
-        const snapshotResult = await loadOperationalSnapshot(userId, shouldApply, generationId);
+        const snapshotResult = await withTimeout(
+          loadOperationalSnapshot(userId, shouldApply, generationId),
+          MANUAL_SYNC_TIMEOUT_MS,
+          'snapshot_timeout'
+        );
         if (!shouldApply()) {
           logSyncGuard({
             stage: 'sync_result_ignored_stale',
@@ -507,6 +555,8 @@ export function useOperationalData(initialDb, session, options = {}) {
           setDataSource('fallback');
           logSyncGuard({
             stage: 'sync_skipped_local_mutation',
+            action: manualSyncRequested ? 'manual_sync' : 'auto_sync',
+            status: 'local_mutation_detected',
             generationId,
             hasUserId: true,
           });
@@ -518,12 +568,24 @@ export function useOperationalData(initialDb, session, options = {}) {
         if (snapshotResult?.circuitOpen) {
           setDataSource('offline_circuit_open');
           setDataError(new Error('Sincronizacao com a nuvem instavel. O app continuara em modo local.'));
+          logSyncGuard({
+            stage: 'sync_finished_circuit_open',
+            action: manualSyncRequested ? 'manual_sync' : 'auto_sync',
+            status: 'error',
+            errorName: 'CIRCUIT_OPEN',
+            errorMessage: 'Sincronizacao com a nuvem instavel. O app continuara em modo local.',
+          }, 'warn');
         } else {
           setDataSource('supabase');
           setDataError(null);
           setLastSyncAt(new Date().toISOString());
+          logSyncGuard({
+            stage: 'sync_finished_success',
+            action: manualSyncRequested ? 'manual_sync' : 'auto_sync',
+            status: 'success',
+          });
         }
-      } catch {
+      } catch (error) {
         if (!shouldApply()) {
           logSyncGuard({
             stage: 'sync_error_ignored_stale',
@@ -532,9 +594,22 @@ export function useOperationalData(initialDb, session, options = {}) {
           });
           return;
         }
-        setDataSource('fallback_error');
-        setDataError(new Error('Sincronizacao instavel. Seus dados locais continuam disponiveis.'));
+        const errorName = error?.name || 'SYNC_ERROR';
+        const rawMessage = getErrorMessage(error);
+        const isTimeout = errorName === 'TimeoutError' || rawMessage === 'readiness_timeout' || rawMessage === 'snapshot_timeout';
+        setDataSource('offline_circuit_open');
+        setDataError(new Error(isTimeout
+          ? 'Sincronizacao demorou mais que o esperado. O app segue em modo local.'
+          : 'Sincronizacao instavel. Seus dados locais continuam disponiveis.'));
+        logSyncGuard({
+          stage: 'sync_finished_exception',
+          action: manualSyncRequested ? 'manual_sync' : 'auto_sync',
+          status: 'error',
+          errorName,
+          errorMessage: rawMessage || 'unknown_error',
+        }, 'warn');
       } finally {
+        setManualSyncInFlight(false);
         if (hydrationGenerationRef.current === generationId) {
           hydratingRef.current = false;
         }
@@ -547,8 +622,11 @@ export function useOperationalData(initialDb, session, options = {}) {
       if (hydrationGenerationRef.current === generationId) {
         hydratingRef.current = false;
       }
+      setManualSyncInFlight(false);
       logSyncGuard({
         stage: 'sync_cancelled_cleanup',
+        action: manualSyncRequested ? 'manual_sync' : 'auto_sync',
+        status: 'cancelled',
         generationId,
         hasUserId: Boolean(userId),
       });
@@ -562,6 +640,7 @@ export function useOperationalData(initialDb, session, options = {}) {
     dataSource,
     dataError,
     lastSyncAt,
+    manualSyncInFlight,
     hydratingRef,
     syncNow,
   };

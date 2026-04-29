@@ -98,6 +98,7 @@ export default function App() {
     dataSource,
     dataError,
     lastSyncAt,
+    manualSyncInFlight,
     syncNow,
   } = useOperationalData(initialDb, session, {
     enabled: Boolean(session?.user?.id) && !loadingAuth,
@@ -137,7 +138,7 @@ export default function App() {
   }
 
   const isBootLoading = loadingAuth;
-  const isOperationalSyncing = Boolean(session) && (dataSource === 'syncing' || (session && !dataReady));
+  const isOperationalSyncing = Boolean(session) && (dataSource === 'syncing' || manualSyncInFlight);
 
   useEffect(() => {
     if (!isBootLoading) {
