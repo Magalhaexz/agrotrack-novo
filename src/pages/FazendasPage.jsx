@@ -122,23 +122,26 @@ export default function FazendasPage({ db, setDb, onConfirmAction }) {
 
   function getResumoDiagnostico(classification) {
     switch (classification) {
+      case 'missing_api_key_header':
+      case 'config_error':
       case 'env_missing':
-        return 'Ambiente Supabase nao configurado.';
       case 'invalid_url':
-        return 'URL do Supabase invalida no ambiente.';
+        return 'Configuração da nuvem incompleta. Verifique as variáveis do Supabase.';
       case 'auth_error':
-        return 'Sessao expirada. Entre novamente.';
+        return 'Sessão expirada. Entre novamente para sincronizar com a nuvem.';
+      case 'auth_or_rls_error':
+        return 'Sem permissão para acessar estes dados na nuvem.';
       case 'schema_error':
       case 'rls_or_policy_error':
-        return 'Tabela fazendas nao encontrada ou sem permissao.';
+        return 'Estrutura da nuvem incompleta. Verifique a tabela fazendas no Supabase.';
       case 'network_error':
       case 'timeout':
       case 'cors_or_fetch_blocked':
-        return 'Projeto Supabase inacessivel pela rede.';
+        return 'Projeto Supabase inacessível pela rede.';
       case 'ok':
-        return 'Conexao com a nuvem validada.';
+        return 'Conexão com a nuvem validada.';
       default:
-        return 'Nao foi possivel validar a conectividade com a nuvem.';
+        return 'Não foi possível validar a conectividade com a nuvem.';
     }
   }
 

@@ -52,23 +52,35 @@ function getSessionSafeState(session) {
 function classifyHttpStatus(status, body = null) {
   const lowerBody = String(body?.message || body?.error_description || body?.hint || '').toLowerCase();
   const code = String(body?.code || '').toUpperCase();
+  const missingApiKey = lowerBody.includes('no api key found in request')
+    || lowerBody.includes('api key')
+    || code === 'PGRST301';
 
-  if (status === 401) {
+  if (missingApiKey) {
     return {
-      classification: 'auth_error',
-      message: 'Sessão inválida ou expirada para acessar a nuvem.',
+      classification: 'missing_api_key_header',
+      message: 'Configuração da nuvem incompleta. Verifique as variáveis do Supabase.',
     };
   }
-  if (status === 403 || code === '42501' || lowerBody.includes('row-level security') || lowerBody.includes('permission denied')) {
+
+  if (status === 401 || status === 403) {
     return {
-      classification: 'rls_or_policy_error',
-      message: 'Permissão negada no Supabase. Verifique políticas RLS e perfil de acesso.',
+      classification: 'auth_or_rls_error',
+      message: 'Sem permissão para acessar estes dados na nuvem.',
     };
   }
+
+  if (code === '42501' || lowerBody.includes('row-level security') || lowerBody.includes('permission denied')) {
+    return {
+      classification: 'auth_or_rls_error',
+      message: 'Sem permissão para acessar estes dados na nuvem.',
+    };
+  }
+
   if (status === 404 || code === 'PGRST204' || code === '42703' || code === '42P01' || lowerBody.includes('column') || lowerBody.includes('schema') || lowerBody.includes('relation')) {
     return {
       classification: 'schema_error',
-      message: 'Estrutura da tabela fazendas está incompatível com o aplicativo.',
+      message: 'Estrutura da nuvem incompleta. Verifique a tabela fazendas no Supabase.',
     };
   }
 
@@ -117,6 +129,8 @@ async function runRestConnectivityCheck({ url, anonKey, token, timeoutMs }) {
           requestUrlHost: safeUrlHost(requestUrl),
           requestUrlPath: '/rest/v1/fazendas',
           status: response.status,
+          anonKeyPresent: Boolean(anonKey),
+          accessTokenPresent: Boolean(token),
         },
       };
     }
@@ -135,6 +149,8 @@ async function runRestConnectivityCheck({ url, anonKey, token, timeoutMs }) {
         errorCode: body?.code || null,
         errorName: null,
         errorMessage: body?.message || null,
+        anonKeyPresent: Boolean(anonKey),
+        accessTokenPresent: Boolean(token),
       },
     };
   } catch (error) {
@@ -143,7 +159,7 @@ async function runRestConnectivityCheck({ url, anonKey, token, timeoutMs }) {
         ok: false,
         stage: 'rest_check',
         classification: 'timeout',
-        message: 'Tempo limite excedido ao conectar com a nuvem.',
+        message: 'Projeto Supabase inacessível pela rede.',
         safeDetails: {
           method,
           requestUrlHost: safeUrlHost(requestUrl),
@@ -151,6 +167,8 @@ async function runRestConnectivityCheck({ url, anonKey, token, timeoutMs }) {
           status: null,
           errorName: 'TimeoutError',
           errorMessage: 'request_timeout',
+          anonKeyPresent: Boolean(anonKey),
+          accessTokenPresent: Boolean(token),
         },
       };
     }
@@ -169,9 +187,7 @@ async function runRestConnectivityCheck({ url, anonKey, token, timeoutMs }) {
       ok: false,
       stage: 'rest_check',
       classification,
-      message: classification === 'cors_or_fetch_blocked'
-        ? 'Falha de conexão no navegador ao acessar a nuvem (CORS, bloqueio ou rede).'
-        : 'Não foi possível conectar à nuvem.',
+      message: 'Projeto Supabase inacessível pela rede.',
       safeDetails: {
         method,
         requestUrlHost: safeUrlHost(requestUrl),
@@ -179,6 +195,8 @@ async function runRestConnectivityCheck({ url, anonKey, token, timeoutMs }) {
         status: null,
         errorName: error?.name || null,
         errorMessage: getErrorMessage(error) || null,
+        anonKeyPresent: Boolean(anonKey),
+        accessTokenPresent: Boolean(token),
       },
     };
   } finally {
@@ -217,17 +235,17 @@ async function runSdkConnectivityCheck({ userId }) {
     let humanMessage = 'Falha ao consultar Supabase via SDK.';
 
     if (code === '42501' || message.includes('row-level security') || message.includes('permission denied')) {
-      classification = 'rls_or_policy_error';
-      humanMessage = 'Permissão negada no Supabase. Verifique políticas RLS e perfil.';
+      classification = 'auth_or_rls_error';
+      humanMessage = 'Sem permissão para acessar estes dados na nuvem.';
     } else if (code === 'PGRST204' || code === '42703' || code === '42P01' || message.includes('column') || message.includes('schema') || message.includes('relation')) {
       classification = 'schema_error';
-      humanMessage = 'Estrutura da tabela fazendas está incompatível com o aplicativo.';
-    } else if (code === '401' || message.includes('jwt') || message.includes('token') || message.includes('auth')) {
+      humanMessage = 'Estrutura da nuvem incompleta. Verifique a tabela fazendas no Supabase.';
+    } else if (code === '401' || code === '403' || message.includes('jwt') || message.includes('token') || message.includes('auth')) {
       classification = 'auth_error';
-      humanMessage = 'Sessão inválida para acessar a nuvem.';
+      humanMessage = 'Sessão expirada. Entre novamente para sincronizar com a nuvem.';
     } else if (isNetworkLikeError(error)) {
       classification = 'network_error';
-      humanMessage = 'Falha de rede ao consultar Supabase via SDK.';
+      humanMessage = 'Projeto Supabase inacessível pela rede.';
     }
 
     return {
@@ -249,7 +267,9 @@ async function runSdkConnectivityCheck({ userId }) {
       ok: false,
       stage: 'sdk_check',
       classification: isNetworkLikeError(error) ? 'network_error' : 'http_error',
-      message: 'Falha inesperada ao validar SDK do Supabase.',
+      message: isNetworkLikeError(error)
+        ? 'Projeto Supabase inacessível pela rede.'
+        : 'Falha inesperada ao validar SDK do Supabase.',
       safeDetails: {
         method: 'SDK_SELECT',
         table: 'fazendas',
@@ -274,8 +294,8 @@ export async function runSupabaseConnectivityDiagnostics({ session, timeoutMs = 
     return {
       ok: false,
       stage: 'env_check',
-      classification: 'env_missing',
-      message: 'Configuração da nuvem ausente. Verifique VITE_SUPABASE_URL e VITE_SUPABASE_ANON_KEY.',
+      classification: 'config_error',
+      message: 'Configuração da nuvem incompleta. Verifique as variáveis do Supabase.',
       safeDetails: {
         envConfigured: Boolean(envStatus?.configured),
         urlPresent: Boolean(url),
@@ -290,8 +310,8 @@ export async function runSupabaseConnectivityDiagnostics({ session, timeoutMs = 
     return {
       ok: false,
       stage: 'env_check',
-      classification: 'invalid_url',
-      message: 'URL do Supabase inválida. Ajuste VITE_SUPABASE_URL.',
+      classification: 'config_error',
+      message: 'Configuração da nuvem incompleta. Verifique as variáveis do Supabase.',
       safeDetails: {
         envConfigured: Boolean(envStatus?.configured),
         urlPresent: true,
@@ -307,7 +327,7 @@ export async function runSupabaseConnectivityDiagnostics({ session, timeoutMs = 
       ok: false,
       stage: 'session_check',
       classification: 'auth_error',
-      message: 'Sessão de autenticação não está pronta para sincronizar com a nuvem.',
+      message: 'Sessão expirada. Entre novamente para sincronizar com a nuvem.',
       safeDetails: {
         envConfigured: true,
         requestUrlHost: host,
@@ -360,14 +380,22 @@ export async function runSupabaseConnectivityDiagnostics({ session, timeoutMs = 
     };
   }
 
-  const combinedClassification = (!restResult.ok && !sdkResult.ok && (
-    restResult.classification === 'network_error'
-    || restResult.classification === 'timeout'
-    || restResult.classification === 'cors_or_fetch_blocked'
-    || sdkResult.classification === 'network_error'
-  ))
-    ? 'network_error'
-    : restResult.classification || sdkResult.classification || 'http_error';
+  const restClassification = restResult.classification;
+  const sdkClassification = sdkResult.classification;
+  const combinedClassification = (restClassification === 'missing_api_key_header' || restClassification === 'config_error')
+    ? 'config_error'
+    : (restClassification === 'auth_or_rls_error' || sdkClassification === 'auth_or_rls_error' || restClassification === 'auth_error' || sdkClassification === 'auth_error')
+      ? 'auth_or_rls_error'
+      : (restClassification === 'schema_error' || sdkClassification === 'schema_error')
+        ? 'schema_error'
+        : (!restResult.ok && !sdkResult.ok && (
+          restClassification === 'network_error'
+          || restClassification === 'timeout'
+          || restClassification === 'cors_or_fetch_blocked'
+          || sdkClassification === 'network_error'
+        ))
+          ? 'network_error'
+          : restClassification || sdkClassification || 'http_error';
 
   return {
     ok: false,

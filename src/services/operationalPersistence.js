@@ -484,15 +484,15 @@ function classifyFazendasSyncError(error) {
   const details = String(error?.details || '').toLowerCase();
 
   if (code === '42501' || message.includes('permission denied') || message.includes('row-level security') || details.includes('row-level security')) {
-    return 'Permissão negada ao sincronizar fazendas. Verifique as políticas RLS.';
+    return 'Sem permissão para acessar estes dados na nuvem.';
   }
 
   if (code === '42703' || code === 'PGRST204' || message.includes('column') || message.includes('schema') || details.includes('column') || details.includes('schema')) {
-    return 'A estrutura da tabela fazendas não está compatível com o app.';
+    return 'Estrutura da nuvem incompleta. Verifique a tabela fazendas no Supabase.';
   }
 
   if (isNetworkError(error)) {
-    return 'A nuvem está indisponível neste momento. Você pode continuar usando os dados locais e tentar sincronizar novamente depois.';
+    return 'Projeto Supabase inacessível pela rede.';
   }
 
   return 'Não foi possível sincronizar fazendas. Seus dados locais continuam disponíveis.';
@@ -540,7 +540,7 @@ export async function checkSupabaseCloudConnection({ session } = {}) {
     };
   }
   if (!sessionUserId) {
-    const message = 'Sua sessão expirou. Faça login novamente.';
+    const message = 'Sessão expirada. Entre novamente para sincronizar com a nuvem.';
     if (isAuthDebugEnabled()) {
       console.info('[HERDON_CLOUD_HEALTH]', {
         stage: 'auth_session_missing',
@@ -585,11 +585,11 @@ export async function checkSupabaseCloudConnection({ session } = {}) {
     const lower = String(error?.message || '').toLowerCase();
     let stage = 'unknown_error';
     let message = 'Não foi possível sincronizar fazendas. Seus dados locais continuam disponíveis.';
-    if (status === 401) { stage = 'auth_session_missing'; message = 'Sua sessão expirou. Faça login novamente.'; }
-    else if (status === 403 || code === '42501') { stage = 'permission_denied'; message = 'Permissão negada ao acessar a nuvem. Verifique as políticas RLS.'; }
-    else if (status === 404 || code === 'PGRST204' || code === '42703' || lower.includes('schema') || lower.includes('column')) { stage = 'schema_mismatch'; message = 'A estrutura da tabela fazendas não está compatível com o app.'; }
+    if (status === 401) { stage = 'auth_session_missing'; message = 'Sessão expirada. Entre novamente para sincronizar com a nuvem.'; }
+    else if (status === 403 || code === '42501') { stage = 'permission_denied'; message = 'Sem permissão para acessar estes dados na nuvem.'; }
+    else if (status === 404 || code === 'PGRST204' || code === '42703' || lower.includes('schema') || lower.includes('column')) { stage = 'schema_mismatch'; message = 'Estrutura da nuvem incompleta. Verifique a tabela fazendas no Supabase.'; }
     else if (code === 'CONFIG_ERROR' || lower.includes('missing_rest_config_or_token')) { stage = 'config_missing'; message = 'Configuração da nuvem ausente. Verifique as variáveis do Supabase.'; }
-    else if (isNetworkError(error) || (error?.name === 'TypeError' && lower.includes('failed to fetch'))) { stage = 'network_error'; message = 'A nuvem está indisponível neste momento. Você pode continuar usando os dados locais e tentar sincronizar novamente depois.'; }
+    else if (isNetworkError(error) || (error?.name === 'TypeError' && lower.includes('failed to fetch'))) { stage = 'network_error'; message = 'Projeto Supabase inacessível pela rede.'; }
 
     if (isAuthDebugEnabled()) {
       console.info('[HERDON_CLOUD_HEALTH]', {
@@ -655,11 +655,11 @@ export async function syncFazendasWithCloud({ fazendas = [], session }) {
       const code = String(error?.code || '').toUpperCase() || null;
       const lower = String(error?.message || '').toLowerCase();
       let message = 'Não foi possível sincronizar fazendas. Seus dados locais continuam disponíveis.';
-      if (status === 401) message = 'Sua sessão expirou. Faça login novamente.';
-      else if (status === 403 || code === '42501') message = 'Permissão negada ao sincronizar fazendas. Verifique as políticas RLS.';
-      else if (status === 404 || code === 'PGRST204' || code === '42703' || lower.includes('schema') || lower.includes('column')) message = 'A estrutura da tabela fazendas não está compatível com o app.';
+      if (status === 401) message = 'Sessão expirada. Entre novamente para sincronizar com a nuvem.';
+      else if (status === 403 || code === '42501') message = 'Sem permissão para acessar estes dados na nuvem.';
+      else if (status === 404 || code === 'PGRST204' || code === '42703' || lower.includes('schema') || lower.includes('column')) message = 'Estrutura da nuvem incompleta. Verifique a tabela fazendas no Supabase.';
       else if (code === 'CONFIG_ERROR' || lower.includes('missing_rest_config_or_token')) message = 'Configuração da nuvem ausente. Verifique as variáveis do Supabase.';
-      else if (isNetworkError(error) || (error?.name === 'TypeError' && lower.includes('failed to fetch'))) message = 'A nuvem está indisponível neste momento. Você pode continuar usando os dados locais e tentar sincronizar novamente depois.';
+      else if (isNetworkError(error) || (error?.name === 'TypeError' && lower.includes('failed to fetch'))) message = 'Projeto Supabase inacessível pela rede.';
       logFazendasSync({ operation: 'insert', payloadKeys: Object.keys(payload), rowNome: payload.nome || null, status, code, message, errorName: error?.name || null, errorMessage: error?.message || null, level: 'warn' });
       return { ok: false, data: localRows, error: code || 'SYNC_FAILED', message, syncedCount, failedCount, selectedCount: 0 };
     }
