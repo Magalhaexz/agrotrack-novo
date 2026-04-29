@@ -77,10 +77,10 @@ function classifyHttpStatus(status, body = null) {
     };
   }
 
-  if (status === 404 || code === 'PGRST204' || code === '42703' || code === '42P01' || lowerBody.includes('column') || lowerBody.includes('schema') || lowerBody.includes('relation')) {
+  if (status === 404 || code === 'PGRST205' || code === 'PGRST204' || code === '42703' || code === '42P01' || lowerBody.includes('column') || lowerBody.includes('schema') || lowerBody.includes('relation')) {
     return {
       classification: 'schema_error',
-      message: 'Estrutura da nuvem incompleta. Verifique a tabela fazendas no Supabase.',
+      message: 'Tabela de fazendas não encontrada na nuvem. Verifique a estrutura do Supabase.',
     };
   }
 
@@ -237,9 +237,9 @@ async function runSdkConnectivityCheck({ userId }) {
     if (code === '42501' || message.includes('row-level security') || message.includes('permission denied')) {
       classification = 'auth_or_rls_error';
       humanMessage = 'Sem permissão para acessar estes dados na nuvem.';
-    } else if (code === 'PGRST204' || code === '42703' || code === '42P01' || message.includes('column') || message.includes('schema') || message.includes('relation')) {
+    } else if (code === 'PGRST205' || code === 'PGRST204' || code === '42703' || code === '42P01' || message.includes('column') || message.includes('schema') || message.includes('relation')) {
       classification = 'schema_error';
-      humanMessage = 'Estrutura da nuvem incompleta. Verifique a tabela fazendas no Supabase.';
+      humanMessage = 'Tabela de fazendas não encontrada na nuvem. Verifique a estrutura do Supabase.';
     } else if (code === '401' || code === '403' || message.includes('jwt') || message.includes('token') || message.includes('auth')) {
       classification = 'auth_error';
       humanMessage = 'Sessão expirada. Entre novamente para sincronizar com a nuvem.';

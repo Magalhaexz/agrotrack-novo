@@ -1,78 +1,71 @@
 @import url('https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,300;9..144,400;9..144,500;9..144,600&family=DM+Mono:wght@400;500&family=Outfit:wght@300;400;500;600;700&display=swap');
 
 /* --- Root Variables --- */
-:root {
-  --bg: #09100a;
-  --surface: #101608;
-  --surface-2: #121a0c;
-  --border: #1a2512;
-  --border-strong: #2e4020;
-  --text: #7a9e62;
-  --text-strong: #cce0a8;
-  --text-soft: #4e6e38;
-  --text-faint: #3a5428;
-  --green: #6bb520;
-  --amber: #cc8f00;
-  --red: #c4503c;
-  --blue: #4487c8;
+ :root {
+  --bg: #090c0d;
+  --surface: #111518;
+  --surface-2: #151b1e;
+  --border: #232b2f;
+  --border-strong: #2f3a40;
+  --text: #b6c1bd;
+  --text-strong: #e5ece9;
+  --text-soft: #8c9994;
+  --text-faint: #6d7974;
+  --green: #32b36d;
+  --amber: #d4a12d;
+  --red: #d25a5a;
+  --blue: #4f8fcb;
 
-  /* Re-mapping for consistency with previous CSS files */
   --color-bg: var(--bg);
   --color-surface: var(--surface);
   --color-surface-2: var(--surface-2);
   --color-border: var(--border);
-  --color-border-focus: var(--border-strong); /* Assuming border-strong is for focus */
-  --color-text: var(--text-strong); /* Main text color */
-  --color-text-secondary: var(--text); /* Secondary text color */
-  --color-text-muted: var(--text-soft); /* Muted text color */
+  --color-border-focus: color-mix(in srgb, var(--green) 55%, var(--border-strong));
+  --color-text: var(--text-strong);
+  --color-text-secondary: var(--text);
+  --color-text-muted: var(--text-soft);
 
   --color-primary: var(--green);
-  --color-primary-light: #87d03a; /* Slightly lighter green */
-  --color-primary-dark: #5a9e1a; /* Slightly darker green */
-  --color-primary-subtle: rgba(107, 181, 32, 0.15); /* Subtle green background */
-  --color-primary-glow: rgba(107, 181, 32, 0.25); /* Green glow effect */
+  --color-primary-light: #58c786;
+  --color-primary-dark: #258f55;
+  --color-primary-subtle: rgba(50, 179, 109, 0.12);
+  --color-primary-glow: rgba(50, 179, 109, 0.18);
 
-  --color-success: var(--green);
-  --color-success-bg: rgba(107, 181, 32, 0.1);
+  --color-success: #2fbf6f;
+  --color-success-bg: rgba(47, 191, 111, 0.12);
   --color-warning: var(--amber);
-  --color-warning-bg: rgba(204, 143, 0, 0.1);
+  --color-warning-bg: rgba(212, 161, 45, 0.14);
   --color-danger: var(--red);
-  --color-danger-bg: rgba(196, 80, 60, 0.1);
+  --color-danger-bg: rgba(210, 90, 90, 0.14);
   --color-info: var(--blue);
-  --color-info-bg: rgba(68, 135, 200, 0.1);
+  --color-info-bg: rgba(79, 143, 203, 0.14);
 
-  /* Input variables (re-mapping to new theme) */
   --input-bg: var(--surface-2);
-  --input-border: var(--border);
-  --input-focus-border: var(--border-strong);
+  --input-border: rgba(255, 255, 255, 0.09);
+  --input-focus-border: color-mix(in srgb, var(--green) 52%, var(--border));
   --input-text: var(--text-strong);
   --input-placeholder: var(--text-soft);
 
-  /* Card variables (re-mapping to new theme) */
   --card-bg: var(--surface);
   --card-border: var(--border);
-  --card-hover-border: var(--border-strong);
+  --card-hover-border: color-mix(in srgb, var(--green) 32%, var(--border-strong));
 
-  /* Table variables (re-mapping to new theme) */
   --table-header-bg: var(--surface-2);
-  --table-row-hover: var(--surface-2);
-  --table-row-alt: var(--surface);
+  --table-row-hover: color-mix(in srgb, var(--surface-2) 85%, black);
+  --table-row-alt: color-mix(in srgb, var(--surface) 92%, black);
   --table-border: var(--border);
 
-  /* Shadow variables (adjusting to new theme's aesthetic) */
-  --shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.3);
-  --shadow-md: 0 4px 16px rgba(0, 0, 0, 0.4);
-  --shadow-lg: 0 8px 32px rgba(0, 0, 0, 0.5);
-  --shadow-glow: 0 0 20px rgba(107, 181, 32, 0.15);
+  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.28);
+  --shadow-md: 0 6px 18px rgba(0, 0, 0, 0.32);
+  --shadow-lg: 0 12px 32px rgba(0, 0, 0, 0.42);
+  --shadow-glow: 0 0 18px rgba(50, 179, 109, 0.12);
 
-  /* Radius variables (keeping previous values) */
   --radius-sm: 6px;
   --radius-md: 10px;
   --radius-lg: 14px;
   --radius-xl: 20px;
   --radius-full: 9999px;
 
-  /* Typography variables (keeping previous values, but mapping to new fonts) */
   --font-sans: 'Outfit', system-ui, sans-serif;
   --text-xs: 0.75rem;
   --text-sm: 0.875rem;
