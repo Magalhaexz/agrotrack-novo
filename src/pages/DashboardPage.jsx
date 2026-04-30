@@ -1,4 +1,4 @@
-import { useMemo } from 'react';
+import { useMemo, useState } from 'react';
 import {
   AlertTriangle,
   ArrowDown,
@@ -30,6 +30,8 @@ import Button from '../components/ui/Button';
 import { getResumoLote } from '../domain/resumoLote';
 import { formatCurrency, formatDate, formatNumber } from '../utils/calculations';
 import { formatarMoeda } from '../utils/formatters';
+import { gerarNovoId } from '../utils/id';
+import { createOperationalRecord, updateOperationalRecord } from '../services/operationalPersistence';
 import '../styles/dashboard.css';
 
 const KPI_VARIANTS = {
@@ -42,11 +44,13 @@ const KPI_VARIANTS = {
 
 export default function DashboardPage({
   db,
+  setDb,
   alerts = [],
   onNavigate = null,
   tabAtiva = 'geral',
   setTabAtiva,
 }) {
+  const [novaTarefa, setNovaTarefa] = useState({ titulo: '', funcionario_id: '', data_vencimento: '', descricao: '' });
   const lotesMap = useMemo(() => new Map((db.lotes || []).map((lote) => [lote.id, lote])), [db.lotes]);
   const lotesAtivos = useMemo(() => (db.lotes || []).filter((lote) => lote.status === 'ativo'), [db.lotes]);
 
@@ -341,6 +345,47 @@ export default function DashboardPage({
       .slice(0, 6);
   }, [eventosCalendario, tarefasUrgentes, onNavigate]);
 
+  const funcionariosMap = useMemo(() => new Map((db.funcionarios || []).map((item) => [Number(item.id), item])), [db.funcionarios]);
+
+  const boardTarefas = useMemo(() => {
+    const hoje = new Date();
+    hoje.setHours(0, 0, 0, 0);
+    return (db.tarefas || []).map((tarefa) => {
+      const vencimento = tarefa?.data_vencimento ? new Date(`${tarefa.data_vencimento}T00:00:00`) : null;
+      const concluida = tarefa.status === 'concluida' || tarefa.status === 'feita';
+      const vencida = !concluida && vencimento && vencimento < hoje;
+      return {
+        ...tarefa,
+        coluna: concluida ? 'feitas' : vencida ? 'vencidas' : 'pendentes',
+        responsavelNome: funcionariosMap.get(Number(tarefa.funcionario_id))?.nome || tarefa.responsavel || 'Nao definido',
+      };
+    });
+  }, [db.tarefas, funcionariosMap]);
+
+  async function criarTarefaDashboard() {
+    if (!novaTarefa.titulo.trim() || !novaTarefa.data_vencimento) return;
+    const payload = {
+      titulo: novaTarefa.titulo.trim(),
+      descricao: novaTarefa.descricao.trim(),
+      funcionario_id: novaTarefa.funcionario_id ? Number(novaTarefa.funcionario_id) : null,
+      data_vencimento: novaTarefa.data_vencimento,
+      status: 'pendente',
+      prioridade: 'media',
+    };
+    const persisted = await createOperationalRecord('tarefas', payload, null);
+    const registro = persisted.data || { id: gerarNovoId(db.tarefas || []), ...payload };
+    setDb?.((prev) => ({ ...prev, tarefas: [...(prev.tarefas || []), registro] }));
+    setNovaTarefa({ titulo: '', funcionario_id: '', data_vencimento: '', descricao: '' });
+  }
+
+  async function marcarComoFeita(tarefa) {
+    await updateOperationalRecord('tarefas', tarefa.id, { status: 'concluida' }, null);
+    setDb?.((prev) => ({
+      ...prev,
+      tarefas: (prev.tarefas || []).map((item) => (item.id === tarefa.id ? { ...item, status: 'concluida' } : item)),
+    }));
+  }
+
   return (
     <div className="dashboard-page">
       <header className="dashboard-toolbar">
@@ -467,6 +512,40 @@ export default function DashboardPage({
                 <Button fullWidth variant="outline" onClick={() => onNavigate?.('suplementacao')}>
                   Registrar consumo
                 </Button>
+              </div>
+            </Card>
+          </section>
+
+          <section className="dashboard-task-board">
+            <Card title="Quadro de tarefas" subtitle="Registre tarefas com responsavel e acompanhe por status no dashboard.">
+              <div className="dashboard-task-create">
+                <input className="ui-input" placeholder="Titulo da tarefa" value={novaTarefa.titulo} onChange={(e) => setNovaTarefa((p) => ({ ...p, titulo: e.target.value }))} />
+                <select className="ui-input" value={novaTarefa.funcionario_id} onChange={(e) => setNovaTarefa((p) => ({ ...p, funcionario_id: e.target.value }))}>
+                  <option value="">Responsavel</option>
+                  {(db.funcionarios || []).map((func) => <option key={func.id} value={func.id}>{func.nome}</option>)}
+                </select>
+                <input className="ui-input" type="date" value={novaTarefa.data_vencimento} onChange={(e) => setNovaTarefa((p) => ({ ...p, data_vencimento: e.target.value }))} />
+                <input className="ui-input" placeholder="Descricao" value={novaTarefa.descricao} onChange={(e) => setNovaTarefa((p) => ({ ...p, descricao: e.target.value }))} />
+                <Button onClick={criarTarefaDashboard}>Adicionar tarefa</Button>
+              </div>
+
+              <div className="dashboard-task-columns">
+                {['pendentes', 'feitas', 'vencidas'].map((coluna) => (
+                  <div key={coluna} className="dashboard-task-column">
+                    <div className="dashboard-task-column-head">{coluna === 'pendentes' ? 'Pendentes' : coluna === 'feitas' ? 'Feitas' : 'Vencidas'}</div>
+                    <div className="dashboard-task-list">
+                      {boardTarefas.filter((item) => item.coluna === coluna).map((tarefa) => (
+                        <article key={tarefa.id} className="dashboard-task-card">
+                          <strong>{tarefa.titulo}</strong>
+                          <span>{tarefa.responsavelNome}</span>
+                          <small>{formatDate(tarefa.data_vencimento)}</small>
+                          {tarefa.descricao ? <p>{tarefa.descricao}</p> : null}
+                          {coluna !== 'feitas' ? <Button size="sm" variant="ghost" onClick={() => marcarComoFeita(tarefa)}>Marcar feita</Button> : null}
+                        </article>
+                      ))}
+                    </div>
+                  </div>
+                ))}
               </div>
             </Card>
           </section>

@@ -87,6 +87,7 @@ export default function PesagensPage({ db, setDb, onConfirmAction, navigationInt
 
   const shouldStartWithNewPesagem = navigationIntent?.page === 'pesagens' && navigationIntent?.action === 'novo';
   const [abrirForm, setAbrirForm] = useState(shouldStartWithNewPesagem);
+  const [modoPesagem, setModoPesagem] = useState('lote');
   const [pesagemEditando, setPesagemEditando] = useState(null);
 
   const lotes = db?.lotes;
@@ -170,12 +171,13 @@ export default function PesagensPage({ db, setDb, onConfirmAction, navigationInt
     };
   }, [pesagens]);
 
-  function abrirNovaPesagem() {
+  function abrirNovaPesagem(tipo = 'lote') {
     if (!hasPermission('pesagens:editar')) {
       showToast({ type: 'error', message: mensagemSemPermissao });
       return;
     }
-    setPesagemEditando(null);
+    setPesagemEditando({ tipo, origem: tipo });
+    setModoPesagem(tipo);
     setAbrirForm(true);
   }
 
@@ -185,6 +187,7 @@ export default function PesagensPage({ db, setDb, onConfirmAction, navigationInt
       return;
     }
     setPesagemEditando(item);
+    setModoPesagem(resolveTipoPesagem(item));
     setAbrirForm(true);
   }
 
@@ -330,16 +333,27 @@ export default function PesagensPage({ db, setDb, onConfirmAction, navigationInt
 
   return (
     <div className="page page--pesagens page--kpi-compact">
-      <div className="page-header page-topbar herdon-page-topbar herdon-page-topbar--compact">
+      <section className="animais-hero pesagens-hero">
         <div>
+          <span className="animais-hero-kicker">Desempenho zootecnico</span>
           <h1>Pesagens</h1>
           <p>Registro e acompanhamento de pesagens por lote e por animal.</p>
         </div>
 
-        <div className="page-topbar-actions">
-          <button className="primary-btn" onClick={abrirNovaPesagem}>
-            + Nova pesagem
-          </button>
+        <div className="animais-hero-cta-card">
+          <strong>{modoPesagem === 'animal' ? 'Pesagem individual ativa' : 'Pesagem por lote ativa'}</strong>
+          <p>{modoPesagem === 'animal' ? 'Selecione um animal e registre a medicao com rastreabilidade individual.' : 'Mantenha o fluxo tradicional de pesagem por lote sem alterar o historico existente.'}</p>
+          <button className="primary-btn" onClick={() => abrirNovaPesagem(modoPesagem)}>+ Nova pesagem</button>
+        </div>
+      </section>
+
+      <div className="fazendas-card pesagens-mode-shell">
+        <div className="fazendas-card-header">
+          <span className="fazendas-card-title">Modo de pesagem</span>
+        </div>
+        <div className="segmented-control" role="tablist" aria-label="Modo de pesagem">
+          <button type="button" className={`segment ${modoPesagem === 'lote' ? 'active' : ''}`} onClick={() => setModoPesagem('lote')}>Por lote</button>
+          <button type="button" className={`segment ${modoPesagem === 'animal' ? 'active' : ''}`} onClick={() => setModoPesagem('animal')}>Por animal</button>
         </div>
       </div>
 
@@ -351,9 +365,9 @@ export default function PesagensPage({ db, setDb, onConfirmAction, navigationInt
         </div>
 
         <div className="kpi-card kpi-card--compact">
-          <div className="kpi-label">Lotes com pesagem</div>
-          <div className="kpi-value">{resumo.lotesComPesagem}</div>
-          <div className="kpi-sub">lotes acompanhados</div>
+          <div className="kpi-label">Pesagens por origem</div>
+          <div className="kpi-value">{resumo.totalPesagensLote} / {resumo.totalPesagensAnimal}</div>
+          <div className="kpi-sub">lote | animal</div>
         </div>
 
         <div className="kpi-card kpi-card--compact">

@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react';
-import { CheckCircle2, Leaf, Plus, Scale, Users } from 'lucide-react';
+import { Plus } from 'lucide-react';
 import AnimalForm from '../components/AnimalForm';
 import Button from '../components/ui/Button';
 import Card from '../components/ui/Card';
@@ -18,6 +18,7 @@ export default function AnimaisPage({ db, setDb, onConfirmAction }) {
   const { hasPermission, session } = useAuth();
   const { showToast } = useToast();
   const [abrirForm, setAbrirForm] = useState(false);
+  const [modoCadastro, setModoCadastro] = useState('grupo');
   const [animalEditando, setAnimalEditando] = useState(null);
   const mensagemSemPermissao = 'Você não tem permissão para executar esta ação.';
 
@@ -93,6 +94,17 @@ export default function AnimaisPage({ db, setDb, onConfirmAction }) {
       return;
     }
     setAnimalEditando(null);
+    setModoCadastro('grupo');
+    setAbrirForm(true);
+  }
+
+  function abrirNovoPorModo(modo) {
+    if (!hasPermission('animais:editar')) {
+      showToast({ type: 'error', message: mensagemSemPermissao });
+      return;
+    }
+    setAnimalEditando({ tipo_registro: modo });
+    setModoCadastro(modo);
     setAbrirForm(true);
   }
 
@@ -183,9 +195,24 @@ export default function AnimaisPage({ db, setDb, onConfirmAction }) {
             <strong>{destaqueAdicionar.titulo}</strong>
             <p>{destaqueAdicionar.descricao}</p>
           </div>
-          <Button icon={<Plus size={16} />} onClick={abrirNovo}>Adicionar grupo de animais</Button>
+          <Button icon={<Plus size={16} />} onClick={() => abrirNovoPorModo(modoCadastro === 'individual' ? 'individual' : 'grupo')}>
+            {modoCadastro === 'individual' ? 'Adicionar animal individual' : 'Adicionar grupo de animais'}
+          </Button>
         </div>
       </section>
+
+      <Card className="animais-mode-card" title="Modo de cadastro" subtitle="Escolha entre manter o fluxo por lote ou registrar um animal individual.">
+        <div className="segmented-control" role="tablist" aria-label="Modo de cadastro de animais">
+          <button type="button" className={`segment ${modoCadastro === 'grupo' ? 'active' : ''}`} onClick={() => setModoCadastro('grupo')}>Cadastro por grupo/lote</button>
+          <button type="button" className={`segment ${modoCadastro === 'individual' ? 'active' : ''}`} onClick={() => setModoCadastro('individual')}>Cadastro individual</button>
+        </div>
+        <div className="animais-mode-actions">
+          <p>{modoCadastro === 'individual' ? 'Registre um animal com identificação única e vínculo opcional a lote.' : 'Mantenha o fluxo atual de lote com quantidade, genética, sexo, peso e desempenho.'}</p>
+          <Button size="sm" icon={<Plus size={14} />} onClick={() => abrirNovoPorModo(modoCadastro)}>
+            {modoCadastro === 'individual' ? 'Novo animal individual' : 'Novo grupo/lote'}
+          </Button>
+        </div>
+      </Card>
 
       <div className="dashboard-grid dashboard-grid--kpi-main">
         <Card title="Cabecas">
@@ -207,11 +234,11 @@ export default function AnimaisPage({ db, setDb, onConfirmAction }) {
       </div>
 
       <section className="animais-workspace-shell">
-        <div className="animais-content-grid">
+        <div className="animais-content-grid animais-content-grid--single">
           <Card
             className="animais-list-card"
             title="Lista de animais"
-            subtitle="Edite ou exclua registros mantendo o cadastro rapido sempre ao lado do historico atual."
+            subtitle="Edite ou exclua registros de grupo e individuais mantendo a operacao consolidada."
             action={<Button size="sm" icon={<Plus size={14} />} onClick={abrirNovo}>Adicionar</Button>}
           >
             {dadosTabela.length === 0 ? (
@@ -275,57 +302,6 @@ export default function AnimaisPage({ db, setDb, onConfirmAction }) {
             )}
           </Card>
 
-          <Card className="animais-add-panel" title="Cadastro rapido" subtitle="Fluxo lateral para registrar um novo grupo sem perder a leitura da listagem.">
-            <div className="animais-add-panel-body">
-              <div className="animais-add-point animais-add-point--highlight">
-                <CheckCircle2 size={18} />
-                <div>
-                  <strong>Cadastro individual opcional</strong>
-                  <span>Cadastro individual opcional para acompanhar animais específicos dentro de um lote.</span>
-                </div>
-              </div>
-              <div className="animais-side-metrics">
-                <div className="animais-side-metric">
-                  <span>Lotes cobertos</span>
-                  <strong>{resumo.lotesCobertos}</strong>
-                </div>
-                <div className="animais-side-metric">
-                  <span>Peso medio</span>
-                  <strong>{formatarNumero(resumo.pesoAtualMedio)} kg</strong>
-                </div>
-              </div>
-              <div className="animais-add-point">
-                <CheckCircle2 size={18} />
-                <div>
-                  <strong>Indicadores alinhados</strong>
-                  <span>Quantidade, peso, consumo e GMD alimentam dashboard, lotes e relatorios.</span>
-                </div>
-              </div>
-
-              <div className="animais-add-point">
-                <Users size={18} />
-                <div>
-                  <strong>Grupos organizados por lote</strong>
-                  <span>Sexo, genetica, quantidade e dias no lote em um unico fluxo.</span>
-                </div>
-              </div>
-              <div className="animais-add-point">
-                <Scale size={18} />
-                <div>
-                  <strong>Peso e rendimento no mesmo cadastro</strong>
-                  <span>Facilita previsao de arroba e acompanhamento zootecnico.</span>
-                </div>
-              </div>
-              <div className="animais-add-point">
-                <Leaf size={18} />
-                <div>
-                  <strong>Consumo sempre a vista</strong>
-                  <span>Ajuda a cruzar dados com suplementacao e desempenho.</span>
-                </div>
-              </div>
-              <Button fullWidth icon={<Plus size={16} />} onClick={abrirNovo}>Novo grupo agora</Button>
-            </div>
-          </Card>
         </div>
       </section>
 

@@ -2688,6 +2688,20 @@ a:hover {
   min-width: 0;
 }
 
+.animais-content-grid--single {
+  grid-template-columns: minmax(0, 1fr);
+}
+
+.animais-mode-card {
+  margin-top: -4px;
+}
+
+.segmented-control { display: inline-grid; grid-template-columns: repeat(2,minmax(0,1fr)); gap: 8px; padding: 6px; border-radius: 14px; border: 1px solid var(--color-border); background: rgba(255,255,255,.02); }
+.segment { border: 1px solid transparent; background: transparent; color: var(--color-text-secondary); border-radius: 10px; padding: 10px 14px; font-weight: 600; }
+.segment.active { border-color: color-mix(in srgb, var(--color-primary) 45%, var(--color-border)); background: var(--color-primary-subtle); color: var(--color-text); }
+.animais-mode-actions { margin-top: 14px; display: flex; justify-content: space-between; gap: 12px; align-items: center; }
+.animais-mode-actions p { margin: 0; color: var(--color-text-secondary); }
+
 .animais-page .dashboard-grid--kpi-main {
   grid-template-columns: repeat(4, minmax(0, 1fr));
 }
@@ -2950,6 +2964,11 @@ a:hover {
 
   .animal-form-grid--2 {
     grid-template-columns: 1fr;
+  }
+
+  .animais-mode-actions {
+    flex-direction: column;
+    align-items: flex-start;
   }
 
   .calendar-year-grid {
@@ -6867,6 +6886,15 @@ body,
   padding: 14px 14px 12px;
 }
 
+.pesagens-hero {
+  margin-bottom: 2px;
+}
+
+.pesagens-mode-shell {
+  display: grid;
+  gap: 10px;
+}
+
 .page--pesagens .fazendas-card-header {
   margin-bottom: 6px;
 }
@@ -6879,6 +6907,10 @@ body,
 
 .page--pesagens .row-actions {
   gap: 6px;
+}
+
+.page--pesagens .kpi-value {
+  white-space: nowrap;
 }
 
 .page--sanitario .sanitario-summary-grid {
@@ -7042,5 +7074,90 @@ body,
   .filters-wrap > label,
   .filters-bar > label {
     width: 100%;
+  }
+}
+
+/* Sprint 8G - Visual stabilization: Animais + Pesagens */
+.animais-page { gap: 16px; }
+.animais-workspace-shell { padding: 2px; }
+.animais-page .ui-card { border-radius: 18px; }
+.animais-page .ui-card-body { padding-top: 14px; }
+.animais-list-card .ui-card-header { margin-bottom: 12px; }
+.animais-list-card .ui-card-header, .animais-mode-card .ui-card-header { gap: 10px; }
+.animais-mode-card .ui-card-subtitle { max-width: 72ch; }
+.animais-table-wrap .data-table th { font-size: .76rem; letter-spacing: .04em; text-transform: uppercase; color: var(--color-text-muted); }
+.animais-table-wrap .data-table td { font-size: .86rem; }
+.animais-table-wrap .row-actions { justify-content: flex-end; }
+.animais-history-card .data-table th, .animais-history-card .data-table td { white-space: nowrap; }
+.animais-history-card .table-responsive, .page--pesagens .fazendas-table-wrap { overflow-x: auto; }
+
+.page--pesagens { gap: 14px; }
+.page--pesagens .animais-hero { padding: 18px; }
+.page--pesagens .kpi-card.kpi-card--compact { padding: 10px 12px; }
+.page--pesagens .kpi-sub { font-size: .75rem; }
+.page--pesagens .data-table th, .page--pesagens .data-table td { padding-top: 9px; padding-bottom: 9px; }
+.page--pesagens .data-table th { font-size: .76rem; text-transform: uppercase; letter-spacing: .04em; }
+.page--pesagens .cell-chip .badge { min-width: 68px; justify-content: center; }
+
+@media (max-width: 1100px) {
+  .animais-table-wrap .data-table,
+  .animais-history-card .data-table,
+  .page--pesagens .data-table { min-width: 920px; }
+}
+
+@media (max-width: 720px) {
+  .animais-hero,
+  .page--pesagens .animais-hero { padding: 14px; border-radius: 18px; }
+  .animais-page .dashboard-grid--kpi-main,
+  .page--pesagens .kpi-grid-3--compact { grid-template-columns: 1fr; }
+  .animais-page .ui-card,
+  .page--pesagens .fazendas-card { padding: 12px; }
+  .animais-list-card .ui-card-header > .ui-button,
+  .page--pesagens .primary-btn { width: 100%; }
+  .segmented-control { width: 100%; }
+}
+
+/* Sprint 8F.1 - Pesagem modal layout polish */
+.pesagem-form {
+  display: grid;
+  gap: 14px;
+}
+
+.pesagem-form-section {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.pesagem-form-field {
+  display: grid;
+  gap: 6px;
+  color: var(--color-text-secondary);
+  font-size: .86rem;
+}
+
+.pesagem-form-field .ui-input {
+  min-height: 42px;
+}
+
+.pesagem-form-grid {
+  gap: 12px;
+}
+
+.pesagem-preview-wrap {
+  border: 1px solid rgba(255,255,255,.06);
+  border-radius: 14px;
+  padding: 10px;
+  background: rgba(255,255,255,.015);
+}
+
+.ui-modal .pesagem-form .ui-button {
+  align-self: start;
+}
+
+@media (max-width: 900px) {
+  .pesagem-form-section,
+  .pesagem-form-grid {
+    grid-template-columns: 1fr;
   }
 }
