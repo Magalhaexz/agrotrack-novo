@@ -112,6 +112,8 @@ export default function PesagemForm({
   return (
     <Modal open onClose={onCancel} title={titulo} footer={footer}>
       <form onSubmit={handleSubmit} className="pesagem-form">
+        <section className="pesagem-form-section-block">
+        <div className="pesagem-form-section-head">Tipo e referencia</div>
         <div className="pesagem-form-section">
         <label className="pesagem-form-field">
           Tipo de pesagem
@@ -131,6 +133,7 @@ export default function PesagemForm({
           </select>
         </label>
         </div>
+        </section>
 
         {form.tipo === 'animal' && (
           <label className="pesagem-form-field">
@@ -146,6 +149,8 @@ export default function PesagemForm({
           </label>
         )}
 
+        <section className="pesagem-form-section-block">
+          <div className="pesagem-form-section-head">Medicao</div>
         <div className="grid-2 pesagem-form-grid">
           <label className="pesagem-form-field">
             Data
@@ -173,6 +178,7 @@ export default function PesagemForm({
             />
           </label>
         </div>
+        </section>
 
         <label className="pesagem-form-field">
           Observacao
@@ -185,6 +191,8 @@ export default function PesagemForm({
           />
         </label>
 
+        <section className="pesagem-form-section-block">
+          <div className="pesagem-form-section-head">Indicadores de valor</div>
         <div className="grid-2 pesagem-form-grid">
           <label className="pesagem-form-field">
             Rendimento de carcaca (%)
@@ -213,6 +221,7 @@ export default function PesagemForm({
             />
           </label>
         </div>
+        </section>
 
         <div className="pesagem-preview-wrap">
           <ArrobaPreview

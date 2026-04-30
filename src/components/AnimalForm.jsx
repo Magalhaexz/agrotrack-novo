@@ -153,13 +153,16 @@ export default function AnimalForm({ initialData, lotes = [], onSave, onCancel }
       size="lg"
     >
       <form onSubmit={handleSubmit} className="animal-form">
-        <label className="animal-form-field">
-          <span className="animal-form-label">Tipo de cadastro</span>
-          <select className="ui-input" name="tipo_registro" value={form.tipo_registro} onChange={handleChange}>
-            <option value="grupo">Grupo por lote</option>
-            <option value="individual">Cadastro individual opcional</option>
-          </select>
-        </label>
+        <section className="animal-form-section">
+          <div className="animal-form-section-head">Registro</div>
+          <label className="animal-form-field">
+            <span className="animal-form-label">Tipo de cadastro</span>
+            <select className="ui-input" name="tipo_registro" value={form.tipo_registro} onChange={handleChange}>
+              <option value="grupo">Grupo por lote</option>
+              <option value="individual">Cadastro individual opcional</option>
+            </select>
+          </label>
+        </section>
 
         {form.tipo_registro === 'individual' ? (
           <div className="animal-form-note">
@@ -167,6 +170,8 @@ export default function AnimalForm({ initialData, lotes = [], onSave, onCancel }
           </div>
         ) : null}
 
+        <section className="animal-form-section">
+          <div className="animal-form-section-head">Identificacao e vinculo</div>
         <div className="animal-form-grid animal-form-grid--2">
           <label className="animal-form-field">
             <span className="animal-form-label">Lote vinculado</span>
@@ -191,6 +196,7 @@ export default function AnimalForm({ initialData, lotes = [], onSave, onCancel }
             <input className="ui-input" type="date" name="data_referencia" value={form.data_referencia} onChange={handleChange} />
           </label>
         </div>
+        </section>
 
         {form.tipo_registro === 'individual' ? (
           <div className="animal-form-grid animal-form-grid--2">
@@ -217,6 +223,8 @@ export default function AnimalForm({ initialData, lotes = [], onSave, onCancel }
           </div>
         ) : null}
 
+        <section className="animal-form-section">
+          <div className="animal-form-section-head">Dados zootecnicos</div>
         <div className="animal-form-grid animal-form-grid--2">
           <label className="animal-form-field">
             <span className="animal-form-label">Genetica / raca</span>
@@ -271,7 +279,10 @@ export default function AnimalForm({ initialData, lotes = [], onSave, onCancel }
             />
           </label>
         </div>
+        </section>
 
+        <section className="animal-form-section">
+          <div className="animal-form-section-head">Preco e rendimento</div>
         <div className="animal-form-grid animal-form-grid--2">
           <label className="animal-form-field">
             <span className="animal-form-label">Dias no lote</span>
@@ -299,6 +310,7 @@ export default function AnimalForm({ initialData, lotes = [], onSave, onCancel }
             />
           </label>
         </div>
+        </section>
 
         <div className="animal-form-grid animal-form-grid--2">
           <label className="animal-form-field">

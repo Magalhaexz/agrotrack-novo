@@ -7161,3 +7161,53 @@ body,
     grid-template-columns: 1fr;
   }
 }
+
+/* Sprint 8F.2 - Animals + Weighing form layout polish */
+.animal-form {
+  gap: 12px;
+}
+
+.animal-form-section,
+.pesagem-form-section-block {
+  display: grid;
+  gap: 10px;
+  padding: 12px;
+  border: 1px solid rgba(255,255,255,.06);
+  border-radius: 14px;
+  background: rgba(255,255,255,.012);
+}
+
+.animal-form-section-head,
+.pesagem-form-section-head {
+  color: var(--color-text-muted);
+  font-size: .72rem;
+  font-weight: 700;
+  letter-spacing: .08em;
+  text-transform: uppercase;
+}
+
+.animal-form-grid--2,
+.pesagem-form-grid {
+  align-items: start;
+}
+
+.animal-form-field,
+.pesagem-form-field {
+  gap: 5px;
+}
+
+.animal-form-label {
+  font-size: .8rem;
+  color: var(--color-text-secondary);
+}
+
+@media (min-width: 900px) {
+  .animal-form {
+    gap: 14px;
+  }
+
+  .animal-form-section,
+  .pesagem-form-section-block {
+    padding: 14px;
+  }
+}

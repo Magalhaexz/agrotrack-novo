@@ -947,3 +947,83 @@
     gap: 10px;
   }
 }
+
+/* Sprint 8F.3 - Reports filter mobile overflow/overlap fix */
+@media (max-width: 760px) {
+  .reports-filter-card {
+    width: 100%;
+    max-width: 100%;
+    padding: 12px;
+    gap: 10px;
+    overflow: visible;
+  }
+
+  .reports-filter-meta {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 8px;
+  }
+
+  .reports-filter-grid {
+    width: 100%;
+    grid-template-columns: 1fr;
+    gap: 10px;
+  }
+
+  .reports-filter-grid > label,
+  .reports-filter-grid .ui-input,
+  .reports-filter-grid select,
+  .reports-filter-grid input {
+    width: 100%;
+    min-width: 0;
+    max-width: 100%;
+    box-sizing: border-box;
+  }
+
+  .reports-filter-grid .full {
+    grid-column: auto;
+  }
+
+  .reports-filter-foot {
+    width: 100%;
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 10px;
+    align-items: stretch;
+  }
+
+  .reports-filter-foot .ui-button,
+  .reports-filter-foot > * {
+    width: 100%;
+    min-width: 0;
+  }
+
+  .reports-filter-summary-grid {
+    grid-template-columns: 1fr;
+    gap: 8px;
+  }
+
+  .reports-filter-summary-card {
+    width: 100%;
+    min-width: 0;
+    overflow: hidden;
+  }
+
+  .reports-filter-summary-card small,
+  .reports-filter-summary-card strong,
+  .reports-filter-summary-card span {
+    overflow-wrap: anywhere;
+    word-break: break-word;
+  }
+}
+
+@media (max-width: 480px) {
+  .reports-page-actions .ui-button,
+  .reports-preset-row .reports-preset-button {
+    min-height: 40px;
+  }
+
+  .reports-filter-label {
+    margin-bottom: 6px;
+  }
+}
