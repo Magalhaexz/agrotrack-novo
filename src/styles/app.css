@@ -6101,3 +6101,64 @@ body,
 .sidebar .sidebar-logo-mark {
   margin-bottom: 2px;
 }
+
+/* Sprint Fix — Sidebar branding and header visual harmonization */
+.sidebar .sidebar-logo,
+.sidebar .sidebar-logo-content,
+.sidebar .sidebar-logo-copy {
+  background: transparent !important;
+  border: 0 !important;
+  box-shadow: none !important;
+}
+
+.sidebar .sidebar-logo {
+  padding: 18px 12px 10px !important;
+}
+
+.sidebar .sidebar-logo-content {
+  grid-template-columns: 1fr !important;
+  justify-items: center;
+  align-items: center;
+  gap: 12px !important;
+}
+
+.sidebar .sidebar-logo-mark {
+  width: 72px !important;
+  height: 72px !important;
+}
+
+.sidebar .sidebar-logo-text {
+  font-size: 1.28rem !important;
+  font-weight: 800;
+  letter-spacing: 0.15em;
+  text-align: center;
+}
+
+.header.top-header {
+  background: #000000 !important;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.07) !important;
+  gap: 12px;
+}
+
+.header.top-header .farm-selector-wrap {
+  flex: 1 1 260px;
+  max-width: 380px;
+}
+
+.header.top-header .header-tabs-shell {
+  flex: 1 1 360px;
+  justify-content: center;
+}
+
+.header.top-header .top-header-actions {
+  margin-left: auto;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+@media (max-width: 900px) {
+  .header.top-header .header-tabs-shell {
+    justify-content: flex-start;
+  }
+}

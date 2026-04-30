@@ -95,7 +95,6 @@ export default function Sidebar({
             <img src={herdonLogo} alt="HERDON" className="shell-logo-image" />
           </div>
           <div>
-            <div className="sidebar-logo-text"><span className="sidebar-logo-text-h">H</span><span className="sidebar-logo-text-rest">ERDON</span></div>
             <div className="mobile-topbar-caption">{getNavLabel(currentPage)}</div>
           </div>
         </div>
