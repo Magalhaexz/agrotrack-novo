@@ -257,26 +257,26 @@ export default function SanitarioPage({ db, setDb, onConfirmAction }) {
   }
 
   return (
-    <div className="page">
+    <div className="page page--sanitario page--kpi-compact">
       <PageHeader
         title="Manejo Sanitário"
         subtitle="Controle de vacinas, vermífugos e tratamentos do rebanho."
-        actions={<Button onClick={abrirNovo}>+ Novo Manejo</Button>}
+        actions={<Button className="sanitario-cta" onClick={abrirNovo}>+ Novo Manejo</Button>}
       />
 
-      <div className="summary-cards-grid">
-        <Card title="Total de Manejos">
+      <div className="summary-cards-grid sanitario-summary-grid">
+        <Card title="Total de Manejos" className="sanitario-summary-card">
           <strong>{resumo.total}</strong>
         </Card>
-        <Card title="Animais Atendidos">
+        <Card title="Animais Atendidos" className="sanitario-summary-card">
           <strong>{resumo.totalAtendidos}</strong>
         </Card>
-        <Card title="Manejos Vencidos">
+        <Card title="Manejos Vencidos" className="sanitario-summary-card sanitario-summary-card--alert">
           <strong>{resumo.vencidos}</strong>
         </Card>
       </div>
 
-      <div className="ui-card no-padding">
+      <div className="ui-card no-padding sanitario-table-shell">
         <div className="table-responsive">
           {dadosTabela.length === 0 ? (
             <div className="empty-state padded">
@@ -284,7 +284,7 @@ export default function SanitarioPage({ db, setDb, onConfirmAction }) {
               <span>Use o botão "Novo Manejo" para começar.</span>
             </div>
           ) : (
-            <table className="dashboard-table">
+            <table className="dashboard-table herdon-table herdon-table--sanitario">
               <thead>
                 <tr>
                   <th>Tipo</th>
@@ -308,11 +308,11 @@ export default function SanitarioPage({ db, setDb, onConfirmAction }) {
                     <td>{formatarData(item.data_aplic)}</td>
                     <td>{item.proxima ? formatarData(item.proxima) : '—'}</td>
                     <td>{item.funcionarioNome || '—'}</td>
-                    <td>{item.qtd}</td>
-                    <td>{renderStatus(item.status)}</td>
+                    <td className="cell-number">{item.qtd}</td>
+                    <td className="cell-chip">{renderStatus(item.status)}</td>
                     <td>{item.obs || '—'}</td>
-                    <td>
-                      <div className="row-actions">
+                    <td className="cell-actions">
+                      <div className="row-actions row-actions--tight">
                         <button
                           className="action-btn"
                           onClick={() => editarItem(item)}

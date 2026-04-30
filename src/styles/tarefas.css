@@ -26,11 +26,17 @@
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));
   gap: 8px;
+  min-width: 0;
   background: var(--card-bg); /* Added background for filter section */
   border: 1px solid var(--card-border);
   border-radius: var(--radius-lg);
   padding: 16px;
   margin-bottom: 16px; /* Space below filters */
+}
+
+.tarefas-filtros > *,
+.tarefas-filters > * {
+  min-width: 0;
 }
 
 .tarefas-filtros select,
@@ -167,6 +173,7 @@
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 8px;
+  min-width: 0;
 }
 
 .task-form-actions {

@@ -606,6 +606,8 @@ textarea.ui-input {
   border-radius: var(--interactive-radius);
   border: 1px solid var(--interactive-border);
   background: #13191c;
+  min-width: 0;
+  max-width: 100%;
 }
 
 .ui-input-shell:hover,
@@ -712,4 +714,81 @@ textarea.ui-input:focus {
   display: block;
   margin-top: 6px;
   color: rgba(168, 181, 175, 0.72);
+}
+
+/* Sprint 7V.3 - modal and narrow-width overflow safety */
+.ui-modal {
+  max-width: min(100%, calc(100vw - 24px));
+}
+
+.ui-modal-head,
+.ui-modal-body,
+.ui-modal-foot,
+.ui-modal-head > div,
+.ui-modal-body > *,
+.ui-modal-foot > * {
+  min-width: 0;
+}
+
+.ui-modal-head {
+  flex-wrap: wrap;
+}
+
+.ui-modal-body {
+  overflow-x: hidden;
+}
+
+.ui-modal-body .table-responsive,
+.ui-modal-body .ui-table-wrap {
+  max-width: 100%;
+}
+
+.ui-modal-foot {
+  align-items: center;
+}
+
+@media (max-width: 900px) {
+  .ui-modal-overlay {
+    padding: 12px;
+  }
+
+  .ui-modal {
+    width: min(100%, calc(100vw - 24px));
+    max-height: min(92vh, calc(100dvh - 24px));
+  }
+}
+
+@media (max-width: 768px) {
+  .ui-modal-head,
+  .ui-modal-foot {
+    align-items: stretch;
+  }
+
+  .ui-modal-head > div,
+  .ui-modal-foot > div,
+  .ui-modal-foot > * {
+    min-width: 0;
+    max-width: 100%;
+  }
+
+  .ui-table-wrap,
+  .ui-modal-body .table-responsive,
+  .ui-modal-body .ui-table-wrap {
+    border-radius: 16px;
+  }
+}
+
+@media (max-width: 640px) {
+  .ui-modal-head > div {
+    width: calc(100% - 50px);
+  }
+
+  .ui-modal-foot {
+    gap: 8px;
+  }
+
+  .ui-modal {
+    width: min(100%, calc(100vw - 16px));
+    max-width: min(100%, calc(100vw - 16px));
+  }
 }
