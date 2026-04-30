@@ -29,7 +29,7 @@ function normalizarInitialData(data) {
 }
 
 function validarForm(form) {
-  if (!form.lote_id) return 'Selecione o lote.';
+  if (form.tipo === 'lote' && !form.lote_id) return 'Selecione o lote.';
   if (form.tipo === 'animal' && !form.animal_id) return 'Selecione o animal.';
   if (!form.data) return 'Informe a data da pesagem.';
   if (!form.peso_medio) return 'Informe o peso medio.';
@@ -92,7 +92,7 @@ export default function PesagemForm({
     onSave?.({
       tipo: form.tipo === 'animal' ? 'animal' : 'lote',
       origem: form.tipo === 'animal' ? 'animal' : 'lote',
-      lote_id: Number(form.lote_id),
+      lote_id: form.lote_id ? Number(form.lote_id) : null,
       animal_id: form.tipo === 'animal' ? Number(form.animal_id) : null,
       data: form.data,
       peso_medio: Number(form.peso_medio),
@@ -135,7 +135,7 @@ export default function PesagemForm({
             Animal
             <select className="ui-input" name="animal_id" value={form.animal_id} onChange={handleChange}>
               <option value="">Selecione</option>
-              {animais.map((animal) => (
+              {animais.filter((animal) => !form.lote_id || Number(animal.lote_id) === Number(form.lote_id)).map((animal) => (
                 <option key={animal.id} value={animal.id}>
                   {animal.identificacao || animal.nome || `Animal #${animal.id}`}
                 </option>
