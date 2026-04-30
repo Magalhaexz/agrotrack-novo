@@ -810,3 +810,50 @@
     justify-content: flex-start;
   }
 }
+
+/* Sprint 7C.3D — premium green accent for central dashboard boxes */
+.dashboard-grid--kpi-main .kpi-panel,
+.dashboard-summary-card,
+.dashboard-stock-card,
+.dashboard-alerts-card,
+.dashboard-tab-content .kpi-card,
+.dashboard-executive-chip {
+  border-color: color-mix(in srgb, var(--color-primary) 22%, rgba(255, 255, 255, 0.08));
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.03),
+    0 8px 20px rgba(0, 0, 0, 0.22),
+    0 0 0 1px color-mix(in srgb, var(--color-primary) 10%, transparent);
+}
+
+.dashboard-grid--kpi-main .kpi-panel::before,
+.dashboard-summary-card::before,
+.dashboard-stock-card::before,
+.dashboard-alerts-card::before,
+.dashboard-tab-content .kpi-card::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  pointer-events: none;
+  background: linear-gradient(145deg, color-mix(in srgb, var(--color-primary) 9%, transparent), transparent 45%);
+  opacity: 0.55;
+}
+
+.kpi-panel--danger,
+.kpi-card--danger,
+.text-danger {
+  box-shadow: 0 0 0 1px color-mix(in srgb, var(--color-danger) 24%, transparent), 0 8px 20px rgba(0, 0, 0, 0.22);
+}
+
+.kpi-panel--danger::before,
+.kpi-card--danger::before {
+  background: linear-gradient(145deg, color-mix(in srgb, var(--color-danger) 10%, transparent), transparent 50%);
+  opacity: 0.5;
+}
+.dashboard-summary-card,
+.dashboard-stock-card,
+.dashboard-alerts-card,
+.dashboard-tab-content .kpi-card {
+  position: relative;
+  overflow: hidden;
+}

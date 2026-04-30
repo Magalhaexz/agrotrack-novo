@@ -5771,3 +5771,116 @@ body,
     transform: none !important;
   }
 }
+
+/* Sprint 7C.3A — flatten sidebar branding and enlarge logo/name */
+.sidebar-logo {
+  background: transparent !important;
+  border: 0 !important;
+  box-shadow: none !important;
+  padding: 14px 12px 8px !important;
+}
+
+.sidebar-logo-content {
+  background: transparent !important;
+  border: 0 !important;
+  box-shadow: none !important;
+  grid-template-columns: 64px minmax(0, 1fr) !important;
+  gap: 12px !important;
+  align-items: center;
+}
+
+.sidebar .sidebar-logo-mark,
+.sidebar-logo .sidebar-logo-mark,
+.sidebar .shell-logo-mark.sidebar-logo-mark {
+  width: 64px !important;
+  height: 64px !important;
+  border-radius: 14px !important;
+  background: transparent !important;
+  border: 0 !important;
+  box-shadow: none !important;
+}
+
+.sidebar .sidebar-logo-copy {
+  background: transparent !important;
+  border: 0 !important;
+  box-shadow: none !important;
+  min-height: auto !important;
+  display: flex !important;
+  align-items: center;
+}
+
+.sidebar .sidebar-logo-text {
+  font-size: 1.18rem !important;
+  line-height: 1;
+  font-weight: 800;
+  letter-spacing: 0.16em;
+  color: #f1f7f4;
+}
+
+.sidebar .sidebar-logo-sub,
+.sidebar .sidebar-logo-caption,
+.sidebar .sidebar-brand-badge {
+  display: none !important;
+}
+
+
+/* Sprint 7C.3B — remove top brand block and rebalance header */
+.header.top-header {
+  gap: 12px;
+}
+
+.header.top-header .farm-selector-wrap {
+  margin-left: 0;
+  flex: 1 1 260px;
+  max-width: 360px;
+}
+
+.header.top-header .header-tabs-shell {
+  flex: 1 1 340px;
+  justify-content: flex-start;
+}
+
+.header.top-header .top-header-actions {
+  margin-left: auto;
+}
+
+@media (max-width: 1100px) {
+  .header.top-header .farm-selector-wrap {
+    max-width: none;
+    flex: 1 1 220px;
+  }
+
+  .header.top-header .header-tabs-shell {
+    flex: 1 1 260px;
+  }
+}
+
+/* Sprint 7C.3C — unify main shell background with sidebar black */
+:root {
+  --color-bg: #000000;
+}
+
+html,
+body,
+#root,
+.app,
+.app-shell,
+.main,
+.main-content,
+.page-wrapper,
+.page-shell,
+.dashboard-page {
+  background: #000000 !important;
+}
+
+.main {
+  background-color: #000000 !important;
+}
+
+.content-card,
+.page-card,
+.section-card,
+.card,
+.ui-card {
+  border-color: rgba(255, 255, 255, 0.08);
+}
