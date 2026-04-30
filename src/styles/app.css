@@ -7116,3 +7116,48 @@ body,
   .page--pesagens .primary-btn { width: 100%; }
   .segmented-control { width: 100%; }
 }
+
+/* Sprint 8F.1 - Pesagem modal layout polish */
+.pesagem-form {
+  display: grid;
+  gap: 14px;
+}
+
+.pesagem-form-section {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.pesagem-form-field {
+  display: grid;
+  gap: 6px;
+  color: var(--color-text-secondary);
+  font-size: .86rem;
+}
+
+.pesagem-form-field .ui-input {
+  min-height: 42px;
+}
+
+.pesagem-form-grid {
+  gap: 12px;
+}
+
+.pesagem-preview-wrap {
+  border: 1px solid rgba(255,255,255,.06);
+  border-radius: 14px;
+  padding: 10px;
+  background: rgba(255,255,255,.015);
+}
+
+.ui-modal .pesagem-form .ui-button {
+  align-self: start;
+}
+
+@media (max-width: 900px) {
+  .pesagem-form-section,
+  .pesagem-form-grid {
+    grid-template-columns: 1fr;
+  }
+}
