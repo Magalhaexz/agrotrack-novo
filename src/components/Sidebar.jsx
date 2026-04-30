@@ -95,7 +95,12 @@ export default function Sidebar({
             <img src={herdonLogo} alt="HERDON" className="shell-logo-image" />
           </div>
           <div>
-            <div className="sidebar-logo-text">HERDON</div>
+            <div className="sidebar-logo-text">
+              <span className="sidebar-brand-word">
+                <span className="sidebar-brand-initial">H</span>
+                <span className="sidebar-brand-rest">ERDON</span>
+              </span>
+            </div>
             <div className="mobile-topbar-caption">{getNavLabel(currentPage)}</div>
           </div>
         </div>
@@ -116,7 +121,12 @@ export default function Sidebar({
               <img src={herdonLogo} alt="HERDON" className="shell-logo-image" />
             </div>
             <div className="sidebar-logo-copy">
-              <div className="sidebar-logo-text">HERDON</div>
+              <div className="sidebar-logo-text">
+                <span className="sidebar-brand-word">
+                  <span className="sidebar-brand-initial">H</span>
+                  <span className="sidebar-brand-rest">ERDON</span>
+                </span>
+              </div>
             </div>
           </div>
 

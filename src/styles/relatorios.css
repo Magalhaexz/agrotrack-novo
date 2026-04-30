@@ -220,6 +220,51 @@
   color: var(--color-text);
 }
 
+@media (max-width: 768px) {
+  .reports-filter-card {
+    gap: 14px;
+    overflow: visible;
+  }
+
+  .reports-filter-grid,
+  .reports-filter-summary-grid {
+    grid-template-columns: 1fr;
+    gap: 10px;
+  }
+
+  .reports-filter-foot {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .reports-filter-foot > * {
+    min-width: 0;
+    width: 100%;
+  }
+
+  .reports-filter-foot .ui-button {
+    width: 100%;
+  }
+
+  .reports-filter-summary-card {
+    padding: 12px 14px;
+  }
+}
+
+@media (max-width: 560px) {
+  .reports-filter-card {
+    gap: 12px;
+  }
+
+  .reports-filter-grid {
+    gap: 8px;
+  }
+
+  .reports-filter-summary-card small {
+    line-height: 1.45;
+  }
+}
+
 .reports-category-empty span {
   color: var(--color-text-secondary);
   font-size: var(--text-sm);

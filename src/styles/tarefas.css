@@ -213,6 +213,30 @@
   }
 }
 
+@media (max-width: 560px) {
+  .tarefas-filtros,
+  .tarefas-filters {
+    padding: 12px;
+    gap: 10px;
+  }
+
+  .tarefas-filtros select,
+  .tarefas-filters select,
+  .task-form input,
+  .task-form select,
+  .task-form textarea {
+    min-height: 42px;
+  }
+
+  .task-form-actions {
+    flex-direction: column;
+  }
+
+  .task-form-actions > * {
+    width: 100%;
+  }
+}
+
 /* Sprint 9.6 - polish for current kanban classes */
 .kanban-column {
   display: grid;

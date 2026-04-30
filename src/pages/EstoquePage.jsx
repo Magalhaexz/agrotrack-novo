@@ -91,7 +91,7 @@ export default function EstoquePage({ db, setDb, onRegistrarSaidaEstoque }) {
   }
 
   return (
-    <div className="page rebanho-page">
+    <div className="page rebanho-page page--estoque">
       <div className="rebanho-header">
         <h1>Estoque</h1>
         <div className="lote-actions">
@@ -138,7 +138,7 @@ export default function EstoquePage({ db, setDb, onRegistrarSaidaEstoque }) {
             const border = item.status === 'critico' ? '#c53030' : item.status === 'baixo' ? '#b7791f' : 'var(--color-border)';
             const bar = item.status === 'critico' ? '#c53030' : item.status === 'baixo' ? '#b7791f' : '#2d6a4f';
             return (
-              <Card key={item.id} className="estoque-card" style={{ borderColor: border }}>
+              <Card key={item.id} className={`estoque-card estoque-card--${item.status}`} style={{ borderColor: border }}>
                 <div className="estoque-card-header">
                   <div>
                     <h3 className="estoque-card-nome">{item.produto}</h3>
@@ -147,12 +147,17 @@ export default function EstoquePage({ db, setDb, onRegistrarSaidaEstoque }) {
                       {item.categoria}
                     </span>
                   </div>
-                  <Badge variant={item.status === 'critico' ? 'danger' : item.status === 'baixo' ? 'warning' : 'neutral'}>{item.status}</Badge>
+                  <Badge className="estoque-card-status" variant={item.status === 'critico' ? 'danger' : item.status === 'baixo' ? 'warning' : 'neutral'}>{item.status}</Badge>
                 </div>
-                {item.status === 'critico' ? <p className="negative"><AlertTriangle size={14} /> Crítico</p> : null}
+                {item.status === 'critico' ? <p className="negative estoque-card-alert"><AlertTriangle size={14} /> Crítico</p> : null}
                 <div className="estoque-card-quantidade">{formatNumber(item.saldo, 2)} {item.unidade}</div>
-                <div className="progress-bar-container"><div className={`progress-bar-fill ${item.status === 'critico' ? 'danger' : item.status === 'baixo' ? 'warning' : ''}`} style={{ width: `${Math.min(Math.max(item.ratio, 4), 100)}%`, background: bar }} /></div>
-                <div className="progress-label">{formatNumber(item.ratio, 0)}%</div>
+                <div className="estoque-card-progress">
+                  <div className="estoque-card-progress-head">
+                    <span>Saldo atual</span>
+                    <span className="progress-label">{formatNumber(item.ratio, 0)}%</span>
+                  </div>
+                  <div className="progress-bar-container"><div className={`progress-bar-fill ${item.status === 'critico' ? 'danger' : item.status === 'baixo' ? 'warning' : ''}`} style={{ width: `${Math.min(Math.max(item.ratio, 4), 100)}%`, background: bar }} /></div>
+                </div>
                 <div className="estoque-card-details">
                   <div className="estoque-detail-row"><span>Valor unitário</span><span>{formatCurrency(item.valor_unitario)}</span></div>
                   <div className="estoque-detail-row"><span>Valor total</span><span>{formatCurrency(item.valorTotal)}</span></div>
