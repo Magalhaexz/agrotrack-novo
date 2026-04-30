@@ -902,3 +902,17 @@
   position: relative;
   overflow: hidden;
 }
+
+.dashboard-task-board { margin-top: 4px; }
+.dashboard-task-create { display: grid; grid-template-columns: 1.2fr .9fr .8fr 1.3fr auto; gap: 10px; margin-bottom: 14px; }
+.dashboard-task-columns { display: grid; grid-template-columns: repeat(3, minmax(0,1fr)); gap: 12px; }
+.dashboard-task-column { border: 1px solid var(--color-border); border-radius: 14px; background: rgba(255,255,255,.02); padding: 10px; min-height: 220px; }
+.dashboard-task-column-head { font-weight: 700; color: var(--color-text); margin-bottom: 10px; }
+.dashboard-task-list { display: grid; gap: 8px; }
+.dashboard-task-card { display: grid; gap: 4px; border: 1px solid rgba(255,255,255,.06); border-radius: 12px; padding: 10px; background: rgba(255,255,255,.015); }
+.dashboard-task-card span, .dashboard-task-card small, .dashboard-task-card p { color: var(--color-text-secondary); margin: 0; }
+
+@media (max-width: 1100px) {
+  .dashboard-task-create { grid-template-columns: 1fr 1fr; }
+  .dashboard-task-columns { grid-template-columns: 1fr; }
+}

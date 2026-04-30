@@ -7,6 +7,7 @@ import { parseNumeroEntrada } from '../utils/formatters';
 const FORM_VAZIO = {
   tipo_registro: 'grupo',
   lote_id: '',
+  data_referencia: '',
   identificacao: '',
   sexo: 'macho',
   gen: '',
@@ -35,6 +36,7 @@ function normalizarInitialData(data) {
   return {
     tipo_registro: data.tipo_registro || (Number(data.qtd || 0) === 1 && data.identificacao ? 'individual' : 'grupo'),
     lote_id: data.lote_id ?? '',
+    data_referencia: data.data_referencia || data.data_entrada || '',
     identificacao: data.identificacao || '',
     sexo: data.sexo === 'femea' ? 'femea' : (data.sexo || 'macho'),
     gen: data.gen || '',
@@ -56,7 +58,7 @@ function obterNumero(form, key) {
 }
 
 function validarForm(form) {
-  if (!form.lote_id) return 'Selecione o lote vinculado.';
+  if (form.tipo_registro === 'grupo' && !form.lote_id) return 'Selecione o lote vinculado.';
   if (form.tipo_registro === 'individual' && !form.identificacao.trim()) {
     return 'Informe a identificacao / brinco / codigo.';
   }
@@ -115,7 +117,8 @@ export default function AnimalForm({ initialData, lotes = [], onSave, onCancel }
     setErro('');
     onSave?.({
       tipo_registro: form.tipo_registro,
-      lote_id: Number(form.lote_id),
+      lote_id: form.lote_id ? Number(form.lote_id) : null,
+      data_referencia: form.data_referencia || null,
       identificacao: form.identificacao.trim(),
       sexo: form.sexo === 'femea' ? 'femea' : form.sexo,
       gen: form.gen.trim(),
@@ -181,6 +184,11 @@ export default function AnimalForm({ initialData, lotes = [], onSave, onCancel }
               <option value="macho">Macho</option>
               <option value="femea">Femea</option>
             </select>
+          </label>
+
+          <label className="animal-form-field">
+            <span className="animal-form-label">Data de entrada / referencia</span>
+            <input className="ui-input" type="date" name="data_referencia" value={form.data_referencia} onChange={handleChange} />
           </label>
         </div>
 
