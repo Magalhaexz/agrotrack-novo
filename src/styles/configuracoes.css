@@ -86,14 +86,71 @@
   margin-top: 20px; /* Space above action buttons */
 }
 
-.danger-zone {
-  border: 1px solid var(--color-danger);
-  border-radius: var(--radius-md);
-  padding: 12px;
+.config-data-stack {
   display: grid;
-  gap: 8px;
-  background: var(--color-danger-bg); /* Use a subtle background for danger zone */
-  color: var(--color-danger); /* Text color for danger zone */
+  gap: 18px;
+}
+
+.config-actions-wrap {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  align-items: flex-start;
+}
+
+.config-actions-wrap--data {
+  justify-content: space-between;
+  padding: 18px;
+  border-radius: 20px;
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.025), rgba(255, 255, 255, 0.01)),
+    rgba(8, 11, 10, 0.84);
+}
+
+.config-panel-intro {
+  display: grid;
+  gap: 6px;
+  max-width: 460px;
+  min-width: 0;
+}
+
+.config-panel-kicker {
+  color: rgba(214, 223, 219, 0.58);
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+.config-panel-intro p {
+  margin: 0;
+  color: rgba(214, 223, 219, 0.76);
+  font-size: 0.9rem;
+  line-height: 1.55;
+}
+
+.config-action-cluster {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 10px;
+  min-width: 0;
+}
+
+.danger-zone {
+  border: 1px solid rgba(239, 68, 68, 0.22);
+  border-radius: 20px;
+  padding: 18px;
+  display: grid;
+  gap: 12px;
+  background:
+    radial-gradient(circle at top right, rgba(239, 68, 68, 0.12), transparent 36%),
+    linear-gradient(180deg, rgba(28, 12, 12, 0.96), rgba(16, 10, 10, 0.96));
+  color: #ffd0d0;
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.03),
+    0 8px 22px rgba(0, 0, 0, 0.18);
 }
 
 .danger-zone h4 {
@@ -101,8 +158,57 @@
   gap: 6px;
   align-items: center;
   margin: 0;
-  font-size: 0.95rem; /* Slightly smaller font for h4 */
-  font-weight: 600;
+  font-size: 0.95rem;
+  font-weight: 700;
+  color: #ffe5e5;
+}
+
+.danger-zone p {
+  margin: 0;
+  color: rgba(255, 224, 224, 0.82);
+  line-height: 1.55;
+}
+
+.danger-zone strong {
+  color: #fff1f1;
+}
+
+.danger-zone-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.danger-zone-chip {
+  display: inline-flex;
+  align-items: center;
+  min-height: 28px;
+  padding: 0 10px;
+  border-radius: 999px;
+  border: 1px solid rgba(255, 179, 179, 0.18);
+  background: rgba(239, 68, 68, 0.12);
+  color: #ffcccc;
+  font-size: 0.7rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.danger-zone-controls {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+}
+
+.danger-zone-controls .ui-input {
+  min-width: min(280px, 100%);
+}
+
+.danger-zone-controls .ui-button--danger {
+  box-shadow: 0 10px 24px rgba(120, 24, 24, 0.2);
 }
 
 .switch-row {
@@ -118,5 +224,21 @@
 @media (max-width: 900px) {
   .config-grid {
     grid-template-columns: 1fr; /* Stack columns on smaller screens */
+  }
+
+  .config-actions-wrap--data,
+  .danger-zone-controls,
+  .config-actions {
+    align-items: stretch;
+  }
+
+  .config-action-cluster,
+  .danger-zone-controls {
+    justify-content: flex-start;
+  }
+
+  .config-action-cluster > *,
+  .danger-zone-controls > * {
+    width: 100%;
   }
 }

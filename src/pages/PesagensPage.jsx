@@ -291,8 +291,8 @@ export default function PesagensPage({ db, setDb, onConfirmAction, navigationInt
   }
 
   return (
-    <div className="page">
-      <div className="page-header page-topbar">
+    <div className="page page--pesagens page--kpi-compact">
+      <div className="page-header page-topbar herdon-page-topbar herdon-page-topbar--compact">
         <div>
           <h1>Pesagens</h1>
           <p>Registro e acompanhamento do peso médio dos lotes.</p>
@@ -305,20 +305,20 @@ export default function PesagensPage({ db, setDb, onConfirmAction, navigationInt
         </div>
       </div>
 
-      <div className="kpi-grid-3">
-        <div className="kpi-card">
+      <div className="kpi-grid-3 kpi-grid-3--compact">
+        <div className="kpi-card kpi-card--compact">
           <div className="kpi-label">Pesagens</div>
           <div className="kpi-value">{resumo.totalPesagens}</div>
           <div className="kpi-sub">registros cadastrados</div>
         </div>
 
-        <div className="kpi-card">
+        <div className="kpi-card kpi-card--compact">
           <div className="kpi-label">Lotes com pesagem</div>
           <div className="kpi-value">{resumo.lotesComPesagem}</div>
           <div className="kpi-sub">lotes acompanhados</div>
         </div>
 
-        <div className="kpi-card">
+        <div className="kpi-card kpi-card--compact">
           <div className="kpi-label">Peso médio geral</div>
           <div className="kpi-value">
             {formatarNumero(resumo.pesoMedioGeral)} kg
@@ -341,7 +341,7 @@ export default function PesagensPage({ db, setDb, onConfirmAction, navigationInt
               <span>Use o botão “Nova pesagem” para registrar o primeiro peso.</span>
             </div>
           ) : (
-            <table className="data-table">
+            <table className="data-table herdon-table herdon-table--pesagens">
               <thead>
                 <tr>
                   <th>Lote</th>
@@ -358,10 +358,10 @@ export default function PesagensPage({ db, setDb, onConfirmAction, navigationInt
                     <td className="text-h">{item.loteNome}</td>
                     <td>{formatarData(item.data)}</td>
                     <td>{formatarNumero(item.peso_medio)} kg</td>
-                    <td>{renderVariacao(item.variacao)}</td>
+                    <td className="cell-chip">{renderVariacao(item.variacao)}</td>
                     <td>{item.observacao || '—'}</td>
-                    <td>
-                      <div className="row-actions">
+                    <td className="cell-actions">
+                      <div className="row-actions row-actions--tight">
                         <button
                           className="action-btn"
                           onClick={() => editarPesagem(item)}

@@ -27,18 +27,18 @@ export default function FuncionarioRow({ funcionario, fazendaNome = '—', onEdi
         {iniciais(funcionario.nome)}
       </div>
 
-      <div style={{ flex: 1 }}>
+      <div className="funcionario-main">
         <div className="funcionario-nome">{funcionario.nome}</div>
         <div className="funcionario-cargo">
           {funcionario.cargo || '—'} · {fazendaNome}
         </div>
       </div>
 
-      <div style={{ minWidth: 140, color: 'var(--color-text-secondary)', fontSize: '0.82rem' }}>
+      <div className="funcionario-phone">
         {funcionario.telefone || '—'}
       </div>
 
-      <span className={ativo ? 'badge-ativo' : 'badge-inativo'}>
+      <span className={`funcionario-status ${ativo ? 'badge-ativo' : 'badge-inativo'}`}>
         {ativo ? 'Ativo' : 'Inativo'}
       </span>
     </div>

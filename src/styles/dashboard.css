@@ -839,6 +839,25 @@
   opacity: 0.55;
 }
 
+@media (max-width: 640px) {
+  .dashboard-toolbar {
+    gap: 10px;
+  }
+
+  .dashboard-toolbar-actions {
+    display: grid;
+    grid-template-columns: 1fr;
+  }
+
+  .dashboard-table tr {
+    padding: 10px;
+  }
+
+  .dashboard-table td {
+    padding: 5px 0;
+  }
+}
+
 .kpi-panel--danger,
 .kpi-card--danger,
 .text-danger {

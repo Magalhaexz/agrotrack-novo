@@ -127,7 +127,7 @@ export default function FuncionariosPage({ db, setDb, onConfirmAction }) {
   }
 
   return (
-    <div className="page">
+    <div className="page page--funcionarios">
       <PageHeader
         title="Funcionários"
         subtitle="Gestão de colaboradores e suas informações"
@@ -143,7 +143,7 @@ export default function FuncionariosPage({ db, setDb, onConfirmAction }) {
         </select>
       </div>
 
-      <div className="ui-card no-padding"> {/* Adicionada classe no-padding para remover padding padrão */}
+      <div className="ui-card no-padding funcionarios-list-shell"> {/* Adicionada classe no-padding para remover padding padrão */}
         {lista.length === 0 ? (
           <div className="empty-state padded"> {/* Adicionada classe padded para padding interno */}
             <p>Nenhum funcionário encontrado.</p>

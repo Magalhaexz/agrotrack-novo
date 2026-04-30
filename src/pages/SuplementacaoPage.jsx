@@ -176,9 +176,9 @@ export default function SuplementacaoPage({ db, setDb }) {
         </div>
       </header>
 
-      <Card title="Dietas vinculadas por lote" subtitle="Compatibilidade preservada com os dados legados de suplementacao.">
+      <Card className="suplementacao-card suplementacao-card--dietas" title="Dietas vinculadas por lote" subtitle="Compatibilidade preservada com os dados legados de suplementacao.">
         <div className="table-responsive">
-          <table className="dashboard-table">
+          <table className="dashboard-table herdon-table herdon-table--suplementacao">
             <thead>
               <tr>
                 <th>Lote</th>
@@ -205,13 +205,13 @@ export default function SuplementacaoPage({ db, setDb }) {
                     <td>{row.itensDieta.length}</td>
                     <td>{formatNumber(row.previstoDia, 2)} kg</td>
                     <td>{formatNumber(row.realDia, 2)} kg</td>
-                    <td>
+                    <td className="cell-chip">
                       <Badge variant={row.diff > 0 ? 'warning' : row.diff < 0 ? 'danger' : 'success'}>
                         {formatNumber(row.diff, 2)} kg
                       </Badge>
                     </td>
-                    <td>
-                      <div className="row-actions">
+                    <td className="cell-actions">
+                      <div className="row-actions row-actions--tight">
                         <button className="action-btn" type="button" onClick={() => handleEditDieta(row.dieta || { lote_id: row.lote.id, nome: '', itens: [] })}>
                           {row.dieta ? 'Editar' : 'Criar'}
                         </button>
@@ -230,9 +230,9 @@ export default function SuplementacaoPage({ db, setDb }) {
         </div>
       </Card>
 
-      <Card title="Projecao de consumo de estoque" subtitle="Mostra o item mais pressionado pela dieta atual de cada lote.">
+      <Card className="suplementacao-card suplementacao-card--projecao" title="Projecao de consumo de estoque" subtitle="Mostra o item mais pressionado pela dieta atual de cada lote.">
         <div className="table-responsive">
-          <table className="dashboard-table">
+          <table className="dashboard-table herdon-table herdon-table--suplementacao">
             <thead>
               <tr>
                 <th>Item</th>
@@ -252,7 +252,7 @@ export default function SuplementacaoPage({ db, setDb }) {
                     <td>{item.item?.produto || 'Item nao encontrado'}</td>
                     <td>{formatNumber(item.consumoDia, 2)} kg</td>
                     <td>{formatNumber(item.item?.quantidade_atual || 0, 2)} kg</td>
-                    <td>
+                    <td className="cell-chip">
                       <Badge variant={item.dias < 7 ? 'danger' : item.dias < 30 ? 'warning' : 'success'}>
                         {item.dias === 999 ? 'Sem consumo' : `${formatNumber(item.dias, 0)} dias`}
                       </Badge>
@@ -376,7 +376,7 @@ function DietaModal({ db, setDb, initialData, onClose, showToast, session }) {
       {errors.itens ? <small className="input-error full" style={{ marginBottom: 10 }}>{errors.itens}</small> : null}
 
       <div className="table-responsive" style={{ marginBottom: 14 }}>
-        <table className="dashboard-table">
+        <table className="dashboard-table herdon-table herdon-table--suplementacao-modal">
           <thead>
             <tr>
               <th>Item</th>
@@ -393,9 +393,9 @@ function DietaModal({ db, setDb, initialData, onClose, showToast, session }) {
               form.itens.map((item, index) => (
                 <tr key={`${item.item_estoque_id}-${index}`}>
                   <td>{estoqueMap.get(Number(item.item_estoque_id))?.produto || 'Item desconhecido'}</td>
-                  <td>{formatNumber(item.qtd_cab_dia, 3)} kg</td>
-                  <td>
-                    <div className="row-actions">
+                  <td className="cell-number">{formatNumber(item.qtd_cab_dia, 3)} kg</td>
+                  <td className="cell-actions">
+                    <div className="row-actions row-actions--tight">
                       <button className="action-btn" type="button" onClick={() => setEditingItemIndex(index)}>Editar</button>
                       <button
                         className="action-btn action-btn-danger"

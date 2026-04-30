@@ -466,7 +466,7 @@ export default function ConfiguracoesPage({ db, setDb, onConfirmAction }) {
               <span className="ui-input-label">Preço da arroba padrão (R$)</span>
               <input className="ui-input" type="number" min="0" step="0.01" value={geral.preco_arroba_padrao} onChange={(e) => setGeral((prev) => ({ ...prev, preco_arroba_padrao: e.target.value }))} />
             </label>
-          </div>
+            </div>
           <div className="config-actions"><Button onClick={salvarGeral}>Salvar configurações gerais</Button></div>
         </Card>
       ) : null}
@@ -725,18 +725,31 @@ export default function ConfiguracoesPage({ db, setDb, onConfirmAction }) {
 
       {tab === 'dados' ? (
         <Card title="Dados e Segurança">
-          <div className="config-actions-wrap">
-            <Button icon={<FileText size={14} />} onClick={exportarDados}>Exportar todos os dados</Button>
-            <Button icon={<FileText size={14} />} variant="outline" onClick={() => fileInputRef.current?.click()}>Importar dados</Button>
-            <input ref={fileInputRef} type="file" accept="application/json" onChange={importarDados} hidden />
+          <div className="config-data-stack">
+            <div className="config-actions-wrap config-actions-wrap--data">
+              <div className="config-panel-intro">
+                <span className="config-panel-kicker">Backup e manutenÃ§Ã£o</span>
+                <p>Exporte, importe e limpe dados de demonstraÃ§Ã£o com uma hierarquia visual mais clara e segura.</p>
+              </div>
+              <div className="config-action-cluster">
+                <Button icon={<FileText size={14} />} onClick={exportarDados}>Exportar todos os dados</Button>
+                <Button icon={<FileText size={14} />} variant="outline" onClick={() => fileInputRef.current?.click()}>Importar dados</Button>
+                <input ref={fileInputRef} type="file" accept="application/json" onChange={importarDados} hidden />
             <Button icon={<X size={14} />} variant="outline" onClick={limparDadosDemo}>Limpar dados de demonstração</Button>
-          </div>
+              </div>
+            </div>
 
-          <div className="danger-zone">
-            <h4><AlertTriangle size={14} /> Zona de perigo</h4>
-            <p>Para excluir conta, digite <strong>CONFIRMAR</strong>.</p>
-            <input className="ui-input" value={confirmText} onChange={(e) => setConfirmText(e.target.value)} placeholder="Digite CONFIRMAR" />
-            <Button variant="danger" onClick={excluirConta}>Excluir conta</Button>
+            <div className="danger-zone danger-zone--settings">
+              <div className="danger-zone-head">
+                <h4><AlertTriangle size={14} /> Zona de perigo</h4>
+                <span className="danger-zone-chip">Acao irreversivel</span>
+              </div>
+              <p>Para excluir conta, digite <strong>CONFIRMAR</strong>.</p>
+              <div className="danger-zone-controls">
+                <input className="ui-input" value={confirmText} onChange={(e) => setConfirmText(e.target.value)} placeholder="Digite CONFIRMAR" />
+                <Button variant="danger" onClick={excluirConta}>Excluir conta</Button>
+              </div>
+            </div>
           </div>
         </Card>
       ) : null}
