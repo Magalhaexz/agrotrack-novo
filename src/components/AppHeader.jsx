@@ -1,7 +1,6 @@
 import { Activity, AlertTriangle, Bell, ChevronDown, Clock3, Loader2, LogOut, Menu, Package, Settings, User } from 'lucide-react';
 import { createPortal } from 'react-dom';
 import { useEffect, useRef, useState } from 'react';
-import herdonLogo from '../assets/logo_app1.png';
 import { obterLabelPerfil } from '../auth/perfis';
 import { getNavLabel } from '../navigation/navConfig';
 import Button from './ui/Button';
@@ -211,16 +210,6 @@ export default function AppHeader({
       <button type="button" className="mobile-menu-inline sem-impressao" onClick={onOpenMenu} aria-label="Abrir menu">
         <Menu size={18} />
       </button>
-
-      <div className="header-brand-shell" aria-label="Marca HERDON">
-        <div className="shell-logo-mark header-brand-mark">
-          <img src={herdonLogo} alt="HERDON" className="shell-logo-image" />
-        </div>
-        <div className="header-brand-copy">
-          <strong>HERDON</strong>
-          <span>Dark premium para operacao pecuaria</span>
-        </div>
-      </div>
 
       <div className="farm-selector-wrap" ref={farmsRef}>
         <button
