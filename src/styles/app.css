@@ -5653,3 +5653,121 @@ body,
     padding: 10px 10px 8px;
   }
 }
+
+/* Micro Sprint 7C.1A — force true black sidebar surfaces */
+.sidebar,
+.sidebar.sb,
+.app-shell .sidebar,
+.sidebar.mobile-open,
+.sidebar::before,
+.sidebar::after,
+.sidebar-logo,
+.sidebar-content,
+.sidebar-user-wrap,
+.sidebar-user,
+.mobile-topbar,
+.mobile-overlay + .sidebar {
+  background: #000000 !important;
+}
+
+.sidebar {
+  background-color: #000000 !important;
+}
+
+/* Micro Sprint 7C.1B — remove sidebar logo frame/moldura only */
+.sidebar .sidebar-logo-mark,
+.sidebar-logo .sidebar-logo-mark,
+.sidebar .shell-logo-mark.sidebar-logo-mark {
+  background: transparent !important;
+  border: 0 !important;
+  box-shadow: none !important;
+  outline: 0 !important;
+}
+
+.sidebar .sidebar-logo-mark::before,
+.sidebar .sidebar-logo-mark::after,
+.sidebar-logo .sidebar-logo-mark::before,
+.sidebar-logo .sidebar-logo-mark::after,
+.sidebar .shell-logo-mark.sidebar-logo-mark::before,
+.sidebar .shell-logo-mark.sidebar-logo-mark::after {
+  content: none !important;
+  background: transparent !important;
+  border: 0 !important;
+  box-shadow: none !important;
+}
+
+.sidebar .sidebar-logo-mark .shell-logo-image {
+  filter: none !important;
+  box-shadow: none !important;
+}
+
+/* Micro Sprint 7C.1D — sidebar green bubble treatment (active + hover only) */
+.sidebar .sidebar-item,
+.sidebar .sidebar-item.nav,
+.sidebar .sidebar-item.subnav {
+  border-radius: 999px;
+  transition: background 170ms ease, border-color 170ms ease, box-shadow 190ms ease, transform 150ms ease, color 170ms ease;
+}
+
+.sidebar .sidebar-item:hover,
+.sidebar .sidebar-item.nav:hover,
+.sidebar .sidebar-item.subnav:hover {
+  background: #0b1013;
+  border-color: color-mix(in srgb, var(--color-primary) 24%, rgba(255,255,255,0.1));
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--color-primary) 14%, transparent);
+  transform: translateY(-1px);
+}
+
+.sidebar .sidebar-item.active,
+.sidebar .sidebar-item.on,
+.sidebar .sidebar-item.nav.active,
+.sidebar .sidebar-item.subnav.active {
+  background: #0d1411;
+  border-color: color-mix(in srgb, var(--color-primary) 42%, rgba(255,255,255,0.14));
+  box-shadow:
+    inset 0 0 0 1px color-mix(in srgb, var(--color-primary) 28%, transparent),
+    0 4px 12px color-mix(in srgb, var(--color-primary) 12%, transparent);
+  color: #ecf5f0;
+}
+
+.sidebar .sidebar-item.active .nav-icon,
+.sidebar .sidebar-item.on .nav-icon,
+.sidebar .sidebar-item.nav.active .nav-icon,
+.sidebar .sidebar-item.subnav.active .nav-icon {
+  color: var(--color-primary);
+}
+
+/* Micro Sprint 7C.1E — subtle sidebar motion polish (visual-only) */
+.sidebar .sidebar-item,
+.sidebar .sidebar-item.nav,
+.sidebar .sidebar-item.subnav {
+  will-change: transform, background-color, border-color, box-shadow;
+  transition:
+    transform 150ms cubic-bezier(0.22, 0.61, 0.36, 1),
+    background-color 180ms ease,
+    border-color 180ms ease,
+    box-shadow 190ms ease,
+    color 170ms ease,
+    opacity 170ms ease;
+}
+
+.sidebar .sidebar-item:hover,
+.sidebar .sidebar-item.nav:hover,
+.sidebar .sidebar-item.subnav:hover {
+  transform: translateX(2px) translateY(-1px);
+}
+
+.sidebar .sidebar-item:active,
+.sidebar .sidebar-item.nav:active,
+.sidebar .sidebar-item.subnav:active {
+  transform: translateX(1px) scale(0.997);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .sidebar .sidebar-item,
+  .sidebar .sidebar-item.nav,
+  .sidebar .sidebar-item.subnav {
+    transition: none !important;
+    transform: none !important;
+  }
+}

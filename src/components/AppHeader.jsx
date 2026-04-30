@@ -218,7 +218,6 @@ export default function AppHeader({
         </div>
         <div className="header-brand-copy">
           <strong>HERDON</strong>
-          <span>Dark premium para operacao pecuaria</span>
         </div>
       </div>
 
