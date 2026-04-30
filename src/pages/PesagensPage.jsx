@@ -2,7 +2,7 @@ import { useMemo, useState } from 'react';
 import PesagemForm from '../components/PesagemForm';
 import { formatarNumero, formatarData } from '../utils/formatters';
 import { gerarNovoId } from '../utils/id';
-import { useToast } from '../hooks/useToast'; // Assuming useToast is available
+import { useToast } from '../hooks/useToast';
 import { useAuth } from '../auth/useAuth';
 import {
   createOperationalRecord,
@@ -14,6 +14,11 @@ import {
 function toFiniteNumber(value, fallback = 0) {
   const normalized = Number(value);
   return Number.isFinite(normalized) ? normalized : fallback;
+}
+
+function resolveTipoPesagem(item) {
+  if (item?.tipo === 'animal' || item?.origem === 'animal') return 'animal';
+  return 'lote';
 }
 
 function resolveLatestPesagem(pesagens) {
@@ -32,9 +37,9 @@ function recalculateLoteFromPesagens(prevDb, loteId, nextPesagens) {
   const animais = Array.isArray(prevDb?.animais) ? prevDb.animais : [];
   const normalizedLoteId = Number(loteId);
 
-  const pesagensLote = (nextPesagens || []).filter(
-    (item) => Number(item?.lote_id) === normalizedLoteId
-  );
+  const pesagensLote = (nextPesagens || []).filter((item) => (
+    resolveTipoPesagem(item) === 'lote' && Number(item?.lote_id) === normalizedLoteId
+  ));
   const latestPesagem = resolveLatestPesagem(pesagensLote);
 
   const fallbackPesoFromAnimais = (() => {
@@ -54,10 +59,7 @@ function recalculateLoteFromPesagens(prevDb, loteId, nextPesagens) {
   const nextUltimaPesagem = latestPesagem?.data || null;
 
   const nextLotes = lotes.map((lote) => {
-    if (Number(lote?.id) !== normalizedLoteId) {
-      return lote;
-    }
-
+    if (Number(lote?.id) !== normalizedLoteId) return lote;
     return {
       ...lote,
       p_at: nextPesoAtual,
@@ -74,86 +76,97 @@ function recalculateLoteFromPesagens(prevDb, loteId, nextPesagens) {
   };
 }
 
+function shouldUpdateLote(record) {
+  return resolveTipoPesagem(record) === 'lote' && Number(record?.lote_id) > 0;
+}
+
 export default function PesagensPage({ db, setDb, onConfirmAction, navigationIntent = null }) {
   const { hasPermission, session } = useAuth();
-  const { showToast } = useToast(); // Initialize toast hook
-  const mensagemSemPermissao = 'Você não tem permissão para executar esta ação.';
+  const { showToast } = useToast();
+  const mensagemSemPermissao = 'Voce nao tem permissao para executar esta acao.';
 
   const shouldStartWithNewPesagem = navigationIntent?.page === 'pesagens' && navigationIntent?.action === 'novo';
   const [abrirForm, setAbrirForm] = useState(shouldStartWithNewPesagem);
   const [pesagemEditando, setPesagemEditando] = useState(null);
 
-  const lotes = db?.lotes || [];
-  const pesagens = db?.pesagens || [];
+  const lotes = db?.lotes;
+  const animais = db?.animais;
+  const pesagens = db?.pesagens;
 
-  // Optimize lotes lookup
   const lotesMap = useMemo(() => {
     const map = new Map();
-    lotes.forEach(l => map.set(l.id, l));
+    (lotes || []).forEach((lote) => map.set(Number(lote.id), lote));
     return map;
   }, [lotes]);
 
+  const animaisMap = useMemo(() => {
+    const map = new Map();
+    (animais || []).forEach((animal) => map.set(Number(animal.id), animal));
+    return map;
+  }, [animais]);
+
   const dadosTabela = useMemo(() => {
-    const pesagensPorLote = new Map(); // Map<lote_id, Array<pesagem>>
-
-    // Group pesagens by lote_id
-    pesagens.forEach(p => {
-      if (!pesagensPorLote.has(p.lote_id)) {
-        pesagensPorLote.set(p.lote_id, []);
-      }
-      pesagensPorLote.get(p.lote_id).push(p);
+    const pesagensPorLote = new Map();
+    (pesagens || []).forEach((pesagem) => {
+      if (resolveTipoPesagem(pesagem) !== 'lote') return;
+      const loteId = Number(pesagem.lote_id);
+      if (!pesagensPorLote.has(loteId)) pesagensPorLote.set(loteId, []);
+      pesagensPorLote.get(loteId).push(pesagem);
     });
 
-    const result = [];
+    const variacaoPorPesagem = new Map();
     pesagensPorLote.forEach((lotePesagens) => {
-      // Sort weighings for the current lot by date to calculate variation
       lotePesagens.sort((a, b) => new Date(a.data) - new Date(b.data));
-
-      for (let i = 0; i < lotePesagens.length; i++) {
-        const pesagem = lotePesagens[i];
-        const lote = lotesMap.get(pesagem.lote_id);
-        let variacao = null;
-
-        if (i > 0) {
-          variacao = Number(pesagem.peso_medio) - Number(lotePesagens[i - 1].peso_medio);
-        }
-
-        result.push({
-          ...pesagem,
-          loteNome: lote?.nome || '—',
-          variacao,
-        });
+      for (let i = 0; i < lotePesagens.length; i += 1) {
+        const atual = lotePesagens[i];
+        const anterior = i > 0 ? lotePesagens[i - 1] : null;
+        const variacao = anterior ? Number(atual.peso_medio) - Number(anterior.peso_medio) : null;
+        variacaoPorPesagem.set(atual.id, variacao);
       }
     });
 
-    // Final sort for display (most recent first)
-    return result.sort((a, b) => new Date(b.data) - new Date(a.data));
-  }, [pesagens, lotesMap]);
+    return [...(pesagens || [])]
+      .map((pesagem) => {
+        const tipo = resolveTipoPesagem(pesagem);
+        const animal = animaisMap.get(Number(pesagem.animal_id));
+        return {
+          ...pesagem,
+          tipo,
+          loteNome: lotesMap.get(Number(pesagem.lote_id))?.nome || '—',
+          animalNome: animal?.identificacao || animal?.nome || null,
+          variacao: tipo === 'lote' ? variacaoPorPesagem.get(pesagem.id) ?? null : null,
+        };
+      })
+      .sort((a, b) => new Date(b.data) - new Date(a.data));
+  }, [pesagens, lotesMap, animaisMap]);
 
   const resumo = useMemo(() => {
-    const totalPesagens = pesagens.length;
+    const basePesagens = pesagens || [];
+    const totalPesagens = basePesagens.length;
     const lotesComPesagem = new Set();
     let ultimaData = '';
     let latestTimestamp = 0;
     let totalPesoMedio = 0;
+    let totalPesagensAnimal = 0;
 
-    pesagens.forEach((p) => {
-      lotesComPesagem.add(p.lote_id);
-      totalPesoMedio += Number(p.peso_medio || 0);
-      const currentTimestamp = new Date(p.data).getTime();
+    basePesagens.forEach((pesagem) => {
+      lotesComPesagem.add(pesagem.lote_id);
+      totalPesoMedio += Number(pesagem.peso_medio || 0);
+      if (resolveTipoPesagem(pesagem) === 'animal') totalPesagensAnimal += 1;
+      const currentTimestamp = new Date(pesagem.data).getTime();
       if (currentTimestamp > latestTimestamp) {
         latestTimestamp = currentTimestamp;
-        ultimaData = p.data;
+        ultimaData = pesagem.data;
       }
     });
 
-    const pesoMedioGeral = totalPesagens ? totalPesoMedio / totalPesagens : 0;
-
     return {
       totalPesagens,
+      totalPesagensAnimal,
+      totalPesagensLote: totalPesagens - totalPesagensAnimal,
       lotesComPesagem: lotesComPesagem.size,
       ultimaData,
-      pesoMedioGeral,
+      pesoMedioGeral: totalPesagens ? totalPesoMedio / totalPesagens : 0,
     };
   }, [pesagens]);
 
@@ -189,26 +202,27 @@ export default function PesagensPage({ db, setDb, onConfirmAction, navigationInt
       : window.confirm('Deseja excluir esta pesagem?');
     if (!confirmado) return;
 
-    const pesagemAlvo = pesagens.find((item) => item.id === id) || null;
+    const pesagemAlvo = (pesagens || []).find((item) => item.id === id) || null;
     const persistedDelete = await deleteOperationalRecord('pesagens', id, session);
 
     setDb((prev) => {
       const pesagensAtuais = Array.isArray(prev?.pesagens) ? prev.pesagens : [];
-      const pesagemRemovida = pesagensAtuais.find((p) => p.id === id);
-      const pesagensRestantes = pesagensAtuais.filter((p) => p.id !== id);
+      const pesagemRemovida = pesagensAtuais.find((item) => item.id === id);
+      const pesagensRestantes = pesagensAtuais.filter((item) => item.id !== id);
 
-      if (!pesagemRemovida?.lote_id) {
-        return {
-          ...prev,
-          pesagens: pesagensRestantes,
-        };
+      if (!shouldUpdateLote(pesagemRemovida)) {
+        return { ...prev, pesagens: pesagensRestantes };
       }
-
       return recalculateLoteFromPesagens(prev, pesagemRemovida.lote_id, pesagensRestantes);
     });
-    if (pesagemAlvo?.lote_id) {
-      const novoLote = recalculateLoteFromPesagens(db, pesagemAlvo.lote_id, pesagens.filter((p) => p.id !== id))
-        ?.lotes?.find((item) => Number(item.id) === Number(pesagemAlvo.lote_id));
+
+    if (shouldUpdateLote(pesagemAlvo)) {
+      const novoLote = recalculateLoteFromPesagens(
+        db,
+        pesagemAlvo.lote_id,
+        (pesagens || []).filter((item) => item.id !== id)
+      )?.lotes?.find((item) => Number(item.id) === Number(pesagemAlvo.lote_id));
+
       if (novoLote) {
         const lotePersist = await updateOperationalRecord('lotes', novoLote.id, {
           p_at: novoLote.p_at,
@@ -217,11 +231,12 @@ export default function PesagensPage({ db, setDb, onConfirmAction, navigationInt
           ultima_pesagem: novoLote.ultima_pesagem,
         }, session);
         if (!persistedDelete.persisted || !lotePersist.persisted) {
-          showToast({ type: 'warning', message: 'Exclusão salva parcialmente apenas no modo local.' });
+          showToast({ type: 'warning', message: 'Exclusao salva parcialmente apenas no modo local.' });
         }
       }
     }
-    showToast({ type: 'success', message: 'Pesagem excluída com sucesso!' });
+
+    showToast({ type: 'success', message: 'Pesagem excluida com sucesso!' });
   }
 
   async function salvarPesagem(dados) {
@@ -229,59 +244,82 @@ export default function PesagensPage({ db, setDb, onConfirmAction, navigationInt
       showToast({ type: 'error', message: mensagemSemPermissao });
       return;
     }
+
     if (pesagemEditando) {
       const pesagemPersistida = await updateOperationalRecord('pesagens', pesagemEditando.id, dados, session);
+      const registroAtualizado = { ...pesagemEditando, ...(pesagemPersistida.data || dados) };
+
       setDb((prev) => {
         const pesagensAtuais = Array.isArray(prev?.pesagens) ? prev.pesagens : [];
-        const pesagensAtualizadas = pesagensAtuais.map((p) =>
-          p.id === pesagemEditando.id ? { ...p, ...(pesagemPersistida.data || dados) } : p
-        );
-        return recalculateLoteFromPesagens(prev, dados.lote_id, pesagensAtualizadas);
-      });
-      const loteRecalculado = recalculateLoteFromPesagens(db, dados.lote_id, pesagens.map((p) => (
-        p.id === pesagemEditando.id ? { ...p, ...(pesagemPersistida.data || dados) } : p
-      )))?.lotes?.find((item) => Number(item.id) === Number(dados.lote_id));
-      if (loteRecalculado) {
-        const lotePersist = await updateOperationalRecord('lotes', loteRecalculado.id, {
-          p_at: loteRecalculado.p_at,
-          peso_atual: loteRecalculado.peso_atual,
-          peso_medio_atual: loteRecalculado.peso_medio_atual,
-          ultima_pesagem: loteRecalculado.ultima_pesagem,
-        }, session);
-        if (!pesagemPersistida.persisted || !lotePersist.persisted) {
-          showToast({ type: 'warning', message: 'Alteração salva parcialmente apenas no modo local.' });
+        const pesagensAtualizadas = pesagensAtuais.map((item) => (
+          item.id === pesagemEditando.id ? registroAtualizado : item
+        ));
+
+        const loteAnterior = shouldUpdateLote(pesagemEditando) ? pesagemEditando.lote_id : null;
+        const loteNovo = shouldUpdateLote(registroAtualizado) ? registroAtualizado.lote_id : null;
+
+        let nextState = { ...prev, pesagens: pesagensAtualizadas };
+        if (loteAnterior) nextState = recalculateLoteFromPesagens(nextState, loteAnterior, pesagensAtualizadas);
+        if (loteNovo && Number(loteNovo) !== Number(loteAnterior)) {
+          nextState = recalculateLoteFromPesagens(nextState, loteNovo, pesagensAtualizadas);
         }
+        if (loteNovo && Number(loteNovo) === Number(loteAnterior)) {
+          nextState = recalculateLoteFromPesagens(nextState, loteNovo, pesagensAtualizadas);
+        }
+        return nextState;
+      });
+
+      const promises = [Promise.resolve(pesagemPersistida)];
+      if (shouldUpdateLote(registroAtualizado)) {
+        const loteRecalculado = recalculateLoteFromPesagens(
+          db,
+          registroAtualizado.lote_id,
+          (pesagens || []).map((item) => (item.id === pesagemEditando.id ? registroAtualizado : item))
+        )?.lotes?.find((item) => Number(item.id) === Number(registroAtualizado.lote_id));
+
+        if (loteRecalculado) {
+          promises.push(updateOperationalRecord('lotes', loteRecalculado.id, {
+            p_at: loteRecalculado.p_at,
+            peso_atual: loteRecalculado.peso_atual,
+            peso_medio_atual: loteRecalculado.peso_medio_atual,
+            ultima_pesagem: loteRecalculado.ultima_pesagem,
+          }, session));
+        }
+      }
+
+      const persistedBatch = await persistCollectionMutation(promises);
+      if (!persistedBatch.persisted) {
+        showToast({ type: 'warning', message: 'Alteracao salva parcialmente apenas no modo local.' });
       }
       showToast({ type: 'success', message: 'Pesagem atualizada com sucesso!' });
     } else {
       const pesagemPersistida = await createOperationalRecord('pesagens', dados, session);
-      const novoId = gerarNovoId(pesagens);
-      const novaPesagem = pesagemPersistida.data || {
-        id: novoId,
-        ...dados,
-      };
+      const novaPesagem = pesagemPersistida.data || { id: gerarNovoId(pesagens || []), ...dados };
 
       setDb((prev) => {
         const pesagensAtuais = Array.isArray(prev?.pesagens) ? prev.pesagens : [];
-        const pesagensAtualizadas = [
-          ...pesagensAtuais,
-          novaPesagem,
-        ];
-        return recalculateLoteFromPesagens(prev, dados.lote_id, pesagensAtualizadas);
+        const pesagensAtualizadas = [...pesagensAtuais, novaPesagem];
+        if (!shouldUpdateLote(novaPesagem)) return { ...prev, pesagens: pesagensAtualizadas };
+        return recalculateLoteFromPesagens(prev, novaPesagem.lote_id, pesagensAtualizadas);
       });
-      const loteRecalculado = recalculateLoteFromPesagens(db, dados.lote_id, [...pesagens, novaPesagem])
-        ?.lotes?.find((item) => Number(item.id) === Number(dados.lote_id));
-      if (loteRecalculado) {
-        const persistLote = updateOperationalRecord('lotes', loteRecalculado.id, {
-          p_at: loteRecalculado.p_at,
-          peso_atual: loteRecalculado.peso_atual,
-          peso_medio_atual: loteRecalculado.peso_medio_atual,
-          ultima_pesagem: loteRecalculado.ultima_pesagem,
-        }, session);
-        const persistedBatch = await persistCollectionMutation([Promise.resolve(pesagemPersistida), persistLote]);
-        if (!persistedBatch.persisted) {
-          showToast({ type: 'warning', message: 'Cadastro salvo parcialmente apenas no modo local.' });
+
+      const promises = [Promise.resolve(pesagemPersistida)];
+      if (shouldUpdateLote(novaPesagem)) {
+        const loteRecalculado = recalculateLoteFromPesagens(db, novaPesagem.lote_id, [...(pesagens || []), novaPesagem])
+          ?.lotes?.find((item) => Number(item.id) === Number(novaPesagem.lote_id));
+        if (loteRecalculado) {
+          promises.push(updateOperationalRecord('lotes', loteRecalculado.id, {
+            p_at: loteRecalculado.p_at,
+            peso_atual: loteRecalculado.peso_atual,
+            peso_medio_atual: loteRecalculado.peso_medio_atual,
+            ultima_pesagem: loteRecalculado.ultima_pesagem,
+          }, session));
         }
+      }
+
+      const persistedBatch = await persistCollectionMutation(promises);
+      if (!persistedBatch.persisted) {
+        showToast({ type: 'warning', message: 'Cadastro salvo parcialmente apenas no modo local.' });
       }
       showToast({ type: 'success', message: 'Pesagem registrada com sucesso!' });
     }
@@ -295,7 +333,7 @@ export default function PesagensPage({ db, setDb, onConfirmAction, navigationInt
       <div className="page-header page-topbar herdon-page-topbar herdon-page-topbar--compact">
         <div>
           <h1>Pesagens</h1>
-          <p>Registro e acompanhamento do peso médio dos lotes.</p>
+          <p>Registro e acompanhamento de pesagens por lote e por animal.</p>
         </div>
 
         <div className="page-topbar-actions">
@@ -309,7 +347,7 @@ export default function PesagensPage({ db, setDb, onConfirmAction, navigationInt
         <div className="kpi-card kpi-card--compact">
           <div className="kpi-label">Pesagens</div>
           <div className="kpi-value">{resumo.totalPesagens}</div>
-          <div className="kpi-sub">registros cadastrados</div>
+          <div className="kpi-sub">lote: {resumo.totalPesagensLote} | animal: {resumo.totalPesagensAnimal}</div>
         </div>
 
         <div className="kpi-card kpi-card--compact">
@@ -319,59 +357,61 @@ export default function PesagensPage({ db, setDb, onConfirmAction, navigationInt
         </div>
 
         <div className="kpi-card kpi-card--compact">
-          <div className="kpi-label">Peso médio geral</div>
-          <div className="kpi-value">
-            {formatarNumero(resumo.pesoMedioGeral)} kg
-          </div>
-          <div className="kpi-sub">
-            última data: {formatarData(resumo.ultimaData)}
-          </div>
+          <div className="kpi-label">Peso medio geral</div>
+          <div className="kpi-value">{formatarNumero(resumo.pesoMedioGeral)} kg</div>
+          <div className="kpi-sub">ultima data: {formatarData(resumo.ultimaData)}</div>
         </div>
       </div>
 
       <div className="fazendas-card">
         <div className="fazendas-card-header">
-          <span className="fazendas-card-title">Histórico de pesagens</span>
+          <span className="fazendas-card-title">Historico de pesagens</span>
         </div>
 
         <div className="fazendas-table-wrap">
           {dadosTabela.length === 0 ? (
             <div className="empty-box">
               <strong>Nenhuma pesagem cadastrada.</strong>
-              <span>Use o botão “Nova pesagem” para registrar o primeiro peso.</span>
+              <span>
+                {(animais || []).length === 0
+                  ? 'Voce pode registrar uma pesagem por lote ou cadastrar um animal para acompanhar individualmente.'
+                  : 'Use o botao "Nova pesagem" para registrar o primeiro peso.'}
+              </span>
             </div>
           ) : (
             <table className="data-table herdon-table herdon-table--pesagens">
               <thead>
                 <tr>
+                  <th>Origem</th>
+                  <th>Referencia</th>
                   <th>Lote</th>
                   <th>Data</th>
-                  <th>Peso médio</th>
-                  <th>Variação</th>
-                  <th>Observação</th>
-                  <th>Ações</th>
+                  <th>Peso medio</th>
+                  <th>Variacao</th>
+                  <th>Observacao</th>
+                  <th>Acoes</th>
                 </tr>
               </thead>
               <tbody>
                 {dadosTabela.map((item) => (
                   <tr key={item.id}>
-                    <td className="text-h">{item.loteNome}</td>
+                    <td className="cell-chip">
+                      <span className={`badge ${item.tipo === 'animal' ? 'badge-info' : 'badge-g'}`}>
+                        {item.tipo === 'animal' ? 'Animal' : 'Lote'}
+                      </span>
+                    </td>
+                    <td className="text-h">{item.tipo === 'animal' ? (item.animalNome || 'Animal sem identificacao') : item.loteNome}</td>
+                    <td>{item.loteNome}</td>
                     <td>{formatarData(item.data)}</td>
                     <td>{formatarNumero(item.peso_medio)} kg</td>
-                    <td className="cell-chip">{renderVariacao(item.variacao)}</td>
+                    <td className="cell-chip">{renderVariacao(item.variacao, item.tipo)}</td>
                     <td>{item.observacao || '—'}</td>
                     <td className="cell-actions">
                       <div className="row-actions row-actions--tight">
-                        <button
-                          className="action-btn"
-                          onClick={() => editarPesagem(item)}
-                        >
+                        <button className="action-btn" onClick={() => editarPesagem(item)}>
                           Editar
                         </button>
-                        <button
-                          className="action-btn action-btn-danger"
-                          onClick={() => excluirPesagem(item.id)}
-                        >
+                        <button className="action-btn action-btn-danger" onClick={() => excluirPesagem(item.id)}>
                           Excluir
                         </button>
                       </div>
@@ -387,7 +427,8 @@ export default function PesagensPage({ db, setDb, onConfirmAction, navigationInt
       {abrirForm && (
         <PesagemForm
           initialData={pesagemEditando}
-          lotes={lotes}
+          lotes={lotes || []}
+          animais={animais || []}
           onSave={salvarPesagem}
           onCancel={() => {
             setAbrirForm(false);
@@ -399,16 +440,10 @@ export default function PesagensPage({ db, setDb, onConfirmAction, navigationInt
   );
 }
 
-function renderVariacao(variacao) {
+function renderVariacao(variacao, tipo) {
+  if (tipo === 'animal') return <span className="badge badge-neutral">Nao se aplica</span>;
   if (variacao === null || variacao === undefined) return '—';
-
-  if (variacao > 0) {
-    return <span className="badge badge-g">+{formatarNumero(variacao)} kg</span>;
-  }
-
-  if (variacao < 0) {
-    return <span className="badge badge-r">{formatarNumero(variacao)} kg</span>;
-  }
-
+  if (variacao > 0) return <span className="badge badge-g">+{formatarNumero(variacao)} kg</span>;
+  if (variacao < 0) return <span className="badge badge-r">{formatarNumero(variacao)} kg</span>;
   return <span className="badge badge-a">0,00 kg</span>;
 }

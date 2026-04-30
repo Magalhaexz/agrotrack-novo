@@ -464,7 +464,7 @@ export default function DashboardPage({
                 <Button fullWidth variant="outline" onClick={() => onNavigate?.('sanitario')}>
                   Registrar manejo
                 </Button>
-                <Button fullWidth variant="ghost" onClick={() => onNavigate?.('suplementacao')}>
+                <Button fullWidth variant="outline" onClick={() => onNavigate?.('suplementacao')}>
                   Registrar consumo
                 </Button>
               </div>

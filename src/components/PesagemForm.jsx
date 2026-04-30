@@ -4,7 +4,9 @@ import Button from './ui/Button';
 import ArrobaPreview from './ArrobaPreview';
 
 const FORM_VAZIO = {
+  tipo: 'lote',
   lote_id: '',
+  animal_id: '',
   data: '',
   peso_medio: '',
   observacao: '',
@@ -15,7 +17,9 @@ const FORM_VAZIO = {
 function normalizarInitialData(data) {
   if (!data) return FORM_VAZIO;
   return {
+    tipo: data.tipo || data.origem || 'lote',
     lote_id: data.lote_id ?? '',
+    animal_id: data.animal_id ?? '',
     data: data.data || '',
     peso_medio: data.peso_medio ?? '',
     observacao: data.observacao || '',
@@ -26,14 +30,21 @@ function normalizarInitialData(data) {
 
 function validarForm(form) {
   if (!form.lote_id) return 'Selecione o lote.';
+  if (form.tipo === 'animal' && !form.animal_id) return 'Selecione o animal.';
   if (!form.data) return 'Informe a data da pesagem.';
-  if (!form.peso_medio) return 'Informe o peso médio.';
-  if (Number(form.peso_medio || 0) <= 0) return 'Peso médio deve ser maior que zero.';
-  if (Number(form.rendimento_carcaca || 0) <= 0) return 'Rendimento de carcaça deve ser maior que zero.';
+  if (!form.peso_medio) return 'Informe o peso medio.';
+  if (Number(form.peso_medio || 0) <= 0) return 'Peso medio deve ser maior que zero.';
+  if (Number(form.rendimento_carcaca || 0) <= 0) return 'Rendimento de carcaca deve ser maior que zero.';
   return null;
 }
 
-export default function PesagemForm({ initialData, lotes = [], onSave, onCancel }) {
+export default function PesagemForm({
+  initialData,
+  lotes = [],
+  animais = [],
+  onSave,
+  onCancel,
+}) {
   const [form, setForm] = useState(() => normalizarInitialData(initialData));
   const [erro, setErro] = useState('');
 
@@ -46,7 +57,26 @@ export default function PesagemForm({ initialData, lotes = [], onSave, onCancel 
 
   function handleChange(e) {
     const { name, value } = e.target;
-    setForm((prev) => ({ ...prev, [name]: value }));
+    setForm((prev) => {
+      if (name === 'tipo') {
+        return {
+          ...prev,
+          tipo: value,
+          animal_id: value === 'animal' ? prev.animal_id : '',
+        };
+      }
+
+      if (name === 'animal_id') {
+        const animalSelecionado = animais.find((item) => Number(item.id) === Number(value));
+        return {
+          ...prev,
+          animal_id: value,
+          lote_id: animalSelecionado?.lote_id ? String(animalSelecionado.lote_id) : prev.lote_id,
+        };
+      }
+
+      return { ...prev, [name]: value };
+    });
   }
 
   function handleSubmit(e) {
@@ -60,14 +90,13 @@ export default function PesagemForm({ initialData, lotes = [], onSave, onCancel 
 
     setErro('');
     onSave?.({
+      tipo: form.tipo === 'animal' ? 'animal' : 'lote',
+      origem: form.tipo === 'animal' ? 'animal' : 'lote',
       lote_id: Number(form.lote_id),
+      animal_id: form.tipo === 'animal' ? Number(form.animal_id) : null,
       data: form.data,
       peso_medio: Number(form.peso_medio),
       observacao: form.observacao.trim(),
-      // Estes campos são usados no ArrobaPreview, mas não são salvos diretamente no onSave
-      // Se precisarem ser salvos, devem ser incluídos aqui.
-      // rendimento_carcaca: Number(form.rendimento_carcaca),
-      // preco_arroba: Number(form.preco_arroba),
     });
   }
 
@@ -83,6 +112,13 @@ export default function PesagemForm({ initialData, lotes = [], onSave, onCancel 
   return (
     <Modal open onClose={onCancel} title={titulo} footer={footer}>
       <form onSubmit={handleSubmit} style={{ display: 'grid', gap: 14 }}>
+        <label>
+          Tipo de pesagem
+          <select className="ui-input" name="tipo" value={form.tipo} onChange={handleChange}>
+            <option value="lote">Por lote</option>
+            <option value="animal">Por animal</option>
+          </select>
+        </label>
 
         <label>
           Lote
@@ -93,6 +129,20 @@ export default function PesagemForm({ initialData, lotes = [], onSave, onCancel 
             ))}
           </select>
         </label>
+
+        {form.tipo === 'animal' && (
+          <label>
+            Animal
+            <select className="ui-input" name="animal_id" value={form.animal_id} onChange={handleChange}>
+              <option value="">Selecione</option>
+              {animais.map((animal) => (
+                <option key={animal.id} value={animal.id}>
+                  {animal.identificacao || animal.nome || `Animal #${animal.id}`}
+                </option>
+              ))}
+            </select>
+          </label>
+        )}
 
         <div className="grid-2">
           <label>
@@ -108,7 +158,7 @@ export default function PesagemForm({ initialData, lotes = [], onSave, onCancel 
           </label>
 
           <label>
-            Peso médio (kg)
+            Peso medio (kg)
             <input
               className="ui-input"
               name="peso_medio"
@@ -123,7 +173,7 @@ export default function PesagemForm({ initialData, lotes = [], onSave, onCancel 
         </div>
 
         <label>
-          Observação
+          Observacao
           <input
             className="ui-input"
             name="observacao"
@@ -135,21 +185,21 @@ export default function PesagemForm({ initialData, lotes = [], onSave, onCancel 
 
         <div className="grid-2">
           <label>
-            Rendimento de carcaça (%)
+            Rendimento de carcaca (%)
             <input
               className="ui-input"
               name="rendimento_carcaca"
               type="number"
               step="0.1"
               min={0}
-              max={100} // Adicionado max para rendimento
+              max={100}
               value={form.rendimento_carcaca}
               onChange={handleChange}
             />
           </label>
 
           <label>
-            Preço por @ (opcional)
+            Preco por @ (opcional)
             <input
               className="ui-input"
               name="preco_arroba"
@@ -173,7 +223,6 @@ export default function PesagemForm({ initialData, lotes = [], onSave, onCancel 
             {erro}
           </p>
         )}
-
       </form>
     </Modal>
   );

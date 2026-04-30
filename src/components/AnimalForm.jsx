@@ -5,7 +5,9 @@ import Modal from './ui/Modal';
 import { parseNumeroEntrada } from '../utils/formatters';
 
 const FORM_VAZIO = {
+  tipo_registro: 'grupo',
   lote_id: '',
+  identificacao: '',
   sexo: 'macho',
   gen: '',
   qtd: '',
@@ -13,11 +15,13 @@ const FORM_VAZIO = {
   p_at: '',
   dias: '',
   consumo: '',
+  status: 'ativo',
+  observacao: '',
   rendimento_carcaca: 52,
   preco_arroba: '',
 };
 
-const VALIDACOES_NUMERICAS = [
+const VALIDACOES_GRUPO = [
   { campo: 'Quantidade', key: 'qtd' },
   { campo: 'Peso inicial', key: 'p_ini' },
   { campo: 'Peso atual', key: 'p_at' },
@@ -29,14 +33,18 @@ const VALIDACOES_NUMERICAS = [
 function normalizarInitialData(data) {
   if (!data) return FORM_VAZIO;
   return {
+    tipo_registro: data.tipo_registro || (Number(data.qtd || 0) === 1 && data.identificacao ? 'individual' : 'grupo'),
     lote_id: data.lote_id ?? '',
-    sexo: data.sexo === 'fêmea' ? 'femea' : (data.sexo || 'macho'),
+    identificacao: data.identificacao || '',
+    sexo: data.sexo === 'femea' ? 'femea' : (data.sexo || 'macho'),
     gen: data.gen || '',
     qtd: data.qtd ?? '',
     p_ini: data.p_ini ?? '',
     p_at: data.p_at ?? '',
     dias: data.dias ?? '',
     consumo: data.consumo ?? '',
+    status: data.status || 'ativo',
+    observacao: data.observacao || '',
     rendimento_carcaca: data.rendimento_carcaca ?? 52,
     preco_arroba: data.preco_arroba ?? '',
   };
@@ -48,11 +56,19 @@ function obterNumero(form, key) {
 }
 
 function validarForm(form) {
-  if (!form.lote_id) return 'Selecione o lote.';
-  if (!form.gen.trim()) return 'Informe a genetica/raca.';
+  if (!form.lote_id) return 'Selecione o lote vinculado.';
+  if (form.tipo_registro === 'individual' && !form.identificacao.trim()) {
+    return 'Informe a identificacao / brinco / codigo.';
+  }
 
-  const invalido = VALIDACOES_NUMERICAS.find(({ key }) => obterNumero(form, key) <= 0);
-  if (invalido) return `${invalido.campo} deve ser maior que zero.`;
+  if (form.tipo_registro === 'grupo') {
+    if (!form.gen.trim()) return 'Informe a genetica/raca.';
+    const invalido = VALIDACOES_GRUPO.find(({ key }) => obterNumero(form, key) <= 0);
+    if (invalido) return `${invalido.campo} deve ser maior que zero.`;
+  } else {
+    if (obterNumero(form, 'p_ini') <= 0) return 'Peso inicial deve ser maior que zero.';
+    if (obterNumero(form, 'p_at') <= 0) return 'Peso atual deve ser maior que zero.';
+  }
 
   return null;
 }
@@ -70,7 +86,21 @@ export default function AnimalForm({ initialData, lotes = [], onSave, onCancel }
 
   function handleChange(event) {
     const { name, value } = event.target;
-    setForm((prev) => ({ ...prev, [name]: value }));
+    setForm((prev) => {
+      if (name === 'tipo_registro') {
+        if (value === 'individual') {
+          return {
+            ...prev,
+            tipo_registro: value,
+            qtd: '1',
+            dias: prev.dias || '1',
+            consumo: prev.consumo || '0.01',
+          };
+        }
+        return { ...prev, tipo_registro: value };
+      }
+      return { ...prev, [name]: value };
+    });
   }
 
   function handleSubmit(event) {
@@ -84,20 +114,24 @@ export default function AnimalForm({ initialData, lotes = [], onSave, onCancel }
 
     setErro('');
     onSave?.({
+      tipo_registro: form.tipo_registro,
       lote_id: Number(form.lote_id),
+      identificacao: form.identificacao.trim(),
       sexo: form.sexo === 'femea' ? 'femea' : form.sexo,
       gen: form.gen.trim(),
-      qtd: obterNumero(form, 'qtd'),
+      qtd: form.tipo_registro === 'individual' ? 1 : obterNumero(form, 'qtd'),
       p_ini: obterNumero(form, 'p_ini'),
       p_at: obterNumero(form, 'p_at'),
-      dias: obterNumero(form, 'dias'),
-      consumo: obterNumero(form, 'consumo'),
+      dias: form.tipo_registro === 'individual' ? Math.max(1, obterNumero(form, 'dias')) : obterNumero(form, 'dias'),
+      consumo: form.tipo_registro === 'individual' ? Math.max(0.01, obterNumero(form, 'consumo')) : obterNumero(form, 'consumo'),
+      status: form.status || 'ativo',
+      observacao: form.observacao.trim(),
       rendimento_carcaca: obterNumero(form, 'rendimento_carcaca'),
       preco_arroba: form.preco_arroba === '' ? null : obterNumero(form, 'preco_arroba'),
     });
   }
 
-  const titulo = initialData ? 'Editar animais' : 'Novo grupo de animais';
+  const titulo = initialData ? 'Editar animais' : 'Novo cadastro de animais';
 
   const footer = (
     <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8 }}>
@@ -111,14 +145,28 @@ export default function AnimalForm({ initialData, lotes = [], onSave, onCancel }
       open
       onClose={onCancel}
       title={titulo}
-      subtitle="Preencha os dados do grupo e acompanhe o reflexo em arrobas em tempo real."
+      subtitle="Preencha os dados e acompanhe o reflexo em arrobas em tempo real."
       footer={footer}
       size="lg"
     >
       <form onSubmit={handleSubmit} className="animal-form">
+        <label className="animal-form-field">
+          <span className="animal-form-label">Tipo de cadastro</span>
+          <select className="ui-input" name="tipo_registro" value={form.tipo_registro} onChange={handleChange}>
+            <option value="grupo">Grupo por lote</option>
+            <option value="individual">Cadastro individual opcional</option>
+          </select>
+        </label>
+
+        {form.tipo_registro === 'individual' ? (
+          <div className="animal-form-note">
+            Cadastro individual opcional para acompanhar animais específicos dentro de um lote.
+          </div>
+        ) : null}
+
         <div className="animal-form-grid animal-form-grid--2">
           <label className="animal-form-field">
-            <span className="animal-form-label">Lote</span>
+            <span className="animal-form-label">Lote vinculado</span>
             <select className="ui-input" name="lote_id" value={form.lote_id} onChange={handleChange}>
               <option value="">Selecione</option>
               {lotes.map((lote) => (
@@ -135,6 +183,31 @@ export default function AnimalForm({ initialData, lotes = [], onSave, onCancel }
             </select>
           </label>
         </div>
+
+        {form.tipo_registro === 'individual' ? (
+          <div className="animal-form-grid animal-form-grid--2">
+            <label className="animal-form-field">
+              <span className="animal-form-label">Identificacao / brinco / codigo</span>
+              <input
+                className="ui-input"
+                name="identificacao"
+                value={form.identificacao}
+                onChange={handleChange}
+                placeholder="Ex: BR-0241"
+              />
+            </label>
+
+            <label className="animal-form-field">
+              <span className="animal-form-label">Status</span>
+              <select className="ui-input" name="status" value={form.status} onChange={handleChange}>
+                <option value="ativo">Ativo</option>
+                <option value="em_tratamento">Em tratamento</option>
+                <option value="vendido">Vendido</option>
+                <option value="inativo">Inativo</option>
+              </select>
+            </label>
+          </div>
+        ) : null}
 
         <div className="animal-form-grid animal-form-grid--2">
           <label className="animal-form-field">
@@ -158,6 +231,7 @@ export default function AnimalForm({ initialData, lotes = [], onSave, onCancel }
               value={form.qtd}
               onChange={handleChange}
               placeholder="Ex: 80"
+              disabled={form.tipo_registro === 'individual'}
             />
           </label>
         </div>
@@ -245,6 +319,19 @@ export default function AnimalForm({ initialData, lotes = [], onSave, onCancel }
             />
           </label>
         </div>
+
+        {form.tipo_registro === 'individual' ? (
+          <label className="animal-form-field">
+            <span className="animal-form-label">Observacoes</span>
+            <input
+              className="ui-input"
+              name="observacao"
+              value={form.observacao}
+              onChange={handleChange}
+              placeholder="Ex: animal de referencia para acompanhamento individual"
+            />
+          </label>
+        ) : null}
 
         <ArrobaPreview
           peso={form.p_at || form.p_ini}

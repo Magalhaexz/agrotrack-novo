@@ -37,6 +37,9 @@ export default function AnimaisPage({ db, setDb, onConfirmAction }) {
       return {
         ...animal,
         loteNome: lote?.nome || '-',
+        tipoRegistro: animal.tipo_registro || (Number(animal.qtd || 0) === 1 && animal.identificacao ? 'individual' : 'grupo'),
+        identificacao: animal.identificacao || '-',
+        status: animal.status || 'ativo',
         gmd,
       };
     });
@@ -69,7 +72,7 @@ export default function AnimaisPage({ db, setDb, onConfirmAction }) {
 
     return {
       titulo: 'Cadastro alinhado com a rotina',
-      descricao: 'Use o CTA principal para registrar rapidamente novos grupos e manter a leitura do rebanho atualizada.',
+      descricao: 'Use o CTA principal para registrar grupos por lote e, opcionalmente, animais individuais sem mudar o fluxo atual.',
     };
   }, [dadosTabela.length]);
 
@@ -172,7 +175,7 @@ export default function AnimaisPage({ db, setDb, onConfirmAction }) {
         <div className="animais-hero-copy">
           <span className="animais-hero-kicker">Fluxo operacional essencial</span>
           <h1>Animais</h1>
-          <p>Controle grupos por lote, acompanhe peso e consumo, e mantenha o fluxo de cadastro sempre acessivel com um CTA principal claro.</p>
+          <p>Controle grupos por lote e use cadastro individual opcional para acompanhar animais especificos sem obrigatoriedade.</p>
         </div>
 
         <div className="animais-hero-cta-card">
@@ -222,9 +225,12 @@ export default function AnimaisPage({ db, setDb, onConfirmAction }) {
                 <table className="data-table">
                   <thead>
                     <tr>
+                      <th>Registro</th>
+                      <th>Identificacao</th>
                       <th>Lote</th>
                       <th>Sexo</th>
                       <th>Genetica</th>
+                      <th>Status</th>
                       <th>Qtd</th>
                       <th>Peso inicial</th>
                       <th>Peso atual</th>
@@ -237,17 +243,24 @@ export default function AnimaisPage({ db, setDb, onConfirmAction }) {
                   <tbody>
                     {dadosTabela.map((animal) => (
                       <tr key={animal.id}>
+                        <td>
+                          <span className={`badge ${animal.tipoRegistro === 'individual' ? 'badge-info' : 'badge-g'}`}>
+                            {animal.tipoRegistro === 'individual' ? 'Individual' : 'Grupo'}
+                          </span>
+                        </td>
+                        <td className="text-h">{animal.identificacao}</td>
                         <td className="text-h">{animal.loteNome}</td>
                         <td>{animal.sexo}</td>
                         <td>{animal.gen}</td>
-                        <td>{animal.qtd}</td>
-                        <td>{formatarNumero(animal.p_ini)} kg</td>
-                        <td>{formatarNumero(animal.p_at)} kg</td>
-                        <td>{animal.dias}</td>
-                        <td>
+                        <td>{animal.status}</td>
+                        <td className="cell-number">{animal.qtd}</td>
+                        <td className="cell-number">{formatarNumero(animal.p_ini)} kg</td>
+                        <td className="cell-number">{formatarNumero(animal.p_at)} kg</td>
+                        <td className="cell-number">{animal.dias}</td>
+                        <td className="cell-number">
                           <span className="animais-gmd-chip">{formatarNumero(animal.gmd)} kg/dia</span>
                         </td>
-                        <td>{formatarNumero(animal.consumo)} kg</td>
+                        <td className="cell-number">{formatarNumero(animal.consumo)} kg</td>
                         <td>
                           <div className="row-actions">
                             <button className="action-btn" onClick={() => editarAnimal(animal)}>Editar</button>
@@ -264,6 +277,13 @@ export default function AnimaisPage({ db, setDb, onConfirmAction }) {
 
           <Card className="animais-add-panel" title="Cadastro rapido" subtitle="Fluxo lateral para registrar um novo grupo sem perder a leitura da listagem.">
             <div className="animais-add-panel-body">
+              <div className="animais-add-point animais-add-point--highlight">
+                <CheckCircle2 size={18} />
+                <div>
+                  <strong>Cadastro individual opcional</strong>
+                  <span>Cadastro individual opcional para acompanhar animais específicos dentro de um lote.</span>
+                </div>
+              </div>
               <div className="animais-side-metrics">
                 <div className="animais-side-metric">
                   <span>Lotes cobertos</span>
@@ -274,7 +294,7 @@ export default function AnimaisPage({ db, setDb, onConfirmAction }) {
                   <strong>{formatarNumero(resumo.pesoAtualMedio)} kg</strong>
                 </div>
               </div>
-              <div className="animais-add-point animais-add-point--highlight">
+              <div className="animais-add-point">
                 <CheckCircle2 size={18} />
                 <div>
                   <strong>Indicadores alinhados</strong>

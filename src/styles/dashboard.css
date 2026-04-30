@@ -787,6 +787,32 @@
   border-color: rgba(255, 255, 255, 0.08);
 }
 
+/* Sprint 8B - quick actions visibility and usability */
+.dashboard-action-grid .ui-button {
+  min-height: 42px;
+  justify-content: flex-start;
+  border-color: rgba(255, 255, 255, 0.12);
+  color: #e9f1ed;
+  opacity: 1;
+}
+
+.dashboard-action-grid .ui-button--outline,
+.dashboard-action-grid .ui-button--secondary,
+.dashboard-action-grid .ui-button--ghost {
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.05), rgba(255, 255, 255, 0.022)),
+    rgba(11, 16, 14, 0.94);
+}
+
+.dashboard-action-grid .ui-button:hover:not(:disabled) {
+  border-color: color-mix(in srgb, var(--color-primary) 34%, rgba(255, 255, 255, 0.12));
+  color: #f5fff8;
+}
+
+.dashboard-action-grid .ui-button:disabled {
+  opacity: 0.62;
+}
+
 @media (max-width: 1024px) {
   .dashboard-grid--kpi-main,
   .dashboard-executive-strip,
