@@ -20,17 +20,30 @@ function isNetworkError(error) {
     || message.includes('timeout');
 }
 
-function classifyOperationalError(error, fallbackMessage) {
+function getSchemaMissingMessageByTable(table) {
+  if (table === 'lotes') {
+    return 'Tabela de lotes n\u00E3o encontrada na nuvem. Verifique a estrutura do Supabase.';
+  }
+  if (table === 'funcionarios') {
+    return 'Tabela de funcion\u00E1rios n\u00E3o encontrada na nuvem. Verifique a estrutura do Supabase.';
+  }
+  return 'Estrutura da base nao compativel com o app. Use o modo local e valide a configuracao.';
+}
+
+function classifyOperationalError(error, fallbackMessage, table = null) {
   const message = String(getErrorMessage(error) || '').toLowerCase();
   const code = String(error?.code || '').toUpperCase();
   if (isNetworkError(error)) {
-    return 'A nuvem está indisponível neste momento. Você pode continuar usando os dados locais e tentar sincronizar novamente depois.';
+    return 'N\u00E3o foi poss\u00EDvel conectar \u00E0 nuvem. Verifique sua conex\u00E3o e tente novamente.';
   }
   if (code === '42501' || message.includes('row-level security') || message.includes('permission denied')) {
-    return 'Permissao insuficiente para gravar na nuvem. Verifique o perfil de acesso.';
+    return 'Permiss\u00E3o insuficiente para sincronizar este registro.';
+  }
+  if (code === 'CONFIG_ERROR' || message.includes('missing_rest_config_or_token')) {
+    return 'Configura\u00E7\u00E3o da nuvem incompleta. Verifique as vari\u00E1veis do Supabase.';
   }
   if (code === 'PGRST204' || code === '42703' || code === '42P01' || message.includes('schema') || message.includes('column') || message.includes('relation')) {
-    return 'Estrutura da base nao compativel com o app. Use o modo local e valide a configuracao.';
+    return getSchemaMissingMessageByTable(table);
   }
   return fallbackMessage;
 }
@@ -127,7 +140,7 @@ export async function ensureSupabaseRequestReadiness(session, context = {}) {
     return {
       ok: false,
       code: 'SESSION_READ_ERROR',
-      message: classifyOperationalError(error, 'Falha ao validar sessao com a nuvem. Seus dados locais continuam disponiveis.'),
+      message: classifyOperationalError(error, 'Falha ao validar sessao com a nuvem. Seus dados locais continuam disponiveis.', context?.table || null),
     };
   }
 }
@@ -170,6 +183,28 @@ function sanitizeMetadata(metadata, localId) {
   return base;
 }
 
+function sanitizeMetadataForModule(metadata, localId, syncedFrom) {
+  const base = isObject(metadata) ? { ...metadata } : {};
+  base.local_id = localId ?? null;
+  base.synced_from = syncedFrom;
+  base.synced_at = new Date().toISOString();
+  return base;
+}
+
+function toNullableDateString(value) {
+  if (value === undefined || value === null) return null;
+  const text = String(value).trim();
+  return text ? text : null;
+}
+
+function normalizeCloudUuid(value) {
+  if (value === undefined || value === null) return null;
+  const text = String(value).trim();
+  if (!text) return null;
+  const uuidPattern = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+  return uuidPattern.test(text) ? text : null;
+}
+
 function mapFazendaToCloudPayload(localRow, userId) {
   const safe = sanitizeRecord(localRow);
   const localId = safe?.id ?? null;
@@ -193,6 +228,50 @@ function mapFazendaToCloudPayload(localRow, userId) {
     status: toNullableString(safe?.status),
     observacoes: toNullableString(safe?.observacoes ?? safe?.observacao ?? safe?.obs),
     metadata,
+  };
+
+  return {
+    localId,
+    payload: Object.fromEntries(
+      Object.entries(payload).filter(([, value]) => value !== undefined)
+    ),
+  };
+}
+
+function mapLoteToCloudPayload(localRow, userId) {
+  const safe = sanitizeRecord(localRow);
+  const localId = safe?.id ?? null;
+  const metadata = sanitizeMetadataForModule(safe?.metadata, localId, 'herdon_manual_lotes_sync');
+  const cloudUuid = normalizeCloudUuid(safe?.cloud_id ?? safe?.metadata?.cloud_id);
+  if (cloudUuid) {
+    metadata.cloud_id = cloudUuid;
+  }
+
+  const payload = {
+    owner_user_id: userId,
+    nome: toNullableString(safe?.nome),
+    faz_id: toNullableNumber(safe?.faz_id),
+    entrada: toNullableDateString(safe?.entrada),
+    saida: toNullableDateString(safe?.saida),
+    status: toNullableString(safe?.status),
+    tipo: toNullableString(safe?.tipo),
+    sistema: toNullableString(safe?.sistema),
+    gmd_meta: toNullableNumber(safe?.gmd_meta),
+    preco_arroba: toNullableNumber(safe?.preco_arroba),
+    rendimento_carcaca: toNullableNumber(safe?.rendimento_carcaca),
+    investimento: toNullableNumber(safe?.investimento),
+    peso_alvo: toNullableNumber(safe?.peso_alvo),
+    raca: toNullableString(safe?.raca),
+    sexo: toNullableString(safe?.sexo),
+    categoria: toNullableString(safe?.categoria),
+    obs: toNullableString(safe?.obs),
+    p_ini: toNullableNumber(safe?.p_ini),
+    p_at: toNullableNumber(safe?.p_at),
+    ultima_pesagem: toNullableDateString(safe?.ultima_pesagem),
+    data_saida: toNullableDateString(safe?.data_saida),
+    fechamento: isObject(safe?.fechamento) ? safe.fechamento : null,
+    metadata,
+    cloud_id: cloudUuid,
   };
 
   return {
@@ -270,6 +349,62 @@ function mergeFazendasSafe(localRows = [], remoteRows = []) {
   return merged;
 }
 
+function mergeLotesSafe(localRows = [], remoteRows = []) {
+  const merged = [];
+  const usedRemoteIndexes = new Set();
+
+  const findRemoteMatch = (localRow) => {
+    const localIdText = localRow?.id !== undefined && localRow?.id !== null
+      ? String(localRow.id)
+      : null;
+    const cloudId = getCloudIdMarker(localRow);
+
+    for (let index = 0; index < remoteRows.length; index += 1) {
+      if (usedRemoteIndexes.has(index)) continue;
+      const remote = remoteRows[index];
+      const remoteIdText = remote?.id !== undefined && remote?.id !== null ? String(remote.id) : null;
+      const remoteLocalIdText = remote?.metadata?.local_id !== undefined && remote?.metadata?.local_id !== null
+        ? String(remote.metadata.local_id)
+        : null;
+      const remoteCloudId = remote?.cloud_id !== undefined && remote?.cloud_id !== null ? String(remote.cloud_id) : null;
+
+      if (cloudId !== null && remoteIdText === String(cloudId)) return index;
+      if (cloudId !== null && remoteCloudId && remoteCloudId === String(cloudId)) return index;
+      if (localIdText && remoteLocalIdText && localIdText === remoteLocalIdText) return index;
+      if (localIdText && remoteIdText && localIdText === remoteIdText) return index;
+    }
+
+    return -1;
+  };
+
+  localRows.forEach((localRow) => {
+    const remoteIndex = findRemoteMatch(localRow);
+    if (remoteIndex === -1) {
+      merged.push(localRow);
+      return;
+    }
+    usedRemoteIndexes.add(remoteIndex);
+    const remote = remoteRows[remoteIndex];
+    merged.push({
+      ...localRow,
+      ...remote,
+      metadata: {
+        ...(isObject(localRow?.metadata) ? localRow.metadata : {}),
+        ...(isObject(remote?.metadata) ? remote.metadata : {}),
+        cloud_id: remote?.cloud_id ?? remote?.id ?? (remote?.metadata?.cloud_id ?? null),
+      },
+    });
+  });
+
+  remoteRows.forEach((remote, index) => {
+    if (!usedRemoteIndexes.has(index)) {
+      merged.push(remote);
+    }
+  });
+
+  return merged;
+}
+
 function sanitizeAuditDetails(input) {
   if (Array.isArray(input)) {
     return input.map(sanitizeAuditDetails);
@@ -328,7 +463,7 @@ export async function createOperationalRecord(table, record, session) {
       errorCode: error?.code || null,
     }, 'warn');
     return buildFallback(
-      classifyOperationalError(error, 'Falha ao persistir cadastro na nuvem. Dados locais mantidos.'),
+      classifyOperationalError(error, 'Falha ao persistir cadastro na nuvem. Dados locais mantidos.', table),
       sanitizeRecord(record)
     );
   }
@@ -368,7 +503,7 @@ export async function updateOperationalRecord(table, id, patch, session) {
       errorCode: error?.code || null,
     }, 'warn');
     return buildFallback(
-      classifyOperationalError(error, 'Falha ao persistir atualizacao na nuvem. Dados locais mantidos.'),
+      classifyOperationalError(error, 'Falha ao persistir atualizacao na nuvem. Dados locais mantidos.', table),
       sanitizeRecord(patch)
     );
   }
@@ -405,7 +540,7 @@ export async function deleteOperationalRecord(table, id, session) {
       errorCode: error?.code || null,
     }, 'warn');
     return buildFallback(
-      classifyOperationalError(error, 'Falha ao persistir exclusao na nuvem. Dados locais mantidos.')
+      classifyOperationalError(error, 'Falha ao persistir exclusao na nuvem. Dados locais mantidos.', table)
     );
   }
 }
@@ -496,6 +631,34 @@ function classifyFazendasSyncError(error) {
   }
 
   return 'Não foi possível sincronizar fazendas. Seus dados locais continuam disponíveis.';
+}
+
+function classifyLotesSyncError(error) {
+  const code = String(error?.code || '').toUpperCase();
+  const message = String(error?.message || '').toLowerCase();
+  const details = String(error?.details || '').toLowerCase();
+
+  if (code === '42501' || message.includes('permission denied') || message.includes('row-level security') || details.includes('row-level security')) {
+    return 'Permissão insuficiente para sincronizar lotes.';
+  }
+
+  if (code === '42703' || code === 'PGRST204' || code === 'PGRST205' || code === '42P01' || message.includes('column') || message.includes('schema') || message.includes('relation') || details.includes('column') || details.includes('schema') || details.includes('relation')) {
+    return 'Tabela de lotes não encontrada na nuvem. Verifique a estrutura do Supabase.';
+  }
+
+  if (code === 'CONFIG_ERROR' || message.includes('missing_rest_config_or_token')) {
+    return 'Configuração da nuvem incompleta. Verifique as variáveis do Supabase.';
+  }
+
+  if (isNetworkError(error)) {
+    return 'Não foi possível conectar à nuvem. Verifique sua conexão e tente novamente.';
+  }
+
+  if (code === '22P02' || message.includes('invalid input syntax') || message.includes('violates')) {
+    return 'Não foi possível validar os dados do lote para sincronização na nuvem.';
+  }
+
+  return 'Não foi possível sincronizar lotes. Seus dados locais continuam disponíveis.';
 }
 
 function logFazendasSync(event = {}) {
@@ -678,6 +841,122 @@ export async function syncFazendasWithCloud({ fazendas = [], session }) {
     const msg = classifyFazendasSyncError(error);
     return { ok: false, data: localRows, error: error?.code || 'REMOTE_FETCH_FAILED', message: msg, syncedCount, failedCount, selectedCount: 0 };
   }
+}
+
+export async function syncLotesWithCloud({ lotes = [], session }) {
+  const readiness = await ensureSupabaseRequestReadiness(session, {
+    stage: 'cloud_sync_lotes',
+    action: 'upsert',
+    table: 'lotes',
+  });
+  if (!readiness.ok) {
+    return {
+      ok: false,
+      data: Array.isArray(lotes) ? lotes : [],
+      error: readiness.code || 'SYNC_NOT_READY',
+      message: readiness.message || 'Sincronizacao indisponivel no momento.',
+      syncedCount: 0,
+      failedCount: 0,
+      selectedCount: 0,
+    };
+  }
+
+  const userId = getSessionUserId(session);
+  const localRows = Array.isArray(lotes) ? lotes : [];
+  if (!userId) {
+    return { ok: false, data: localRows, error: 'AUTH_REQUIRED', message: 'Faça login para sincronizar com a nuvem.', syncedCount: 0, failedCount: 0, selectedCount: 0 };
+  }
+
+  let syncedCount = 0;
+  let failedCount = 0;
+
+  let remoteList = [];
+  try {
+    const { data, error } = await supabase
+      .from('lotes')
+      .select('*')
+      .eq('owner_user_id', userId);
+    if (error) throw error;
+    remoteList = Array.isArray(data) ? data : [];
+  } catch (error) {
+    return {
+      ok: false,
+      data: localRows,
+      error: error?.code || 'REMOTE_FETCH_FAILED',
+      message: classifyLotesSyncError(error),
+      syncedCount,
+      failedCount,
+      selectedCount: 0,
+    };
+  }
+
+  const findRemoteMatch = (localRow) => {
+    const localIdText = localRow?.id !== undefined && localRow?.id !== null ? String(localRow.id) : null;
+    const cloudId = getCloudIdMarker(localRow);
+
+    return remoteList.find((remote) => {
+      const remoteIdText = remote?.id !== undefined && remote?.id !== null ? String(remote.id) : null;
+      const remoteCloudIdText = remote?.cloud_id !== undefined && remote?.cloud_id !== null ? String(remote.cloud_id) : null;
+      const remoteLocalIdText = remote?.metadata?.local_id !== undefined && remote?.metadata?.local_id !== null
+        ? String(remote.metadata.local_id)
+        : null;
+
+      if (cloudId !== null && (remoteIdText === String(cloudId) || remoteCloudIdText === String(cloudId))) return true;
+      if (localIdText && remoteLocalIdText && localIdText === remoteLocalIdText) return true;
+      if (localIdText && remoteIdText && localIdText === remoteIdText) return true;
+      return false;
+    }) || null;
+  };
+
+  for (const localRow of localRows) {
+    const { payload } = mapLoteToCloudPayload(localRow, userId);
+    const remoteMatch = findRemoteMatch(localRow);
+
+    try {
+      if (remoteMatch?.id) {
+        const { data, error } = await supabase
+          .from('lotes')
+          .update(payload)
+          .eq('id', remoteMatch.id)
+          .eq('owner_user_id', userId)
+          .select('*')
+          .single();
+        if (error) throw error;
+        syncedCount += 1;
+        remoteList = remoteList.map((item) => (item.id === remoteMatch.id ? data : item));
+      } else {
+        const { data, error } = await supabase
+          .from('lotes')
+          .insert(payload)
+          .select('*')
+          .single();
+        if (error) throw error;
+        syncedCount += 1;
+        remoteList.push(data);
+      }
+    } catch (error) {
+      failedCount += 1;
+      return {
+        ok: false,
+        data: localRows,
+        error: error?.code || 'SYNC_FAILED',
+        message: classifyLotesSyncError(error),
+        syncedCount,
+        failedCount,
+        selectedCount: Array.isArray(remoteList) ? remoteList.length : 0,
+      };
+    }
+  }
+
+  return {
+    ok: true,
+    data: mergeLotesSafe(localRows, remoteList),
+    error: null,
+    message: null,
+    syncedCount,
+    failedCount,
+    selectedCount: Array.isArray(remoteList) ? remoteList.length : 0,
+  };
 }
 
 

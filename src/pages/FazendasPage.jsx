@@ -11,6 +11,7 @@ import {
   createOperationalRecord,
   deleteOperationalRecord,
   syncFazendasWithCloud,
+  syncLotesWithCloud,
   updateOperationalRecord,
 } from '../services/operationalPersistence';
 import { runSupabaseConnectivityDiagnostics } from '../services/supabaseDiagnostics';
@@ -185,7 +186,7 @@ export default function FazendasPage({ db, setDb, onConfirmAction }) {
     if (sincronizandoFazendas) return;
 
     if (!session?.user?.id) {
-      showToast({ type: 'warning', message: 'Faça login para sincronizar com a nuvem.' });
+      showToast({ type: 'warning', message: 'Fa?a login para sincronizar com a nuvem.' });
       return;
     }
 
@@ -193,7 +194,7 @@ export default function FazendasPage({ db, setDb, onConfirmAction }) {
     loadingToastRef.current = showToast({
       id: 'fazendas-sync-loading',
       type: 'info',
-      message: 'Sincronizando fazendas...',
+      message: 'Sincronizando fazendas e lotes...',
       persist: true,
     });
 
@@ -202,40 +203,50 @@ export default function FazendasPage({ db, setDb, onConfirmAction }) {
       if (!health?.ok) {
         showToast({
           type: 'warning',
-          message: health?.message || 'Não foi possível conectar à nuvem. Verifique sua conexão e tente novamente.',
+          message: health?.message || 'N?o foi poss?vel conectar ? nuvem. Verifique sua conex?o e tente novamente.',
         });
         return;
       }
 
-      const result = await syncFazendasWithCloud({
+      const fazendasSync = await syncFazendasWithCloud({
         fazendas,
         session,
       });
+      const lotesSync = await syncLotesWithCloud({
+        lotes,
+        session,
+      });
 
-      if (Array.isArray(result?.data)) {
+      if (Array.isArray(fazendasSync?.data) || Array.isArray(lotesSync?.data)) {
         setDb((prev) => ({
           ...prev,
-          fazendas: result.data,
+          fazendas: Array.isArray(fazendasSync?.data) ? fazendasSync.data : prev.fazendas,
+          lotes: Array.isArray(lotesSync?.data) ? lotesSync.data : prev.lotes,
         }));
       }
 
-      if (result?.ok && ((result?.syncedCount || 0) > 0 || (result?.selectedCount || 0) > 0)) {
-        showToast({ type: 'success', message: 'Fazendas sincronizadas com sucesso.' });
-      } else if ((result?.failedCount || 0) > 0 && (result?.syncedCount || 0) > 0) {
+      if (fazendasSync?.ok && lotesSync?.ok) {
+        showToast({ type: 'success', message: 'Fazendas e lotes sincronizados com sucesso.' });
+      } else if (fazendasSync?.ok && !lotesSync?.ok) {
         showToast({
           type: 'warning',
-          message: result?.message || 'Algumas fazendas não foram sincronizadas. Seus dados locais continuam disponíveis.',
+          message: lotesSync?.message || 'Lotes n?o puderam ser sincronizados. Fazendas foram mantidas.',
+        });
+      } else if (!fazendasSync?.ok) {
+        showToast({
+          type: 'warning',
+          message: fazendasSync?.message || 'N?o foi poss?vel sincronizar fazendas. Seus dados locais continuam dispon?veis.',
         });
       } else {
         showToast({
           type: 'warning',
-          message: result?.message || 'Não foi possível sincronizar fazendas. Seus dados locais continuam disponíveis.',
+          message: 'Sincroniza??o conclu?da com avisos.',
         });
       }
     } catch {
       showToast({
         type: 'warning',
-        message: 'Não foi possível sincronizar fazendas. Seus dados locais continuam disponíveis.',
+        message: 'N?o foi poss?vel sincronizar fazendas e lotes. Seus dados locais continuam dispon?veis.',
       });
     } finally {
       if (loadingToastRef.current) {
@@ -258,7 +269,7 @@ export default function FazendasPage({ db, setDb, onConfirmAction }) {
               onClick={sincronizarFazendasComNuvem}
               disabled={sincronizandoFazendas || diagnosticandoNuvem}
             >
-              {sincronizandoFazendas ? 'Sincronizando fazendas...' : 'Sincronizar fazendas com a nuvem'}
+              {sincronizandoFazendas ? 'Sincronizando fazendas e lotes...' : 'Sincronizar fazendas e lotes com a nuvem'}
             </Button>
             {podeVerDiagnostico ? (
               <Button
