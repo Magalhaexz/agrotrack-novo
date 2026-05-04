@@ -528,7 +528,7 @@ export default function App() {
         ) : null}
         {(dataSource === 'fallback_error' || dataSource === 'fallback_timeout') ? (
           <div style={{ padding: '8px 16px 0', fontSize: 12, color: 'var(--text-secondary, #6b7280)' }}>
-            Sincronizacao instavel. Seus dados locais continuam disponiveis.
+            Sincronização instável. Seus dados locais continuam disponíveis.
           </div>
         ) : null}
         <AppHeader
