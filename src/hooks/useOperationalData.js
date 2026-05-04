@@ -26,16 +26,13 @@ const HYDRATION_MAX_ATTEMPTS = 2;
 const HYDRATION_BACKOFF_MS = 350;
 const HYDRATION_START_DELAY_MS = 1800;
 const HYDRATION_FAILURE_COOLDOWN_MS = 45000;
-const AUTO_SYNC_COOLDOWN_MS = 45000;
 const HYDRATION_FAILURES_TO_OPEN_CIRCUIT = 4;
 const MANUAL_SYNC_TIMEOUT_MS = 15000;
 const HERDON_DISABLE_SUPABASE_SYNC = 'HERDON_DISABLE_SUPABASE_SYNC';
-const HERDON_ENABLE_SUPABASE_SYNC = 'HERDON_ENABLE_SUPABASE_SYNC';
 const inFlightSnapshots = new Map();
 const failedHydrationAt = new Map();
 const schemaWarningTables = new Set();
 let autoSyncDisabledLogged = false;
-let lastAutoSyncAt = 0;
 
 function nowMs() {
   return typeof performance !== 'undefined' ? performance.now() : Date.now();
@@ -110,16 +107,6 @@ function shouldDisableSupabaseSync() {
   }
 }
 
-function shouldEnableSupabaseSync() {
-  try {
-    const raw = localStorage.getItem(HERDON_ENABLE_SUPABASE_SYNC);
-    if (!raw) return false;
-    const normalized = String(raw).toLowerCase();
-    return normalized === '1' || normalized === 'true' || normalized === 'yes' || normalized === 'on';
-  } catch {
-    return false;
-  }
-}
 
 function logSyncGuard(payload, level = 'debug') {
   if (!import.meta.env.DEV) return;
@@ -419,9 +406,7 @@ export function useOperationalData(initialDb, session, options = {}) {
     const fallbackDb = createOperationalFallbackDb(initialDb);
     const userId = session?.user?.id || null;
     const syncDisabled = shouldDisableSupabaseSync();
-    const syncEnabled = shouldEnableSupabaseSync();
     const manualSyncRequested = manualSyncNonce > 0;
-    const shouldAutoSync = syncEnabled && (Date.now() - lastAutoSyncAt > AUTO_SYNC_COOLDOWN_MS);
 
     const shouldApply = () => {
       const isCurrentGeneration = hydrationGenerationRef.current === generationId;
@@ -467,7 +452,7 @@ export function useOperationalData(initialDb, session, options = {}) {
       };
     }
 
-    if (!manualSyncRequested && !shouldAutoSync) {
+    if (!manualSyncRequested) {
       setDbState(fallbackDb);
       setDataSource('local_offline');
       setDataError(null);
@@ -575,12 +560,9 @@ export function useOperationalData(initialDb, session, options = {}) {
           setDataSource('supabase');
           setDataError(null);
           setLastSyncAt(new Date().toISOString());
-          if (!manualSyncRequested) {
-            lastAutoSyncAt = Date.now();
-          }
           logSyncGuard({
             stage: 'sync_finished_success',
-            action: manualSyncRequested ? 'manual_sync' : 'auto_sync',
+            action: 'manual_sync',
             status: 'success',
           });
         }
