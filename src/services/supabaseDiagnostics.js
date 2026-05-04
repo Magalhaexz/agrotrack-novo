@@ -41,16 +41,16 @@ function classifyMinimalDiagnosticFailure({ error = null, status = null, code = 
   const text = getErrorMessage(error).toLowerCase();
   const pgCode = String(code || '').toUpperCase();
 
-  if (status === 401) return { type: 'auth', message: 'Sessão expirada. Entre novamente para sincronizar com a nuvem.' };
-  if (status === 403 || pgCode === '42501') return { type: 'rls', message: 'Permissão insuficiente para sincronizar com a nuvem.' };
-  if (status === 404 || pgCode === 'PGRST205' || pgCode === '42P01') return { type: 'schema', message: 'Tabela não encontrada na nuvem. Verifique a estrutura do Supabase.' };
-  if (status === 400 || pgCode === '42703' || pgCode === 'PGRST204') return { type: 'payload', message: 'Estrutura da nuvem incompatível com o app. Verifique as colunas no Supabase.' };
-  if (error?.name === 'AbortError' || text.includes('timeout')) return { type: 'timeout', message: 'Falha de transporte no navegador' };
-  if (text.includes('err_http2_protocol_error')) return { type: 'http2_protocol_error', message: 'Falha de transporte no navegador' };
-  if (text.includes('err_connection_reset')) return { type: 'network_reset', message: 'Falha de transporte no navegador' };
-  if (text.includes('err_connection_closed')) return { type: 'network_reset', message: 'Falha de transporte no navegador' };
-  if (isNetworkLikeError(error)) return { type: 'network_reset', message: 'Falha de transporte no navegador' };
-  return { type: 'unknown', message: 'Falha de transporte no navegador' };
+  if (status === 401) return { type: 'auth', message: 'Sessão inválida ou expirada.' };
+  if (status === 403 || pgCode === '42501') return { type: 'rls', message: 'Permissão insuficiente. Verifique as políticas RLS no Supabase.' };
+  if (status === 404 || pgCode === 'PGRST205' || pgCode === '42P01') return { type: 'schema', message: 'Tabela não encontrada na nuvem.' };
+  if (status === 400 || pgCode === '42703' || pgCode === 'PGRST204') return { type: 'payload', message: 'Estrutura da tabela incompatível com o app.' };
+  if (error?.name === 'AbortError' || text.includes('timeout')) return { type: 'timeout', message: 'Falha de conexão do navegador com o Supabase.' };
+  if (text.includes('err_http2_protocol_error')) return { type: 'http2_protocol_error', message: 'Falha de conexão do navegador com o Supabase.' };
+  if (text.includes('err_connection_reset')) return { type: 'network_reset', message: 'Falha de conexão do navegador com o Supabase.' };
+  if (text.includes('err_connection_closed')) return { type: 'network_reset', message: 'Falha de conexão do navegador com o Supabase.' };
+  if (isNetworkLikeError(error)) return { type: 'network_reset', message: 'Falha de conexão do navegador com o Supabase.' };
+  return { type: 'unknown', message: 'Falha de conexão do navegador com o Supabase.' };
 }
 
 async function runMinimalRestStep({ step, table, supabaseUrl, anonKey, token = null, timeoutMs = 8000 }) {
