@@ -14,7 +14,7 @@ import {
   syncLotesWithCloud,
   updateOperationalRecord,
 } from '../services/operationalPersistence';
-import { runBrowserSafeCloudProbe, runSupabaseConnectivityDiagnostics } from '../services/supabaseDiagnostics';
+import { runBrowserSafeCloudProbe, runMinimalCloudDiagnostic } from '../services/supabaseDiagnostics';
 
 export default function FazendasPage({ db, setDb, onConfirmAction }) {
   const { showToast, dismissToast } = useToast();
@@ -121,57 +121,61 @@ export default function FazendasPage({ db, setDb, onConfirmAction }) {
       showToast({ type: 'warning', message: 'Exclusão aplicada apenas localmente.' });
     }
   }
-
-  function getResumoDiagnostico(classification) {
-    switch (classification) {
-      case 'missing_api_key_header':
-      case 'config_error':
-      case 'env_missing':
-      case 'invalid_url':
-        return 'Configuração da nuvem incompleta. Verifique as variáveis do Supabase.';
-      case 'auth_error':
-        return 'Sessão expirada. Entre novamente para sincronizar com a nuvem.';
-      case 'auth_or_rls_error':
-        return 'Sem permissão para acessar estes dados na nuvem.';
-      case 'schema_error':
-      case 'rls_or_policy_error':
-        return 'Estrutura da nuvem incompleta. Verifique a tabela fazendas no Supabase.';
-      case 'network_error':
-      case 'timeout':
-      case 'cors_or_fetch_blocked':
-        return 'Projeto Supabase inacessível pela rede.';
-      case 'ok':
-        return 'Conexão com a nuvem validada.';
-      default:
-        return 'Não foi possível validar a conectividade com a nuvem.';
-    }
+  function traduzirStatusEtapa(step) {
+    if (step === 'env_check') return 'Ambiente configurado';
+    if (step === 'rest_without_session') return 'REST sem sessão';
+    if (step === 'rest_with_session') return 'REST com sessão';
+    if (step === 'client_select') return 'Supabase client';
+    return 'Diagnóstico';
   }
 
   async function executarDiagnosticoNuvem() {
     if (!podeVerDiagnostico || diagnosticandoNuvem) return;
     setDiagnosticandoNuvem(true);
     try {
-      const result = await runSupabaseConnectivityDiagnostics({ session });
+      const result = await runMinimalCloudDiagnostic({ session, table: 'lotes', timeoutMs: 8000 });
+      const steps = Array.isArray(result?.steps) ? result.steps : [];
+      steps.forEach((item) => {
+        const label = traduzirStatusEtapa(item?.step);
+        const suffix = item?.ok ? 'OK' : 'Erro';
+        showToast({
+          type: item?.ok ? 'success' : 'warning',
+          message: `${label}: ${suffix}`,
+        });
+      });
+
       showToast({
         type: result?.ok ? 'success' : 'warning',
-        message: getResumoDiagnostico(result?.classification),
+        message: result?.conclusionMessage || 'Falha ao executar diagnóstico da nuvem.',
       });
 
       if (import.meta.env.DEV || isAdmin) {
-        console.info('[HERDON_CLOUD_DIAGNOSTIC]', {
-          stage: result?.stage || null,
-          classification: result?.classification || null,
-          ok: Boolean(result?.ok),
-          safeDetails: result?.safeDetails || null,
+        console.groupCollapsed('[HERDON_CLOUD_MINIMAL_DIAGNOSTIC]');
+        console.info({
+          appOrigin: result?.appOrigin || window.location.origin,
+          supabaseHost: result?.supabaseHost || null,
+          envStatus: result?.envStatus || null,
+          table: result?.table || 'lotes',
+          steps: steps.map((item) => ({
+            step: item?.step || null,
+            table: item?.table || 'lotes',
+            endpointPath: item?.endpointPath || null,
+            httpStatus: item?.httpStatus ?? null,
+            postgrestCode: item?.postgrestCode ?? null,
+            failureType: item?.failureType ?? null,
+            safeMessage: item?.safeMessage || null,
+          })),
+          safeMessage: result?.conclusionMessage || null,
         });
+        console.groupEnd();
       }
     } catch (error) {
       showToast({
         type: 'warning',
-        message: 'Nao foi possivel executar o diagnostico da nuvem.',
+        message: 'Não foi possível executar o diagnóstico da nuvem.',
       });
       if (import.meta.env.DEV) {
-        console.warn('[HERDON_CLOUD_DIAGNOSTIC]', {
+        console.warn('[HERDON_CLOUD_MINIMAL_DIAGNOSTIC]', {
           stage: 'diagnostic_exception',
           classification: 'unknown_error',
           errorName: error?.name || null,
@@ -318,7 +322,7 @@ export default function FazendasPage({ db, setDb, onConfirmAction }) {
                 onClick={executarDiagnosticoNuvem}
                 disabled={sincronizandoFazendas || diagnosticandoNuvem}
               >
-                {diagnosticandoNuvem ? 'Diagnosticando nuvem...' : 'Diagnosticar nuvem'}
+                {diagnosticandoNuvem ? 'Testando conexão com a nuvem...' : 'Testar conexão com a nuvem'}
               </Button>
             ) : null}
             <Button onClick={() => {
@@ -363,3 +367,4 @@ export default function FazendasPage({ db, setDb, onConfirmAction }) {
     </div>
   );
 }
+
