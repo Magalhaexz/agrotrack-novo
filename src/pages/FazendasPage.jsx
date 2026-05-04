@@ -26,6 +26,7 @@ export default function FazendasPage({ db, setDb, onConfirmAction }) {
   const [sincronizandoFazendas, setSincronizandoFazendas] = useState(false);
   const [diagnosticandoNuvem, setDiagnosticandoNuvem] = useState(false);
   const loadingToastRef = useRef(null);
+  const manualSyncRef = useRef({ inFlight: false, lastStartAt: 0 });
   const isAdmin = String(user?.perfil || '').toLowerCase() === 'admin' || hasPermission('configuracoes:editar');
   const podeVerDiagnostico = Boolean(import.meta.env.DEV || isAdmin);
 
@@ -183,10 +184,14 @@ export default function FazendasPage({ db, setDb, onConfirmAction }) {
   }
 
   async function sincronizarFazendasComNuvem() {
-    if (sincronizandoFazendas) return;
+    const now = Date.now();
+    if (sincronizandoFazendas || manualSyncRef.current.inFlight) return;
+    if (now - manualSyncRef.current.lastStartAt < 1200) return;
+    manualSyncRef.current = { inFlight: true, lastStartAt: now };
 
     if (!session?.user?.id) {
-      showToast({ type: 'warning', message: 'Fa?a login para sincronizar com a nuvem.' });
+      showToast({ type: 'warning', message: 'Faça login para sincronizar com a nuvem.' });
+      manualSyncRef.current.inFlight = false;
       return;
     }
 
@@ -203,7 +208,7 @@ export default function FazendasPage({ db, setDb, onConfirmAction }) {
       if (!health?.ok) {
         showToast({
           type: 'warning',
-          message: health?.message || 'N?o foi poss?vel conectar ? nuvem. Verifique sua conex?o e tente novamente.',
+          message: health?.message || 'Não foi possível conectar ao Supabase. Verifique sua conexão, DNS ou variáveis da nuvem.',
         });
         return;
       }
@@ -225,30 +230,31 @@ export default function FazendasPage({ db, setDb, onConfirmAction }) {
         }));
       }
 
-      if (fazendasSync?.ok && lotesSync?.ok) {
-        showToast({ type: 'success', message: 'Fazendas e lotes sincronizados com sucesso.' });
-      } else if (fazendasSync?.ok && !lotesSync?.ok) {
+      if (fazendasSync?.status === 'success' && lotesSync?.status === 'success') {
+        showToast({ type: 'success', message: 'Fazendas sincronizadas. Lotes sincronizados.' });
+      } else if (fazendasSync?.status === 'success' && lotesSync?.status !== 'success') {
         showToast({
           type: 'warning',
-          message: lotesSync?.message || 'Lotes n?o puderam ser sincronizados. Fazendas foram mantidas.',
+          message: `Fazendas sincronizadas. Lotes: ${lotesSync?.message || 'erro ao sincronizar.'}`,
         });
-      } else if (!fazendasSync?.ok) {
+      } else if (fazendasSync?.status !== 'success' && lotesSync?.status === 'success') {
         showToast({
           type: 'warning',
-          message: fazendasSync?.message || 'N?o foi poss?vel sincronizar fazendas. Seus dados locais continuam dispon?veis.',
+          message: `Fazendas: ${fazendasSync?.message || 'erro ao sincronizar.'} Lotes sincronizados.`,
         });
       } else {
         showToast({
           type: 'warning',
-          message: 'Sincroniza??o conclu?da com avisos.',
+          message: `Fazendas: ${fazendasSync?.message || 'erro'} Lotes: ${lotesSync?.message || 'erro'}`,
         });
       }
     } catch {
       showToast({
         type: 'warning',
-        message: 'N?o foi poss?vel sincronizar fazendas e lotes. Seus dados locais continuam dispon?veis.',
+        message: 'Não foi possível sincronizar fazendas e lotes. Seus dados locais continuam disponíveis.',
       });
     } finally {
+      manualSyncRef.current.inFlight = false;
       if (loadingToastRef.current) {
         dismissToast(loadingToastRef.current);
         loadingToastRef.current = null;
