@@ -6,6 +6,7 @@ import FazendaModal from '../components/fazendas/FazendaModal';
 import { gerarNovoId } from '../utils/id';
 import { useToast } from '../hooks/useToast';
 import { useAuth } from '../auth/useAuth';
+import { limparPersistenciaSessao, signOutLocalSafely } from '../lib/supabase';
 import {
   createOperationalRecord,
   deleteOperationalRecord,
@@ -18,8 +19,8 @@ import { runMinimalCloudDiagnostic } from '../services/supabaseDiagnostics';
 
 export default function FazendasPage({ db, setDb, onConfirmAction }) {
   const { showToast, dismissToast } = useToast();
-  const { hasPermission, session, user } = useAuth();
-  const mensagemSemPermissao = 'Você não tem permissão para executar esta ação.';
+  const { hasPermission, session, user, forceLocalSignOut } = useAuth();
+  const mensagemSemPermissao = 'Voc� n�o tem permiss�o para executar esta a��o.';
 
   const [openModal, setOpenModal] = useState(false);
   const [editando, setEditando] = useState(null);
@@ -37,9 +38,7 @@ export default function FazendasPage({ db, setDb, onConfirmAction }) {
     const map = new Map();
     lotes.forEach((lote) => {
       const fazendaId = Number(lote.faz_id);
-      if (!map.has(fazendaId)) {
-        map.set(fazendaId, []);
-      }
+      if (!map.has(fazendaId)) map.set(fazendaId, []);
       map.get(fazendaId).push(lote);
     });
     return map;
@@ -66,24 +65,14 @@ export default function FazendasPage({ db, setDb, onConfirmAction }) {
           f.id === editando.id ? { ...f, ...(persisted.data || payload) } : f
         ),
       }));
-      if (!persisted.persisted) {
-        showToast({ type: 'warning', message: 'Alteração salva apenas localmente.' });
-      }
+      if (!persisted.persisted) showToast({ type: 'warning', message: 'Altera��o salva apenas localmente.' });
     } else {
       const persisted = await createOperationalRecord('fazendas', payload, session);
       setDb((prev) => ({
         ...prev,
-        fazendas: [
-          ...prev.fazendas,
-          persisted.data || {
-            id: gerarNovoId(prev.fazendas),
-            ...payload,
-          },
-        ],
+        fazendas: [...prev.fazendas, persisted.data || { id: gerarNovoId(prev.fazendas), ...payload }],
       }));
-      if (!persisted.persisted) {
-        showToast({ type: 'warning', message: 'Cadastro salvo apenas localmente.' });
-      }
+      if (!persisted.persisted) showToast({ type: 'warning', message: 'Cadastro salvo apenas localmente.' });
     }
     setOpenModal(false);
     setEditando(null);
@@ -96,37 +85,30 @@ export default function FazendasPage({ db, setDb, onConfirmAction }) {
     }
     const fazenda = cards.find((f) => f.id === id);
     if (!fazenda) return;
-
     if (fazenda.lotesVinculados > 0) {
-      alert('Não é possível excluir uma fazenda com lotes vinculados.');
+      alert('N�o � poss�vel excluir uma fazenda com lotes vinculados.');
       return;
     }
-
     const confirmado = typeof onConfirmAction === 'function'
       ? await onConfirmAction({
-          title: 'Excluir fazenda',
-          message: `Deseja realmente excluir a fazenda "${fazenda.nome}"?`,
-          tone: 'danger',
-        })
+        title: 'Excluir fazenda',
+        message: `Deseja realmente excluir a fazenda "${fazenda.nome}"?`,
+        tone: 'danger',
+      })
       : window.confirm(`Deseja realmente excluir a fazenda "${fazenda.nome}"?`);
 
     if (!confirmado) return;
-
     const persisted = await deleteOperationalRecord('fazendas', id, session);
-    setDb((prev) => ({
-      ...prev,
-      fazendas: prev.fazendas.filter((f) => f.id !== id),
-    }));
-    if (!persisted.persisted) {
-      showToast({ type: 'warning', message: 'Exclusão aplicada apenas localmente.' });
-    }
+    setDb((prev) => ({ ...prev, fazendas: prev.fazendas.filter((f) => f.id !== id) }));
+    if (!persisted.persisted) showToast({ type: 'warning', message: 'Exclus�o aplicada apenas localmente.' });
   }
+
   function traduzirStatusEtapa(step) {
-    if (step === 'env_check') return 'Ambiente configurado';
-    if (step === 'rest_without_session') return 'REST sem sessão';
-    if (step === 'rest_with_session') return 'REST com sessão';
+    if (step === 'env_check') return 'Ambiente';
+    if (step === 'rest_without_session') return 'REST sem sess�o';
+    if (step === 'rest_with_session') return 'REST com sess�o';
     if (step === 'client_select') return 'Supabase client';
-    return 'Diagnóstico';
+    return 'Diagn�stico';
   }
 
   async function executarDiagnosticoNuvem() {
@@ -136,18 +118,23 @@ export default function FazendasPage({ db, setDb, onConfirmAction }) {
       const result = await runMinimalCloudDiagnostic({ session, table: 'lotes', timeoutMs: 8000 });
       const steps = Array.isArray(result?.steps) ? result.steps : [];
       steps.forEach((item) => {
-        const label = traduzirStatusEtapa(item?.step);
-        const suffix = item?.ok ? 'OK' : 'Erro';
         showToast({
           type: item?.ok ? 'success' : 'warning',
-          message: `${label}: ${suffix}`,
+          message: `${traduzirStatusEtapa(item?.step)}: ${item?.ok ? 'OK' : 'Erro'}`,
         });
       });
 
       showToast({
         type: result?.ok ? 'success' : 'warning',
-        message: result?.conclusionMessage || 'Falha ao executar diagnóstico da nuvem.',
+        message: result?.conclusionMessage || 'Falha ao executar diagn�stico da nuvem.',
       });
+
+      if (result?.conclusion === 'session_failure') {
+        showToast({
+          type: 'warning',
+          message: 'Sess�o expirada. Use Reconectar � nuvem para entrar novamente.',
+        });
+      }
 
       if (import.meta.env.DEV || isAdmin) {
         console.groupCollapsed('[HERDON_CLOUD_MINIMAL_DIAGNOSTIC]');
@@ -167,13 +154,21 @@ export default function FazendasPage({ db, setDb, onConfirmAction }) {
           })),
           safeMessage: result?.conclusionMessage || null,
         });
+        if (result?.authState) {
+          console.info('[HERDON_CLOUD_AUTH_DIAGNOSTIC]', {
+            hasSession: Boolean(result.authState.hasSession),
+            hasAccessToken: Boolean(result.authState.hasAccessToken),
+            tokenLooksJwt: Boolean(result.authState.tokenLooksJwt),
+            tokenExpired: Boolean(result.authState.tokenExpired),
+            refreshAttempted: Boolean(result.authState.refreshAttempted),
+            refreshSucceeded: Boolean(result.authState.refreshSucceeded),
+            safeMessage: result?.conclusionMessage || 'Sess�o expirada. Entre novamente para sincronizar com a nuvem.',
+          });
+        }
         console.groupEnd();
       }
     } catch (error) {
-      showToast({
-        type: 'warning',
-        message: 'Não foi possível executar o diagnóstico da nuvem.',
-      });
+      showToast({ type: 'warning', message: 'N�o foi poss�vel executar o diagn�stico da nuvem.' });
       if (import.meta.env.DEV) {
         console.warn('[HERDON_CLOUD_MINIMAL_DIAGNOSTIC]', {
           stage: 'diagnostic_exception',
@@ -187,6 +182,22 @@ export default function FazendasPage({ db, setDb, onConfirmAction }) {
     }
   }
 
+  async function reconectarNuvem() {
+    if (sincronizandoFazendas || diagnosticandoNuvem) return;
+    try {
+      await signOutLocalSafely(4000);
+    } catch {
+      // segue limpeza local
+    } finally {
+      limparPersistenciaSessao();
+      forceLocalSignOut?.();
+      showToast({
+        type: 'info',
+        message: 'Reconex�o iniciada. Entre novamente para sincronizar com a nuvem.',
+      });
+    }
+  }
+
   async function sincronizarFazendasComNuvem() {
     const now = Date.now();
     if (sincronizandoFazendas || manualSyncRef.current.inFlight) return;
@@ -194,7 +205,7 @@ export default function FazendasPage({ db, setDb, onConfirmAction }) {
     manualSyncRef.current = { inFlight: true, lastStartAt: now };
 
     if (!session?.user?.id) {
-      showToast({ type: 'warning', message: 'Faça login para sincronizar com a nuvem.' });
+      showToast({ type: 'warning', message: 'Fa�a login para sincronizar com a nuvem.' });
       manualSyncRef.current.inFlight = false;
       return;
     }
@@ -208,15 +219,9 @@ export default function FazendasPage({ db, setDb, onConfirmAction }) {
     });
 
     try {
-      const fazendasSync = await syncFazendasWithCloud({
-        fazendas,
-        session,
-      });
+      const fazendasSync = await syncFazendasWithCloud({ fazendas, session });
       showToast({ type: 'info', message: 'Fazendas: sincronizando...' });
-      const lotesSync = await syncLotesWithCloud({
-        lotes,
-        session,
-      });
+      const lotesSync = await syncLotesWithCloud({ lotes, session });
       showToast({ type: 'info', message: 'Lotes: sincronizando...' });
 
       if (Array.isArray(fazendasSync?.data) || Array.isArray(lotesSync?.data)) {
@@ -229,23 +234,15 @@ export default function FazendasPage({ db, setDb, onConfirmAction }) {
 
       if (fazendasSync?.status === 'success' && lotesSync?.status === 'success') {
         showToast({ type: 'success', message: 'Fazendas sincronizadas. Lotes sincronizados.' });
-      } else if (fazendasSync?.status === 'success' && lotesSync?.status !== 'success') {
-        showToast({
-          type: 'warning',
-          message: `Fazendas sincronizadas. Falha ao sincronizar lotes: ver diagnóstico. ${lotesSync?.message || ''}`.trim(),
-        });
-      } else if (fazendasSync?.status !== 'success' && lotesSync?.status === 'success') {
-        showToast({
-          type: 'warning',
-          message: `Fazendas: ${fazendasSync?.message || 'erro ao sincronizar.'} Lotes sincronizados.`,
-        });
+      } else if (fazendasSync?.status === 'success') {
+        showToast({ type: 'warning', message: `Fazendas sincronizadas. Falha ao sincronizar lotes: ${lotesSync?.message || 'ver diagn�stico.'}` });
+      } else if (lotesSync?.status === 'success') {
+        showToast({ type: 'warning', message: `Fazendas: ${fazendasSync?.message || 'erro ao sincronizar.'} Lotes sincronizados.` });
       } else {
-        showToast({
-          type: 'warning',
-          message: `Fazendas: ${fazendasSync?.message || 'erro'} Lotes: ${lotesSync?.message || 'erro'}`,
-        });
+        showToast({ type: 'warning', message: `Fazendas: ${fazendasSync?.message || 'erro'} Lotes: ${lotesSync?.message || 'erro'}` });
       }
-      if (fazendasSync?.status !== 'success' || lotesSync?.status !== 'success' ) {
+
+      if (fazendasSync?.status !== 'success' || lotesSync?.status !== 'success') {
         let supabaseHost = null;
         try {
           supabaseHost = new URL(import.meta.env.VITE_SUPABASE_URL).host;
@@ -254,7 +251,8 @@ export default function FazendasPage({ db, setDb, onConfirmAction }) {
         }
         const primaryModule = fazendasSync?.status !== 'success' ? 'fazendas' : 'lotes';
         const primaryResult = fazendasSync?.status !== 'success' ? fazendasSync : lotesSync;
-        const safeDiagnostic = {
+        console.groupCollapsed('[HERDON_CLOUD_PRODUCTION_DIAGNOSTIC]');
+        console.info({
           appOrigin: window.location.origin,
           supabaseHost,
           module: primaryModule,
@@ -268,16 +266,11 @@ export default function FazendasPage({ db, setDb, onConfirmAction }) {
             fazendas: getCloudSyncCooldownState('fazendas'),
             lotes: getCloudSyncCooldownState('lotes'),
           },
-        };
-        console.groupCollapsed('[HERDON_CLOUD_PRODUCTION_DIAGNOSTIC]');
-        console.info(safeDiagnostic);
+        });
         console.groupEnd();
       }
     } catch {
-      showToast({
-        type: 'warning',
-        message: 'Não foi possível sincronizar fazendas e lotes. Seus dados locais continuam disponíveis.',
-      });
+      showToast({ type: 'warning', message: 'N�o foi poss�vel sincronizar fazendas e lotes. Seus dados locais continuam dispon�veis.' });
     } finally {
       manualSyncRef.current.inFlight = false;
       if (loadingToastRef.current) {
@@ -292,7 +285,7 @@ export default function FazendasPage({ db, setDb, onConfirmAction }) {
     <div className="page">
       <PageHeader
         title="Fazendas"
-        subtitle="Gestão completa das propriedades e suas capacidades"
+        subtitle="Gest�o completa das propriedades e suas capacidades"
         actions={(
           <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
             <Button
@@ -308,15 +301,23 @@ export default function FazendasPage({ db, setDb, onConfirmAction }) {
                 onClick={executarDiagnosticoNuvem}
                 disabled={sincronizandoFazendas || diagnosticandoNuvem}
               >
-                {diagnosticandoNuvem ? 'Testando conexão com a nuvem...' : 'Testar conexão com a nuvem'}
+                {diagnosticandoNuvem ? 'Testando conex�o com a nuvem...' : 'Testar conex�o com a nuvem'}
               </Button>
             ) : null}
+            <Button
+              variant="outline"
+              onClick={reconectarNuvem}
+              disabled={sincronizandoFazendas || diagnosticandoNuvem}
+            >
+              Reconectar � nuvem
+            </Button>
             <Button onClick={() => {
               if (!hasPermission('fazendas:editar')) {
                 showToast({ type: 'error', message: mensagemSemPermissao });
                 return;
               }
-              setEditando(null); setOpenModal(true);
+              setEditando(null);
+              setOpenModal(true);
             }}
             >
               + Nova Fazenda
@@ -328,7 +329,7 @@ export default function FazendasPage({ db, setDb, onConfirmAction }) {
       {cards.length === 0 ? (
         <div className="ui-card empty-state">
           <strong>Nenhuma fazenda cadastrada.</strong>
-          <span>Use o botão "Nova Fazenda" para começar.</span>
+          <span>Use o bot�o "Nova Fazenda" para come�ar.</span>
         </div>
       ) : (
         <div className="grid-3">
@@ -353,6 +354,3 @@ export default function FazendasPage({ db, setDb, onConfirmAction }) {
     </div>
   );
 }
-
-
-

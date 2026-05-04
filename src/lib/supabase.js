@@ -167,6 +167,100 @@ export async function signOutLocalSafely(timeoutMs = 5000) {
   return Promise.race([signOutPromise, timeoutPromise]);
 }
 
+function looksLikeJwt(token) {
+  if (!token || typeof token !== 'string') return false;
+  const parts = token.split('.');
+  return parts.length === 3 && parts.every((part) => part.length > 0);
+}
+
+function decodeJwtPayloadSafe(token) {
+  if (!looksLikeJwt(token)) return null;
+  try {
+    const base64 = token.split('.')[1].replace(/-/g, '+').replace(/_/g, '/');
+    const padded = base64.padEnd(base64.length + ((4 - (base64.length % 4)) % 4), '=');
+    const decoded = atob(padded);
+    return JSON.parse(decoded);
+  } catch {
+    return null;
+  }
+}
+
+function tokenExpired(token) {
+  const payload = decodeJwtPayloadSafe(token);
+  const exp = Number(payload?.exp);
+  if (!Number.isFinite(exp) || exp <= 0) return false;
+  const nowSec = Math.floor(Date.now() / 1000);
+  return exp <= (nowSec + 30);
+}
+
+export async function validateSupabaseSessionForCloud() {
+  const authState = {
+    hasSession: false,
+    hasAccessToken: false,
+    tokenLooksJwt: false,
+    tokenExpired: false,
+    refreshAttempted: false,
+    refreshSucceeded: false,
+  };
+
+  try {
+    const { data, error } = await supabase.auth.getSession();
+    if (error) {
+      return {
+        ok: false,
+        code: 'SESSION_READ_ERROR',
+        message: 'Sessão expirada. Entre novamente para sincronizar com a nuvem.',
+        authState,
+      };
+    }
+
+    let activeSession = data?.session ?? null;
+    let token = activeSession?.access_token || null;
+    authState.hasSession = Boolean(activeSession);
+    authState.hasAccessToken = Boolean(token);
+    authState.tokenLooksJwt = looksLikeJwt(token);
+    authState.tokenExpired = token ? tokenExpired(token) : false;
+
+    if (!activeSession || !token || !authState.tokenLooksJwt || authState.tokenExpired) {
+      authState.refreshAttempted = true;
+      const { data: refreshData, error: refreshError } = await supabase.auth.refreshSession();
+      if (!refreshError) {
+        activeSession = refreshData?.session ?? null;
+        token = activeSession?.access_token || null;
+        authState.refreshSucceeded = Boolean(activeSession && token);
+        authState.hasSession = Boolean(activeSession);
+        authState.hasAccessToken = Boolean(token);
+        authState.tokenLooksJwt = looksLikeJwt(token);
+        authState.tokenExpired = token ? tokenExpired(token) : false;
+      }
+    }
+
+    if (!activeSession || !token || !authState.tokenLooksJwt || authState.tokenExpired) {
+      return {
+        ok: false,
+        code: 'SESSION_STALE',
+        message: 'Sessão expirada. Entre novamente para sincronizar com a nuvem.',
+        authState,
+      };
+    }
+
+    return {
+      ok: true,
+      code: null,
+      message: null,
+      session: activeSession,
+      authState,
+    };
+  } catch {
+    return {
+      ok: false,
+      code: 'SESSION_READ_EXCEPTION',
+      message: 'Sessão expirada. Entre novamente para sincronizar com a nuvem.',
+      authState,
+    };
+  }
+}
+
 export function publicarEventoLogout(reason = 'manual_logout') {
   const payload = JSON.stringify({
     at: Date.now(),

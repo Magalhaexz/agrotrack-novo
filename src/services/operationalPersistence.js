@@ -1,4 +1,4 @@
-import { getSupabaseEnvStatus, supabase } from '../lib/supabase.js';
+import { getSupabaseEnvStatus, supabase, validateSupabaseSessionForCloud } from '../lib/supabase.js';
 const NETWORK_CIRCUIT_OPEN_MS = 45000;
 const moduleNetworkCircuit = new Map();
 
@@ -191,22 +191,22 @@ export async function ensureSupabaseRequestReadiness(session, context = {}) {
   }
 
   try {
-    const { data, error } = await supabase.auth.getSession();
-    if (error) {
-      throw error;
-    }
-    let activeSession = data?.session ?? null;
-    let activeUserId = activeSession?.user?.id || null;
-    let hasAccessToken = Boolean(activeSession?.access_token);
-    if (!activeUserId || !hasAccessToken || String(activeUserId) !== String(sessionUserId)) {
-      const { data: refreshedData, error: refreshError } = await supabase.auth.refreshSession();
-      if (!refreshError) {
-        activeSession = refreshedData?.session ?? null;
-        activeUserId = activeSession?.user?.id || null;
-        hasAccessToken = Boolean(activeSession?.access_token);
+    const validated = await validateSupabaseSessionForCloud();
+    const activeSession = validated?.session ?? null;
+    const activeUserId = activeSession?.user?.id || null;
+    const hasAccessToken = Boolean(activeSession?.access_token);
+    if (!validated?.ok || !activeUserId || !hasAccessToken || String(activeUserId) !== String(sessionUserId)) {
+      if (!validated?.ok && import.meta.env.DEV) {
+        console.info('[HERDON_CLOUD_AUTH_DIAGNOSTIC]', {
+          hasSession: Boolean(validated?.authState?.hasSession),
+          hasAccessToken: Boolean(validated?.authState?.hasAccessToken),
+          tokenLooksJwt: Boolean(validated?.authState?.tokenLooksJwt),
+          tokenExpired: Boolean(validated?.authState?.tokenExpired),
+          refreshAttempted: Boolean(validated?.authState?.refreshAttempted),
+          refreshSucceeded: Boolean(validated?.authState?.refreshSucceeded),
+          safeMessage: validated?.message || 'Sessão expirada. Entre novamente para sincronizar com a nuvem.',
+        });
       }
-    }
-    if (!activeUserId || !hasAccessToken || String(activeUserId) !== String(sessionUserId)) {
       logOperationalSync({
         stage: 'session_stale',
         ...context,
@@ -216,8 +216,8 @@ export async function ensureSupabaseRequestReadiness(session, context = {}) {
       }, 'warn');
       return {
         ok: false,
-        code: 'SESSION_STALE',
-        message: 'Sessao expirada ou invalida. Entre novamente para sincronizar com a nuvem.',
+        code: validated?.code || 'SESSION_STALE',
+        message: validated?.message || 'Sessão expirada. Entre novamente para sincronizar com a nuvem.',
       };
     }
     return {
