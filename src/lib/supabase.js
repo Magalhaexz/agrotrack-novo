@@ -104,6 +104,7 @@ function removerChavesAuthDoStorage(storage) {
   const dynamicRules = [
     (key) => key.includes('supabase.auth.token'),
     (key) => key.includes('supabase.auth'),
+    (key) => key.toLowerCase().includes('supabase'),
     (key) => key.startsWith('sb-') && key.endsWith('-auth-token'),
     (key) => key.startsWith('sb-') && key.endsWith('-refresh-token'),
     (key) => key.startsWith('sb-') && key.endsWith('-code-verifier'),
@@ -129,6 +130,10 @@ export function limparPersistenciaSessao() {
   } catch {
     // Ignora indisponibilidade de sessionStorage
   }
+}
+
+export function resetSupabaseAuthLocally() {
+  limparPersistenciaSessao();
 }
 
 export function limparMarcadoresFluxoAuth() {
