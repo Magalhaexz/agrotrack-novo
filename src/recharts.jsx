@@ -68,7 +68,7 @@ export function LineChart({ data = [], children }) {
           const points = data
             .map((row, idx) => {
               const v = Number(row[line.props.dataKey]);
-              if (Number.isNaN(v)) return null; // Ignora valores nÃ£o numÃ©ricos
+              if (Number.isNaN(v)) return null; // Ignora valores não numéricos
               return `${scaleX(idx)},${scaleY(v)}`;
             })
             .filter(Boolean) // Remove pontos nulos

@@ -1,4 +1,4 @@
-import { createClient } from '@supabase/supabase-js';
+﻿import { createClient } from '@supabase/supabase-js';
 
 function normalizeEnvValue(value) {
   if (value === undefined || value === null) return '';
@@ -30,34 +30,35 @@ export function getSupabaseEnvStatus() {
     isTestEnvironment,
     message: supabaseEnvConfigured
       ? null
-      : 'Configuracao do Supabase ausente. Verifique VITE_SUPABASE_URL e VITE_SUPABASE_ANON_KEY.',
+      : 'Configuração do Supabase ausente. Verifique VITE_SUPABASE_URL e VITE_SUPABASE_ANON_KEY.',
   };
 }
 
 export const supabase = supabaseEnvConfigured
   ? createClient(supabaseUrl, supabaseAnonKey)
   : {
-      from() {
-        const envStatus = getSupabaseEnvStatus();
-        throw new Error(envStatus.message || 'Supabase nao inicializado.');
-      },
-      auth: {
-        getSession: async () => ({ data: { session: null }, error: null }),
-        signInWithPassword: async () => ({ data: { session: null }, error: null }),
-        signInWithOAuth: async () => ({ data: null, error: null }),
-        signUp: async () => ({ data: { session: null }, error: null }),
-        resetPasswordForEmail: async () => ({ data: null, error: null }),
-        updateUser: async () => ({ data: null, error: null }),
-        onAuthStateChange: () => ({
-          data: {
-            subscription: {
-              unsubscribe() {},
-            },
+    from() {
+      const envStatus = getSupabaseEnvStatus();
+      throw new Error(envStatus.message || 'Supabase não inicializado.');
+    },
+    auth: {
+      getSession: async () => ({ data: { session: null }, error: null }),
+      refreshSession: async () => ({ data: { session: null }, error: null }),
+      signInWithPassword: async () => ({ data: { session: null }, error: null }),
+      signInWithOAuth: async () => ({ data: null, error: null }),
+      signUp: async () => ({ data: { session: null }, error: null }),
+      resetPasswordForEmail: async () => ({ data: null, error: null }),
+      updateUser: async () => ({ data: null, error: null }),
+      onAuthStateChange: () => ({
+        data: {
+          subscription: {
+            unsubscribe() {},
           },
-        }),
-        signOut: async () => ({ error: null }),
-      },
-    };
+        },
+      }),
+      signOut: async () => ({ error: null }),
+    },
+  };
 
 export const HERDON_LOGOUT_EVENT_KEY = 'herdon_logout_event';
 export const HERDON_LOGOUT_CHANNEL = 'herdon_auth_channel';
@@ -81,13 +82,13 @@ function withStorage(action) {
   try {
     action(localStorage);
   } catch {
-    // localStorage indisponivel
+    // localStorage indisponível
   }
 
   try {
     action(sessionStorage);
   } catch {
-    // sessionStorage indisponivel
+    // sessionStorage indisponível
   }
 }
 
@@ -158,7 +159,7 @@ export function obterLogoutEmAndamentoAt() {
   }
 }
 
-export async function signOutLocalSafely(timeoutMs = 5000) {
+export async function signOutLocalSafely(timeoutMs = 3000) {
   const signOutPromise = supabase.auth.signOut({ scope: 'local' });
   const timeoutPromise = wait(timeoutMs).then(() => {
     throw createTimeoutError('local_sign_out_timeout');
@@ -208,54 +209,73 @@ export async function validateSupabaseSessionForCloud() {
     if (error) {
       return {
         ok: false,
+        status: 'invalid',
         code: 'SESSION_READ_ERROR',
-        message: 'Sessão expirada. Entre novamente para sincronizar com a nuvem.',
+        safeMessage: 'Sessão expirada. Entre novamente para sincronizar com a nuvem.',
         authState,
       };
     }
 
     let activeSession = data?.session ?? null;
     let token = activeSession?.access_token || null;
+
     authState.hasSession = Boolean(activeSession);
     authState.hasAccessToken = Boolean(token);
     authState.tokenLooksJwt = looksLikeJwt(token);
     authState.tokenExpired = token ? tokenExpired(token) : false;
 
-    if (!activeSession || !token || !authState.tokenLooksJwt || authState.tokenExpired) {
+    const tokenNeedsRecovery = !activeSession || !token || !authState.tokenLooksJwt || authState.tokenExpired;
+
+    if (tokenNeedsRecovery) {
       authState.refreshAttempted = true;
       const { data: refreshData, error: refreshError } = await supabase.auth.refreshSession();
-      if (!refreshError) {
-        activeSession = refreshData?.session ?? null;
+      if (!refreshError && refreshData?.session) {
+        activeSession = refreshData.session;
         token = activeSession?.access_token || null;
         authState.refreshSucceeded = Boolean(activeSession && token);
         authState.hasSession = Boolean(activeSession);
         authState.hasAccessToken = Boolean(token);
         authState.tokenLooksJwt = looksLikeJwt(token);
         authState.tokenExpired = token ? tokenExpired(token) : false;
+      } else {
+        return {
+          ok: false,
+          status: 'refresh_failed',
+          code: 'SESSION_REFRESH_FAILED',
+          safeMessage: 'Sessão expirada. Entre novamente para sincronizar com a nuvem.',
+          authState,
+        };
       }
     }
 
     if (!activeSession || !token || !authState.tokenLooksJwt || authState.tokenExpired) {
+      let status = 'invalid';
+      if (!activeSession || !token) status = 'missing';
+      else if (authState.tokenExpired) status = 'expired';
+
       return {
         ok: false,
+        status,
         code: 'SESSION_STALE',
-        message: 'Sessão expirada. Entre novamente para sincronizar com a nuvem.',
+        safeMessage: 'Sessão expirada. Entre novamente para sincronizar com a nuvem.',
         authState,
       };
     }
 
     return {
       ok: true,
+      status: 'valid',
       code: null,
-      message: null,
+      safeMessage: 'Sessão válida para sincronização com a nuvem.',
       session: activeSession,
       authState,
     };
   } catch {
     return {
       ok: false,
+      status: 'invalid',
       code: 'SESSION_READ_EXCEPTION',
-      message: 'Sessão expirada. Entre novamente para sincronizar com a nuvem.',
+      safeMessage: 'Sessão expirada. Entre novamente para sincronizar com a nuvem.',
       authState,
     };
   }
@@ -270,7 +290,7 @@ export function publicarEventoLogout(reason = 'manual_logout') {
   try {
     localStorage.setItem(HERDON_LOGOUT_EVENT_KEY, payload);
   } catch {
-    // Sem storage disponivel
+    // Sem storage disponível
   }
 
   try {
@@ -278,6 +298,6 @@ export function publicarEventoLogout(reason = 'manual_logout') {
     channel.postMessage({ type: 'logout', payload });
     channel.close();
   } catch {
-    // BroadcastChannel indisponivel
+    // BroadcastChannel indisponível
   }
 }

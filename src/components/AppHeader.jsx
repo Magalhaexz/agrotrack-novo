@@ -1,4 +1,4 @@
-import { Activity, AlertTriangle, Bell, ChevronDown, Clock3, Loader2, LogOut, Menu, Package, Settings, User } from 'lucide-react';
+﻿import { Activity, AlertTriangle, Bell, ChevronDown, Clock3, Loader2, LogOut, Menu, Package, Settings, User } from 'lucide-react';
 import { createPortal } from 'react-dom';
 import { useEffect, useRef, useState } from 'react';
 import { obterLabelPerfil } from '../auth/perfis';
@@ -46,6 +46,11 @@ function formatSyncTime(value) {
   }
 }
 
+function messageIsSessionError(message) {
+  const text = String(message || '').toLowerCase();
+  return text.includes('sessão expirada') || text.includes('sessao expirada') || text.includes('sessão inválida') || text.includes('sessao invalida');
+}
+
 function getCloudState(syncStatus) {
   const source = syncStatus?.dataSource || 'signed_out';
   const message = syncStatus?.dataError?.message || '';
@@ -56,8 +61,19 @@ function getCloudState(syncStatus) {
       icon: 'loading',
       label: 'Sincronizando',
       detail: 'Sincronizando módulos',
-      title: 'Sincronizacao em andamento',
+      title: 'Sincronização manual em andamento',
       disabled: true,
+    };
+  }
+
+  if (messageIsSessionError(message)) {
+    return {
+      tone: 'warning',
+      icon: 'warning',
+      label: 'Sessão expirada',
+      detail: 'Reconectar à nuvem',
+      title: 'Sessão expirada. Reconecte para voltar a sincronizar.',
+      disabled: false,
     };
   }
 
@@ -65,9 +81,9 @@ function getCloudState(syncStatus) {
     return {
       tone: 'online',
       icon: 'cloud',
-      label: 'Nuvem disponível',
+      label: 'Nuvem conectada',
       detail: formatSyncTime(syncStatus?.lastSyncAt),
-      title: 'Dados carregados do Supabase',
+      title: 'Dados sincronizados com o Supabase',
       disabled: false,
     };
   }
@@ -78,7 +94,7 @@ function getCloudState(syncStatus) {
       icon: 'warning',
       label: 'Dados locais ativos',
       detail: message || 'Falha ao conectar ao Supabase pelo navegador',
-      title: message || 'Sincronizacao instavel. Dados locais disponiveis.',
+      title: message || 'Falha de nuvem detectada. O modo local continua ativo.',
       disabled: false,
     };
   }
@@ -87,21 +103,21 @@ function getCloudState(syncStatus) {
     return {
       tone: 'muted',
       icon: 'local',
-      label: 'Nuvem pausada',
-      detail: 'Sincronizacao desativada',
-      title: 'A sincronizacao com Supabase esta desativada neste navegador',
+      label: 'Dados locais ativos',
+      detail: 'Nuvem pausada',
+      title: 'Sincronização com Supabase desativada neste navegador',
       disabled: false,
     };
   }
 
-    return {
-      tone: 'local',
-      icon: 'local',
-      label: 'Dados locais ativos',
-      detail: 'Nuvem não verificada',
-      title: 'Sincronização manual disponível',
-      disabled: false,
-    };
+  return {
+    tone: 'local',
+    icon: 'local',
+    label: 'Dados locais ativos',
+    detail: 'Nuvem não verificada',
+    title: 'Sincronização manual disponível',
+    disabled: false,
+  };
 }
 
 export default function AppHeader({
@@ -160,7 +176,7 @@ export default function AppHeader({
     return 'success';
   }
 
-  const nomeExibicao = usuarioLogado?.nome || 'Usuario';
+  const nomeExibicao = usuarioLogado?.nome || 'Usuário';
   const perfilExibicao = obterLabelPerfil(usuarioLogado?.perfilLabel || usuarioLogado?.perfil);
   const cloudState = getCloudState(syncStatus);
 
@@ -179,9 +195,9 @@ export default function AppHeader({
       const nextLeft = isMobile
         ? viewportPadding
         : Math.min(
-            Math.max(viewportPadding, rect.right - dropdownWidth),
-            Math.max(viewportPadding, window.innerWidth - dropdownWidth - viewportPadding)
-          );
+          Math.max(viewportPadding, rect.right - dropdownWidth),
+          Math.max(viewportPadding, window.innerWidth - dropdownWidth - viewportPadding)
+        );
       const top = rect.bottom + 12;
       const maxHeight = Math.max(240, window.innerHeight - top - viewportPadding);
 
@@ -302,7 +318,7 @@ export default function AppHeader({
             type="button"
             className="header-notification-btn notif-btn"
             ref={notifButtonRef}
-            aria-label={`Notificacoes: ${notifications} ${notifications === 1 ? 'alerta' : 'alertas'} pendentes`}
+            aria-label={`Notificações: ${notifications} ${notifications === 1 ? 'alerta' : 'alertas'} pendentes`}
             onClick={() => setOpenNotif((value) => !value)}
             aria-expanded={openNotif}
             aria-controls="notification-dropdown-menu"
@@ -348,7 +364,7 @@ export default function AppHeader({
               </button>
               <button type="button" className="user-dropdown-item" onClick={() => { onNavigateSettings?.(); setOpenUserMenu(false); }}>
                 <Settings size={15} />
-                Configuracoes
+                Configurações
               </button>
               <div className="user-dropdown-divider" />
               <button type="button" className="user-dropdown-item logout" onClick={handleLogout}>
@@ -362,68 +378,68 @@ export default function AppHeader({
 
       {openNotif
         ? createPortal(
-            <>
-              <button
-                type="button"
-                className="notif-overlay"
-                aria-label="Fechar notificacoes"
-                onClick={() => setOpenNotif(false)}
-              />
-              <div
-                id="notification-dropdown-menu"
-                className={`notif-dropdown ${notifPosition.mobile ? 'notif-dropdown--mobile' : ''}`}
-                style={{
-                  position: 'fixed',
-                  top: `${notifPosition.top}px`,
-                  left: `${notifPosition.left}px`,
-                  width: `${notifPosition.width}px`,
-                  maxHeight: `${notifPosition.maxHeight}px`,
-                }}
-              >
-                <div className="notif-panel-header">
-                  <div>
-                    <span className="notif-panel-kicker">Central de alertas</span>
-                    <strong>{notifications > 0 ? `${notifications} pendentes` : 'Tudo em dia'}</strong>
-                    <small>Alertas operacionais, sanitarios, estoque e lembretes do HERDON.</small>
-                  </div>
-                  <span className="notif-panel-pill">{notifications}</span>
+          <>
+            <button
+              type="button"
+              className="notif-overlay"
+              aria-label="Fechar notificações"
+              onClick={() => setOpenNotif(false)}
+            />
+            <div
+              id="notification-dropdown-menu"
+              className={`notif-dropdown ${notifPosition.mobile ? 'notif-dropdown--mobile' : ''}`}
+              style={{
+                position: 'fixed',
+                top: `${notifPosition.top}px`,
+                left: `${notifPosition.left}px`,
+                width: `${notifPosition.width}px`,
+                maxHeight: `${notifPosition.maxHeight}px`,
+              }}
+            >
+              <div className="notif-panel-header">
+                <div>
+                  <span className="notif-panel-kicker">Central de alertas</span>
+                  <strong>{notifications > 0 ? `${notifications} pendentes` : 'Tudo em dia'}</strong>
+                  <small>Alertas operacionais, sanitários, estoque e lembretes do HERDON.</small>
                 </div>
-
-                {alerts.length === 0 ? (
-                  <p className="notif-empty">Sem alertas ativos no momento.</p>
-                ) : (
-                  <div className="notif-list">
-                    {alerts.map((alert) => {
-                      const tone = getAlertTone(alert);
-                      const destino = getNavLabel(alert?.route || 'dashboard');
-
-                      return (
-                        <div key={alert.ackKey || alert.id} className={`notif-item notif-item--${tone}`}>
-                          <div className="notif-item-head">
-                            <div className={`notif-item-dot notif-item-dot--${tone}`} aria-hidden="true" />
-                            <div className="notif-item-copy">
-                              <strong>{alert.title || alert.titulo}</strong>
-                              <span className="notif-item-meta">{destino}</span>
-                            </div>
-                            <span className={`notif-item-tag notif-item-tag--${tone}`}>
-                              {tone === 'danger' ? 'Critico' : tone === 'warning' ? 'Atencao' : tone === 'info' ? 'Monitorar' : 'Operacional'}
-                            </span>
-                          </div>
-                          <small>{alert.description || alert.mensagem}</small>
-                          <div className="notif-actions">
-                            <Button size="sm" variant="outline" onClick={() => { onResolveAlert?.(alert); setOpenNotif(false); }}>Resolver</Button>
-                            <Button size="sm" variant="ghost" icon={<Clock3 size={12} />} onClick={() => { onSnoozeAlert?.(alert); setOpenNotif(false); }}>Adiar</Button>
-                            <Button size="sm" variant="ghost" onClick={() => { onAlertNavigate?.(alert); setOpenNotif(false); }}>Abrir</Button>
-                          </div>
-                        </div>
-                      );
-                    })}
-                  </div>
-                )}
+                <span className="notif-panel-pill">{notifications}</span>
               </div>
-            </>,
-            document.body
-          )
+
+              {alerts.length === 0 ? (
+                <p className="notif-empty">Sem alertas ativos no momento.</p>
+              ) : (
+                <div className="notif-list">
+                  {alerts.map((alert) => {
+                    const tone = getAlertTone(alert);
+                    const destino = getNavLabel(alert?.route || 'dashboard');
+
+                    return (
+                      <div key={alert.ackKey || alert.id} className={`notif-item notif-item--${tone}`}>
+                        <div className="notif-item-head">
+                          <div className={`notif-item-dot notif-item-dot--${tone}`} aria-hidden="true" />
+                          <div className="notif-item-copy">
+                            <strong>{alert.title || alert.titulo}</strong>
+                            <span className="notif-item-meta">{destino}</span>
+                          </div>
+                          <span className={`notif-item-tag notif-item-tag--${tone}`}>
+                            {tone === 'danger' ? 'Crítico' : tone === 'warning' ? 'Atenção' : tone === 'info' ? 'Monitorar' : 'Operacional'}
+                          </span>
+                        </div>
+                        <small>{alert.description || alert.mensagem}</small>
+                        <div className="notif-actions">
+                          <Button size="sm" variant="outline" onClick={() => { onResolveAlert?.(alert); setOpenNotif(false); }}>Resolver</Button>
+                          <Button size="sm" variant="ghost" icon={<Clock3 size={12} />} onClick={() => { onSnoozeAlert?.(alert); setOpenNotif(false); }}>Adiar</Button>
+                          <Button size="sm" variant="ghost" onClick={() => { onAlertNavigate?.(alert); setOpenNotif(false); }}>Abrir</Button>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+          </>,
+          document.body
+        )
         : null}
     </header>
   );
