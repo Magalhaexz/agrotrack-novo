@@ -206,6 +206,144 @@ function buildEnvStep() {
 }
 
 export async function runMinimalCloudDiagnostic({ table = 'lotes', session, timeoutMs = 8000 } = {}) {
+  const accessToken = session?.access_token || session?.session?.access_token || null;
+  if (!accessToken) {
+    return {
+      ok: false,
+      table,
+      appOrigin: typeof window !== 'undefined' ? window.location.origin : null,
+      supabaseHost: null,
+      envStatus: buildEnvStep().envStatus,
+      authState: {
+        hasSession: Boolean(session?.user),
+        hasAccessToken: false,
+        tokenLooksJwt: null,
+        tokenExpired: null,
+        refreshAttempted: false,
+        refreshSucceeded: false,
+      },
+      steps: [
+        { step: 'env_check', ok: true, safeMessage: 'Ambiente configurado' },
+        { step: 'rest_without_session', ok: true, safeMessage: 'OK' },
+        { step: 'session_check', ok: false, status: 'missing', safeMessage: 'Sessão inválida ou expirada.' },
+        { step: 'rest_with_session', ok: false, safeMessage: 'Bloqueado por sessão inválida', skipped: true },
+        { step: 'client_select', ok: false, safeMessage: 'Bloqueado por sessão inválida', skipped: true },
+      ],
+      conclusion: 'session_failure',
+      conclusionMessage: 'Sessão expirada. Entre novamente para sincronizar com a nuvem.',
+    };
+  }
+
+  try {
+    const serverResponse = await fetch('/api/cloud-diagnostic', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${accessToken}`,
+      },
+      body: JSON.stringify({}),
+    });
+
+    const serverJson = await serverResponse.json().catch(() => null);
+    if (serverResponse.ok && serverJson) {
+      const checks = Array.isArray(serverJson?.checks) ? serverJson.checks : [];
+      const mapCheck = (name, fallbackStep) => {
+        const hit = checks.find((item) => item?.name === name);
+        if (!hit) return null;
+        return {
+          step: fallbackStep,
+          table: hit?.table || table,
+          endpointPath: `/api/cloud-diagnostic:${name}`,
+          ok: hit?.status === 'success',
+          httpStatus: hit?.httpStatus ?? (hit?.status === 'success' ? 200 : null),
+          postgrestCode: hit?.code ?? null,
+          failureType: hit?.status === 'success' ? null : 'server_check_error',
+          safeMessage: hit?.message || (hit?.status === 'success' ? 'OK' : 'Erro no diagnóstico do servidor'),
+          source: 'server',
+        };
+      };
+
+      const envStep = {
+        step: 'env_check',
+        ok: checks.some((item) => item?.name === 'env' ? item?.status === 'success' : false),
+        envStatus: {
+          supabaseUrlPresent: true,
+          anonKeyPresent: true,
+          host: null,
+          urlValid: true,
+          anonKeyLooksValid: true,
+        },
+        safeMessage: checks.find((item) => item?.name === 'env')?.message || 'Ambiente configurado',
+        source: 'server',
+      };
+      const restNoAuth = mapCheck('table_lotes', 'rest_without_session') || {
+        step: 'rest_without_session',
+        table,
+        endpointPath: '/api/cloud-diagnostic:table_lotes',
+        ok: false,
+        httpStatus: null,
+        postgrestCode: null,
+        failureType: 'unknown',
+        safeMessage: 'Falha ao conectar o servidor à nuvem.',
+        source: 'server',
+      };
+      const sessionStep = {
+        step: 'session_check',
+        ok: Boolean(session?.user?.id),
+        status: session?.user?.id ? 'valid' : 'missing',
+        safeMessage: session?.user?.id ? 'Sessão válida' : 'Sessão inválida ou expirada.',
+        source: 'server',
+      };
+      const restWithAuth = mapCheck('table_lotes_owner', 'rest_with_session') || {
+        step: 'rest_with_session',
+        table,
+        endpointPath: '/api/cloud-diagnostic:table_lotes_owner',
+        ok: false,
+        httpStatus: null,
+        postgrestCode: null,
+        failureType: 'unknown',
+        safeMessage: 'Falha ao conectar o servidor à nuvem.',
+        source: 'server',
+      };
+      const clientStep = mapCheck('table_fazendas_owner', 'client_select') || {
+        step: 'client_select',
+        table: 'fazendas',
+        endpointPath: '/api/cloud-diagnostic:table_fazendas_owner',
+        ok: false,
+        httpStatus: null,
+        postgrestCode: null,
+        failureType: 'unknown',
+        safeMessage: 'Falha ao conectar o servidor à nuvem.',
+        source: 'server',
+      };
+
+      const steps = [envStep, restNoAuth, sessionStep, restWithAuth, clientStep];
+      const ok = steps.every((item) => item?.ok);
+      return {
+        ok,
+        table,
+        appOrigin: typeof window !== 'undefined' ? window.location.origin : null,
+        supabaseHost: null,
+        envStatus: envStep.envStatus,
+        authState: {
+          hasSession: Boolean(session?.user),
+          hasAccessToken: Boolean(session?.access_token || session?.session?.access_token),
+          tokenLooksJwt: null,
+          tokenExpired: null,
+          refreshAttempted: false,
+          refreshSucceeded: false,
+        },
+        steps,
+        conclusion: ok ? 'connectivity_ok' : 'server_bridge_failure',
+        conclusionMessage: ok
+          ? 'Nuvem conectada pelo servidor.'
+          : 'Não foi possível sincronizar pelo servidor. O modo local continua ativo.',
+      };
+    }
+  } catch {
+    // fallback para diagnóstico direto
+  }
+
   const envStep = buildEnvStep();
   const supabaseUrl = normalizeEnvValue(import.meta?.env?.VITE_SUPABASE_URL || '');
   const anonKey = normalizeEnvValue(import.meta?.env?.VITE_SUPABASE_ANON_KEY || '');

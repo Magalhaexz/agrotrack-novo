@@ -341,10 +341,57 @@ export default function FazendasPage({ db, setDb, onConfirmAction }) {
 
     try {
       showToast({ type: 'info', message: 'Fazendas: sincronizando...' });
-      const fazendasSync = await syncFazendasWithCloud({ fazendas, session });
-
       showToast({ type: 'info', message: 'Lotes: sincronizando...' });
-      const lotesSync = await syncLotesWithCloud({ lotes, session });
+
+      let fazendasSync = null;
+      let lotesSync = null;
+      let usedServerBridge = false;
+
+      try {
+        const accessToken = session?.access_token || session?.session?.access_token || null;
+        if (!accessToken) {
+          throw new Error('missing_access_token');
+        }
+        const response = await fetch('/api/cloud-sync', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${accessToken}`,
+          },
+          body: JSON.stringify({
+            fazendas,
+            lotes,
+          }),
+        });
+        const payload = await response.json().catch(() => null);
+        if (!response.ok || !payload) {
+          throw new Error('server_sync_failed');
+        }
+        usedServerBridge = true;
+        fazendasSync = {
+          module: 'fazendas',
+          status: payload?.fazendas?.status || 'error',
+          message: payload?.fazendas?.status === 'success'
+            ? 'Fazendas sincronizadas com a nuvem.'
+            : 'Não foi possível sincronizar pelo servidor. O modo local continua ativo.',
+          data: Array.isArray(payload?.fazendas?.data) ? payload.fazendas.data : fazendas,
+          httpStatus: response.status,
+          code: payload?.fazendas?.status === 'success' ? null : 'SERVER_SYNC_FAILED',
+        };
+        lotesSync = {
+          module: 'lotes',
+          status: payload?.lotes?.status || 'error',
+          message: payload?.lotes?.status === 'success'
+            ? 'Lotes sincronizados com a nuvem.'
+            : 'Não foi possível sincronizar pelo servidor. O modo local continua ativo.',
+          data: Array.isArray(payload?.lotes?.data) ? payload.lotes.data : lotes,
+          httpStatus: response.status,
+          code: payload?.lotes?.status === 'success' ? null : 'SERVER_SYNC_FAILED',
+        };
+      } catch {
+        fazendasSync = await syncFazendasWithCloud({ fazendas, session });
+        lotesSync = await syncLotesWithCloud({ lotes, session });
+      }
 
       if (Array.isArray(fazendasSync?.data) || Array.isArray(lotesSync?.data)) {
         setDb((prev) => ({
@@ -355,13 +402,19 @@ export default function FazendasPage({ db, setDb, onConfirmAction }) {
       }
 
       if (fazendasSync?.status === 'success' && lotesSync?.status === 'success') {
-        showToast({ type: 'success', message: 'Fazendas sincronizadas. Lotes sincronizados.' });
+        if (usedServerBridge) {
+          showToast({ type: 'success', message: 'Nuvem conectada pelo servidor.' });
+          showToast({ type: 'success', message: 'Fazendas sincronizadas com a nuvem.' });
+          showToast({ type: 'success', message: 'Lotes sincronizados com a nuvem.' });
+        } else {
+          showToast({ type: 'success', message: 'Fazendas sincronizadas. Lotes sincronizados.' });
+        }
       } else if (fazendasSync?.status === 'success') {
         showToast({ type: 'warning', message: `Fazendas sincronizadas. Falha ao sincronizar lotes: ${lotesSync?.message || 'ver diagnóstico.'}` });
       } else if (lotesSync?.status === 'success') {
         showToast({ type: 'warning', message: `Fazendas: ${fazendasSync?.message || 'erro ao sincronizar.'} Lotes sincronizados.` });
       } else {
-        showToast({ type: 'warning', message: `Fazendas: ${fazendasSync?.message || 'erro'} Lotes: ${lotesSync?.message || 'erro'}` });
+        showToast({ type: 'warning', message: 'Não foi possível sincronizar pelo servidor. O modo local continua ativo.' });
       }
 
       if (fazendasSync?.status !== 'success' || lotesSync?.status !== 'success') {
