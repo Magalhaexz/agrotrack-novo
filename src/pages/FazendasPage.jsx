@@ -7,14 +7,14 @@ import { gerarNovoId } from '../utils/id';
 import { useToast } from '../hooks/useToast';
 import { useAuth } from '../auth/useAuth';
 import {
-  checkSupabaseCloudConnection,
   createOperationalRecord,
   deleteOperationalRecord,
+  getCloudSyncCooldownState,
   syncFazendasWithCloud,
   syncLotesWithCloud,
   updateOperationalRecord,
 } from '../services/operationalPersistence';
-import { runBrowserSafeCloudProbe, runMinimalCloudDiagnostic } from '../services/supabaseDiagnostics';
+import { runMinimalCloudDiagnostic } from '../services/supabaseDiagnostics';
 
 export default function FazendasPage({ db, setDb, onConfirmAction }) {
   const { showToast, dismissToast } = useToast();
@@ -208,22 +208,6 @@ export default function FazendasPage({ db, setDb, onConfirmAction }) {
     });
 
     try {
-      const health = await checkSupabaseCloudConnection({ session });
-      if (!health?.ok) {
-        showToast({
-          type: 'warning',
-          message: health?.message || 'Não foi possível conectar ao Supabase. Verifique sua conexão, DNS ou variáveis da nuvem.',
-        });
-        return;
-      }
-      const browserProbe = await runBrowserSafeCloudProbe({ table: 'lotes', session, timeoutMs: 7000 });
-      if (!browserProbe?.ok) {
-        showToast({
-          type: 'warning',
-          message: 'Falha ao conectar ao Supabase pelo navegador',
-        });
-      }
-
       const fazendasSync = await syncFazendasWithCloud({
         fazendas,
         session,
@@ -261,29 +245,31 @@ export default function FazendasPage({ db, setDb, onConfirmAction }) {
           message: `Fazendas: ${fazendasSync?.message || 'erro'} Lotes: ${lotesSync?.message || 'erro'}`,
         });
       }
-      if (fazendasSync?.status !== 'success' || lotesSync?.status !== 'success' || !browserProbe?.ok) {
+      if (fazendasSync?.status !== 'success' || lotesSync?.status !== 'success' ) {
         let supabaseHost = null;
         try {
           supabaseHost = new URL(import.meta.env.VITE_SUPABASE_URL).host;
         } catch {
           supabaseHost = null;
         }
+        const primaryModule = fazendasSync?.status !== 'success' ? 'fazendas' : 'lotes';
+        const primaryResult = fazendasSync?.status !== 'success' ? fazendasSync : lotesSync;
         const safeDiagnostic = {
           appOrigin: window.location.origin,
           supabaseHost,
-          module: fazendasSync?.status !== 'success' ? 'fazendas' : 'lotes',
-          table: fazendasSync?.status !== 'success' ? 'fazendas' : 'lotes',
-          stage: fazendasSync?.status !== 'success' ? 'manual_sync_fazendas' : 'manual_sync_lotes',
-          failureType: browserProbe?.failureType || (lotesSync?.status === 'timeout' ? 'timeout' : 'unknown'),
-          httpStatus: (lotesSync?.httpStatus ?? fazendasSync?.httpStatus ?? browserProbe?.httpStatus ?? null),
-          postgrestCode: (lotesSync?.code ?? fazendasSync?.code ?? browserProbe?.postgrestCode ?? null),
-          safeMessage: (lotesSync?.message || fazendasSync?.message || browserProbe?.safeMessage || 'Falha ao sincronizar'),
-          retryState: {
-            inFlight: manualSyncRef.current.inFlight,
-            lastStartAt: manualSyncRef.current.lastStartAt,
+          module: primaryModule,
+          table: primaryModule,
+          stage: primaryModule === 'fazendas' ? 'manual_sync_fazendas' : 'manual_sync_lotes',
+          failureType: primaryResult?.status === 'timeout' ? 'timeout' : 'error',
+          httpStatus: primaryResult?.httpStatus ?? null,
+          postgrestCode: primaryResult?.code ?? null,
+          safeMessage: primaryResult?.message || 'Falha ao sincronizar com a nuvem.',
+          cooldownState: {
+            fazendas: getCloudSyncCooldownState('fazendas'),
+            lotes: getCloudSyncCooldownState('lotes'),
           },
         };
-        console.groupCollapsed('[HERDON_CLOUD_DIAGNOSTIC]');
+        console.groupCollapsed('[HERDON_CLOUD_PRODUCTION_DIAGNOSTIC]');
         console.info(safeDiagnostic);
         console.groupEnd();
       }
@@ -367,4 +353,6 @@ export default function FazendasPage({ db, setDb, onConfirmAction }) {
     </div>
   );
 }
+
+
 

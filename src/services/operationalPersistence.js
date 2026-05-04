@@ -52,6 +52,24 @@ function closeNetworkCircuit(moduleName) {
   moduleNetworkCircuit.delete(moduleName);
 }
 
+export function getCloudSyncCooldownState(moduleName) {
+  const openedAt = moduleNetworkCircuit.get(moduleName) || 0;
+  if (!openedAt) {
+    return {
+      module: moduleName,
+      open: false,
+      remainingMs: 0,
+    };
+  }
+  const elapsed = Date.now() - openedAt;
+  const remainingMs = Math.max(0, NETWORK_CIRCUIT_OPEN_MS - elapsed);
+  return {
+    module: moduleName,
+    open: remainingMs > 0,
+    remainingMs,
+  };
+}
+
 function buildModuleSyncResult({
   module,
   status,
@@ -643,7 +661,7 @@ export async function persistCollectionMutation(mutations = []) {
 export async function createAuditEvent(event = {}, session) {
   const userId = getSessionUserId(session);
   if (!userId) {
-    return buildFallback('Sessão indisponível para registrar auditoria.');
+    return buildFallback('SessÃ£o indisponÃ­vel para registrar auditoria.');
   }
 
   const payload = {
@@ -662,7 +680,7 @@ export async function createAuditEvent(event = {}, session) {
 export async function deleteOwnerScopedCollection(table, session, extraFilters = []) {
   const userId = getSessionUserId(session);
   if (!userId) {
-    return buildFallback('Sessão indisponível para limpeza da coleção.');
+    return buildFallback('SessÃ£o indisponÃ­vel para limpeza da coleÃ§Ã£o.');
   }
 
   try {
@@ -673,11 +691,11 @@ export async function deleteOwnerScopedCollection(table, session, extraFilters =
     });
     const { error } = await query;
     if (error) {
-      throw new Error(error.message || 'Falha ao limpar coleção.');
+      throw new Error(error.message || 'Falha ao limpar coleÃ§Ã£o.');
     }
     return { persisted: true, data: null, error: null };
   } catch (error) {
-    return buildFallback(error?.message || 'Falha ao persistir limpeza da coleção.');
+    return buildFallback(error?.message || 'Falha ao persistir limpeza da coleÃ§Ã£o.');
   }
 }
 
@@ -698,18 +716,18 @@ function classifyFazendasSyncError(error) {
   const details = String(error?.details || '').toLowerCase();
 
   if (code === '42501' || message.includes('permission denied') || message.includes('row-level security') || details.includes('row-level security')) {
-    return 'Sem permissão para acessar estes dados na nuvem.';
+    return 'Sem permissÃ£o para acessar estes dados na nuvem.';
   }
 
   if (code === '42703' || code === 'PGRST204' || message.includes('column') || message.includes('schema') || details.includes('column') || details.includes('schema')) {
-    return 'Tabela de fazendas não encontrada na nuvem. Verifique a estrutura do Supabase.';
+    return 'Tabela de fazendas nÃ£o encontrada na nuvem. Verifique a estrutura do Supabase.';
   }
 
   if (isNetworkError(error)) {
-    return 'Projeto Supabase inacessível pela rede.';
+    return 'Falha de conexão do navegador com o Supabase. O modo local continua ativo.';
   }
 
-  return 'Não foi possível sincronizar fazendas. Seus dados locais continuam disponíveis.';
+  return 'NÃ£o foi possÃ­vel sincronizar fazendas. Seus dados locais continuam disponÃ­veis.';
 }
 
 function classifyLotesSyncError(error) {
@@ -731,7 +749,7 @@ function classifyLotesSyncError(error) {
   }
 
   if (status === 400 || code === '42703' || code === 'PGRST204' || message.includes('column') || message.includes('schema') || message.includes('relation') || details.includes('column') || details.includes('schema') || details.includes('relation')) {
-    return 'Estrutura da tabela de lotes incompat\u00EDvel com o app. Verifique as colunas no Supabase.';
+    return 'Estrutura da nuvem incompatível com o app. Verifique as colunas no Supabase.';
   }
 
   if (code === 'CONFIG_ERROR' || message.includes('missing_rest_config_or_token')) {
@@ -739,7 +757,7 @@ function classifyLotesSyncError(error) {
   }
 
   if (isNetworkError(error)) {
-    return 'N\u00E3o foi poss\u00EDvel conectar ao Supabase. Verifique sua conex\u00E3o, DNS ou vari\u00E1veis da nuvem.';
+    return 'Falha de conexão do navegador com o Supabase. O modo local continua ativo.';
   }
 
   if (code === '57014' || message.includes('timeout')) {
@@ -747,7 +765,7 @@ function classifyLotesSyncError(error) {
   }
 
   if (code === '22P02' || message.includes('invalid input syntax') || message.includes('violates')) {
-    return 'Estrutura da tabela de lotes incompat\u00EDvel com o app. Verifique as colunas no Supabase.';
+    return 'Estrutura da nuvem incompatível com o app. Verifique as colunas no Supabase.';
   }
 
   return 'N\u00E3o foi poss\u00EDvel sincronizar lotes. Seus dados locais continuam dispon\u00EDveis.';
@@ -773,7 +791,7 @@ export async function checkSupabaseCloudConnection({ session } = {}) {
     };
   }
   if (!sessionUserId) {
-    const message = 'Sessão expirada. Entre novamente para sincronizar com a nuvem.';
+    const message = 'SessÃ£o expirada. Entre novamente para sincronizar com a nuvem.';
     if (isAuthDebugEnabled()) {
       console.info('[HERDON_CLOUD_HEALTH]', {
         stage: 'auth_session_missing',
@@ -817,12 +835,12 @@ export async function checkSupabaseCloudConnection({ session } = {}) {
     const code = String(error?.code || '').toUpperCase() || null;
     const lower = String(error?.message || '').toLowerCase();
     let stage = 'unknown_error';
-    let message = 'Não foi possível sincronizar fazendas. Seus dados locais continuam disponíveis.';
-    if (status === 401) { stage = 'auth_session_missing'; message = 'Sessão expirada. Entre novamente para sincronizar com a nuvem.'; }
-    else if (status === 403 || code === '42501') { stage = 'permission_denied'; message = 'Sem permissão para acessar estes dados na nuvem.'; }
-    else if (status === 404 || code === 'PGRST205' || code === 'PGRST204' || code === '42703' || lower.includes('schema') || lower.includes('column')) { stage = 'schema_mismatch'; message = 'Tabela de fazendas não encontrada na nuvem. Verifique a estrutura do Supabase.'; }
-    else if (code === 'CONFIG_ERROR' || lower.includes('missing_rest_config_or_token')) { stage = 'config_missing'; message = 'Configuração da nuvem ausente. Verifique as variáveis do Supabase.'; }
-    else if (isNetworkError(error) || (error?.name === 'TypeError' && lower.includes('failed to fetch'))) { stage = 'network_error'; message = 'Projeto Supabase inacessível pela rede.'; }
+    let message = 'NÃ£o foi possÃ­vel sincronizar fazendas. Seus dados locais continuam disponÃ­veis.';
+    if (status === 401) { stage = 'auth_session_missing'; message = 'SessÃ£o expirada. Entre novamente para sincronizar com a nuvem.'; }
+    else if (status === 403 || code === '42501') { stage = 'permission_denied'; message = 'Sem permissÃ£o para acessar estes dados na nuvem.'; }
+    else if (status === 404 || code === 'PGRST205' || code === 'PGRST204' || code === '42703' || lower.includes('schema') || lower.includes('column')) { stage = 'schema_mismatch'; message = 'Tabela de fazendas nÃ£o encontrada na nuvem. Verifique a estrutura do Supabase.'; }
+    else if (code === 'CONFIG_ERROR' || lower.includes('missing_rest_config_or_token')) { stage = 'config_missing'; message = 'ConfiguraÃ§Ã£o da nuvem ausente. Verifique as variÃ¡veis do Supabase.'; }
+    else if (isNetworkError(error) || (error?.name === 'TypeError' && lower.includes('failed to fetch'))) { stage = 'network_error'; message = 'Projeto Supabase inacessÃ­vel pela rede.'; }
 
     if (isAuthDebugEnabled()) {
       console.info('[HERDON_CLOUD_HEALTH]', {
@@ -1004,6 +1022,7 @@ export async function syncLotesWithCloud({ lotes = [], session }) {
   closeNetworkCircuit('lotes');
   return buildModuleSyncResult({ module: 'lotes', status: 'success', message: 'Lotes sincronizados.', data: mergeLotesSafe(localRows, remoteList), syncedCount, failedCount, selectedCount: Array.isArray(remoteList) ? remoteList.length : 0 });
 }
+
 
 
 
