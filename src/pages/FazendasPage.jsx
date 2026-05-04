@@ -14,7 +14,7 @@ import {
   syncLotesWithCloud,
   updateOperationalRecord,
 } from '../services/operationalPersistence';
-import { runSupabaseConnectivityDiagnostics } from '../services/supabaseDiagnostics';
+import { runBrowserSafeCloudProbe, runSupabaseConnectivityDiagnostics } from '../services/supabaseDiagnostics';
 
 export default function FazendasPage({ db, setDb, onConfirmAction }) {
   const { showToast, dismissToast } = useToast();
@@ -212,15 +212,24 @@ export default function FazendasPage({ db, setDb, onConfirmAction }) {
         });
         return;
       }
+      const browserProbe = await runBrowserSafeCloudProbe({ table: 'lotes', session, timeoutMs: 7000 });
+      if (!browserProbe?.ok) {
+        showToast({
+          type: 'warning',
+          message: 'Falha ao conectar ao Supabase pelo navegador',
+        });
+      }
 
       const fazendasSync = await syncFazendasWithCloud({
         fazendas,
         session,
       });
+      showToast({ type: 'info', message: 'Fazendas: sincronizando...' });
       const lotesSync = await syncLotesWithCloud({
         lotes,
         session,
       });
+      showToast({ type: 'info', message: 'Lotes: sincronizando...' });
 
       if (Array.isArray(fazendasSync?.data) || Array.isArray(lotesSync?.data)) {
         setDb((prev) => ({
@@ -235,7 +244,7 @@ export default function FazendasPage({ db, setDb, onConfirmAction }) {
       } else if (fazendasSync?.status === 'success' && lotesSync?.status !== 'success') {
         showToast({
           type: 'warning',
-          message: `Fazendas sincronizadas. Lotes: ${lotesSync?.message || 'erro ao sincronizar.'}`,
+          message: `Fazendas sincronizadas. Falha ao sincronizar lotes: ver diagnóstico. ${lotesSync?.message || ''}`.trim(),
         });
       } else if (fazendasSync?.status !== 'success' && lotesSync?.status === 'success') {
         showToast({
@@ -247,6 +256,32 @@ export default function FazendasPage({ db, setDb, onConfirmAction }) {
           type: 'warning',
           message: `Fazendas: ${fazendasSync?.message || 'erro'} Lotes: ${lotesSync?.message || 'erro'}`,
         });
+      }
+      if (fazendasSync?.status !== 'success' || lotesSync?.status !== 'success' || !browserProbe?.ok) {
+        let supabaseHost = null;
+        try {
+          supabaseHost = new URL(import.meta.env.VITE_SUPABASE_URL).host;
+        } catch {
+          supabaseHost = null;
+        }
+        const safeDiagnostic = {
+          appOrigin: window.location.origin,
+          supabaseHost,
+          module: fazendasSync?.status !== 'success' ? 'fazendas' : 'lotes',
+          table: fazendasSync?.status !== 'success' ? 'fazendas' : 'lotes',
+          stage: fazendasSync?.status !== 'success' ? 'manual_sync_fazendas' : 'manual_sync_lotes',
+          failureType: browserProbe?.failureType || (lotesSync?.status === 'timeout' ? 'timeout' : 'unknown'),
+          httpStatus: (lotesSync?.httpStatus ?? fazendasSync?.httpStatus ?? browserProbe?.httpStatus ?? null),
+          postgrestCode: (lotesSync?.code ?? fazendasSync?.code ?? browserProbe?.postgrestCode ?? null),
+          safeMessage: (lotesSync?.message || fazendasSync?.message || browserProbe?.safeMessage || 'Falha ao sincronizar'),
+          retryState: {
+            inFlight: manualSyncRef.current.inFlight,
+            lastStartAt: manualSyncRef.current.lastStartAt,
+          },
+        };
+        console.groupCollapsed('[HERDON_CLOUD_DIAGNOSTIC]');
+        console.info(safeDiagnostic);
+        console.groupEnd();
       }
     } catch {
       showToast({

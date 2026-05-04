@@ -412,3 +412,80 @@ export async function runSupabaseConnectivityDiagnostics({ session, timeoutMs = 
   };
 }
 
+function classifyBrowserProbeFailure(error, status = null, code = null) {
+  const message = getErrorMessage(error).toLowerCase();
+  if (status === 401) return 'auth';
+  if (status === 403 || code === '42501') return 'rls';
+  if (status === 404 || code === 'PGRST205' || code === '42P01') return 'schema';
+  if (status === 400 || code === '42703' || code === 'PGRST204') return 'payload';
+  if (message.includes('err_http2_protocol_error')) return 'http2_protocol_error';
+  if (message.includes('err_connection_reset')) return 'network_reset';
+  if (message.includes('err_connection_closed')) return 'network_reset';
+  if (error?.name === 'AbortError' || message.includes('timeout')) return 'timeout';
+  if (isNetworkLikeError(error)) return 'network_reset';
+  return 'unknown';
+}
+
+export async function runBrowserSafeCloudProbe({ timeoutMs = 8000, table = 'lotes', session } = {}) {
+  const envStatus = getSupabaseEnvStatus();
+  if (!envStatus?.configured) {
+    return {
+      ok: false,
+      table,
+      endpoint: `/rest/v1/${table}?select=id&limit=1`,
+      httpStatus: null,
+      postgrestCode: null,
+      failureType: 'payload',
+      safeMessage: 'Configuração da nuvem incompleta. Verifique as variáveis do Supabase.',
+    };
+  }
+
+  const userId = session?.user?.id || null;
+  const controller = new AbortController();
+  const timer = globalThis.setTimeout(() => controller.abort(), timeoutMs);
+  try {
+    let query = supabase.from(table).select('id').limit(1);
+    if (userId) {
+      query = query.eq('owner_user_id', userId);
+    }
+    const { error } = await query.abortSignal(controller.signal);
+    if (!error) {
+      return {
+        ok: true,
+        table,
+        endpoint: `/rest/v1/${table}?select=id&limit=1`,
+        httpStatus: 200,
+        postgrestCode: null,
+        failureType: null,
+        safeMessage: 'Nuvem disponível',
+      };
+    }
+
+    const status = Number(error?.status) || null;
+    const code = String(error?.code || '').toUpperCase() || null;
+    const failureType = classifyBrowserProbeFailure(error, status, code);
+    return {
+      ok: false,
+      table,
+      endpoint: `/rest/v1/${table}?select=id&limit=1`,
+      httpStatus: status,
+      postgrestCode: code,
+      failureType,
+      safeMessage: 'Falha ao conectar ao Supabase pelo navegador',
+    };
+  } catch (error) {
+    const failureType = classifyBrowserProbeFailure(error, null, null);
+    return {
+      ok: false,
+      table,
+      endpoint: `/rest/v1/${table}?select=id&limit=1`,
+      httpStatus: null,
+      postgrestCode: null,
+      failureType,
+      safeMessage: 'Falha ao conectar ao Supabase pelo navegador',
+    };
+  } finally {
+    globalThis.clearTimeout(timer);
+  }
+}
+

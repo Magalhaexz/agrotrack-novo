@@ -55,7 +55,7 @@ function getCloudState(syncStatus) {
       tone: 'syncing',
       icon: 'loading',
       label: 'Sincronizando',
-      detail: 'Atualizando dados',
+      detail: 'Sincronizando módulos',
       title: 'Sincronizacao em andamento',
       disabled: true,
     };
@@ -65,7 +65,7 @@ function getCloudState(syncStatus) {
     return {
       tone: 'online',
       icon: 'cloud',
-      label: 'Nuvem ativa',
+      label: 'Nuvem disponível',
       detail: formatSyncTime(syncStatus?.lastSyncAt),
       title: 'Dados carregados do Supabase',
       disabled: false,
@@ -76,8 +76,8 @@ function getCloudState(syncStatus) {
     return {
       tone: 'warning',
       icon: 'warning',
-      label: 'Dados locais',
-      detail: message || 'Nuvem instavel',
+      label: 'Dados locais ativos',
+      detail: message || 'Falha ao conectar ao Supabase pelo navegador',
       title: message || 'Sincronizacao instavel. Dados locais disponiveis.',
       disabled: false,
     };
@@ -94,14 +94,14 @@ function getCloudState(syncStatus) {
     };
   }
 
-  return {
-    tone: 'local',
-    icon: 'local',
-    label: 'Dados locais',
-    detail: 'Clique para sincronizar',
-    title: 'Sincronizacao manual disponivel',
-    disabled: false,
-  };
+    return {
+      tone: 'local',
+      icon: 'local',
+      label: 'Dados locais ativos',
+      detail: 'Nuvem não verificada',
+      title: 'Sincronização manual disponível',
+      disabled: false,
+    };
 }
 
 export default function AppHeader({
