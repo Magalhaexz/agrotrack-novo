@@ -1,4 +1,4 @@
-import { getSupabaseEnvStatus, supabase } from '../lib/supabase.js';
+import { getSupabaseEnvStatus, supabase, validateSupabaseSessionForCloud } from '../lib/supabase.js';
 
 const DEFAULT_TIMEOUT_MS = 10000;
 
@@ -678,6 +678,15 @@ export async function runMinimalCloudDiagnostic({ table = 'lotes', session, time
   const supabaseUrl = normalizeEnvValue(import.meta?.env?.VITE_SUPABASE_URL || '');
   const anonKey = normalizeEnvValue(import.meta?.env?.VITE_SUPABASE_ANON_KEY || '');
   const token = session?.access_token || session?.session?.access_token || null;
+  const validatedSession = token ? await validateSupabaseSessionForCloud() : null;
+  const authState = validatedSession?.authState || {
+    hasSession: Boolean(session),
+    hasAccessToken: Boolean(token),
+    tokenLooksJwt: false,
+    tokenExpired: false,
+    refreshAttempted: false,
+    refreshSucceeded: false,
+  };
 
   const restNoAuth = envStep.ok
     ? await runMinimalRestStep({
@@ -696,16 +705,16 @@ export async function runMinimalCloudDiagnostic({ table = 'lotes', session, time
       httpStatus: null,
       postgrestCode: null,
       failureType: 'config',
-      safeMessage: 'Erro de configuração',
+      safeMessage: 'Erro de configura��o',
     };
 
-  const restWithAuth = token
+  const restWithAuth = token && validatedSession?.ok
     ? await runMinimalRestStep({
       step: 'rest_with_session',
       table,
       supabaseUrl,
       anonKey,
-      token,
+      token: validatedSession?.session?.access_token || token,
       timeoutMs,
     })
     : {
@@ -716,11 +725,11 @@ export async function runMinimalCloudDiagnostic({ table = 'lotes', session, time
       httpStatus: null,
       postgrestCode: null,
       failureType: 'auth',
-      safeMessage: 'Sessão inválida ou expirada. Entre novamente.',
+      safeMessage: 'Sess�o expirada. Entre novamente para sincronizar com a nuvem.',
       skipped: true,
     };
 
-  const clientStep = envStep.ok
+  const clientStep = envStep.ok && (validatedSession?.ok || !token)
     ? await runMinimalClientStep({ table, timeoutMs })
     : {
       step: 'client_select',
@@ -729,27 +738,27 @@ export async function runMinimalCloudDiagnostic({ table = 'lotes', session, time
       ok: false,
       httpStatus: null,
       postgrestCode: null,
-      failureType: 'config',
-      safeMessage: 'Erro de configuração',
+      failureType: 'auth',
+      safeMessage: 'Sess�o expirada. Entre novamente para sincronizar com a nuvem.',
     };
 
   const steps = [envStep, restNoAuth, restWithAuth, clientStep];
   const ok = envStep.ok && restNoAuth.ok && (restWithAuth.ok || !token) && clientStep.ok;
 
   let conclusion = 'sync_pipeline_issue';
-  let conclusionMessage = 'REST e cliente Supabase operacionais. O problema está no pipeline de sincronização.';
+  let conclusionMessage = 'REST e cliente Supabase operacionais. O problema est� no pipeline de sincroniza��o.';
   if (!restNoAuth.ok && ['network_reset', 'http2_protocol_error', 'timeout'].includes(restNoAuth.failureType)) {
     conclusion = 'browser_network_failure';
-    conclusionMessage = 'Falha de conexão do navegador com o Supabase. O modo local continua ativo.';
+    conclusionMessage = 'Falha de conex�o do navegador com o Supabase. O modo local continua ativo.';
   } else if (restNoAuth.ok && !restWithAuth.ok && token) {
     conclusion = 'session_failure';
-    conclusionMessage = 'Sessão inválida ou expirada. Entre novamente.';
+    conclusionMessage = 'Sess�o expirada. Entre novamente para sincronizar com a nuvem.';
   } else if (restNoAuth.ok && !clientStep.ok) {
     conclusion = 'supabase_client_failure';
-    conclusionMessage = 'Falha no cliente Supabase. Verifique sessão e configuração.';
+    conclusionMessage = 'Falha no cliente Supabase. Verifique sess�o e configura��o.';
   } else if (!envStep.ok) {
     conclusion = 'config_failure';
-    conclusionMessage = 'Erro de configuração';
+    conclusionMessage = 'Erro de configura��o';
   } else if (ok) {
     conclusion = 'connectivity_ok';
     conclusionMessage = 'Conectividade com a nuvem validada.';
@@ -761,9 +770,9 @@ export async function runMinimalCloudDiagnostic({ table = 'lotes', session, time
     appOrigin: typeof window !== 'undefined' ? window.location.origin : null,
     supabaseHost: envStep.envStatus?.host || null,
     envStatus: envStep.envStatus,
+    authState,
     steps,
     conclusion,
     conclusionMessage,
   };
 }
-
