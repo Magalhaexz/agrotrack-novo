@@ -6,7 +6,7 @@ import FazendaModal from '../components/fazendas/FazendaModal';
 import { gerarNovoId } from '../utils/id';
 import { useToast } from '../hooks/useToast';
 import { useAuth } from '../auth/useAuth';
-import { limparPersistenciaSessao, signOutLocalSafely, validateSupabaseSessionForCloud } from '../lib/supabase';
+import { resetSupabaseAuthLocally, validateSupabaseSessionForCloud } from '../lib/supabase';
 import {
   createOperationalRecord,
   deleteOperationalRecord,
@@ -26,6 +26,7 @@ export default function FazendasPage({ db, setDb, onConfirmAction }) {
   const [editando, setEditando] = useState(null);
   const [sincronizandoFazendas, setSincronizandoFazendas] = useState(false);
   const [diagnosticandoNuvem, setDiagnosticandoNuvem] = useState(false);
+  const [reconectandoNuvem, setReconectandoNuvem] = useState(false);
   const loadingToastRef = useRef(null);
   const manualSyncRef = useRef({ inFlight: false, lastStartAt: 0 });
   const isAdmin = String(user?.perfil || '').toLowerCase() === 'admin' || hasPermission('configuracoes:editar');
@@ -136,6 +137,14 @@ export default function FazendasPage({ db, setDb, onConfirmAction }) {
           return;
         }
 
+        if (item?.safeMessage === 'Bloqueado por sessão inválida') {
+          showToast({
+            type: 'warning',
+            message: `${traduzirStatusEtapa(item?.step)}: Bloqueado por sessão inválida`,
+          });
+          return;
+        }
+
         showToast({
           type: item?.ok ? 'success' : 'warning',
           message: `${traduzirStatusEtapa(item?.step)}: ${item?.ok ? 'OK' : 'Erro'}`,
@@ -201,18 +210,53 @@ export default function FazendasPage({ db, setDb, onConfirmAction }) {
   }
 
   async function reconectarNuvem() {
-    if (sincronizandoFazendas || diagnosticandoNuvem) return;
+    if (sincronizandoFazendas || diagnosticandoNuvem || reconectandoNuvem) return;
+    setReconectandoNuvem(true);
     try {
-      await signOutLocalSafely(4000);
-    } catch {
-      // segue limpeza local
-    } finally {
-      limparPersistenciaSessao();
+      if (import.meta.env.DEV || isAdmin) {
+        console.info('[HERDON_CLOUD_RECONNECT_DIAGNOSTIC]', {
+          action: 'reconnect',
+          localCleanupStarted: true,
+          localCleanupSucceeded: false,
+          remoteSignOutSkipped: true,
+          safeMessage: 'Iniciando limpeza local da sessão Supabase.',
+        });
+      }
+
+      resetSupabaseAuthLocally();
       forceLocalSignOut?.();
+
+      if (import.meta.env.DEV || isAdmin) {
+        console.info('[HERDON_CLOUD_RECONNECT_DIAGNOSTIC]', {
+          action: 'reconnect',
+          localCleanupStarted: true,
+          localCleanupSucceeded: true,
+          remoteSignOutSkipped: true,
+          safeMessage: 'Sessão local limpa com sucesso.',
+        });
+      }
+
       showToast({
         type: 'info',
         message: 'Sessão local limpa. Entre novamente para conectar à nuvem.',
       });
+    } catch {
+      if (import.meta.env.DEV || isAdmin) {
+        console.warn('[HERDON_CLOUD_RECONNECT_DIAGNOSTIC]', {
+          action: 'reconnect',
+          localCleanupStarted: true,
+          localCleanupSucceeded: false,
+          remoteSignOutSkipped: true,
+          safeMessage: 'Falha ao limpar sessão local. Tentando manter o app utilizável.',
+        });
+      }
+      forceLocalSignOut?.();
+      showToast({
+        type: 'warning',
+        message: 'Sessão local limpa. Entre novamente para conectar à nuvem.',
+      });
+    } finally {
+      setReconectandoNuvem(false);
     }
   }
 
@@ -331,7 +375,7 @@ export default function FazendasPage({ db, setDb, onConfirmAction }) {
             <Button
               variant="secondary"
               onClick={sincronizarFazendasComNuvem}
-              disabled={sincronizandoFazendas || diagnosticandoNuvem}
+              disabled={sincronizandoFazendas || diagnosticandoNuvem || reconectandoNuvem}
             >
               {sincronizandoFazendas ? 'Sincronizando fazendas e lotes...' : 'Sincronizar fazendas e lotes com a nuvem'}
             </Button>
@@ -339,7 +383,7 @@ export default function FazendasPage({ db, setDb, onConfirmAction }) {
               <Button
                 variant="ghost"
                 onClick={executarDiagnosticoNuvem}
-                disabled={sincronizandoFazendas || diagnosticandoNuvem}
+                disabled={sincronizandoFazendas || diagnosticandoNuvem || reconectandoNuvem}
               >
                 {diagnosticandoNuvem ? 'Testando conexão com a nuvem...' : 'Testar conexão com a nuvem'}
               </Button>
@@ -347,9 +391,9 @@ export default function FazendasPage({ db, setDb, onConfirmAction }) {
             <Button
               variant="outline"
               onClick={reconectarNuvem}
-              disabled={sincronizandoFazendas || diagnosticandoNuvem}
+              disabled={sincronizandoFazendas || diagnosticandoNuvem || reconectandoNuvem}
             >
-              Reconectar à nuvem
+              {reconectandoNuvem ? 'Reconectando...' : 'Reconectar à nuvem'}
             </Button>
             <Button onClick={() => {
               if (!hasPermission('fazendas:editar')) {
