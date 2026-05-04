@@ -1,8 +1,17 @@
-﻿/* global process */
+/* global process */
 import { getSupabaseAdminClient, getSupabaseServerEnvStatus, resolveAuthenticatedUser } from './_supabaseAdmin.js';
 
 function json(res, status, payload) {
   res.status(status).json(payload);
+}
+
+function isMalformedAuthorizationHeader(req) {
+  const raw = req?.headers?.authorization || req?.headers?.Authorization;
+  if (!raw) return false;
+  const header = String(raw).trim();
+  if (!header.toLowerCase().startsWith('bearer ')) return true;
+  const token = header.slice(7).trim();
+  return !token || token === 'undefined' || token === 'null' || token.includes('{') || token.includes('}') || token.includes('[object Object]') || token.split('.').length !== 3;
 }
 
 function isObject(value) {
@@ -229,6 +238,10 @@ export default async function handler(req, res) {
       fazendas: { status: 'error', syncedCount: 0, failedCount: 0 },
       lotes: { status: 'error', syncedCount: 0, failedCount: 0 },
     });
+  }
+
+  if (isMalformedAuthorizationHeader(req)) {
+    return json(res, 401, { ok: false, message: 'Sessão expirada. Entre novamente para sincronizar com a nuvem.' });
   }
 
   const authenticatedUser = await resolveAuthenticatedUser(req);
