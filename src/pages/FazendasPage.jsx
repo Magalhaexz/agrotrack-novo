@@ -121,6 +121,20 @@ export default function FazendasPage({ db, setDb, onConfirmAction }) {
     return 'Expirada';
   }
 
+  function resumirFalha(item) {
+    const status = item?.httpStatus ? String(item.httpStatus) : null;
+    const code = item?.postgrestCode ? String(item.postgrestCode).toUpperCase() : null;
+    const type = String(item?.failureType || '').toLowerCase();
+
+    if (code === '42501' || type === 'rls') return `${status || code || 'erro'} / RLS`;
+    if (code === '42703' || code === 'PGRST204') return `${code} / Coluna ausente`;
+    if (code === 'PGRST205' || code === '42P01' || type === 'schema') return `${code || status || '404'} / Tabela ausente`;
+    if (type === 'auth' || status === '401') return `${status || '401'} / Sessão inválida`;
+    if (type === 'payload' || status === '400') return `${code || status || '400'} / Estrutura incompatível`;
+    if (type === 'network_reset' || type === 'http2_protocol_error' || type === 'timeout') return 'Sem resposta / Rede';
+    return `${code || status || 'erro'} / ${item?.safeMessage || 'Falha'}`;
+  }
+
   async function executarDiagnosticoNuvem() {
     if (!podeVerDiagnostico || diagnosticandoNuvem) return;
     setDiagnosticandoNuvem(true);
@@ -141,6 +155,14 @@ export default function FazendasPage({ db, setDb, onConfirmAction }) {
           showToast({
             type: 'warning',
             message: `${traduzirStatusEtapa(item?.step)}: Bloqueado por sessão inválida`,
+          });
+          return;
+        }
+
+        if (!item?.ok) {
+          showToast({
+            type: 'warning',
+            message: `${traduzirStatusEtapa(item?.step)}: Erro — ${resumirFalha(item)}`,
           });
           return;
         }
@@ -192,6 +214,22 @@ export default function FazendasPage({ db, setDb, onConfirmAction }) {
             safeMessage: result?.conclusionMessage || 'Sessão expirada. Entre novamente para sincronizar com a nuvem.',
           });
         }
+        const authFailureSteps = steps.filter(
+          (item) => ['rest_with_session', 'client_select'].includes(item?.step) && !item?.ok
+        );
+        authFailureSteps.forEach((item) => {
+          console.groupCollapsed('[HERDON_CLOUD_AUTH_REQUEST_DETAIL]');
+          console.info({
+            step: item?.step || null,
+            table: item?.table || 'lotes',
+            endpointPath: item?.endpointPath || null,
+            httpStatus: item?.httpStatus ?? null,
+            postgrestCode: item?.postgrestCode ?? null,
+            failureType: item?.failureType ?? null,
+            safeMessage: item?.safeMessage || null,
+          });
+          console.groupEnd();
+        });
         console.groupEnd();
       }
     } catch (error) {
