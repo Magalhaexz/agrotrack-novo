@@ -1,4 +1,6 @@
 import { getSupabaseEnvStatus, supabase } from '../lib/supabase.js';
+const NETWORK_CIRCUIT_OPEN_MS = 45000;
+const moduleNetworkCircuit = new Map();
 
 function getSessionUserId(session) {
   return session?.user?.id || null;
@@ -11,13 +13,90 @@ function getErrorMessage(error) {
 }
 
 function isNetworkError(error) {
+  if (Number(error?.status)) return false;
   const message = String(getErrorMessage(error) || '').toLowerCase();
   return message.includes('failed to fetch')
     || message.includes('networkerror')
     || message.includes('network request failed')
     || message.includes('fetch failed')
     || message.includes('err_connection')
-    || message.includes('timeout');
+    || message.includes('timeout')
+    || message.includes('err_http2_protocol_error')
+    || message.includes('err_connection_reset');
+}
+
+function getHttpStatus(error) {
+  const status = Number(error?.status);
+  return Number.isFinite(status) && status > 0 ? status : null;
+}
+
+function getPostgrestCode(error) {
+  const code = String(error?.code || '').toUpperCase();
+  return code || null;
+}
+
+function shouldOpenNetworkCircuit(error) {
+  return isNetworkError(error);
+}
+
+function isNetworkCircuitOpen(moduleName) {
+  const openedAt = moduleNetworkCircuit.get(moduleName) || 0;
+  return (Date.now() - openedAt) < NETWORK_CIRCUIT_OPEN_MS;
+}
+
+function openNetworkCircuit(moduleName) {
+  moduleNetworkCircuit.set(moduleName, Date.now());
+}
+
+function closeNetworkCircuit(moduleName) {
+  moduleNetworkCircuit.delete(moduleName);
+}
+
+function buildModuleSyncResult({
+  module,
+  status,
+  message,
+  code = null,
+  httpStatus = null,
+  data = [],
+  syncedCount = 0,
+  failedCount = 0,
+  selectedCount = 0,
+}) {
+  return {
+    module,
+    status,
+    message,
+    code,
+    httpStatus,
+    ok: status === 'success',
+    data: Array.isArray(data) ? data : [],
+    syncedCount,
+    failedCount,
+    selectedCount,
+  };
+}
+
+function logModuleSyncEvent({
+  module,
+  stage,
+  table,
+  host = null,
+  httpStatus = null,
+  postgrestCode = null,
+  safeMessage = null,
+}, level = 'debug') {
+  if (!import.meta.env.DEV) return;
+  const logger = level === 'warn' ? console.warn : console.info;
+  logger('[HERDON_CLOUD_MODULE_SYNC]', {
+    module: module || null,
+    stage: stage || null,
+    table: table || null,
+    host,
+    httpStatus,
+    postgrestCode,
+    safeMessage,
+  });
 }
 
 function getSchemaMissingMessageByTable(table) {
@@ -637,51 +716,42 @@ function classifyLotesSyncError(error) {
   const code = String(error?.code || '').toUpperCase();
   const message = String(error?.message || '').toLowerCase();
   const details = String(error?.details || '').toLowerCase();
+  const status = getHttpStatus(error);
 
-  if (code === '42501' || message.includes('permission denied') || message.includes('row-level security') || details.includes('row-level security')) {
-    return 'Permissão insuficiente para sincronizar lotes.';
+  if (status === 401) {
+    return 'Sess\u00E3o expirada. Entre novamente para sincronizar com a nuvem.';
   }
 
-  if (code === '42703' || code === 'PGRST204' || code === 'PGRST205' || code === '42P01' || message.includes('column') || message.includes('schema') || message.includes('relation') || details.includes('column') || details.includes('schema') || details.includes('relation')) {
-    return 'Tabela de lotes não encontrada na nuvem. Verifique a estrutura do Supabase.';
+  if (code === '42501' || status === 403 || message.includes('permission denied') || message.includes('row-level security') || details.includes('row-level security')) {
+    return 'Permiss\u00E3o insuficiente para sincronizar lotes.';
+  }
+
+  if (status === 404 || code === 'PGRST205' || code === '42P01') {
+    return 'Tabela de lotes n\u00E3o encontrada na nuvem. Verifique a estrutura do Supabase.';
+  }
+
+  if (status === 400 || code === '42703' || code === 'PGRST204' || message.includes('column') || message.includes('schema') || message.includes('relation') || details.includes('column') || details.includes('schema') || details.includes('relation')) {
+    return 'Estrutura da tabela de lotes incompat\u00EDvel com o app. Verifique as colunas no Supabase.';
   }
 
   if (code === 'CONFIG_ERROR' || message.includes('missing_rest_config_or_token')) {
-    return 'Configuração da nuvem incompleta. Verifique as variáveis do Supabase.';
+    return 'Configura\u00E7\u00E3o da nuvem incompleta. Verifique as vari\u00E1veis do Supabase.';
   }
 
   if (isNetworkError(error)) {
-    return 'Não foi possível conectar à nuvem. Verifique sua conexão e tente novamente.';
+    return 'N\u00E3o foi poss\u00EDvel conectar ao Supabase. Verifique sua conex\u00E3o, DNS ou vari\u00E1veis da nuvem.';
+  }
+
+  if (code === '57014' || message.includes('timeout')) {
+    return 'A sincroniza\u00E7\u00E3o de lotes demorou mais que o esperado.';
   }
 
   if (code === '22P02' || message.includes('invalid input syntax') || message.includes('violates')) {
-    return 'Não foi possível validar os dados do lote para sincronização na nuvem.';
+    return 'Estrutura da tabela de lotes incompat\u00EDvel com o app. Verifique as colunas no Supabase.';
   }
 
-  return 'Não foi possível sincronizar lotes. Seus dados locais continuam disponíveis.';
+  return 'N\u00E3o foi poss\u00EDvel sincronizar lotes. Seus dados locais continuam dispon\u00EDveis.';
 }
-
-function logFazendasSync(event = {}) {
-  if (!isAuthDebugEnabled()) return;
-  const payload = {
-    sessionUserIdPresent: Boolean(event.sessionUserId),
-    authSessionPresent: event.authSessionPresent ?? null,
-    localCount: event.localCount ?? null,
-    operation: event.operation ?? null,
-    payloadKeys: Array.isArray(event.payloadKeys) ? event.payloadKeys : null,
-    rowNome: event.rowNome ?? null,
-    errorName: event.errorName ?? null,
-    errorCode: event.errorCode ?? null,
-    errorMessage: event.errorMessage ?? null,
-    details: event.details ?? null,
-    hint: event.hint ?? null,
-  };
-
-  const logger = event.level === 'warn' ? console.warn : console.debug;
-  logger('[HERDON_FAZENDAS_SYNC]', payload);
-}
-
-
 
 export async function checkSupabaseCloudConnection({ session } = {}) {
   const sessionUserId = getSessionUserId(session);
@@ -772,27 +842,35 @@ export async function checkSupabaseCloudConnection({ session } = {}) {
 }
 
 export async function syncFazendasWithCloud({ fazendas = [], session }) {
+  if (isNetworkCircuitOpen('fazendas')) {
+    return buildModuleSyncResult({
+      module: 'fazendas',
+      status: 'skipped',
+      message: 'Verifica\u00E7\u00E3o de nuvem pausada temporariamente por falhas de rede.',
+      code: 'NETWORK_CIRCUIT_OPEN',
+      data: Array.isArray(fazendas) ? fazendas : [],
+    });
+  }
+
   const readiness = await ensureSupabaseRequestReadiness(session, {
     stage: 'cloud_sync_fazendas',
     action: 'upsert',
     table: 'fazendas',
   });
   if (!readiness.ok) {
-    return {
-      ok: false,
-      data: Array.isArray(fazendas) ? fazendas : [],
-      error: readiness.code || 'SYNC_NOT_READY',
+    return buildModuleSyncResult({
+      module: 'fazendas',
+      status: 'error',
       message: readiness.message || 'Sincronizacao indisponivel no momento.',
-      syncedCount: 0,
-      failedCount: 0,
-      selectedCount: 0,
-    };
+      code: readiness.code || 'SYNC_NOT_READY',
+      data: Array.isArray(fazendas) ? fazendas : [],
+    });
   }
+
   const userId = getSessionUserId(session);
   const localRows = Array.isArray(fazendas) ? fazendas : [];
-
   if (!userId) {
-    return { ok: false, data: localRows, error: 'AUTH_REQUIRED', message: 'Faça login para sincronizar com a nuvem.', syncedCount: 0, failedCount: 0, selectedCount: 0 };
+    return buildModuleSyncResult({ module: 'fazendas', status: 'error', message: 'Fa\u00E7a login para sincronizar com a nuvem.', code: 'AUTH_REQUIRED', data: localRows });
   }
 
   let syncedCount = 0;
@@ -802,69 +880,67 @@ export async function syncFazendasWithCloud({ fazendas = [], session }) {
     if (getCloudIdMarker(localRow) !== null) continue;
     const { payload } = mapFazendaToCloudPayload(localRow, userId);
     try {
-      const { error } = await supabase
-        .from('fazendas')
-        .insert(payload)
-        .select('id')
-        .single();
-      if (error) {
-        throw error;
-      }
+      const { error } = await supabase.from('fazendas').insert(payload).select('id').single();
+      if (error) throw error;
       syncedCount += 1;
-      logFazendasSync({ operation: 'insert', payloadKeys: Object.keys(payload), rowNome: payload.nome || null, status: 201, message: 'ok' });
     } catch (error) {
       failedCount += 1;
-      const status = Number(error?.status) || null;
-      const code = String(error?.code || '').toUpperCase() || null;
+      const status = getHttpStatus(error);
+      const code = getPostgrestCode(error) || 'SYNC_FAILED';
       const lower = String(error?.message || '').toLowerCase();
-      let message = 'Não foi possível sincronizar fazendas. Seus dados locais continuam disponíveis.';
-      if (status === 401) message = 'Sessão expirada. Entre novamente para sincronizar com a nuvem.';
-      else if (status === 403 || code === '42501') message = 'Sem permissão para acessar estes dados na nuvem.';
-      else if (status === 404 || code === 'PGRST205' || code === 'PGRST204' || code === '42703' || lower.includes('schema') || lower.includes('column')) message = 'Tabela de fazendas não encontrada na nuvem. Verifique a estrutura do Supabase.';
-      else if (code === 'CONFIG_ERROR' || lower.includes('missing_rest_config_or_token')) message = 'Configuração da nuvem ausente. Verifique as variáveis do Supabase.';
-      else if (isNetworkError(error) || (error?.name === 'TypeError' && lower.includes('failed to fetch'))) message = 'Projeto Supabase inacessível pela rede.';
-      logFazendasSync({ operation: 'insert', payloadKeys: Object.keys(payload), rowNome: payload.nome || null, status, code, message, errorName: error?.name || null, errorMessage: error?.message || null, level: 'warn' });
-      return { ok: false, data: localRows, error: code || 'SYNC_FAILED', message, syncedCount, failedCount, selectedCount: 0 };
+      let message = 'N\u00E3o foi poss\u00EDvel sincronizar fazendas. Seus dados locais continuam dispon\u00EDveis.';
+      if (status === 401) message = 'Sess\u00E3o expirada. Entre novamente para sincronizar com a nuvem.';
+      else if (status === 403 || code === '42501') message = 'Sem permiss\u00E3o para acessar estes dados na nuvem.';
+      else if (status === 404 || code === 'PGRST205' || code === 'PGRST204' || code === '42703' || lower.includes('schema') || lower.includes('column')) message = 'Tabela de fazendas n\u00E3o encontrada na nuvem. Verifique a estrutura do Supabase.';
+      else if (code === 'CONFIG_ERROR' || lower.includes('missing_rest_config_or_token')) message = 'Configura\u00E7\u00E3o da nuvem incompleta. Verifique as vari\u00E1veis do Supabase.';
+      else if (isNetworkError(error)) message = 'N\u00E3o foi poss\u00EDvel conectar ao Supabase. Verifique sua conex\u00E3o, DNS ou vari\u00E1veis da nuvem.';
+      if (shouldOpenNetworkCircuit(error)) openNetworkCircuit('fazendas');
+      return buildModuleSyncResult({ module: 'fazendas', status: 'error', message, code, httpStatus: status, data: localRows, syncedCount, failedCount, selectedCount: 0 });
     }
   }
 
   try {
-    const { data: remoteList, error } = await supabase
-      .from('fazendas')
-      .select('*')
-      .eq('owner_user_id', userId);
-    if (error) {
-      throw error;
-    }
-    return { ok: true, data: mergeFazendasSafe(localRows, Array.isArray(remoteList) ? remoteList : []), error: null, message: null, syncedCount, failedCount, selectedCount: Array.isArray(remoteList) ? remoteList.length : 0 };
+    const { data: remoteList, error } = await supabase.from('fazendas').select('*').eq('owner_user_id', userId);
+    if (error) throw error;
+    closeNetworkCircuit('fazendas');
+    return buildModuleSyncResult({ module: 'fazendas', status: 'success', message: 'Fazendas sincronizadas.', data: mergeFazendasSafe(localRows, Array.isArray(remoteList) ? remoteList : []), syncedCount, failedCount, selectedCount: Array.isArray(remoteList) ? remoteList.length : 0 });
   } catch (error) {
+    if (shouldOpenNetworkCircuit(error)) openNetworkCircuit('fazendas');
     const msg = classifyFazendasSyncError(error);
-    return { ok: false, data: localRows, error: error?.code || 'REMOTE_FETCH_FAILED', message: msg, syncedCount, failedCount, selectedCount: 0 };
+    return buildModuleSyncResult({ module: 'fazendas', status: 'error', message: msg, code: error?.code || 'REMOTE_FETCH_FAILED', httpStatus: getHttpStatus(error), data: localRows, syncedCount, failedCount, selectedCount: 0 });
   }
 }
 
 export async function syncLotesWithCloud({ lotes = [], session }) {
+  if (isNetworkCircuitOpen('lotes')) {
+    return buildModuleSyncResult({
+      module: 'lotes',
+      status: 'skipped',
+      message: 'Verifica\u00E7\u00E3o de nuvem pausada temporariamente por falhas de rede.',
+      code: 'NETWORK_CIRCUIT_OPEN',
+      data: Array.isArray(lotes) ? lotes : [],
+    });
+  }
+
   const readiness = await ensureSupabaseRequestReadiness(session, {
     stage: 'cloud_sync_lotes',
     action: 'upsert',
     table: 'lotes',
   });
   if (!readiness.ok) {
-    return {
-      ok: false,
-      data: Array.isArray(lotes) ? lotes : [],
-      error: readiness.code || 'SYNC_NOT_READY',
+    return buildModuleSyncResult({
+      module: 'lotes',
+      status: 'error',
       message: readiness.message || 'Sincronizacao indisponivel no momento.',
-      syncedCount: 0,
-      failedCount: 0,
-      selectedCount: 0,
-    };
+      code: readiness.code || 'SYNC_NOT_READY',
+      data: Array.isArray(lotes) ? lotes : [],
+    });
   }
 
   const userId = getSessionUserId(session);
   const localRows = Array.isArray(lotes) ? lotes : [];
   if (!userId) {
-    return { ok: false, data: localRows, error: 'AUTH_REQUIRED', message: 'Faça login para sincronizar com a nuvem.', syncedCount: 0, failedCount: 0, selectedCount: 0 };
+    return buildModuleSyncResult({ module: 'lotes', status: 'error', message: 'Fa\u00E7a login para sincronizar com a nuvem.', code: 'AUTH_REQUIRED', data: localRows });
   }
 
   let syncedCount = 0;
@@ -872,22 +948,14 @@ export async function syncLotesWithCloud({ lotes = [], session }) {
 
   let remoteList = [];
   try {
-    const { data, error } = await supabase
-      .from('lotes')
-      .select('*')
-      .eq('owner_user_id', userId);
+    const { data, error } = await supabase.from('lotes').select('*').eq('owner_user_id', userId);
     if (error) throw error;
     remoteList = Array.isArray(data) ? data : [];
   } catch (error) {
-    return {
-      ok: false,
-      data: localRows,
-      error: error?.code || 'REMOTE_FETCH_FAILED',
-      message: classifyLotesSyncError(error),
-      syncedCount,
-      failedCount,
-      selectedCount: 0,
-    };
+    const msg = classifyLotesSyncError(error);
+    logModuleSyncEvent({ module: 'lotes', stage: 'fetch_remote_failed', table: 'lotes', httpStatus: getHttpStatus(error), postgrestCode: getPostgrestCode(error), safeMessage: msg }, 'warn');
+    if (shouldOpenNetworkCircuit(error)) openNetworkCircuit('lotes');
+    return buildModuleSyncResult({ module: 'lotes', status: 'error', message: msg, code: error?.code || 'REMOTE_FETCH_FAILED', httpStatus: getHttpStatus(error), data: localRows, syncedCount, failedCount, selectedCount: 0 });
   }
 
   const findRemoteMatch = (localRow) => {
@@ -897,9 +965,7 @@ export async function syncLotesWithCloud({ lotes = [], session }) {
     return remoteList.find((remote) => {
       const remoteIdText = remote?.id !== undefined && remote?.id !== null ? String(remote.id) : null;
       const remoteCloudIdText = remote?.cloud_id !== undefined && remote?.cloud_id !== null ? String(remote.cloud_id) : null;
-      const remoteLocalIdText = remote?.metadata?.local_id !== undefined && remote?.metadata?.local_id !== null
-        ? String(remote.metadata.local_id)
-        : null;
+      const remoteLocalIdText = remote?.metadata?.local_id !== undefined && remote?.metadata?.local_id !== null ? String(remote.metadata.local_id) : null;
 
       if (cloudId !== null && (remoteIdText === String(cloudId) || remoteCloudIdText === String(cloudId))) return true;
       if (localIdText && remoteLocalIdText && localIdText === remoteLocalIdText) return true;
@@ -914,49 +980,29 @@ export async function syncLotesWithCloud({ lotes = [], session }) {
 
     try {
       if (remoteMatch?.id) {
-        const { data, error } = await supabase
-          .from('lotes')
-          .update(payload)
-          .eq('id', remoteMatch.id)
-          .eq('owner_user_id', userId)
-          .select('*')
-          .single();
+        const { data, error } = await supabase.from('lotes').update(payload).eq('id', remoteMatch.id).eq('owner_user_id', userId).select('*').single();
         if (error) throw error;
         syncedCount += 1;
         remoteList = remoteList.map((item) => (item.id === remoteMatch.id ? data : item));
       } else {
-        const { data, error } = await supabase
-          .from('lotes')
-          .insert(payload)
-          .select('*')
-          .single();
+        const { data, error } = await supabase.from('lotes').insert(payload).select('*').single();
         if (error) throw error;
         syncedCount += 1;
         remoteList.push(data);
       }
     } catch (error) {
       failedCount += 1;
-      return {
-        ok: false,
-        data: localRows,
-        error: error?.code || 'SYNC_FAILED',
-        message: classifyLotesSyncError(error),
-        syncedCount,
-        failedCount,
-        selectedCount: Array.isArray(remoteList) ? remoteList.length : 0,
-      };
+      const status = getHttpStatus(error);
+      const msg = classifyLotesSyncError(error);
+      const timeoutLike = error?.name === 'TimeoutError' || String(error?.message || '').toLowerCase().includes('timeout');
+      logModuleSyncEvent({ module: 'lotes', stage: 'upsert_failed', table: 'lotes', httpStatus: status, postgrestCode: getPostgrestCode(error), safeMessage: msg }, 'warn');
+      if (shouldOpenNetworkCircuit(error)) openNetworkCircuit('lotes');
+      return buildModuleSyncResult({ module: 'lotes', status: timeoutLike ? 'timeout' : 'error', message: timeoutLike ? 'A sincroniza\u00E7\u00E3o de lotes demorou mais que o esperado.' : msg, code: error?.code || 'SYNC_FAILED', httpStatus: status, data: localRows, syncedCount, failedCount, selectedCount: Array.isArray(remoteList) ? remoteList.length : 0 });
     }
   }
 
-  return {
-    ok: true,
-    data: mergeLotesSafe(localRows, remoteList),
-    error: null,
-    message: null,
-    syncedCount,
-    failedCount,
-    selectedCount: Array.isArray(remoteList) ? remoteList.length : 0,
-  };
+  closeNetworkCircuit('lotes');
+  return buildModuleSyncResult({ module: 'lotes', status: 'success', message: 'Lotes sincronizados.', data: mergeLotesSafe(localRows, remoteList), syncedCount, failedCount, selectedCount: Array.isArray(remoteList) ? remoteList.length : 0 });
 }
 
 

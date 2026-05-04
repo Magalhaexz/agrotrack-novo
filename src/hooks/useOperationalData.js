@@ -1,6 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { supabase } from '../lib/supabase';
-import { ensureSupabaseRequestReadiness } from '../services/operationalPersistence';
 
 const OPERACIONAL_TABLES = [
   'fazendas',
@@ -27,6 +26,7 @@ const HYDRATION_MAX_ATTEMPTS = 2;
 const HYDRATION_BACKOFF_MS = 350;
 const HYDRATION_START_DELAY_MS = 1800;
 const HYDRATION_FAILURE_COOLDOWN_MS = 45000;
+const AUTO_SYNC_COOLDOWN_MS = 45000;
 const HYDRATION_FAILURES_TO_OPEN_CIRCUIT = 4;
 const MANUAL_SYNC_TIMEOUT_MS = 15000;
 const HERDON_DISABLE_SUPABASE_SYNC = 'HERDON_DISABLE_SUPABASE_SYNC';
@@ -35,6 +35,7 @@ const inFlightSnapshots = new Map();
 const failedHydrationAt = new Map();
 const schemaWarningTables = new Set();
 let autoSyncDisabledLogged = false;
+let lastAutoSyncAt = 0;
 
 function nowMs() {
   return typeof performance !== 'undefined' ? performance.now() : Date.now();
@@ -420,7 +421,7 @@ export function useOperationalData(initialDb, session, options = {}) {
     const syncDisabled = shouldDisableSupabaseSync();
     const syncEnabled = shouldEnableSupabaseSync();
     const manualSyncRequested = manualSyncNonce > 0;
-    const shouldAutoSync = syncEnabled;
+    const shouldAutoSync = syncEnabled && (Date.now() - lastAutoSyncAt > AUTO_SYNC_COOLDOWN_MS);
 
     const shouldApply = () => {
       const isCurrentGeneration = hydrationGenerationRef.current === generationId;
@@ -521,24 +522,6 @@ export function useOperationalData(initialDb, session, options = {}) {
       });
 
       try {
-        const readiness = await withTimeout(ensureSupabaseRequestReadiness(session, {
-          stage: 'operational_hydration',
-          action: 'select',
-          table: 'operacional_snapshot',
-        }), MANUAL_SYNC_TIMEOUT_MS, 'readiness_timeout');
-        if (!readiness.ok) {
-          setDataSource('offline_circuit_open');
-          setDataError(new Error(readiness.message || 'Sincronizacao indisponivel no momento.'));
-          logSyncGuard({
-            stage: 'sync_finished_not_ready',
-            action: manualSyncRequested ? 'manual_sync' : 'auto_sync',
-            status: 'error',
-            errorName: readiness.code || 'SYNC_NOT_READY',
-            errorMessage: readiness.message || 'Sincronizacao indisponivel no momento.',
-          }, 'warn');
-          return;
-        }
-
         const snapshotResult = await withTimeout(
           loadOperationalSnapshot(userId, shouldApply, generationId),
           MANUAL_SYNC_TIMEOUT_MS,
@@ -592,6 +575,9 @@ export function useOperationalData(initialDb, session, options = {}) {
           setDataSource('supabase');
           setDataError(null);
           setLastSyncAt(new Date().toISOString());
+          if (!manualSyncRequested) {
+            lastAutoSyncAt = Date.now();
+          }
           logSyncGuard({
             stage: 'sync_finished_success',
             action: manualSyncRequested ? 'manual_sync' : 'auto_sync',
@@ -609,8 +595,8 @@ export function useOperationalData(initialDb, session, options = {}) {
         }
         const errorName = error?.name || 'SYNC_ERROR';
         const rawMessage = getErrorMessage(error);
-        const isTimeout = errorName === 'TimeoutError' || rawMessage === 'readiness_timeout' || rawMessage === 'snapshot_timeout';
-        setDataSource('offline_circuit_open');
+        const isTimeout = errorName === 'TimeoutError' || rawMessage === 'snapshot_timeout';
+        setDataSource(isTimeout ? 'fallback_timeout' : 'offline_circuit_open');
         setDataError(new Error(isTimeout
           ? 'Sincronizacao demorou mais que o esperado. O app segue em modo local.'
           : 'Sincronizacao instavel. Seus dados locais continuam disponiveis.'));
