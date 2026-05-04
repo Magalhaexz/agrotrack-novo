@@ -1,6 +1,16 @@
-﻿import { supabase, validateSupabaseSessionForCloud } from '../lib/supabase.js';
+import { supabase, validateSupabaseSessionForCloud } from '../lib/supabase.js';
 
 const DEFAULT_TIMEOUT_MS = 10000;
+const INVALID_SESSION_MESSAGE = 'Sessão inválida. Reconecte à nuvem.';
+
+async function getSafeAccessToken() {
+  const sessionResult = await supabase.auth.getSession();
+  const accessToken = sessionResult?.data?.session?.access_token || null;
+  const tokenLooksJwt = typeof accessToken === 'string' && accessToken.split('.').length === 3;
+  const tokenLength = typeof accessToken === 'string' ? accessToken.length : 0;
+  return { accessToken, hasAccessToken: Boolean(accessToken), tokenLooksJwt, tokenLength };
+}
+
 
 function normalizeEnvValue(value) {
   if (value === undefined || value === null) return '';
@@ -206,8 +216,13 @@ function buildEnvStep() {
 }
 
 export async function runMinimalCloudDiagnostic({ table = 'lotes', session, timeoutMs = 8000 } = {}) {
-  const accessToken = session?.access_token || session?.session?.access_token || null;
-  if (!accessToken) {
+  const tokenInfo = await getSafeAccessToken();
+  if (!tokenInfo.hasAccessToken || !tokenInfo.tokenLooksJwt) {
+    if (import.meta.env.DEV) {
+      console.groupCollapsed('[HERDON_SERVERLESS_AUTH_HEADER_DIAGNOSTIC]');
+      console.info({ endpoint: '/api/cloud-diagnostic', status: null, hasAccessToken: tokenInfo.hasAccessToken, tokenLooksJwt: tokenInfo.tokenLooksJwt, tokenLength: tokenInfo.tokenLength, failureType: 'invalid_session', safeMessage: INVALID_SESSION_MESSAGE });
+      console.groupEnd();
+    }
     return {
       ok: false,
       table,
@@ -216,8 +231,8 @@ export async function runMinimalCloudDiagnostic({ table = 'lotes', session, time
       envStatus: buildEnvStep().envStatus,
       authState: {
         hasSession: Boolean(session?.user),
-        hasAccessToken: false,
-        tokenLooksJwt: null,
+        hasAccessToken: tokenInfo.hasAccessToken,
+        tokenLooksJwt: tokenInfo.tokenLooksJwt,
         tokenExpired: null,
         refreshAttempted: false,
         refreshSucceeded: false,
@@ -230,7 +245,7 @@ export async function runMinimalCloudDiagnostic({ table = 'lotes', session, time
         { step: 'client_select', ok: false, safeMessage: 'Bloqueado por sessão inválida', skipped: true },
       ],
       conclusion: 'session_failure',
-      conclusionMessage: 'Sessão expirada. Entre novamente para sincronizar com a nuvem.',
+      conclusionMessage: INVALID_SESSION_MESSAGE,
     };
   }
 
@@ -239,11 +254,16 @@ export async function runMinimalCloudDiagnostic({ table = 'lotes', session, time
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        Authorization: `Bearer ${accessToken}`,
+        Authorization: `Bearer ${tokenInfo.accessToken}`,
       },
       body: JSON.stringify({}),
     });
 
+    if (import.meta.env.DEV) {
+      console.groupCollapsed('[HERDON_SERVERLESS_AUTH_HEADER_DIAGNOSTIC]');
+      console.info({ endpoint: '/api/cloud-diagnostic', status: serverResponse.status, hasAccessToken: tokenInfo.hasAccessToken, tokenLooksJwt: tokenInfo.tokenLooksJwt, tokenLength: tokenInfo.tokenLength, failureType: serverResponse.ok ? null : 'server_http_error', safeMessage: serverResponse.ok ? 'Nuvem conectada pelo servidor.' : 'Diagnóstico pelo servidor falhou. O modo local continua ativo.' });
+      console.groupEnd();
+    }
     const serverJson = await serverResponse.json().catch(() => null);
     if (serverResponse.ok && serverJson) {
       const checks = Array.isArray(serverJson?.checks) ? serverJson.checks : [];
@@ -341,7 +361,26 @@ export async function runMinimalCloudDiagnostic({ table = 'lotes', session, time
       };
     }
   } catch {
-    // fallback para diagnóstico direto
+    if (import.meta.env.DEV) {
+      console.groupCollapsed('[HERDON_SERVERLESS_AUTH_HEADER_DIAGNOSTIC]');
+      console.info({ endpoint: '/api/cloud-diagnostic', status: 494, hasAccessToken: tokenInfo.hasAccessToken, tokenLooksJwt: tokenInfo.tokenLooksJwt, tokenLength: tokenInfo.tokenLength, failureType: 'server_network_error', safeMessage: 'Diagnóstico pelo servidor falhou. O modo local continua ativo.' });
+      console.groupEnd();
+    }
+    return {
+      ok: false,
+      table,
+      appOrigin: typeof window !== 'undefined' ? window.location.origin : null,
+      supabaseHost: null,
+      envStatus: buildEnvStep().envStatus,
+      authState: { hasSession: Boolean(session?.user), hasAccessToken: tokenInfo.hasAccessToken, tokenLooksJwt: tokenInfo.tokenLooksJwt, tokenExpired: null, refreshAttempted: false, refreshSucceeded: false },
+      steps: [
+        { step: 'env_check', ok: true, safeMessage: 'Ambiente configurado' },
+        { step: 'rest_without_session', ok: false, safeMessage: 'Diagnóstico pelo servidor falhou. O modo local continua ativo.' },
+        { step: 'session_check', ok: false, status: 'invalid', safeMessage: 'Diagnóstico pelo servidor falhou. O modo local continua ativo.' },
+      ],
+      conclusion: 'server_bridge_failure',
+      conclusionMessage: 'Diagnóstico pelo servidor falhou. O modo local continua ativo.',
+    };
   }
 
   const envStep = buildEnvStep();
