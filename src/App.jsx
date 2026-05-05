@@ -58,6 +58,7 @@ const TarefasPage = lazy(() => import('./pages/TarefasPage'));
 const PerfilPage = lazy(() => import('./pages/PerfilPage'));
 const ConfiguracoesPage = lazy(() => import('./pages/ConfiguracoesPage'));
 const LoginPage = lazy(() => import('./pages/LoginPage'));
+const TODAY_BOOT_ISO = new Date().toISOString().slice(0, 10);
 
 const pageMap = {
   dashboard: DashboardPage,
@@ -317,6 +318,7 @@ export default function App() {
   }
 
   const alertasResolvidos = Array.isArray(db?.alertas_resolvidos) ? db.alertas_resolvidos : [];
+  const alertasAdiados = Array.isArray(db?.alertas_adiados) ? db.alertas_adiados : [];
 
   const rawAlerts = useMemo(() => {
     const legacy = buildAlerts(db);
@@ -330,8 +332,14 @@ export default function App() {
   }, [db]);
 
   const alerts = useMemo(
-    () => rawAlerts.filter((alert) => !alertasResolvidos.includes(alert.ackKey || alert.id)),
-    [alertasResolvidos, rawAlerts]
+    () => rawAlerts.filter((alert) => {
+      const chave = alert.ackKey || alert.id;
+      if (alertasResolvidos.includes(chave)) return false;
+      const adiado = alertasAdiados.find((item) => item?.chave === chave);
+      if (!adiado?.ate) return true;
+      return String(adiado.ate) <= TODAY_BOOT_ISO;
+    }),
+    [alertasAdiados, alertasResolvidos, rawAlerts]
   );
 
   async function marcarAlertaComoFeito(alert) {
@@ -348,6 +356,34 @@ export default function App() {
     if (!persisted.persisted) {
       showToast({ type: 'warning', message: 'Alerta resolvido apenas localmente.' });
     }
+    showToast({ type: 'success', message: 'Notificação resolvida.' });
+  }
+
+  async function adiarAlerta(alert) {
+    if (!hasPermission('tarefas:editar')) {
+      showToast({ type: 'error', message: 'Você não tem permissão para executar esta ação.' });
+      return;
+    }
+    const chave = alert?.ackKey || alert?.id;
+    if (!chave) return;
+    const opcao = window.prompt('Adiar notificação para: 1 (amanhã), 3, 7 dias ou data YYYY-MM-DD', '1');
+    if (!opcao) return;
+    const ate = parseSnoozeDate(opcao);
+    if (!ate) {
+      showToast({ type: 'warning', message: 'Data inválida para adiamento.' });
+      return;
+    }
+    const payload = { chave, ate };
+    const persisted = await createOperationalRecord('alertas_adiados', payload, session);
+    setDb((prev) => ({
+      ...prev,
+      alertas_adiados: [
+        ...(prev?.alertas_adiados || []).filter((item) => item?.chave !== chave),
+        persisted.data || payload,
+      ],
+    }));
+    if (!persisted.persisted) showToast({ type: 'warning', message: 'Lembrete adiado apenas localmente.' });
+    showToast({ type: 'success', message: 'Lembrete adiado.' });
   }
 
   const userContext = { id: user?.id || null, email: user?.email || '' };
@@ -570,7 +606,7 @@ export default function App() {
             cloudVerifiedMessage: cloudDiagnosticState.message,
           }}
           onResolveAlert={marcarAlertaComoFeito}
-          onSnoozeAlert={(alert) => showToast({ type: 'warning', message: `Alerta adiado: ${alert.title}` })}
+          onSnoozeAlert={adiarAlerta}
           onAlertNavigate={(alert) => {
             if (alert?.route) {
               navigateWithPermission(alert.route);
@@ -698,4 +734,14 @@ export default function App() {
       />
     </div>
   );
+}
+
+function parseSnoozeDate(option) {
+  const clean = String(option || '').trim();
+  if (/^\d{4}-\d{2}-\d{2}$/.test(clean)) return clean;
+  const dias = Number(clean);
+  if (![1, 3, 7].includes(dias)) return null;
+  const data = new Date();
+  data.setDate(data.getDate() + dias);
+  return data.toISOString().slice(0, 10);
 }

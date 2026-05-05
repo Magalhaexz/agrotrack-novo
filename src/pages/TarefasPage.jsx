@@ -15,9 +15,10 @@ import {
 import '../styles/tarefas.css';
 
 const STATUS_COLUMNS = [
-  { id: 'pendente', title: 'Pendente' },
-  { id: 'em_andamento', title: 'Em andamento' },
-  { id: 'concluida', title: 'Concluída' },
+  { id: 'pendente', title: 'Pendentes' },
+  { id: 'vencida', title: 'Vencidas' },
+  { id: 'adiada', title: 'Adiadas' },
+  { id: 'concluida', title: 'Concluídas' },
 ];
 
 const PRIORIDADES = ['baixa', 'media', 'alta', 'critica'];
@@ -68,7 +69,7 @@ export default function TarefasPage({ db, setDb, onConfirmAction }) {
     () =>
       STATUS_COLUMNS.reduce((acc, column) => {
         acc[column.id] = tarefasFiltradas
-          .filter((task) => task.status === column.id)
+          .filter((task) => resolveBucket(task) === column.id)
           .sort((a, b) => new Date(a.data_vencimento || '2999-12-31').getTime() - new Date(b.data_vencimento || '2999-12-31').getTime());
         return acc;
       }, {}),
@@ -200,6 +201,33 @@ export default function TarefasPage({ db, setDb, onConfirmAction }) {
     showToast({ type: 'success', message: `Tarefa "${task.titulo}" movida para "${toLabel(next)}".` });
   }, [hasPermission, session, setDb, showToast]);
 
+  const atualizarTarefa = useCallback(async (task, patch, successMessage) => {
+    if (!hasPermission('tarefas:editar')) {
+      showToast({ type: 'error', message: mensagemSemPermissao });
+      return;
+    }
+    const persisted = await updateOperationalRecord('tarefas', task.id, patch, session);
+    setDb((prev) => ({
+      ...prev,
+      tarefas: (prev?.tarefas || []).map((item) => (item.id === task.id ? { ...item, ...(persisted.data || {}), ...patch } : item)),
+    }));
+    if (!persisted.persisted) showToast({ type: 'warning', message: 'Alteração salva apenas localmente.' });
+    if (successMessage) showToast({ type: 'success', message: successMessage });
+  }, [hasPermission, mensagemSemPermissao, session, setDb, showToast]);
+
+  const concluirTarefa = useCallback((task) => atualizarTarefa(task, { status: 'concluida', concluida_em: new Date().toISOString() }, 'Tarefa concluída.'), [atualizarTarefa]);
+  const reabrirTarefa = useCallback((task) => atualizarTarefa(task, { status: 'pendente' }, 'Tarefa reaberta.'), [atualizarTarefa]);
+  const adiarTarefa = useCallback((task) => {
+    const opcao = window.prompt('Adiar para: 1 (amanhã), 3, 7 dias ou data YYYY-MM-DD', '1');
+    if (!opcao) return;
+    const novaData = parseSnoozeOption(opcao, task.data_vencimento);
+    if (!novaData) {
+      showToast({ type: 'warning', message: 'Data inválida para adiamento.' });
+      return;
+    }
+    atualizarTarefa(task, { status: 'adiada', data_vencimento: novaData, adiado_em: new Date().toISOString() }, 'Tarefa adiada.');
+  }, [atualizarTarefa, showToast]);
+
   return (
     <div className="tarefas-page">
       <header className="page-header">
@@ -278,9 +306,12 @@ export default function TarefasPage({ db, setDb, onConfirmAction }) {
                     </div>
                     <div className="kanban-card-actions">
                       <Button variant="ghost" size="sm" onClick={() => openEditTask(task)}>Editar</Button>
+                      {task.status !== 'concluida' ? <Button variant="secondary" size="sm" onClick={() => concluirTarefa(task)}>Marcar como concluída</Button> : null}
+                      {task.status !== 'concluida' ? <Button variant="ghost" size="sm" onClick={() => adiarTarefa(task)}>Adiar</Button> : null}
+                      {task.status === 'concluida' ? <Button variant="ghost" size="sm" onClick={() => reabrirTarefa(task)}>Reabrir</Button> : null}
                       {task.status !== 'concluida' && (
-                        <Button variant="secondary" size="sm" onClick={() => moveToNextStatus(task)}>
-                          {task.status === 'pendente' ? 'Iniciar' : 'Concluir'} <ChevronRight size={14} />
+                        <Button variant="ghost" size="sm" onClick={() => moveToNextStatus(task)}>
+                          Resolver <ChevronRight size={14} />
                         </Button>
                       )}
                       <Button variant="danger" size="sm" onClick={() => handleDelete(task)}>Excluir</Button>
@@ -489,6 +520,23 @@ function isOverdue(dateStr) {
   const due = new Date(dateStr);
   due.setHours(0, 0, 0, 0);
   return due < today;
+}
+
+function resolveBucket(task) {
+  if (task?.status === 'concluida') return 'concluida';
+  if (task?.status === 'adiada') return 'adiada';
+  return isOverdue(task?.data_vencimento) ? 'vencida' : 'pendente';
+}
+
+function parseSnoozeOption(option, fallbackDate) {
+  const clean = String(option || '').trim();
+  if (/^\d{4}-\d{2}-\d{2}$/.test(clean)) return clean;
+  const dias = Number(clean);
+  if (![1, 3, 7].includes(dias)) return null;
+  const base = fallbackDate ? new Date(`${fallbackDate}T00:00:00`) : new Date();
+  if (Number.isNaN(base.getTime())) return null;
+  base.setDate(base.getDate() + dias);
+  return base.toISOString().slice(0, 10);
 }
 
 /**
