@@ -1,4 +1,4 @@
-﻿import { useMemo, useRef, useState } from 'react';
+import { useMemo, useRef, useState } from 'react';
 import Button from '../components/ui/Button';
 import PageHeader from '../components/PageHeader';
 import FazendaCard from '../components/fazendas/FazendaCard';
@@ -6,13 +6,11 @@ import FazendaModal from '../components/fazendas/FazendaModal';
 import { gerarNovoId } from '../utils/id';
 import { useToast } from '../hooks/useToast';
 import { useAuth } from '../auth/useAuth';
-import { resetSupabaseAuthLocally, validateSupabaseSessionForCloud } from '../lib/supabase';
+import { resetSupabaseAuthLocally, supabase, validateSupabaseSessionForCloud } from '../lib/supabase';
 import {
   createOperationalRecord,
   deleteOperationalRecord,
   getCloudSyncCooldownState,
-  syncFazendasWithCloud,
-  syncLotesWithCloud,
   updateOperationalRecord,
 } from '../services/operationalPersistence';
 import { runMinimalCloudDiagnostic } from '../services/supabaseDiagnostics';
@@ -109,6 +107,8 @@ export default function FazendasPage({ db, setDb, onConfirmAction }) {
     if (step === 'rest_without_session') return 'REST sem sessão';
     if (step === 'session_check') return 'Sessão';
     if (step === 'rest_with_session') return 'REST com sessão';
+    if (step === 'fazendas_check') return 'Fazendas';
+    if (step === 'lotes_check') return 'Lotes';
     if (step === 'client_select') return 'Supabase client';
     return 'Diagnóstico';
   }
@@ -167,16 +167,27 @@ export default function FazendasPage({ db, setDb, onConfirmAction }) {
           return;
         }
 
-        showToast({
-          type: item?.ok ? 'success' : 'warning',
-          message: `${traduzirStatusEtapa(item?.step)}: ${item?.ok ? 'OK' : 'Erro'}`,
-        });
+        if (item?.safeMessage && item.safeMessage.includes(': OK')) {
+          showToast({ type: 'success', message: item.safeMessage });
+        }
       });
 
       showToast({
         type: result?.ok ? 'success' : 'warning',
         message: result?.conclusionMessage || 'Falha ao executar diagnóstico da nuvem.',
       });
+
+      try {
+        window.dispatchEvent(new CustomEvent('herdon-cloud-diagnostic-state', {
+          detail: {
+            verified: Boolean(result?.ok),
+            message: result?.conclusionMessage || null,
+            checkedAt: Date.now(),
+          },
+        }));
+      } catch {
+        // noop
+      }
 
       if (result?.conclusion === 'session_failure') {
         showToast({
@@ -348,9 +359,19 @@ export default function FazendasPage({ db, setDb, onConfirmAction }) {
       let usedServerBridge = false;
 
       try {
-        const accessToken = session?.access_token || session?.session?.access_token || null;
-        if (!accessToken) {
-          throw new Error('missing_access_token');
+        const sessionResult = await supabase.auth.getSession();
+        const accessToken = sessionResult?.data?.session?.access_token || null;
+        const hasAccessToken = Boolean(accessToken);
+        const tokenLooksJwt = typeof accessToken === 'string' && accessToken.split('.').length === 3;
+        const tokenLength = typeof accessToken === 'string' ? accessToken.length : 0;
+        if (import.meta.env.DEV || isAdmin) {
+          console.groupCollapsed('[HERDON_SERVERLESS_AUTH_HEADER_DIAGNOSTIC]');
+          console.info({ endpoint: '/api/cloud-sync', status: null, hasAccessToken, tokenLooksJwt, tokenLength, failureType: hasAccessToken && tokenLooksJwt ? null : 'invalid_session', safeMessage: hasAccessToken && tokenLooksJwt ? 'Pré-validação do token concluída.' : 'Sessão inválida. Reconecte à nuvem.' });
+          console.groupEnd();
+        }
+        if (!hasAccessToken || !tokenLooksJwt) {
+          showToast({ type: 'warning', message: 'Sessão inválida. Reconecte à nuvem.' });
+          return;
         }
         const response = await fetch('/api/cloud-sync', {
           method: 'POST',
@@ -363,6 +384,11 @@ export default function FazendasPage({ db, setDb, onConfirmAction }) {
             lotes,
           }),
         });
+        if (import.meta.env.DEV || isAdmin) {
+          console.groupCollapsed('[HERDON_SERVERLESS_AUTH_HEADER_DIAGNOSTIC]');
+          console.info({ endpoint: '/api/cloud-sync', status: response.status, hasAccessToken: true, tokenLooksJwt: true, tokenLength: accessToken.length, failureType: response.ok ? null : 'server_http_error', safeMessage: response.ok ? 'Sync pelo servidor respondeu com sucesso.' : 'Falha na sincronização pelo servidor. O modo local continua ativo.' });
+          console.groupEnd();
+        }
         const payload = await response.json().catch(() => null);
         if (!response.ok || !payload) {
           throw new Error('server_sync_failed');
@@ -389,8 +415,14 @@ export default function FazendasPage({ db, setDb, onConfirmAction }) {
           code: payload?.lotes?.status === 'success' ? null : 'SERVER_SYNC_FAILED',
         };
       } catch {
-        fazendasSync = await syncFazendasWithCloud({ fazendas, session });
-        lotesSync = await syncLotesWithCloud({ lotes, session });
+        showToast({ type: 'warning', message: 'Falha na sincronização pelo servidor. O modo local continua ativo.' });
+        if (import.meta.env.DEV || isAdmin) {
+          console.groupCollapsed('[HERDON_SERVERLESS_AUTH_HEADER_DIAGNOSTIC]');
+          console.info({ endpoint: '/api/cloud-sync', status: 494, hasAccessToken: Boolean(session?.access_token || session?.session?.access_token), tokenLooksJwt: true, tokenLength: 0, failureType: 'server_network_error', safeMessage: 'Falha na sincronização pelo servidor. O modo local continua ativo.' });
+          console.groupEnd();
+        }
+        fazendasSync = { module: 'fazendas', status: 'error', message: 'Não foi possível sincronizar pelo servidor. O modo local continua ativo.', data: fazendas, httpStatus: 494, code: 'SERVER_SYNC_FAILED' };
+        lotesSync = { module: 'lotes', status: 'error', message: 'Não foi possível sincronizar pelo servidor. O modo local continua ativo.', data: lotes, httpStatus: 494, code: 'SERVER_SYNC_FAILED' };
       }
 
       if (Array.isArray(fazendasSync?.data) || Array.isArray(lotesSync?.data)) {
