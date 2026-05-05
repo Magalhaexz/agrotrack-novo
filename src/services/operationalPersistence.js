@@ -242,11 +242,13 @@ export async function ensureSupabaseRequestReadiness(session, context = {}) {
   }
 }
 
-function buildFallback(message, data = null) {
+function buildFallback(message, data = null, code = 'LOCAL_FALLBACK') {
   return {
     persisted: false,
     data,
     error: message,
+    syncStatus: 'local_only',
+    code,
   };
 }
 
@@ -528,7 +530,7 @@ function sanitizeAuditDetails(input) {
 export async function createOperationalRecord(table, record, session) {
   const readiness = await ensureSupabaseRequestReadiness(session, { action: 'create', table });
   if (!readiness.ok) {
-    return buildFallback(readiness.message, sanitizeRecord(record));
+    return buildFallback(readiness.message, sanitizeRecord(record), readiness.code || 'CLOUD_NOT_READY');
   }
   const userId = getSessionUserId(session);
 
@@ -547,7 +549,7 @@ export async function createOperationalRecord(table, record, session) {
       throw new Error(error.message || 'Falha ao criar registro.');
     }
 
-    return { persisted: true, data, error: null };
+    return { persisted: true, data, error: null, syncStatus: 'cloud_success', code: null };
   } catch (error) {
     logOperationalSync({
       stage: 'create_error',
@@ -561,7 +563,8 @@ export async function createOperationalRecord(table, record, session) {
     }, 'warn');
     return buildFallback(
       classifyOperationalError(error, 'Falha ao persistir cadastro na nuvem. Dados locais mantidos.', table),
-      sanitizeRecord(record)
+      sanitizeRecord(record),
+      error?.code || 'WRITE_FAILED'
     );
   }
 }
@@ -569,7 +572,7 @@ export async function createOperationalRecord(table, record, session) {
 export async function updateOperationalRecord(table, id, patch, session) {
   const readiness = await ensureSupabaseRequestReadiness(session, { action: 'update', table });
   if (!readiness.ok) {
-    return buildFallback(readiness.message, sanitizeRecord(patch));
+    return buildFallback(readiness.message, sanitizeRecord(patch), readiness.code || 'CLOUD_NOT_READY');
   }
   const userId = getSessionUserId(session);
 
@@ -587,7 +590,7 @@ export async function updateOperationalRecord(table, id, patch, session) {
       throw new Error(error.message || 'Falha ao atualizar registro.');
     }
 
-    return { persisted: true, data, error: null };
+    return { persisted: true, data, error: null, syncStatus: 'cloud_success', code: null };
   } catch (error) {
     logOperationalSync({
       stage: 'update_error',
@@ -601,7 +604,8 @@ export async function updateOperationalRecord(table, id, patch, session) {
     }, 'warn');
     return buildFallback(
       classifyOperationalError(error, 'Falha ao persistir atualizacao na nuvem. Dados locais mantidos.', table),
-      sanitizeRecord(patch)
+      sanitizeRecord(patch),
+      error?.code || 'WRITE_FAILED'
     );
   }
 }
@@ -609,7 +613,7 @@ export async function updateOperationalRecord(table, id, patch, session) {
 export async function deleteOperationalRecord(table, id, session) {
   const readiness = await ensureSupabaseRequestReadiness(session, { action: 'delete', table });
   if (!readiness.ok) {
-    return buildFallback(readiness.message);
+    return buildFallback(readiness.message, null, readiness.code || 'CLOUD_NOT_READY');
   }
   const userId = getSessionUserId(session);
 
@@ -637,7 +641,9 @@ export async function deleteOperationalRecord(table, id, session) {
       errorCode: error?.code || null,
     }, 'warn');
     return buildFallback(
-      classifyOperationalError(error, 'Falha ao persistir exclusao na nuvem. Dados locais mantidos.', table)
+      classifyOperationalError(error, 'Falha ao persistir exclusao na nuvem. Dados locais mantidos.', table),
+      null,
+      error?.code || 'WRITE_FAILED'
     );
   }
 }

@@ -142,7 +142,7 @@ export default function LotesPage({
     <div className="page rebanho-page">
       <div className="rebanho-header">
         <div><h1>Rebanho</h1><p>Gestão completa de lotes, movimentações e indicadores zootécnicos.</p></div>
-        <Button icon={<Plus size={16} />} onClick={() => {
+        <Button icon={<Plus size={16} />} disabled={!hasPermission('lotes:editar')} onClick={() => {
           if (!hasPermission('lotes:editar')) {
             showToast({ type: 'error', message: mensagemSemPermissao });
             return;
@@ -194,8 +194,8 @@ export default function LotesPage({
             <p className={lote.resumo.lucroTotal >= 0 ? 'text-success' : 'text-danger'}>Resultado parcial: {formatCurrency(lote.resumo.lucroTotal || 0)}</p>
             <div className="lote-actions">
               <Button size="sm" variant="outline" icon={<ChevronRight size={14} />} onClick={() => { setActiveTab('visao'); setActiveLoteId(lote.id); }}>Ver Detalhes</Button>
-              <Button size="sm" variant="ghost" icon={<Truck size={14} />} onClick={() => abrirMovimentacao(lote)}>Registrar Movimentação</Button>
-              <Button size="sm" variant="ghost" icon={<Scale size={14} />} onClick={() => {
+              <Button size="sm" variant="ghost" icon={<Truck size={14} />} disabled={!hasPermission('animais:movimentar')} onClick={() => abrirMovimentacao(lote)}>Registrar Movimentação</Button>
+              <Button size="sm" variant="ghost" icon={<Scale size={14} />} disabled={!hasPermission('pesagens:editar')} onClick={() => {
                 if (!hasPermission('pesagens:editar')) {
                   showToast({ type: 'error', message: mensagemSemPermissao });
                   return;
@@ -1058,18 +1058,72 @@ function NovoLoteModal({ db, setDb, onClose, showToast, hasPermission, session }
     qtd_inicial: '',
     custo_aquisicao: '',
     peso_alvo: '',
-    saida_meta: '',
+    gmd_esperado: String(configGeral.gmd_meta_padrao || ''),
+    dieta_nome: '',
+    produto_vinculado: '',
+    consumo_tipo: '%_peso_vivo',
+    consumo_valor: '',
     obs: '',
   });
   const [errors, setErrors] = useState({});
+
+  const produtosEstoque = useMemo(() => {
+    return (db.estoque || []).map((item) => {
+      const nome = item.produto || item.nome || `Produto ${item.id}`;
+      const precoKgDireto = Number(item.preco_por_kg ?? item.preco_kg ?? item.valor_kg ?? 0);
+      const precoEmbalagem = Number(item.preco_unitario ?? item.preco ?? item.valor ?? 0);
+      const pesoEmbalagemKg = Number(item.peso_embalagem_kg ?? item.peso_kg ?? item.peso_embalagem ?? 0);
+      const precoKg = precoKgDireto > 0
+        ? precoKgDireto
+        : (precoEmbalagem > 0 && pesoEmbalagemKg > 0 ? precoEmbalagem / pesoEmbalagemKg : null);
+      return { id: item.id, nome, precoKg };
+    });
+  }, [db.estoque]);
+
+  const pesoInicialNum = Number(form.peso_inicial || 0);
+  const pesoAlvoNum = Number(form.peso_alvo || 0);
+  const gmdEsperadoNum = Number(form.gmd_esperado || 0);
+  const consumoValorNum = Number(form.consumo_valor || 0);
+
+  const diferencaPeso = pesoAlvoNum - pesoInicialNum;
+  const diasEstimados = gmdEsperadoNum > 0 && diferencaPeso > 0 ? Math.ceil(diferencaPeso / gmdEsperadoNum) : null;
+  const dataPrevistaSaida = diasEstimados !== null && form.entrada
+    ? new Date(new Date(`${form.entrada}T00:00:00`).getTime() + diasEstimados * 86400000).toISOString().slice(0, 10)
+    : null;
+  const pesoMedioPeriodo = pesoInicialNum > 0 && pesoAlvoNum > 0 ? (pesoInicialNum + pesoAlvoNum) / 2 : null;
+  const consumoDiarioPorAnimal = (() => {
+    if (form.consumo_tipo === '%_peso_vivo') {
+      const decimal = consumoValorNum > 0 ? consumoValorNum / 100 : 0;
+      return pesoMedioPeriodo !== null && decimal > 0 ? pesoMedioPeriodo * decimal : null;
+    }
+    if (form.consumo_tipo === 'kg_cab_dia') {
+      return consumoValorNum > 0 ? consumoValorNum : null;
+    }
+    return null;
+  })();
+  const consumoPeriodoPorAnimal = consumoDiarioPorAnimal !== null && diasEstimados !== null ? consumoDiarioPorAnimal * diasEstimados : null;
+  const consumoTotalLote = consumoPeriodoPorAnimal !== null && Number(form.qtd_inicial || 0) > 0
+    ? consumoPeriodoPorAnimal * Number(form.qtd_inicial || 0)
+    : null;
+  const produtoSelecionado = produtosEstoque.find((item) => item.nome === form.produto_vinculado) || null;
+  const precoProdutoKg = Number(produtoSelecionado?.precoKg || 0) > 0 ? Number(produtoSelecionado.precoKg) : null;
+  const custoDiarioPorAnimal = consumoDiarioPorAnimal !== null && precoProdutoKg !== null ? consumoDiarioPorAnimal * precoProdutoKg : null;
+  const custoPeriodoPorAnimal = consumoPeriodoPorAnimal !== null && precoProdutoKg !== null ? consumoPeriodoPorAnimal * precoProdutoKg : null;
+  const custoTotalLote = consumoTotalLote !== null && precoProdutoKg !== null ? consumoTotalLote * precoProdutoKg : null;
+
+
+
 
   function validate() {
     const e = {};
     if (!form.nome.trim()) e.nome = 'Nome é obrigatório';
     if (!form.faz_id) e.faz_id = 'Fazenda é obrigatória';
-    if (!form.entrada) e.entrada = 'Data de entrada é obrigatória';
+    if (!form.entrada) e.entrada = 'Informe a data de entrada para projetar a saída.';
     if (Number(form.qtd_inicial || 0) <= 0) e.qtd_inicial = 'Quantidade inicial deve ser maior que zero';
     if (Number(form.peso_inicial || 0) <= 0) e.peso_inicial = 'Peso inicial deve ser maior que zero';
+    if (Number(form.gmd_esperado || 0) <= 0) e.gmd_esperado = 'Informe um GMD esperado válido.';
+    if (Number(form.peso_alvo || 0) <= Number(form.peso_inicial || 0)) e.peso_alvo = 'O peso alvo deve ser maior que o peso inicial.';
+    if (Number(form.consumo_valor || 0) <= 0) e.consumo_valor = 'Informe a regra de consumo deste produto.';
     setErrors(e);
     return !Object.keys(e).length;
   }
@@ -1086,23 +1140,34 @@ function NovoLoteModal({ db, setDb, onClose, showToast, hasPermission, session }
 
     const novoLoteId = gerarNovoId(db.lotes);
     const custoAquisicao = Number(form.custo_aquisicao || 0);
+    const planejamentoLote = [
+      '[Planejamento lote]',
+      `GMD esperado: ${Number(form.gmd_esperado || 0)}`,
+      `Dieta/produto: ${form.produto_vinculado || 'Não informado'}`,
+      `Modo de consumo: ${form.consumo_tipo || 'Não informado'}`,
+      `Valor de consumo: ${Number(form.consumo_valor || 0)}`,
+      `Saída projetada (informativa): ${dataPrevistaSaida || 'Não calculada'}`,
+      `Consumo estimado suplemento (kg): ${consumoTotalLote !== null ? consumoTotalLote.toFixed(2) : 'Não calculado'}`,
+      `Custo estimado suplemento (R$): ${custoTotalLote !== null ? custoTotalLote.toFixed(2) : 'Não calculado'}`,
+    ].join(' | ');
+
     const lotePayload = {
       nome: form.nome,
       faz_id: Number(form.faz_id),
       entrada: form.entrada,
-      saida: form.saida_meta,
+      saida: null,
       investimento: custoAquisicao,
       status: 'ativo',
       tipo: 'engorda',
       sistema: 'confinamento',
-      gmd_meta: configGeral.gmd_meta_padrao || 1,
+      gmd_meta: Number(form.gmd_esperado || configGeral.gmd_meta_padrao || 1),
       preco_arroba: configGeral.preco_arroba_padrao || 290,
       rendimento_carcaca: configGeral.rendimento_carcaca_padrao || 52,
       peso_alvo: Number(form.peso_alvo || 0),
       raca: form.raca,
       sexo: form.sexo,
       categoria: form.categoria,
-      obs: form.obs,
+      obs: [form.obs, planejamentoLote].filter(Boolean).join(' | '),
       p_ini: Number(form.peso_inicial),
       p_at: Number(form.peso_inicial),
       ultima_pesagem: form.entrada,
@@ -1168,10 +1233,25 @@ function NovoLoteModal({ db, setDb, onClose, showToast, hasPermission, session }
         }
       ] : prev.custos,
     }));
-    if (!lotePersist.persisted || !animalPersist.persisted || !custoPersist.persisted) {
-      showToast({ type: 'warning', message: 'Lote salvo parcialmente apenas no modo local.' });
+    const falhasCloud = [lotePersist, animalPersist, custoPersist].filter((item) => !item?.persisted);
+    if (falhasCloud.length === 0) {
+      showToast({ type: 'success', message: `Lote ${form.nome} criado e sincronizado com a nuvem.` });
+      onClose();
+      return;
     }
-    showToast({ type: 'success', message: `Lote ${form.nome} criado com sucesso!` });
+
+    const lotePersistido = Boolean(lotePersist?.persisted);
+    const animaisPersistidos = Boolean(animalPersist?.persisted);
+    const custoPersistido = Boolean(custoPersist?.persisted);
+
+    if (lotePersistido && (animaisPersistidos || custoPersistido)) {
+      showToast({ type: 'warning', message: 'Cadastro concluído com sincronização parcial. Parte dos dados permanece em modo local.' });
+    } else if (lotePersistido || animaisPersistidos || custoPersistido) {
+      showToast({ type: 'warning', message: 'Cadastro concluído parcialmente no modo local. Reconecte para sincronizar o restante.' });
+    } else {
+      showToast({ type: 'warning', message: 'Cadastro salvo apenas no modo local. A sincronização com a nuvem não foi concluída.' });
+    }
+
     onClose();
   }
 
@@ -1212,8 +1292,49 @@ function NovoLoteModal({ db, setDb, onClose, showToast, hasPermission, session }
         <Input label="Peso médio inicial" type="number" error={errors.peso_inicial} value={form.peso_inicial} onChange={(e) => setForm((p) => ({ ...p, peso_inicial: e.target.value }))} />
         <Input label="Quantidade inicial" type="number" error={errors.qtd_inicial} value={form.qtd_inicial} onChange={(e) => setForm((p) => ({ ...p, qtd_inicial: e.target.value }))} />
         <Input label="Custo de aquisição" prefix="R$" type="number" value={form.custo_aquisicao} onChange={(e) => setForm((p) => ({ ...p, custo_aquisicao: e.target.value }))} />
-        <Input label="Peso alvo" suffix="kg" type="number" value={form.peso_alvo} onChange={(e) => setForm((p) => ({ ...p, peso_alvo: e.target.value }))} />
-        <Input label="Data alvo de saída" type="date" value={form.saida_meta} onChange={(e) => setForm((p) => ({ ...p, saida_meta: e.target.value }))} />
+        <Input label="Peso alvo" suffix="kg" type="number" error={errors.peso_alvo} value={form.peso_alvo} onChange={(e) => setForm((p) => ({ ...p, peso_alvo: e.target.value }))} />
+
+        <Input label="GMD esperado" suffix="kg/dia" type="number" error={errors.gmd_esperado} value={form.gmd_esperado} onChange={(e) => setForm((p) => ({ ...p, gmd_esperado: e.target.value }))} />
+        <label className="ui-input-wrap">
+          <span className="ui-input-label">Qual dieta este lote receberá?</span>
+          <input className="ui-input" value={form.dieta_nome} onChange={(e) => setForm((p) => ({ ...p, dieta_nome: e.target.value }))} placeholder="Ex.: Dieta de terminação" />
+        </label>
+        <label className="ui-input-wrap">
+          <span className="ui-input-label">Produto/suplemento vinculado ao estoque</span>
+          <select className="ui-input" value={form.produto_vinculado} onChange={(e) => { const v=e.target.value; const sp=produtosEstoque.find((item)=>item.nome===v); setForm((p)=>({ ...p, produto_vinculado:v, consumo_tipo: sp?.tipoPadrao || p.consumo_tipo, consumo_valor: sp?.valorPadrao ? String(sp.valorPadrao) : p.consumo_valor })); }}>
+            <option value="">Produto não vinculado ao estoque</option>
+            {produtosEstoque.map((item) => <option key={item.id} value={item.nome}>{item.nome}</option>)}
+          </select>
+        </label>
+        <label className="ui-input-wrap">
+          <span className="ui-input-label">Tipo de consumo</span>
+          <select className="ui-input" value={form.consumo_tipo} onChange={(e) => setForm((p) => ({ ...p, consumo_tipo: e.target.value }))}>
+            <option value="%_peso_vivo">% do peso vivo</option>
+            <option value="kg_cab_dia">kg/cabeça/dia</option>
+          </select>
+        </label>
+        <Input label="Consumo informado" suffix={form.consumo_tipo === '%_peso_vivo' ? '% do peso vivo' : 'kg/cabeça/dia'} type="number" error={errors.consumo_valor} value={form.consumo_valor} onChange={(e) => setForm((p) => ({ ...p, consumo_valor: e.target.value }))} />
+        <Input label="Data prevista de saída" type="text" value={dataPrevistaSaida ? formatDate(dataPrevistaSaida) : 'Informe dados válidos para projetar a saída'} readOnly />
+
+        <div className="ui-card full" style={{ padding: 12, borderStyle: 'dashed' }}>
+          <strong>Estimativas do lote</strong>
+          <p>Dias estimados na fazenda: {diasEstimados !== null ? `${formatNumber(diasEstimados, 0)} dias` : 'Informe um GMD esperado válido.'}</p>
+          <p>Data prevista de saída: {dataPrevistaSaida ? formatDate(dataPrevistaSaida) : 'Informe dados válidos para calcular.'}</p>
+          <p>Consumo diário por animal: {consumoDiarioPorAnimal !== null ? `${formatNumber(consumoDiarioPorAnimal, 3)} kg/dia` : 'Informe a regra de consumo deste produto.'}</p>
+          <p>Consumo por animal no período: {consumoPeriodoPorAnimal !== null ? `${formatNumber(consumoPeriodoPorAnimal, 2)} kg` : 'Informe dados válidos para calcular.'}</p>
+          <p>Consumo total estimado do lote: {consumoTotalLote !== null ? `${formatNumber(consumoTotalLote, 2)} kg` : 'Informe quantidade de cabeças para calcular.'}</p>
+          <p>Custo diário por animal: {custoDiarioPorAnimal !== null ? formatCurrency(custoDiarioPorAnimal) : 'Custo estimado indisponível: informe o custo do produto no estoque.'}</p>
+          <p>Custo estimado por animal no período: {custoPeriodoPorAnimal !== null ? formatCurrency(custoPeriodoPorAnimal) : 'Custo estimado indisponível: informe o custo do produto no estoque.'}</p>
+          <p>Custo estimado total do lote: {custoTotalLote !== null ? formatCurrency(custoTotalLote) : 'Custo estimado indisponível: informe o custo do produto no estoque.'}</p>
+          <p>Custo diário por animal: {custoDiarioPorAnimal !== null ? formatCurrency(custoDiarioPorAnimal) : 'Custo estimado indisponível: informe o custo do produto no estoque.'}</p>
+          <p>Custo estimado por animal no período: {custoPeriodoPorAnimal !== null ? formatCurrency(custoPeriodoPorAnimal) : 'Custo estimado indisponível: informe o custo do produto no estoque.'}</p>
+          <p>Custo estimado total do lote: {custoTotalLote !== null ? formatCurrency(custoTotalLote) : 'Custo estimado indisponível: informe o custo do produto no estoque.'}</p>
+          <p>Produto/suplemento: {form.produto_vinculado || 'Produto não vinculado ao estoque'}</p>
+          <p>Tipo de consumo: {form.consumo_tipo === '%_peso_vivo' ? '% do peso vivo' : 'kg/cabeça/dia'}</p>
+          <p>Consumo informado: {form.consumo_valor ? `${form.consumo_valor} ${form.consumo_tipo === '%_peso_vivo' ? '%' : 'kg/cabeça/dia'}` : 'Informe a regra de consumo deste produto.'}</p>
+          <p>Dieta escolhida: {form.dieta_nome || 'Não informada'}</p>
+        </div>
+
         <label className="ui-input-wrap full">
           <span className="ui-input-label">Observações</span>
           <textarea className="ui-input" value={form.obs} onChange={(e) => setForm((p) => ({ ...p, obs: e.target.value }))} />

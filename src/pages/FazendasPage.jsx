@@ -136,6 +136,10 @@ export default function FazendasPage({ db, setDb, onConfirmAction }) {
   }
 
   async function executarDiagnosticoNuvem() {
+    if (!hasPermission('fazendas:editar')) {
+      showToast({ type: 'error', message: 'Acesso restrito ao perfil autorizado.' });
+      return;
+    }
     if (!podeVerDiagnostico || diagnosticandoNuvem) return;
     setDiagnosticandoNuvem(true);
     try {
@@ -259,6 +263,10 @@ export default function FazendasPage({ db, setDb, onConfirmAction }) {
   }
 
   async function reconectarNuvem() {
+    if (!hasPermission('fazendas:editar')) {
+      showToast({ type: 'error', message: 'Acesso restrito ao perfil autorizado.' });
+      return;
+    }
     if (sincronizandoFazendas || diagnosticandoNuvem || reconectandoNuvem) return;
     setReconectandoNuvem(true);
     try {
@@ -310,6 +318,10 @@ export default function FazendasPage({ db, setDb, onConfirmAction }) {
   }
 
   async function sincronizarFazendasComNuvem() {
+    if (!hasPermission('fazendas:editar')) {
+      showToast({ type: 'error', message: 'Somente perfis autorizados podem editar este registro.' });
+      return;
+    }
     const now = Date.now();
     if (sincronizandoFazendas || manualSyncRef.current.inFlight) return;
     if (now - manualSyncRef.current.lastStartAt < 1200) return;
@@ -351,12 +363,10 @@ export default function FazendasPage({ db, setDb, onConfirmAction }) {
     });
 
     try {
-      showToast({ type: 'info', message: 'Fazendas: sincronizando...' });
-      showToast({ type: 'info', message: 'Lotes: sincronizando...' });
+      showToast({ type: 'info', message: 'Sincronização iniciada. Aguarde...' });
 
       let fazendasSync = null;
       let lotesSync = null;
-      let usedServerBridge = false;
 
       try {
         const sessionResult = await supabase.auth.getSession();
@@ -393,7 +403,6 @@ export default function FazendasPage({ db, setDb, onConfirmAction }) {
         if (!response.ok || !payload) {
           throw new Error('server_sync_failed');
         }
-        usedServerBridge = true;
         fazendasSync = {
           module: 'fazendas',
           status: payload?.fazendas?.status || 'error',
@@ -415,7 +424,6 @@ export default function FazendasPage({ db, setDb, onConfirmAction }) {
           code: payload?.lotes?.status === 'success' ? null : 'SERVER_SYNC_FAILED',
         };
       } catch {
-        showToast({ type: 'warning', message: 'Falha na sincronização pelo servidor. O modo local continua ativo.' });
         if (import.meta.env.DEV || isAdmin) {
           console.groupCollapsed('[HERDON_SERVERLESS_AUTH_HEADER_DIAGNOSTIC]');
           console.info({ endpoint: '/api/cloud-sync', status: 494, hasAccessToken: Boolean(session?.access_token || session?.session?.access_token), tokenLooksJwt: true, tokenLength: 0, failureType: 'server_network_error', safeMessage: 'Falha na sincronização pelo servidor. O modo local continua ativo.' });
@@ -434,19 +442,11 @@ export default function FazendasPage({ db, setDb, onConfirmAction }) {
       }
 
       if (fazendasSync?.status === 'success' && lotesSync?.status === 'success') {
-        if (usedServerBridge) {
-          showToast({ type: 'success', message: 'Nuvem conectada pelo servidor.' });
-          showToast({ type: 'success', message: 'Fazendas sincronizadas com a nuvem.' });
-          showToast({ type: 'success', message: 'Lotes sincronizados com a nuvem.' });
-        } else {
-          showToast({ type: 'success', message: 'Fazendas sincronizadas. Lotes sincronizados.' });
-        }
-      } else if (fazendasSync?.status === 'success') {
-        showToast({ type: 'warning', message: `Fazendas sincronizadas. Falha ao sincronizar lotes: ${lotesSync?.message || 'ver diagnóstico.'}` });
-      } else if (lotesSync?.status === 'success') {
-        showToast({ type: 'warning', message: `Fazendas: ${fazendasSync?.message || 'erro ao sincronizar.'} Lotes sincronizados.` });
+        showToast({ type: 'success', message: 'Fazendas e lotes sincronizados com a nuvem.' });
+      } else if (fazendasSync?.status === 'success' || lotesSync?.status === 'success') {
+        showToast({ type: 'warning', message: 'Sincronização parcial concluída. Parte dos dados permanece em modo local.' });
       } else {
-        showToast({ type: 'warning', message: 'Não foi possível sincronizar pelo servidor. O modo local continua ativo.' });
+        showToast({ type: 'warning', message: 'Falha na sincronização. O modo local continua ativo.' });
       }
 
       if (fazendasSync?.status !== 'success' || lotesSync?.status !== 'success') {
@@ -498,6 +498,7 @@ export default function FazendasPage({ db, setDb, onConfirmAction }) {
             <Button
               variant="secondary"
               onClick={sincronizarFazendasComNuvem}
+              disabled={!hasPermission('fazendas:editar')}
               disabled={sincronizandoFazendas || diagnosticandoNuvem || reconectandoNuvem}
             >
               {sincronizandoFazendas ? 'Sincronizando fazendas e lotes...' : 'Sincronizar fazendas e lotes com a nuvem'}
@@ -506,6 +507,7 @@ export default function FazendasPage({ db, setDb, onConfirmAction }) {
               <Button
                 variant="ghost"
                 onClick={executarDiagnosticoNuvem}
+                disabled={!hasPermission('fazendas:editar')}
                 disabled={sincronizandoFazendas || diagnosticandoNuvem || reconectandoNuvem}
               >
                 {diagnosticandoNuvem ? 'Testando conexão com a nuvem...' : 'Testar conexão com a nuvem'}
@@ -514,11 +516,12 @@ export default function FazendasPage({ db, setDb, onConfirmAction }) {
             <Button
               variant="outline"
               onClick={reconectarNuvem}
+              disabled={!hasPermission('fazendas:editar')}
               disabled={sincronizandoFazendas || diagnosticandoNuvem || reconectandoNuvem}
             >
               {reconectandoNuvem ? 'Reconectando...' : 'Reconectar à nuvem'}
             </Button>
-            <Button onClick={() => {
+            <Button disabled={!hasPermission('fazendas:editar')} onClick={() => {
               if (!hasPermission('fazendas:editar')) {
                 showToast({ type: 'error', message: mensagemSemPermissao });
                 return;

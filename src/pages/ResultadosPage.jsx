@@ -758,9 +758,26 @@ function buildReportBundle(db, filters) {
     }));
 
   const ledgerRows = [...financialRows, ...animalRevenueRows];
+  const pagamentosDiariosRows = ledgerRows.filter((row) => row.categoria === 'Pagamento Diário' || row.categoria === 'Pagamento Diario');
   const ledgerExpense = ledgerRows.filter((row) => row.tipo !== 'Receita').reduce((total, row) => total + row.valor, 0);
   const ledgerRevenue = ledgerRows.filter((row) => row.tipo === 'Receita').reduce((total, row) => total + row.valor, 0);
   const potentialRevenue = visibleLotes.reduce((total, item) => total + Number(item.indicadores.receitaTotal || 0), 0);
+  const planejamentoLoteRows = visibleLotes.map(({ lote, fazenda }) => {
+    const plano = parsePlanejamentoLote(lote.obs);
+    return {
+      id: lote.id,
+      lote: lote.nome,
+      fazenda: fazenda?.nome || '-',
+      gmdEsperado: plano.gmdEsperado || 'Sem dados suficientes',
+      produto: plano.produto || 'Sem dados suficientes',
+      consumoTipo: plano.consumoTipo || 'Sem dados suficientes',
+      consumoInformado: plano.consumoInformado || 'Sem dados suficientes',
+      dataPrevistaSaida: plano.dataPrevistaSaida || 'Estimativa indisponível',
+      consumoEstimado: plano.consumoEstimado || 'Estimativa indisponível',
+      custoEstimado: plano.custoEstimado || 'Estimativa indisponível',
+    };
+  });
+  const iatfRows = sanitaryRows.filter((row) => String(row.tipo || '').toUpperCase() === 'IATF' || String(row.descricao || '').toUpperCase().includes('IATF'));
 
   const performanceRows = visibleLotes.map((item) => {
     const ultimaPesagem = item.pesagensPeriodo.slice().sort((a, b) => String(a.data).localeCompare(String(b.data))).at(-1);
@@ -983,6 +1000,7 @@ function buildReportBundle(db, filters) {
           'Escopo com risco ativo',
           'danger'
         ),
+        createSummary('Protocolos IATF', formatNumber(iatfRows.length, 0), 'Registros reprodutivos dentro do contrato sanitário', iatfRows.length ? 'info' : 'neutral'),
       ],
       highlights: buildSanitaryHighlights(sanitaryRows),
       exportConfig: createExportConfig('relatorio-sanitario', filters, [
@@ -1010,6 +1028,26 @@ function buildReportBundle(db, filters) {
             { key: 'status', label: 'Status', render: (row) => <Badge variant={sanitizeBadge(row.status)}>{row.status}</Badge> },
           ],
           rows: sanitaryRows,
+        },
+        {
+          id: 'iatf',
+          title: 'Agenda IATF / Reprodução',
+          description: 'Protocolos IATF registrados no sanitário para acompanhamento de agenda.',
+          badgeLabel: `${iatfRows.length} protocolos`,
+          badgeVariant: 'neutral',
+          emptyTitle: 'Nenhum registro encontrado',
+          emptySubtitle: 'Cadastre protocolos IATF no módulo sanitário para visualizar este quadro.',
+          mobileTitleKey: 'descricao',
+          mobileSubtitleKey: (row) => `${row.lote} • ${row.proxima}`,
+          columns: [
+            { key: 'descricao', label: 'Protocolo' },
+            { key: 'lote', label: 'Lote' },
+            { key: 'fazenda', label: 'Fazenda' },
+            { key: 'aplicacao', label: 'Início' },
+            { key: 'proxima', label: 'Próxima ação' },
+            { key: 'status', label: 'Status', render: (row) => <Badge variant={sanitizeBadge(row.status)}>{row.status}</Badge> },
+          ],
+          rows: iatfRows,
         },
       ],
     },
@@ -1122,6 +1160,7 @@ function buildReportBundle(db, filters) {
           'Somente o que já foi efetivamente lançado',
           ledgerRevenue - ledgerExpense >= 0 ? 'success' : 'danger'
         ),
+        createSummary('Pagamentos diários', formatNumber(pagamentosDiariosRows.length, 0), 'Lidos de movimentações financeiras', 'info'),
       ],
       highlights: buildFinancialHighlights(ledgerRows, potentialRevenue, ledgerExpense),
       exportConfig: createExportConfig('relatorio-financeiro', filters, [
@@ -1149,6 +1188,49 @@ function buildReportBundle(db, filters) {
             { key: 'valor', label: 'Valor', render: (row) => formatCurrency(row.valor) },
           ],
           rows: ledgerRows,
+        },
+        {
+          id: 'financeiro-pagamentos-diarios',
+          title: 'Pagamentos diários',
+          description: 'Pagamentos categorizados como Pagamento Diário no financeiro.',
+          badgeLabel: `${pagamentosDiariosRows.length} pagamentos`,
+          badgeVariant: 'neutral',
+          emptyTitle: 'Nenhum registro encontrado',
+          emptySubtitle: 'Sem pagamentos diários para os filtros selecionados.',
+          mobileTitleKey: 'categoria',
+          mobileSubtitleKey: (row) => `${row.data} • ${formatCurrency(row.valor)}`,
+          columns: [
+            { key: 'data', label: 'Data' },
+            { key: 'categoria', label: 'Categoria' },
+            { key: 'origem', label: 'Origem' },
+            { key: 'lote', label: 'Lote' },
+            { key: 'fazenda', label: 'Fazenda' },
+            { key: 'valor', label: 'Valor', render: (row) => formatCurrency(row.valor) },
+          ],
+          rows: pagamentosDiariosRows,
+        },
+        {
+          id: 'financeiro-planejamento-lotes',
+          title: 'Planejamento de lote e estimativas',
+          description: 'Representação de GMD, dieta/consumo e estimativas persistidas em campos compatíveis.',
+          badgeLabel: `${planejamentoLoteRows.length} lotes`,
+          badgeVariant: 'neutral',
+          emptyTitle: 'Nenhum lote encontrado',
+          emptySubtitle: 'Sem dados suficientes para exibir planejamento neste recorte.',
+          mobileTitleKey: 'lote',
+          mobileSubtitleKey: 'fazenda',
+          columns: [
+            { key: 'lote', label: 'Lote' },
+            { key: 'fazenda', label: 'Fazenda' },
+            { key: 'gmdEsperado', label: 'GMD esperado' },
+            { key: 'produto', label: 'Dieta/produto' },
+            { key: 'consumoTipo', label: 'Tipo de consumo' },
+            { key: 'consumoInformado', label: 'Consumo informado' },
+            { key: 'dataPrevistaSaida', label: 'Data prevista (projeção)' },
+            { key: 'consumoEstimado', label: 'Consumo estimado' },
+            { key: 'custoEstimado', label: 'Custo estimado' },
+          ],
+          rows: planejamentoLoteRows,
         },
       ],
     },
@@ -1621,4 +1703,17 @@ function sortDateDesc(a, b) {
   const first = a === '-' ? '' : String(a).split('/').reverse().join('-');
   const second = b === '-' ? '' : String(b).split('/').reverse().join('-');
   return String(second).localeCompare(String(first));
+}
+
+function parsePlanejamentoLote(obs) {
+  const text = String(obs || '');
+  return {
+    gmdEsperado: (text.match(/GMD esperado:\s*([^|]+)/i) || [])[1]?.trim(),
+    produto: (text.match(/Dieta\/produto:\s*([^|]+)/i) || [])[1]?.trim(),
+    consumoTipo: (text.match(/Modo de consumo:\s*([^|]+)/i) || [])[1]?.trim(),
+    consumoInformado: (text.match(/Valor de consumo:\s*([^|]+)/i) || [])[1]?.trim(),
+    dataPrevistaSaida: (text.match(/Saída projetada \(informativa\):\s*([^|]+)/i) || [])[1]?.trim(),
+    consumoEstimado: (text.match(/Consumo estimado suplemento \(kg\):\s*([^|]+)/i) || [])[1]?.trim(),
+    custoEstimado: (text.match(/Custo estimado suplemento \(R\$\):\s*([^|]+)/i) || [])[1]?.trim(),
+  };
 }

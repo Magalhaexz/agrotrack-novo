@@ -61,7 +61,7 @@ function getCloudState(syncStatus) {
       tone: 'online',
       icon: 'cloud',
       label: 'Nuvem verificada',
-      detail: 'Nuvem ativa',
+      detail: syncStatus?.lastSyncAt ? `Última sync: ${formatSyncTime(syncStatus.lastSyncAt)}` : 'Nuvem ativa',
       title: syncStatus?.cloudVerifiedMessage || 'Nuvem conectada pelo servidor.',
       disabled: false,
     };
@@ -71,7 +71,7 @@ function getCloudState(syncStatus) {
     return {
       tone: 'syncing',
       icon: 'loading',
-      label: 'Sincronizando',
+      label: 'Sincronizando...',
       detail: 'Sincronizando módulos',
       title: 'Sincronização manual em andamento',
       disabled: true,
@@ -104,8 +104,8 @@ function getCloudState(syncStatus) {
     return {
       tone: 'warning',
       icon: 'warning',
-      label: 'Dados locais ativos',
-      detail: message || 'Falha ao conectar ao Supabase pelo navegador',
+      label: 'Modo local',
+      detail: message || 'Nuvem indisponível no momento',
       title: message || 'Falha de nuvem detectada. O modo local continua ativo.',
       disabled: false,
     };
@@ -115,8 +115,8 @@ function getCloudState(syncStatus) {
     return {
       tone: 'muted',
       icon: 'local',
-      label: 'Dados locais ativos',
-      detail: 'Nuvem pausada',
+      label: 'Nuvem pausada',
+      detail: 'Modo local ativo',
       title: 'Sincronização com Supabase desativada neste navegador',
       disabled: false,
     };
@@ -125,7 +125,7 @@ function getCloudState(syncStatus) {
   return {
     tone: 'local',
     icon: 'local',
-    label: 'Dados locais ativos',
+    label: 'Modo local',
     detail: 'Nuvem não verificada',
     title: 'Sincronização manual disponível',
     disabled: false,

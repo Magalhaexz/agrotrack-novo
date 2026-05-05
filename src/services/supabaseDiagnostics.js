@@ -211,11 +211,22 @@ function _buildEnvStep() {
       urlValid,
       anonKeyLooksValid,
     },
-    safeMessage: rawUrl && rawAnonKey && urlValid ? 'Ambiente configurado' : 'Erro de configuração',
+    safeMessage: rawUrl && rawAnonKey && urlValid ? 'Ambiente configurado' : 'Configuração da nuvem incompleta.',
   };
 }
 
 export async function runMinimalCloudDiagnostic({ table = 'lotes' } = {}) {
+  const envStep = _buildEnvStep();
+  if (!envStep.ok) {
+    return {
+      ok: false,
+      table,
+      steps: [envStep],
+      conclusion: 'config_error',
+      conclusionMessage: 'Não foi possível conectar à nuvem. Verifique a configuração. Modo local ativo.',
+    };
+  }
+
   const tokenInfo = await getSafeAccessToken();
   if (!tokenInfo.hasAccessToken || !tokenInfo.tokenLooksJwt) {
     if (import.meta.env.DEV) {
@@ -227,7 +238,7 @@ export async function runMinimalCloudDiagnostic({ table = 'lotes' } = {}) {
       ok: false,
       table,
       steps: [
-        { step: 'env_check', ok: true, safeMessage: 'Ambiente configurado' },
+        envStep,
         { step: 'session_check', ok: false, status: 'invalid', safeMessage: INVALID_SESSION_MESSAGE },
       ],
       conclusion: 'session_failure',
@@ -248,7 +259,7 @@ export async function runMinimalCloudDiagnostic({ table = 'lotes' } = {}) {
     const ok = Boolean(response.ok && payload?.ok === true);
     const safeMessage = ok
       ? 'Nuvem conectada pelo servidor.'
-      : `Diagnóstico pelo servidor falhou${response?.status ? ` — status ${response.status}.` : '. O modo local continua ativo.'}`;
+      : `Não foi possível conectar à nuvem. Verifique a configuração.${response?.status ? ` (status ${response.status})` : ''} Modo local ativo.`;
 
     if (import.meta.env.DEV) {
       console.groupCollapsed('[HERDON_SERVERLESS_CLOUD_DIAGNOSTIC]');
@@ -260,7 +271,7 @@ export async function runMinimalCloudDiagnostic({ table = 'lotes' } = {}) {
       ok,
       table,
       steps: [
-        { step: 'env_check', ok: checks.find((c) => c?.name === 'env')?.status === 'success', safeMessage: 'Ambiente: OK' },
+        { step: 'env_check', ok: checks.find((c) => c?.name === 'env')?.status === 'success', safeMessage: checks.find((c) => c?.name === 'env')?.status === 'success' ? 'Ambiente: OK' : 'Configuração da nuvem incompleta.' },
         { step: 'fazendas_check', ok: checks.find((c) => c?.name === 'table_fazendas')?.status === 'success', safeMessage: 'Fazendas: OK' },
         { step: 'lotes_check', ok: checks.find((c) => c?.name === 'table_lotes')?.status === 'success', safeMessage: 'Lotes: OK' },
       ],
@@ -268,7 +279,7 @@ export async function runMinimalCloudDiagnostic({ table = 'lotes' } = {}) {
       conclusionMessage: safeMessage,
     };
   } catch {
-    const safeMessage = 'Diagnóstico pelo servidor falhou. O modo local continua ativo.';
+    const safeMessage = 'Não foi possível conectar à nuvem. Verifique a configuração. Modo local ativo.';
     if (import.meta.env.DEV) {
       console.groupCollapsed('[HERDON_SERVERLESS_CLOUD_DIAGNOSTIC]');
       console.info({ endpoint: '/api/cloud-diagnostic', status: null, ok: false, checks: [], safeMessage });

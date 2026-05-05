@@ -1027,3 +1027,15 @@
     margin-bottom: 6px;
   }
 }
+
+/* Sprint 12 - relatorios polish */
+.reports-module-chip {
+  border: 1px solid rgba(148, 163, 184, 0.22);
+  background: linear-gradient(145deg, rgba(15, 23, 42, 0.84), rgba(30, 41, 59, 0.72));
+}
+
+@media (max-width: 900px) {
+  .reports-module-chip {
+    padding: 12px;
+  }
+}
