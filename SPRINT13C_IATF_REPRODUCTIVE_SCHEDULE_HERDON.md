@@ -16,7 +16,7 @@ Foi aplicado um protocolo inicial seguro, com offsets ajustáveis na camada fron
 - Dia 9: aplicação hormonal
 - Dia 10: inseminação
 - Dia 40: diagnóstico de gestação
-- Dia 50: repasse/revisão
+- Dia 55: repasse/revisão
 
 Os valores são editáveis no formulário para não fixar apenas um protocolo como verdade única.
 
@@ -28,6 +28,7 @@ A prévia mostra as datas em português e exibe:
 - Data prevista
 
 No salvamento, o sistema seleciona a primeira data futura/atual como referência de próxima ação (`proxima`) e registra o item no fluxo sanitário operacional já existente.
+Também grava metadados no campo `obs` (status, fazenda, offsets e agenda serializada), permitindo reconstruir o cronograma de forma compatível com o modelo atual, sem nova tabela.
 
 ## Como funcionam os lembretes reprodutivos no dashboard
 Foi adicionado um card **Lembretes reprodutivos** no dashboard, com leitura dos registros IATF já persistidos em `sanitario`:
@@ -38,10 +39,17 @@ Foi adicionado um card **Lembretes reprodutivos** no dashboard, com leitura dos 
 
 Também são exibidos até dois próximos protocolos com nome, lote e data prevista.
 
+## Fluxo de cadastro IATF concluído
+- formulário na seção de Reprodução com nome, fazenda, lote/grupo, data inicial, status e observação
+- offsets editáveis no mesmo fluxo para retirada, aplicação hormonal, inseminação, diagnóstico e repasse/revisão
+- prévia visual da agenda com \"Próxima ação\" e \"Data prevista\" em português
+- salvamento pelo mesmo pipeline de manejo sanitário, evitando mudanças de infraestrutura
+
 ## Estratégia de persistência utilizada
 A persistência reutiliza o padrão operacional existente, sem criação de nova estrutura de banco:
 - gravação no conjunto já utilizado por manejo sanitário (`sanitario`)
 - uso das funções já existentes de persistência operacional/local-cloud
+- tag semântica de IATF em `tipo` e metadados ricos no `obs` para leitura posterior no dashboard e reprocessamento de agenda
 - sem criação de tabelas novas e sem mudança de schema Supabase
 
 ## O que intencionalmente não foi alterado

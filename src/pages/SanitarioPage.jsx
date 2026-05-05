@@ -20,7 +20,7 @@ export default function SanitarioPage({ db, setDb, onConfirmAction }) {
   const mensagemSemPermissao = 'Você não tem permissão para executar esta ação.';
   const [abrirForm, setAbrirForm] = useState(false);
   const [itemEditando, setItemEditando] = useState(null);
-  const [iatf, setIatf] = useState({ nome: '', fazenda_id: db?.fazendas?.[0]?.id ? String(db.fazendas[0].id) : '', lote_id: db?.lotes?.[0]?.id ? String(db.lotes[0].id) : '', data_inicial: new Date().toISOString().slice(0,10), obs: '', status: 'Planejado', retirada_dias: 8, hormonal_dias: 9, inseminacao_dias: 10, diagnostico_dias: 40, repasse_dias: 50 });
+  const [iatf, setIatf] = useState({ nome: '', fazenda_id: db?.fazendas?.[0]?.id ? String(db.fazendas[0].id) : '', lote_id: db?.lotes?.[0]?.id ? String(db.lotes[0].id) : '', data_inicial: new Date().toISOString().slice(0,10), obs: '', status: 'Planejado', retirada_dias: 8, hormonal_dias: 9, inseminacao_dias: 10, diagnostico_dias: 40, repasse_dias: 55 });
 
   // Memoizar mapas para otimizar lookups
   const lotesMap = useMemo(() => {
@@ -276,6 +276,9 @@ export default function SanitarioPage({ db, setDb, onConfirmAction }) {
     if (!hasPermission('sanitario:editar')) { showToast({ type: 'error', message: mensagemSemPermissao }); return; }
     if (!iatf.nome.trim() || !iatf.data_inicial) { showToast({ type: 'warning', message: 'Informe nome do protocolo e data inicial.' }); return; }
     const proxima = iatfAgenda.find((item) => new Date(`${item.data}T00:00:00`) >= new Date(new Date().toISOString().slice(0,10)+'T00:00:00')) || iatfAgenda[0];
+    const fazendaNome = (db?.fazendas || []).find((f) => String(f.id) === String(iatf.fazenda_id))?.nome || 'Sem fazenda';
+    const offsets = `Offset dias: retirada=${Number(iatf.retirada_dias || 0)}, hormonal=${Number(iatf.hormonal_dias || 0)}, inseminação=${Number(iatf.inseminacao_dias || 0)}, diagnóstico=${Number(iatf.diagnostico_dias || 0)}, repasse=${Number(iatf.repasse_dias || 0)}`;
+    const agendaSerializada = iatfAgenda.map((evento) => `Dia ${evento.dias} ${evento.label}: ${evento.data}`).join(' | ');
     const dados = {
       tipo: 'IATF',
       desc: iatf.nome,
@@ -284,7 +287,7 @@ export default function SanitarioPage({ db, setDb, onConfirmAction }) {
       proxima: proxima?.data || iatf.data_inicial,
       alerta_dias_antes: 2,
       qtd: 0,
-      obs: `Status: ${iatf.status} | Protocolo IATF | ${iatf.obs || 'Sem observação'}`,
+      obs: `Status: ${iatf.status} | Protocolo IATF | Fazenda: ${fazendaNome} | ${offsets} | Agenda: ${agendaSerializada} | ${iatf.obs || 'Sem observação'}`,
       funcionario_responsavel_id: null,
     };
     await salvarItem(dados);
@@ -320,14 +323,19 @@ export default function SanitarioPage({ db, setDb, onConfirmAction }) {
           <select className="ui-input" value={iatf.status} onChange={(e) => setIatf((p) => ({ ...p, status: e.target.value }))}><option>Planejado</option><option>Em andamento</option><option>Concluído</option><option>Cancelado</option></select>
           <input className="ui-input" placeholder="Observação" value={iatf.obs} onChange={(e) => setIatf((p) => ({ ...p, obs: e.target.value }))} />
           <input className="ui-input" type="number" value={iatf.retirada_dias} onChange={(e) => setIatf((p) => ({ ...p, retirada_dias: e.target.value }))} placeholder="Dia retirada" />
+          <input className="ui-input" type="number" value={iatf.hormonal_dias} onChange={(e) => setIatf((p) => ({ ...p, hormonal_dias: e.target.value }))} placeholder="Dia aplicação hormonal" />
           <input className="ui-input" type="number" value={iatf.inseminacao_dias} onChange={(e) => setIatf((p) => ({ ...p, inseminacao_dias: e.target.value }))} placeholder="Dia inseminação" />
           <input className="ui-input" type="number" value={iatf.diagnostico_dias} onChange={(e) => setIatf((p) => ({ ...p, diagnostico_dias: e.target.value }))} placeholder="Dia diagnóstico" />
+          <input className="ui-input" type="number" value={iatf.repasse_dias} onChange={(e) => setIatf((p) => ({ ...p, repasse_dias: e.target.value }))} placeholder="Dia repasse/revisão" />
         </div>
         <div className="ui-card" style={{ marginTop: 10, padding: 12 }}>
           <strong>Prévia do cronograma</strong>
           {iatfAgenda.map((e) => <p key={e.label}>Dia {e.dias}: {e.label} — {formatarData(e.data)}</p>)}
-          <p>Próxima ação: {iatfAgenda[1]?.label || '—'}</p>
-          <p>Data prevista: {iatfAgenda[1] ? formatarData(iatfAgenda[1].data) : '—'}</p>
+          <p>Próxima ação: {iatfAgenda.find((item) => new Date(`${item.data}T00:00:00`) >= new Date(new Date().toISOString().slice(0,10)+'T00:00:00'))?.label || '—'}</p>
+          <p>Data prevista: {(() => {
+            const evento = iatfAgenda.find((item) => new Date(`${item.data}T00:00:00`) >= new Date(new Date().toISOString().slice(0,10)+'T00:00:00'));
+            return evento ? formatarData(evento.data) : '—';
+          })()}</p>
         </div>
         <div style={{ marginTop: 10 }}><Button onClick={salvarIatf}>Salvar protocolo IATF</Button></div>
       </Card>
