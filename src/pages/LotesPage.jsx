@@ -1140,6 +1140,17 @@ function NovoLoteModal({ db, setDb, onClose, showToast, hasPermission, session }
 
     const novoLoteId = gerarNovoId(db.lotes);
     const custoAquisicao = Number(form.custo_aquisicao || 0);
+    const planejamentoLote = [
+      '[Planejamento lote]',
+      `GMD esperado: ${Number(form.gmd_esperado || 0)}`,
+      `Dieta/produto: ${form.produto_vinculado || 'Não informado'}`,
+      `Modo de consumo: ${form.consumo_tipo || 'Não informado'}`,
+      `Valor de consumo: ${Number(form.consumo_valor || 0)}`,
+      `Saída projetada (informativa): ${dataPrevistaSaida || 'Não calculada'}`,
+      `Consumo estimado suplemento (kg): ${consumoTotalLote !== null ? consumoTotalLote.toFixed(2) : 'Não calculado'}`,
+      `Custo estimado suplemento (R$): ${custoTotalLote !== null ? custoTotalLote.toFixed(2) : 'Não calculado'}`,
+    ].join(' | ');
+
     const lotePayload = {
       nome: form.nome,
       faz_id: Number(form.faz_id),
@@ -1156,7 +1167,7 @@ function NovoLoteModal({ db, setDb, onClose, showToast, hasPermission, session }
       raca: form.raca,
       sexo: form.sexo,
       categoria: form.categoria,
-      obs: form.obs,
+      obs: [form.obs, planejamentoLote].filter(Boolean).join(' | '),
       p_ini: Number(form.peso_inicial),
       p_at: Number(form.peso_inicial),
       ultima_pesagem: form.entrada,
