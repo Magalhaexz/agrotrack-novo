@@ -29,6 +29,7 @@ export default function FinanceiroPage({ db, setDb }) {
 
   const lotes = Array.isArray(db?.lotes) ? db.lotes : [];
   const movimentacoes = Array.isArray(db?.movimentacoes_financeiras) ? db.movimentacoes_financeiras : [];
+  const podeEditarFinanceiroUi = hasPermission('financeiro:editar');
 
   function podeEditarFinanceiro() {
     if (hasPermission('financeiro:editar')) return true;
@@ -387,7 +388,10 @@ export default function FinanceiroPage({ db, setDb }) {
               <label className="ui-input-wrap"><span className="ui-input-label">Status</span><select className="ui-input" value={novoPagamento.pago ? 'pago' : 'nao_pago'} onChange={(e) => setNovoPagamento((p) => ({ ...p, pago: e.target.value === 'pago' }))}><option value="nao_pago">Não pago</option><option value="pago">Pago</option></select></label>
               <Input label="Observação (opcional)" value={novoPagamento.observacao} onChange={(e) => setNovoPagamento((p) => ({ ...p, observacao: e.target.value }))} />
             </div>
-            <div style={{ marginTop: 12 }}><Button onClick={salvarPagamentoDiario}>Salvar pagamento diário</Button></div>
+            <div style={{ marginTop: 12 }}>
+              <Button onClick={salvarPagamentoDiario} disabled={!podeEditarFinanceiroUi}>Salvar pagamento diário</Button>
+              {!podeEditarFinanceiroUi ? <small style={{ display: 'block', marginTop: 6 }}>Acesso restrito ao perfil autorizado.</small> : null}
+            </div>
           </Card>
 
           <Card title="Lista de pagamentos" subtitle="Marque rapidamente os pagamentos já realizados.">
@@ -397,7 +401,7 @@ export default function FinanceiroPage({ db, setDb }) {
                 <tbody>
                   {pagamentos.length === 0 ? <tr><td colSpan="7" className="empty-state-td">Nenhum pagamento pendente</td></tr> : pagamentos.map((item) => (
                     <tr key={item.id}>
-                      <td><input type="checkbox" checked={Boolean(item.pago)} onChange={() => alternarPagamentoPago(item)} /></td>
+                      <td><input type="checkbox" disabled={!podeEditarFinanceiroUi} checked={Boolean(item.pago)} onChange={() => alternarPagamentoPago(item)} /></td>
                       <td>{item.descricao || '-'}</td>
                       <td>{formatCurrency(item.valor || 0)}</td>
                       <td>{formatDate(item.data_vencimento || item.data)}</td>
@@ -677,5 +681,4 @@ function sumOtherCategories(items, excludedAliases) {
     .filter((item) => !aliasSet.has(String(item.name || '').toLowerCase()))
     .reduce((sum, item) => sum + Number(item.value || 0), 0);
 }
-
 

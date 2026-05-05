@@ -136,6 +136,10 @@ export default function FazendasPage({ db, setDb, onConfirmAction }) {
   }
 
   async function executarDiagnosticoNuvem() {
+    if (!hasPermission('fazendas:editar')) {
+      showToast({ type: 'error', message: 'Acesso restrito ao perfil autorizado.' });
+      return;
+    }
     if (!podeVerDiagnostico || diagnosticandoNuvem) return;
     setDiagnosticandoNuvem(true);
     try {
@@ -259,6 +263,10 @@ export default function FazendasPage({ db, setDb, onConfirmAction }) {
   }
 
   async function reconectarNuvem() {
+    if (!hasPermission('fazendas:editar')) {
+      showToast({ type: 'error', message: 'Acesso restrito ao perfil autorizado.' });
+      return;
+    }
     if (sincronizandoFazendas || diagnosticandoNuvem || reconectandoNuvem) return;
     setReconectandoNuvem(true);
     try {
@@ -310,6 +318,10 @@ export default function FazendasPage({ db, setDb, onConfirmAction }) {
   }
 
   async function sincronizarFazendasComNuvem() {
+    if (!hasPermission('fazendas:editar')) {
+      showToast({ type: 'error', message: 'Somente perfis autorizados podem editar este registro.' });
+      return;
+    }
     const now = Date.now();
     if (sincronizandoFazendas || manualSyncRef.current.inFlight) return;
     if (now - manualSyncRef.current.lastStartAt < 1200) return;
@@ -486,6 +498,7 @@ export default function FazendasPage({ db, setDb, onConfirmAction }) {
             <Button
               variant="secondary"
               onClick={sincronizarFazendasComNuvem}
+              disabled={!hasPermission('fazendas:editar')}
               disabled={sincronizandoFazendas || diagnosticandoNuvem || reconectandoNuvem}
             >
               {sincronizandoFazendas ? 'Sincronizando fazendas e lotes...' : 'Sincronizar fazendas e lotes com a nuvem'}
@@ -494,6 +507,7 @@ export default function FazendasPage({ db, setDb, onConfirmAction }) {
               <Button
                 variant="ghost"
                 onClick={executarDiagnosticoNuvem}
+                disabled={!hasPermission('fazendas:editar')}
                 disabled={sincronizandoFazendas || diagnosticandoNuvem || reconectandoNuvem}
               >
                 {diagnosticandoNuvem ? 'Testando conexão com a nuvem...' : 'Testar conexão com a nuvem'}
@@ -502,11 +516,12 @@ export default function FazendasPage({ db, setDb, onConfirmAction }) {
             <Button
               variant="outline"
               onClick={reconectarNuvem}
+              disabled={!hasPermission('fazendas:editar')}
               disabled={sincronizandoFazendas || diagnosticandoNuvem || reconectandoNuvem}
             >
               {reconectandoNuvem ? 'Reconectando...' : 'Reconectar à nuvem'}
             </Button>
-            <Button onClick={() => {
+            <Button disabled={!hasPermission('fazendas:editar')} onClick={() => {
               if (!hasPermission('fazendas:editar')) {
                 showToast({ type: 'error', message: mensagemSemPermissao });
                 return;

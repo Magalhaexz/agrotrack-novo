@@ -32,6 +32,8 @@ import { formatCurrency, formatDate, formatNumber } from '../utils/calculations'
 import { formatarMoeda } from '../utils/formatters';
 import { gerarNovoId } from '../utils/id';
 import { createOperationalRecord, updateOperationalRecord } from '../services/operationalPersistence';
+import { useAuth } from '../auth/useAuth';
+import { useToast } from '../hooks/useToast';
 import '../styles/dashboard.css';
 
 const getTodayIso = () => new Date().toISOString().slice(0, 10);
@@ -52,6 +54,9 @@ export default function DashboardPage({
   tabAtiva = 'geral',
   setTabAtiva,
 }) {
+  const { hasPermission } = useAuth();
+  const { showToast } = useToast();
+  const mensagemSemPermissao = 'Você não tem permissão para executar esta ação.';
   const [novaTarefa, setNovaTarefa] = useState({ titulo: '', funcionario_id: '', data_vencimento: '', descricao: '' });
 
   const [cloudVerified, setCloudVerified] = useState(false);
@@ -473,6 +478,10 @@ export default function DashboardPage({
   }, [db.tarefas, funcionariosMap]);
 
   async function criarTarefaDashboard() {
+    if (!hasPermission('tarefas:editar')) {
+      showToast({ type: 'error', message: mensagemSemPermissao });
+      return;
+    }
     if (!novaTarefa.titulo.trim() || !novaTarefa.data_vencimento) return;
     const payload = {
       titulo: novaTarefa.titulo.trim(),
@@ -489,6 +498,10 @@ export default function DashboardPage({
   }
 
   async function marcarComoFeita(tarefa) {
+    if (!hasPermission('tarefas:editar')) {
+      showToast({ type: 'error', message: mensagemSemPermissao });
+      return;
+    }
     await updateOperationalRecord('tarefas', tarefa.id, { status: 'concluida' }, null);
     setDb?.((prev) => ({
       ...prev,
@@ -651,16 +664,16 @@ export default function DashboardPage({
               subtitle="Atalhos diretos para os fluxos que mais importam em uma demo."
             >
               <div className="dashboard-action-grid">
-                <Button fullWidth onClick={() => onNavigate?.('pesagens', { action: 'novo' })}>
+                <Button fullWidth disabled={!hasPermission('pesagens:editar')} onClick={() => onNavigate?.('pesagens', { action: 'novo' })}>
                   Nova pesagem
                 </Button>
-                <Button fullWidth variant="outline" onClick={() => onNavigate?.('lotes')}>
+                <Button fullWidth variant="outline" disabled={!hasPermission('lotes:editar')} onClick={() => onNavigate?.('lotes')}>
                   Novo lote
                 </Button>
-                <Button fullWidth variant="outline" onClick={() => onNavigate?.('sanitario')}>
+                <Button fullWidth variant="outline" disabled={!hasPermission('sanitario:editar')} onClick={() => onNavigate?.('sanitario')}>
                   Registrar manejo
                 </Button>
-                <Button fullWidth variant="outline" onClick={() => onNavigate?.('suplementacao')}>
+                <Button fullWidth variant="outline" disabled={!hasPermission('estoque:editar')} onClick={() => onNavigate?.('suplementacao')}>
                   Registrar consumo
                 </Button>
               </div>
@@ -677,7 +690,7 @@ export default function DashboardPage({
                 </select>
                 <input className="ui-input" type="date" value={novaTarefa.data_vencimento} onChange={(e) => setNovaTarefa((p) => ({ ...p, data_vencimento: e.target.value }))} />
                 <input className="ui-input" placeholder="Descricao" value={novaTarefa.descricao} onChange={(e) => setNovaTarefa((p) => ({ ...p, descricao: e.target.value }))} />
-                <Button onClick={criarTarefaDashboard}>Adicionar tarefa</Button>
+                <Button onClick={criarTarefaDashboard} disabled={!hasPermission('tarefas:editar')}>Adicionar tarefa</Button>
               </div>
 
               <div className="dashboard-task-columns">
