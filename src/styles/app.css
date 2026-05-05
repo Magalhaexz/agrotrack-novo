@@ -7211,3 +7211,189 @@ body,
     padding: 14px;
   }
 }
+
+/* Sprint 12 - Premium UI layout refinement */
+:root {
+  --herdon-neon-soft: rgba(34, 197, 94, 0.18);
+  --herdon-border-soft: rgba(148, 163, 184, 0.18);
+}
+
+.main {
+  overflow-x: clip;
+}
+
+.page-wrapper {
+  padding-inline: clamp(14px, 2.2vw, 28px);
+}
+
+.page .ui-card,
+.ui-card {
+  border: 1px solid var(--herdon-border-soft);
+  box-shadow: 0 10px 28px rgba(2, 6, 23, 0.34);
+}
+
+.ui-card.empty-state {
+  padding: clamp(20px, 2.4vw, 30px);
+  text-align: center;
+  border-style: dashed;
+  background: linear-gradient(180deg, rgba(15, 23, 42, 0.72), rgba(15, 23, 42, 0.52));
+}
+
+.ui-card.empty-state strong {
+  color: #e2e8f0;
+  letter-spacing: 0.2px;
+}
+
+.ui-card.empty-state span {
+  color: #94a3b8;
+}
+
+.grid-3 {
+  gap: clamp(12px, 1.8vw, 18px);
+}
+
+.herdon-table,
+.table-wrap,
+.table-scroll {
+  overflow-x: auto;
+}
+
+.herdon-table th {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  backdrop-filter: blur(6px);
+  background: rgba(15, 23, 42, 0.88);
+}
+
+.herdon-table td,
+.herdon-table th {
+  white-space: nowrap;
+}
+
+.header-sync-chip {
+  border-color: rgba(34, 197, 94, 0.26);
+  box-shadow: 0 0 0 1px rgba(34, 197, 94, 0.08), 0 10px 20px rgba(2, 6, 23, 0.32);
+}
+
+.header-sync-chip--online {
+  background: linear-gradient(140deg, rgba(15, 23, 42, 0.95), rgba(21, 36, 30, 0.92));
+}
+
+.ui-button,
+button,
+.header-sync-refresh {
+  transition: transform .18s ease, box-shadow .22s ease, border-color .22s ease;
+}
+
+.ui-button:hover,
+button:hover,
+.header-sync-refresh:hover {
+  transform: translateY(-1px);
+}
+
+.skeleton-page .skeleton-card,
+.skeleton-page .skeleton-banner,
+.skeleton-page .skeleton-table {
+  background: linear-gradient(100deg, rgba(30, 41, 59, 0.55) 30%, rgba(51, 65, 85, 0.7) 45%, rgba(30, 41, 59, 0.55) 60%);
+  background-size: 220% 100%;
+  animation: herdonShimmer 1.5s linear infinite;
+}
+
+@keyframes herdonShimmer {
+  from { background-position: 100% 0; }
+  to { background-position: -100% 0; }
+}
+
+@media (max-width: 980px) {
+  .top-header {
+    padding-inline: 10px;
+  }
+
+  .page-wrapper {
+    padding-inline: 10px;
+  }
+
+  .ui-card {
+    border-radius: 14px;
+  }
+}
+
+@media (max-width: 640px) {
+  .grid-3 {
+    grid-template-columns: 1fr;
+  }
+
+  .header-sync-chip {
+    max-width: 100%;
+  }
+}
+
+/* Sprint 18A3 - Header cloud controls layout hotfix */
+.header-sync-chip {
+  display: grid;
+  grid-template-columns: auto minmax(140px, 1fr) auto;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+
+.header-sync-copy {
+  min-width: 0;
+}
+
+.header-sync-copy strong,
+.header-sync-copy small {
+  display: block;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.header-sync-actions {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: nowrap;
+}
+
+.header-sync-refresh--compact {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 8px;
+  font-size: 11px;
+  white-space: nowrap;
+}
+
+.top-header-actions {
+  align-items: center;
+  gap: 8px;
+}
+
+@media (max-width: 1280px) {
+  .header-sync-refresh--compact span {
+    display: none;
+  }
+
+  .header-sync-refresh--compact {
+    padding: 4px 6px;
+  }
+}
+
+@media (max-width: 1024px) {
+  .top-header-actions {
+    flex-wrap: wrap;
+    justify-content: flex-end;
+  }
+
+  .header-sync-chip {
+    grid-template-columns: auto 1fr;
+    row-gap: 6px;
+  }
+
+  .header-sync-actions {
+    grid-column: 1 / -1;
+    justify-content: flex-start;
+  }
+}

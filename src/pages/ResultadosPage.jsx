@@ -108,9 +108,9 @@ export default function ResultadosPage({ db }) {
   const [draftFilters, setDraftFilters] = useState(defaultFilters);
   const [appliedFilters, setAppliedFilters] = useState(defaultFilters);
   const [isGenerating, setIsGenerating] = useState(false);
+  const [isExporting, setIsExporting] = useState(false);
   const [validationError, setValidationError] = useState('');
 
-  /* eslint-disable react-hooks/set-state-in-effect */
   useEffect(() => {
     setDraftFilters((prev) => ({
       ...defaultFilters,
@@ -125,7 +125,6 @@ export default function ResultadosPage({ db }) {
       status: prev?.status || defaultFilters.status,
     }));
   }, [defaultFilters]);
-  /* eslint-enable react-hooks/set-state-in-effect */
 
   useEffect(() => () => window.clearTimeout(timerRef.current), []);
 
@@ -234,6 +233,30 @@ export default function ResultadosPage({ db }) {
       dataInicio: range.start,
       dataFim: range.end,
     }));
+  }
+
+  function exportarCsv() {
+    const sheets = Array.isArray(activeReport?.exportConfig?.sheets) ? activeReport.exportConfig.sheets : [];
+    if (!sheets.length) {
+      setValidationError('Nenhum registro encontrado');
+      return;
+    }
+    setIsExporting(true);
+    setValidationError('');
+    try {
+      const csv = buildCsvFromSheets(sheets);
+      const blob = new Blob([`\uFEFF${csv}`], { type: 'text/csv;charset=utf-8;' });
+      const url = URL.createObjectURL(blob);
+      const anchor = document.createElement('a');
+      anchor.href = url;
+      anchor.download = `${activeReport.exportConfig.filename}.csv`;
+      document.body.appendChild(anchor);
+      anchor.click();
+      document.body.removeChild(anchor);
+      URL.revokeObjectURL(url);
+    } finally {
+      setIsExporting(false);
+    }
   }
 
   return (
@@ -495,9 +518,14 @@ export default function ResultadosPage({ db }) {
                       payload com filtros, metadados e resumo.
                     </p>
                   </div>
-                  <Button variant="outline" disabled>
-                    PDF / XLSX em breve
-                  </Button>
+                  <div className="report-export-actions">
+                    <Button variant="outline" onClick={() => window.print()}>
+                      Imprimir
+                    </Button>
+                    <Button variant="primary" onClick={exportarCsv} loading={isExporting}>
+                      Exportar CSV
+                    </Button>
+                  </div>
                 </div>
               </Card>
 
@@ -564,6 +592,7 @@ export default function ResultadosPage({ db }) {
               {activeReport.tables.map((table) => (
                 <Card
                   key={table.id}
+                  className="report-table-card"
                   title={table.title}
                   subtitle={table.description}
                   action={<Badge variant={table.badgeVariant}>{table.badgeLabel}</Badge>}
@@ -758,9 +787,26 @@ function buildReportBundle(db, filters) {
     }));
 
   const ledgerRows = [...financialRows, ...animalRevenueRows];
+  const pagamentosDiariosRows = ledgerRows.filter((row) => row.categoria === 'Pagamento Diário' || row.categoria === 'Pagamento Diario');
   const ledgerExpense = ledgerRows.filter((row) => row.tipo !== 'Receita').reduce((total, row) => total + row.valor, 0);
   const ledgerRevenue = ledgerRows.filter((row) => row.tipo === 'Receita').reduce((total, row) => total + row.valor, 0);
   const potentialRevenue = visibleLotes.reduce((total, item) => total + Number(item.indicadores.receitaTotal || 0), 0);
+  const planejamentoLoteRows = visibleLotes.map(({ lote, fazenda }) => {
+    const plano = parsePlanejamentoLote(lote.obs);
+    return {
+      id: lote.id,
+      lote: lote.nome,
+      fazenda: fazenda?.nome || '-',
+      gmdEsperado: plano.gmdEsperado || 'Sem dados suficientes',
+      produto: plano.produto || 'Sem dados suficientes',
+      consumoTipo: plano.consumoTipo || 'Sem dados suficientes',
+      consumoInformado: plano.consumoInformado || 'Sem dados suficientes',
+      dataPrevistaSaida: plano.dataPrevistaSaida || 'Estimativa indisponível',
+      consumoEstimado: plano.consumoEstimado || 'Estimativa indisponível',
+      custoEstimado: plano.custoEstimado || 'Estimativa indisponível',
+    };
+  });
+  const iatfRows = sanitaryRows.filter((row) => String(row.tipo || '').toUpperCase() === 'IATF' || String(row.descricao || '').toUpperCase().includes('IATF'));
 
   const performanceRows = visibleLotes.map((item) => {
     const ultimaPesagem = item.pesagensPeriodo.slice().sort((a, b) => String(a.data).localeCompare(String(b.data))).at(-1);
@@ -983,6 +1029,7 @@ function buildReportBundle(db, filters) {
           'Escopo com risco ativo',
           'danger'
         ),
+        createSummary('Protocolos IATF', formatNumber(iatfRows.length, 0), 'Registros reprodutivos dentro do contrato sanitário', iatfRows.length ? 'info' : 'neutral'),
       ],
       highlights: buildSanitaryHighlights(sanitaryRows),
       exportConfig: createExportConfig('relatorio-sanitario', filters, [
@@ -1010,6 +1057,26 @@ function buildReportBundle(db, filters) {
             { key: 'status', label: 'Status', render: (row) => <Badge variant={sanitizeBadge(row.status)}>{row.status}</Badge> },
           ],
           rows: sanitaryRows,
+        },
+        {
+          id: 'iatf',
+          title: 'Agenda IATF / Reprodução',
+          description: 'Protocolos IATF registrados no sanitário para acompanhamento de agenda.',
+          badgeLabel: `${iatfRows.length} protocolos`,
+          badgeVariant: 'neutral',
+          emptyTitle: 'Nenhum registro encontrado',
+          emptySubtitle: 'Cadastre protocolos IATF no módulo sanitário para visualizar este quadro.',
+          mobileTitleKey: 'descricao',
+          mobileSubtitleKey: (row) => `${row.lote} • ${row.proxima}`,
+          columns: [
+            { key: 'descricao', label: 'Protocolo' },
+            { key: 'lote', label: 'Lote' },
+            { key: 'fazenda', label: 'Fazenda' },
+            { key: 'aplicacao', label: 'Início' },
+            { key: 'proxima', label: 'Próxima ação' },
+            { key: 'status', label: 'Status', render: (row) => <Badge variant={sanitizeBadge(row.status)}>{row.status}</Badge> },
+          ],
+          rows: iatfRows,
         },
       ],
     },
@@ -1122,6 +1189,7 @@ function buildReportBundle(db, filters) {
           'Somente o que já foi efetivamente lançado',
           ledgerRevenue - ledgerExpense >= 0 ? 'success' : 'danger'
         ),
+        createSummary('Pagamentos diários', formatNumber(pagamentosDiariosRows.length, 0), 'Lidos de movimentações financeiras', 'info'),
       ],
       highlights: buildFinancialHighlights(ledgerRows, potentialRevenue, ledgerExpense),
       exportConfig: createExportConfig('relatorio-financeiro', filters, [
@@ -1149,6 +1217,49 @@ function buildReportBundle(db, filters) {
             { key: 'valor', label: 'Valor', render: (row) => formatCurrency(row.valor) },
           ],
           rows: ledgerRows,
+        },
+        {
+          id: 'financeiro-pagamentos-diarios',
+          title: 'Pagamentos diários',
+          description: 'Pagamentos categorizados como Pagamento Diário no financeiro.',
+          badgeLabel: `${pagamentosDiariosRows.length} pagamentos`,
+          badgeVariant: 'neutral',
+          emptyTitle: 'Nenhum registro encontrado',
+          emptySubtitle: 'Sem pagamentos diários para os filtros selecionados.',
+          mobileTitleKey: 'categoria',
+          mobileSubtitleKey: (row) => `${row.data} • ${formatCurrency(row.valor)}`,
+          columns: [
+            { key: 'data', label: 'Data' },
+            { key: 'categoria', label: 'Categoria' },
+            { key: 'origem', label: 'Origem' },
+            { key: 'lote', label: 'Lote' },
+            { key: 'fazenda', label: 'Fazenda' },
+            { key: 'valor', label: 'Valor', render: (row) => formatCurrency(row.valor) },
+          ],
+          rows: pagamentosDiariosRows,
+        },
+        {
+          id: 'financeiro-planejamento-lotes',
+          title: 'Planejamento de lote e estimativas',
+          description: 'Representação de GMD, dieta/consumo e estimativas persistidas em campos compatíveis.',
+          badgeLabel: `${planejamentoLoteRows.length} lotes`,
+          badgeVariant: 'neutral',
+          emptyTitle: 'Nenhum lote encontrado',
+          emptySubtitle: 'Sem dados suficientes para exibir planejamento neste recorte.',
+          mobileTitleKey: 'lote',
+          mobileSubtitleKey: 'fazenda',
+          columns: [
+            { key: 'lote', label: 'Lote' },
+            { key: 'fazenda', label: 'Fazenda' },
+            { key: 'gmdEsperado', label: 'GMD esperado' },
+            { key: 'produto', label: 'Dieta/produto' },
+            { key: 'consumoTipo', label: 'Tipo de consumo' },
+            { key: 'consumoInformado', label: 'Consumo informado' },
+            { key: 'dataPrevistaSaida', label: 'Data prevista (projeção)' },
+            { key: 'consumoEstimado', label: 'Consumo estimado' },
+            { key: 'custoEstimado', label: 'Custo estimado' },
+          ],
+          rows: planejamentoLoteRows,
         },
       ],
     },
@@ -1239,6 +1350,7 @@ function createExportConfig(baseName, filters, sheets) {
     name: sheet.name,
     rowCount: sheet.rows.length,
     columns: sheet.rows.length ? Object.keys(sheet.rows[0]) : [],
+    rows: sheet.rows,
   }));
 
   return {
@@ -1246,6 +1358,58 @@ function createExportConfig(baseName, filters, sheets) {
     totalRows: sheets.reduce((total, sheet) => total + sheet.rows.length, 0),
     sheets: mappedSheets,
   };
+}
+
+function buildCsvFromSheets(sheets) {
+  const lines = [];
+  sheets.forEach((sheet, index) => {
+    const rows = Array.isArray(sheet.rows) ? sheet.rows : [];
+    const columns = rows.length ? Object.keys(rows[0]) : sheet.columns || [];
+    if (index > 0) lines.push('');
+    lines.push(`Aba: ${sheet.name}`);
+    if (!columns.length) {
+      lines.push('Observação;Nenhum registro encontrado');
+      return;
+    }
+    lines.push(columns.map((col) => toCsvCell(formatCsvHeader(col))).join(';'));
+    if (!rows.length) {
+      lines.push(toCsvCell('Nenhum registro encontrado'));
+      return;
+    }
+    rows.forEach((row) => {
+      lines.push(columns.map((col) => toCsvCell(toSafeExportValue(row[col]))).join(';'));
+    });
+  });
+  return lines.join('\n');
+}
+
+function toCsvCell(value) {
+  const text = String(value ?? '').replace(/"/g, '""');
+  return `"${text}"`;
+}
+
+function formatCsvHeader(key) {
+  const map = {
+    receita_realizada: 'Receita realizada',
+    receita_potencial: 'Receita potencial',
+    despesa: 'Despesa',
+    gmdEsperado: 'GMD esperado',
+    consumoInformado: 'Consumo informado',
+    consumoEstimado: 'Consumo estimado',
+    custoEstimado: 'Custo estimado',
+    dataPrevistaSaida: 'Data prevista de saída',
+  };
+  if (map[key]) return map[key];
+  return String(key)
+    .replace(/([a-z])([A-Z])/g, '$1 $2')
+    .replaceAll('_', ' ')
+    .replace(/^./, (char) => char.toUpperCase());
+}
+
+function toSafeExportValue(value) {
+  if (value == null || value === '') return 'Sem dados suficientes';
+  if (typeof value === 'number' && Number.isNaN(value)) return 'Estimativa indisponível';
+  return value;
 }
 
 function buildLotHighlights(rows) {
@@ -1621,4 +1785,17 @@ function sortDateDesc(a, b) {
   const first = a === '-' ? '' : String(a).split('/').reverse().join('-');
   const second = b === '-' ? '' : String(b).split('/').reverse().join('-');
   return String(second).localeCompare(String(first));
+}
+
+function parsePlanejamentoLote(obs) {
+  const text = String(obs || '');
+  return {
+    gmdEsperado: (text.match(/GMD esperado:\s*([^|]+)/i) || [])[1]?.trim(),
+    produto: (text.match(/Dieta\/produto:\s*([^|]+)/i) || [])[1]?.trim(),
+    consumoTipo: (text.match(/Modo de consumo:\s*([^|]+)/i) || [])[1]?.trim(),
+    consumoInformado: (text.match(/Valor de consumo:\s*([^|]+)/i) || [])[1]?.trim(),
+    dataPrevistaSaida: (text.match(/Saída projetada \(informativa\):\s*([^|]+)/i) || [])[1]?.trim(),
+    consumoEstimado: (text.match(/Consumo estimado suplemento \(kg\):\s*([^|]+)/i) || [])[1]?.trim(),
+    custoEstimado: (text.match(/Custo estimado suplemento \(R\$\):\s*([^|]+)/i) || [])[1]?.trim(),
+  };
 }

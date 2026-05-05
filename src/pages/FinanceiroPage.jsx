@@ -10,12 +10,19 @@ import { formatCurrency, formatDate, formatNumber } from '../utils/calculations'
 import { gerarNovoId } from '../utils/id';
 import { useAuth } from '../auth/useAuth';
 import { useToast } from '../hooks/useToast';
-import { createOperationalRecord } from '../services/operationalPersistence';
+import { createOperationalRecord, updateOperationalRecord } from '../services/operationalPersistence';
 
-const tabs = ['dre', 'lote', 'lanc'];
+const tabs = ['dre', 'lote', 'lanc', 'pag'];
 const despCats = ['Compra Animal', 'Racao', 'Suplemento', 'Medicamento', 'Vacina', 'Frete', 'Funcionario', 'Arrendamento', 'Manutencao', 'Outro'];
 const recCats = ['Venda Animal', 'Venda Produto', 'Outro'];
+const metodosPagamento = ['Dinheiro', 'Pix', 'Cartão', 'Boleto', 'Transferência', 'Cheque', 'Outro'];
 const getTodayIso = () => new Date().toISOString().slice(0, 10);
+const TAB_LABELS = {
+  dre: 'DRE',
+  lote: 'Por Lote',
+  lanc: 'Lançamentos',
+  pag: 'Pagamentos Diários',
+};
 
 export default function FinanceiroPage({ db, setDb }) {
   const { hasPermission, session } = useAuth();
@@ -24,9 +31,11 @@ export default function FinanceiroPage({ db, setDb }) {
   const [detailLoteId, setDetailLoteId] = useState(null);
   const [openLanc, setOpenLanc] = useState(false);
   const [filters, setFilters] = useState({ tipo: 'todos', cat: 'todas', lote: 'todos' });
+  const [novoPagamento, setNovoPagamento] = useState({ descricao: '', valor: '', data_vencimento: getTodayIso(), metodo: 'Pix', pago: false, observacao: '' });
 
   const lotes = Array.isArray(db?.lotes) ? db.lotes : [];
   const movimentacoes = Array.isArray(db?.movimentacoes_financeiras) ? db.movimentacoes_financeiras : [];
+  const podeEditarFinanceiroUi = hasPermission('financeiro:editar');
 
   function podeEditarFinanceiro() {
     if (hasPermission('financeiro:editar')) return true;
@@ -122,6 +131,51 @@ export default function FinanceiroPage({ db, setDb }) {
     }));
   }, [lotesRows]);
 
+
+  const pagamentos = useMemo(() => (
+    movimentacoes
+      .filter((item) => item?.tipo === 'despesa' && (item?.categoria === 'Pagamento Diário' || item?.categoria === 'Pagamento Diario'))
+      .sort((a, b) => new Date(a.data_vencimento || a.data || 0) - new Date(b.data_vencimento || b.data || 0))
+  ), [movimentacoes]);
+
+  async function salvarPagamentoDiario() {
+    if (!podeEditarFinanceiro()) return;
+    if (!novoPagamento.descricao.trim() || Number(novoPagamento.valor || 0) <= 0) {
+      showToast({ type: 'warning', message: 'Informe descrição e valor válidos para o pagamento.' });
+      return;
+    }
+
+    const payload = {
+      tipo: 'despesa',
+      categoria: 'Pagamento Diário',
+      descricao: novoPagamento.descricao.trim(),
+      valor: Number(novoPagamento.valor || 0),
+      data: novoPagamento.data_vencimento || getTodayIso(),
+      data_vencimento: novoPagamento.data_vencimento || getTodayIso(),
+      metodo_pagamento: novoPagamento.metodo,
+      pago: Boolean(novoPagamento.pago),
+      observacao: novoPagamento.observacao || null,
+    };
+
+    const persisted = await createOperationalRecord('movimentacoes_financeiras', payload, session);
+    setDb((prev) => ({
+      ...prev,
+      movimentacoes_financeiras: [...(prev.movimentacoes_financeiras || []), persisted.data || { id: gerarNovoId(prev.movimentacoes_financeiras || []), ...payload }],
+    }));
+    setNovoPagamento({ descricao: '', valor: '', data_vencimento: getTodayIso(), metodo: 'Pix', pago: false, observacao: '' });
+    showToast({ type: 'success', message: 'Pagamento diário registrado.' });
+  }
+
+  async function alternarPagamentoPago(item) {
+    if (!podeEditarFinanceiro()) return;
+    const patch = { pago: !item?.pago };
+    const persisted = await updateOperationalRecord('movimentacoes_financeiras', item.id, patch, session);
+    setDb((prev) => ({
+      ...prev,
+      movimentacoes_financeiras: (prev.movimentacoes_financeiras || []).map((row) => row.id === item.id ? { ...row, ...(persisted.data || patch) } : row),
+    }));
+  }
+
   if (detalhe) {
     return (
       <div className="page rebanho-page">
@@ -178,9 +232,12 @@ export default function FinanceiroPage({ db, setDb }) {
   }
 
   return (
-    <div className="page rebanho-page">
-      <div className="rebanho-header">
-        <h1>Financeiro</h1>
+    <div className="page rebanho-page financeiro-page">
+      <div className="rebanho-header financeiro-header">
+        <div>
+          <h1>Financeiro</h1>
+          <p className="financeiro-subtitle">Acompanhe DRE, lotes, lançamentos e pagamentos diários em uma visão única.</p>
+        </div>
         <div className="lote-actions">
           <Button onClick={() => {
             if (!podeEditarFinanceiro()) return;
@@ -192,10 +249,10 @@ export default function FinanceiroPage({ db, setDb }) {
         </div>
       </div>
 
-      <div className="tab-buttons">
+      <div className="tab-buttons financeiro-tabs">
         {tabs.map((item) => (
-          <Button key={item} variant={tab === item ? 'primary' : 'ghost'} onClick={() => setTab(item)}>
-            {item === 'dre' ? 'DRE' : item === 'lote' ? 'Por Lote' : 'Lancamentos'}
+          <Button key={item} className={`financeiro-tab-btn ${tab === item ? 'is-active' : ''}`} variant={tab === item ? 'primary' : 'ghost'} onClick={() => setTab(item)}>
+            {TAB_LABELS[item]}
           </Button>
         ))}
       </div>
@@ -323,6 +380,47 @@ export default function FinanceiroPage({ db, setDb }) {
                   <Bar dataKey="margemPct" fill="#82ca9d" />
                 </BarChart>
               </ResponsiveContainer>
+            </div>
+          </Card>
+        </>
+      ) : null}
+
+
+      {tab === 'pag' ? (
+        <>
+          <Card title="Pagamentos Diários" subtitle="Registre e acompanhe pagamentos do dia a dia da fazenda.">
+            <div className="form-grid two">
+              <Input label="Descrição do pagamento" value={novoPagamento.descricao} onChange={(e) => setNovoPagamento((p) => ({ ...p, descricao: e.target.value }))} />
+              <Input label="Valor" type="number" value={novoPagamento.valor} onChange={(e) => setNovoPagamento((p) => ({ ...p, valor: e.target.value }))} />
+              <Input label="Data de vencimento" type="date" value={novoPagamento.data_vencimento} onChange={(e) => setNovoPagamento((p) => ({ ...p, data_vencimento: e.target.value }))} />
+              <label className="ui-input-wrap"><span className="ui-input-label">Modalidade de pagamento</span><select className="ui-input" value={novoPagamento.metodo} onChange={(e) => setNovoPagamento((p) => ({ ...p, metodo: e.target.value }))}>{metodosPagamento.map((m) => <option key={m} value={m}>{m}</option>)}</select></label>
+              <label className="ui-input-wrap"><span className="ui-input-label">Status</span><select className="ui-input" value={novoPagamento.pago ? 'pago' : 'nao_pago'} onChange={(e) => setNovoPagamento((p) => ({ ...p, pago: e.target.value === 'pago' }))}><option value="nao_pago">Não pago</option><option value="pago">Pago</option></select></label>
+              <Input label="Observação (opcional)" value={novoPagamento.observacao} onChange={(e) => setNovoPagamento((p) => ({ ...p, observacao: e.target.value }))} />
+            </div>
+            <div style={{ marginTop: 12 }}>
+              <Button onClick={salvarPagamentoDiario} disabled={!podeEditarFinanceiroUi}>Salvar pagamento diário</Button>
+              {!podeEditarFinanceiroUi ? <small style={{ display: 'block', marginTop: 6 }}>Acesso restrito ao perfil autorizado.</small> : null}
+            </div>
+          </Card>
+
+          <Card title="Lista de pagamentos" subtitle="Marque rapidamente os pagamentos já realizados.">
+            <div className="table-responsive">
+              <table className="data-table">
+                <thead><tr><th>Pago</th><th>Descrição</th><th>Valor</th><th>Vencimento</th><th>Método</th><th>Status</th><th>Obs</th></tr></thead>
+                <tbody>
+                  {pagamentos.length === 0 ? <tr><td colSpan="7" className="empty-state-td">Nenhum pagamento pendente</td></tr> : pagamentos.map((item) => (
+                    <tr key={item.id}>
+                      <td><input type="checkbox" disabled={!podeEditarFinanceiroUi} checked={Boolean(item.pago)} onChange={() => alternarPagamentoPago(item)} /></td>
+                      <td>{item.descricao || '-'}</td>
+                      <td>{formatCurrency(item.valor || 0)}</td>
+                      <td>{formatDate(item.data_vencimento || item.data)}</td>
+                      <td>{item.metodo_pagamento || 'Outro'}</td>
+                      <td><Badge variant={item.pago ? 'success' : 'warning'}>{item.pago ? 'Pago' : 'Não pago'}</Badge></td>
+                      <td>{item.observacao || '-'}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
             </div>
           </Card>
         </>

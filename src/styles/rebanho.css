@@ -281,3 +281,35 @@ label textarea {
     grid-template-columns: 1fr;
   }
 }
+
+/* SPRINT18A1 - Financeiro UI polish */
+.financeiro-page {
+  gap: 14px;
+}
+
+.financeiro-header {
+  align-items: flex-start;
+  margin-bottom: 4px;
+}
+
+.financeiro-subtitle {
+  margin: 4px 0 0;
+  color: var(--text-secondary);
+  font-size: 13px;
+}
+
+.financeiro-tabs {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin: 4px 0 10px;
+}
+
+.financeiro-tab-btn {
+  min-width: 132px;
+  justify-content: center;
+}
+
+.financeiro-tab-btn.is-active {
+  box-shadow: 0 8px 18px rgba(16, 24, 40, 0.28);
+}

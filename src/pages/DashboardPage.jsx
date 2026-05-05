@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import {
   AlertTriangle,
   ArrowDown,
@@ -32,7 +32,11 @@ import { formatCurrency, formatDate, formatNumber } from '../utils/calculations'
 import { formatarMoeda } from '../utils/formatters';
 import { gerarNovoId } from '../utils/id';
 import { createOperationalRecord, updateOperationalRecord } from '../services/operationalPersistence';
+import { useAuth } from '../auth/useAuth';
+import { useToast } from '../hooks/useToast';
 import '../styles/dashboard.css';
+
+const getTodayIso = () => new Date().toISOString().slice(0, 10);
 
 const KPI_VARIANTS = {
   success: 'success',
@@ -50,8 +54,45 @@ export default function DashboardPage({
   tabAtiva = 'geral',
   setTabAtiva,
 }) {
+  const { hasPermission } = useAuth();
+  const { showToast } = useToast();
+  const mensagemSemPermissao = 'Você não tem permissão para executar esta ação.';
   const [novaTarefa, setNovaTarefa] = useState({ titulo: '', funcionario_id: '', data_vencimento: '', descricao: '' });
+
+  const [cloudVerified, setCloudVerified] = useState(false);
+
+  useEffect(() => {
+    function handleCloudState(event) {
+      setCloudVerified(Boolean(event?.detail?.verified));
+    }
+    window.addEventListener('herdon-cloud-diagnostic-state', handleCloudState);
+    return () => window.removeEventListener('herdon-cloud-diagnostic-state', handleCloudState);
+  }, []);
+
   const lotesMap = useMemo(() => new Map((db.lotes || []).map((lote) => [lote.id, lote])), [db.lotes]);
+
+  const pagamentosDiarios = useMemo(
+    () => (db.movimentacoes_financeiras || []).filter((item) => item?.tipo === 'despesa' && (item?.categoria === 'Pagamento Diário' || item?.categoria === 'Pagamento Diario')),
+    [db.movimentacoes_financeiras]
+  );
+
+  const pagamentosResumo = useMemo(() => {
+    const hoje = new Date();
+    hoje.setHours(0, 0, 0, 0);
+    let vencidos = 0; let hojeCount = 0; let proximos = 0; let totalPendente = 0; let totalPago = 0;
+    pagamentosDiarios.forEach((item) => {
+      const valor = Number(item.valor || 0);
+      const pago = Boolean(item.pago);
+      const dataBase = new Date(`${(item.data_vencimento || item.data || getTodayIso())}T00:00:00`);
+      if (pago) { totalPago += valor; return; }
+      totalPendente += valor;
+      if (dataBase < hoje) vencidos += 1;
+      else if (dataBase.getTime() === hoje.getTime()) hojeCount += 1;
+      else proximos += 1;
+    });
+    return { vencidos, hoje: hojeCount, proximos, totalPendente, totalPago };
+  }, [pagamentosDiarios]);
+
   const lotesAtivos = useMemo(() => (db.lotes || []).filter((lote) => lote.status === 'ativo'), [db.lotes]);
 
   const lotesStats = useMemo(
@@ -141,6 +182,31 @@ export default function DashboardPage({
         .slice(0, 6),
     [db.sanitario, lotesMap]
   );
+
+  const lembretesReprodutivos = useMemo(() => {
+    const hojeIso = new Date().toISOString().slice(0, 10);
+    const iatfItens = (db.sanitario || [])
+      .filter((item) => String(item.tipo || '').toUpperCase() === 'IATF' || String(item.obs || '').includes('Protocolo IATF'))
+      .map((item) => {
+        const lote = lotesMap.get(item.lote_id);
+        const dataRef = item.proxima || item.data_aplic;
+        return {
+          ...item,
+          loteNome: lote?.nome || 'Sem lote',
+          dias: daysUntil(dataRef),
+          dataRef,
+          emAndamento: String(item.obs || '').includes('Status: Em andamento'),
+        };
+      })
+      .filter((item) => item.dataRef)
+      .sort((a, b) => (a.dias ?? 9999) - (b.dias ?? 9999));
+
+    const hoje = iatfItens.filter((item) => item.dataRef === hojeIso);
+    const proximas = iatfItens.filter((item) => Number.isFinite(item.dias) && item.dias > 0 && item.dias <= 14);
+    const emAndamento = iatfItens.filter((item) => item.emAndamento);
+
+    return { hoje, proximas, emAndamento, total: iatfItens.length };
+  }, [db.sanitario, lotesMap]);
 
   const tarefasUrgentes = useMemo(
     () =>
@@ -234,6 +300,36 @@ export default function DashboardPage({
     return { melhorLote: melhor, piorLote: pior };
   }, [lotesStats]);
 
+
+  const indicadoresFinanceiros = useMemo(() => {
+    if (!lotesStats.length) {
+      return {
+        lucroTotal: 0,
+        lucroPorCabeca: null,
+        lucroPorArroba: null,
+        margemPct: null,
+        custoPorCabecaDia: null,
+      };
+    }
+
+    const base = lotesStats.reduce((acc, item) => {
+      acc.lucroTotal += Number(item.indicators.lucroTotal || 0);
+      acc.receitaTotal += Number(item.indicators.receitaTotal || 0);
+      acc.custoTotal += Number(item.indicators.custoTotal || 0);
+      acc.cabecas += Number(item.indicators.totalAnimais || 0);
+      acc.custoPorCabecaDia += Number(item.indicators.custoPorCabecaDia || 0);
+      return acc;
+    }, { lucroTotal: 0, receitaTotal: 0, custoTotal: 0, cabecas: 0, custoPorCabecaDia: 0 });
+
+    return {
+      lucroTotal: base.lucroTotal,
+      lucroPorCabeca: base.cabecas > 0 ? base.lucroTotal / base.cabecas : null,
+      lucroPorArroba: arrobaMedia > 0 && base.cabecas > 0 ? base.lucroTotal / (arrobaMedia * base.cabecas) : null,
+      margemPct: base.receitaTotal > 0 ? (base.lucroTotal / base.receitaTotal) * 100 : null,
+      custoPorCabecaDia: lotesStats.length > 0 ? base.custoPorCabecaDia / lotesStats.length : null,
+    };
+  }, [arrobaMedia, lotesStats]);
+
   const kpisMain = [
     {
       title: 'Cabecas ativas',
@@ -265,35 +361,54 @@ export default function DashboardPage({
     },
     {
       title: 'Resultado financeiro',
-      value: formatCurrency(resultadoMes),
-      variation: getVariation(resultadoMes, resultadoMes * 0.85),
+      value: formatCurrency(indicadoresFinanceiros.lucroTotal),
+      variation: getVariation(indicadoresFinanceiros.lucroTotal, indicadoresFinanceiros.lucroTotal * 0.85),
       icon: DollarSign,
-      variant: resultadoMes >= 0 ? KPI_VARIANTS.success : KPI_VARIANTS.danger,
+      variant: indicadoresFinanceiros.lucroTotal >= 0 ? KPI_VARIANTS.success : KPI_VARIANTS.danger,
     },
     {
-      title: 'Estoque critico',
-      value: formatNumber(estoqueCritico.length, 0),
-      variation: getVariation(estoqueCritico.length, Math.max(0, estoqueCritico.length - 1)),
-      icon: Package,
-      variant: estoqueCritico.length ? KPI_VARIANTS.warning : KPI_VARIANTS.success,
+      title: 'Margem consolidada',
+      value: indicadoresFinanceiros.margemPct === null ? 'Sem base' : `${formatNumber(indicadoresFinanceiros.margemPct, 1)}%`,
+      variation: getVariation(indicadoresFinanceiros.margemPct || 0, (indicadoresFinanceiros.margemPct || 0) * 0.95),
+      icon: Scale,
+      variant: (indicadoresFinanceiros.margemPct || 0) >= 0 ? KPI_VARIANTS.info : KPI_VARIANTS.warning,
+    },
+    {
+      title: 'Status nuvem',
+      value: cloudVerified ? 'Nuvem verificada' : 'Modo local',
+      variation: { direction: 'neutral', value: cloudVerified ? 'Sincronização disponível' : 'Reconectar para validar' },
+      icon: cloudVerified ? CheckCircle2 : AlertTriangle,
+      variant: cloudVerified ? KPI_VARIANTS.success : KPI_VARIANTS.warning,
+    },
+    {
+      title: 'Pagamentos pendentes',
+      value: formatNumber(pagamentosResumo.vencidos + pagamentosResumo.hoje + pagamentosResumo.proximos, 0),
+      variation: { direction: 'neutral', value: pagamentosResumo.totalPendente > 0 ? `Total pendente: ${formatCurrency(pagamentosResumo.totalPendente)}` : 'Nenhum pagamento pendente' },
+      icon: BellRing,
+      variant: pagamentosResumo.totalPendente > 0 ? KPI_VARIANTS.warning : KPI_VARIANTS.success,
     },
   ];
 
   const executiveSignals = [
     {
-      label: 'Alertas prioritarios',
+      label: 'Alertas prioritários',
       value: formatNumber(totalAlertasCriticos || alertasFormatados.length, 0),
-      helper: totalAlertasCriticos ? 'criticos aguardando acao' : 'alertas operacionais em leitura',
+      helper: totalAlertasCriticos ? 'críticos aguardando ação' : 'alertas operacionais em leitura',
     },
     {
-      label: 'Arroba media',
-      value: `${formatNumber(arrobaMedia, 2)} @`,
-      helper: 'media consolidada do rebanho ativo',
+      label: 'Lucro por cabeça',
+      value: indicadoresFinanceiros.lucroPorCabeca === null ? 'Sem base' : formatarMoeda(indicadoresFinanceiros.lucroPorCabeca),
+      helper: 'consolidado dos lotes ativos',
     },
     {
-      label: 'Valor em estoque',
-      value: formatarMoeda(valorTotalEstoque),
-      helper: 'base disponivel para operacao',
+      label: 'Custo/cabeça/dia',
+      value: indicadoresFinanceiros.custoPorCabecaDia === null ? 'Sem base' : formatarMoeda(indicadoresFinanceiros.custoPorCabecaDia),
+      helper: 'eficiência operacional média',
+    },
+    {
+      label: 'Lucro por arroba',
+      value: indicadoresFinanceiros.lucroPorArroba === null ? 'Sem base' : formatarMoeda(indicadoresFinanceiros.lucroPorArroba),
+      helper: 'indicador financeiro zootécnico',
     },
   ];
 
@@ -363,6 +478,10 @@ export default function DashboardPage({
   }, [db.tarefas, funcionariosMap]);
 
   async function criarTarefaDashboard() {
+    if (!hasPermission('tarefas:editar')) {
+      showToast({ type: 'error', message: mensagemSemPermissao });
+      return;
+    }
     if (!novaTarefa.titulo.trim() || !novaTarefa.data_vencimento) return;
     const payload = {
       titulo: novaTarefa.titulo.trim(),
@@ -379,6 +498,10 @@ export default function DashboardPage({
   }
 
   async function marcarComoFeita(tarefa) {
+    if (!hasPermission('tarefas:editar')) {
+      showToast({ type: 'error', message: mensagemSemPermissao });
+      return;
+    }
     await updateOperationalRecord('tarefas', tarefa.id, { status: 'concluida' }, null);
     setDb?.((prev) => ({
       ...prev,
@@ -495,21 +618,62 @@ export default function DashboardPage({
               </div>
             </Card>
 
+
+            <Card
+              title="Lembretes de pagamentos"
+              subtitle="Acompanhe vencimentos e mantenha o caixa organizado."
+              action={<Button size="sm" variant="ghost" onClick={() => onNavigate?.('financeiro')}>Abrir financeiro</Button>}
+            >
+              <div className="dashboard-list">
+                <div className="dashboard-list-item"><div className="dashboard-list-copy"><strong>Pagamentos vencidos</strong><p>{formatNumber(pagamentosResumo.vencidos, 0)}</p></div></div>
+                <div className="dashboard-list-item"><div className="dashboard-list-copy"><strong>Vencem hoje</strong><p>{formatNumber(pagamentosResumo.hoje, 0)}</p></div></div>
+                <div className="dashboard-list-item"><div className="dashboard-list-copy"><strong>Próximos pagamentos</strong><p>{formatNumber(pagamentosResumo.proximos, 0)}</p></div></div>
+                <div className="dashboard-list-item"><div className="dashboard-list-copy"><strong>Total pendente</strong><p>{pagamentosResumo.totalPendente > 0 ? formatCurrency(pagamentosResumo.totalPendente) : 'Nenhum pagamento pendente'}</p></div></div>
+                <div className="dashboard-list-item"><div className="dashboard-list-copy"><strong>Total pago</strong><p>{formatCurrency(pagamentosResumo.totalPago)}</p></div></div>
+              </div>
+            </Card>
+
+            <Card
+              title="Lembretes reprodutivos"
+              subtitle="Acompanhe ações de IATF/Reprodução planejadas no manejo sanitário."
+              action={<Button size="sm" variant="ghost" onClick={() => onNavigate?.('sanitario')}>Abrir sanitário</Button>}
+            >
+              <div className="dashboard-list">
+                {lembretesReprodutivos.total === 0 ? (
+                  <p className="dashboard-empty-copy">Nenhuma ação reprodutiva pendente.</p>
+                ) : (
+                  <>
+                    <div className="dashboard-list-item"><div className="dashboard-list-copy"><strong>IATF hoje</strong><p>{formatNumber(lembretesReprodutivos.hoje.length, 0)}</p></div></div>
+                    <div className="dashboard-list-item"><div className="dashboard-list-copy"><strong>Próximas ações reprodutivas</strong><p>{formatNumber(lembretesReprodutivos.proximas.length, 0)}</p></div></div>
+                    <div className="dashboard-list-item"><div className="dashboard-list-copy"><strong>Protocolos em andamento</strong><p>{formatNumber(lembretesReprodutivos.emAndamento.length, 0)}</p></div></div>
+                    {lembretesReprodutivos.proximas.slice(0, 2).map((item) => (
+                      <div key={`iatf-next-${item.id}`} className="dashboard-list-item">
+                        <div className="dashboard-list-copy">
+                          <strong>{item.desc || 'Protocolo IATF'}</strong>
+                          <p>{item.loteNome} • {formatDate(item.dataRef)}</p>
+                        </div>
+                      </div>
+                    ))}
+                  </>
+                )}
+              </div>
+            </Card>
+
             <Card
               title="Acoes rapidas uteis"
               subtitle="Atalhos diretos para os fluxos que mais importam em uma demo."
             >
               <div className="dashboard-action-grid">
-                <Button fullWidth onClick={() => onNavigate?.('pesagens', { action: 'novo' })}>
+                <Button fullWidth disabled={!hasPermission('pesagens:editar')} onClick={() => onNavigate?.('pesagens', { action: 'novo' })}>
                   Nova pesagem
                 </Button>
-                <Button fullWidth variant="outline" onClick={() => onNavigate?.('lotes')}>
+                <Button fullWidth variant="outline" disabled={!hasPermission('lotes:editar')} onClick={() => onNavigate?.('lotes')}>
                   Novo lote
                 </Button>
-                <Button fullWidth variant="outline" onClick={() => onNavigate?.('sanitario')}>
+                <Button fullWidth variant="outline" disabled={!hasPermission('sanitario:editar')} onClick={() => onNavigate?.('sanitario')}>
                   Registrar manejo
                 </Button>
-                <Button fullWidth variant="outline" onClick={() => onNavigate?.('suplementacao')}>
+                <Button fullWidth variant="outline" disabled={!hasPermission('estoque:editar')} onClick={() => onNavigate?.('suplementacao')}>
                   Registrar consumo
                 </Button>
               </div>
@@ -526,7 +690,7 @@ export default function DashboardPage({
                 </select>
                 <input className="ui-input" type="date" value={novaTarefa.data_vencimento} onChange={(e) => setNovaTarefa((p) => ({ ...p, data_vencimento: e.target.value }))} />
                 <input className="ui-input" placeholder="Descricao" value={novaTarefa.descricao} onChange={(e) => setNovaTarefa((p) => ({ ...p, descricao: e.target.value }))} />
-                <Button onClick={criarTarefaDashboard}>Adicionar tarefa</Button>
+                <Button onClick={criarTarefaDashboard} disabled={!hasPermission('tarefas:editar')}>Adicionar tarefa</Button>
               </div>
 
               <div className="dashboard-task-columns">

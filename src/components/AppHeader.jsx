@@ -55,12 +55,24 @@ function getCloudState(syncStatus) {
   const source = syncStatus?.dataSource || 'signed_out';
   const message = syncStatus?.dataError?.message || '';
 
+
+  if (syncStatus?.cloudVerified) {
+    return {
+      tone: 'online',
+      icon: 'cloud',
+      label: 'Nuvem ativa',
+      detail: syncStatus?.lastSyncAt ? `Última sync: ${formatSyncTime(syncStatus.lastSyncAt)}` : 'Nuvem não verificada',
+      title: syncStatus?.cloudVerifiedMessage || 'Nuvem conectada pelo servidor.',
+      disabled: false,
+    };
+  }
+
   if (syncStatus?.isSyncing || source === 'syncing') {
     return {
       tone: 'syncing',
       icon: 'loading',
-      label: 'Sincronizando',
-      detail: 'Sincronizando módulos',
+      label: 'Sincronizando...',
+      detail: syncStatus?.lastSyncAt ? `Última sync: ${formatSyncTime(syncStatus.lastSyncAt)}` : 'Nuvem não verificada',
       title: 'Sincronização manual em andamento',
       disabled: true,
     };
@@ -70,8 +82,8 @@ function getCloudState(syncStatus) {
     return {
       tone: 'warning',
       icon: 'warning',
-      label: 'Sessão expirada',
-      detail: 'Reconectar à nuvem',
+      label: 'Modo local',
+      detail: 'Nuvem não verificada',
       title: 'Sessão expirada. Reconecte para voltar a sincronizar.',
       disabled: false,
     };
@@ -92,8 +104,8 @@ function getCloudState(syncStatus) {
     return {
       tone: 'warning',
       icon: 'warning',
-      label: 'Dados locais ativos',
-      detail: message || 'Falha ao conectar ao Supabase pelo navegador',
+      label: 'Modo local',
+      detail: message || 'Nuvem indisponível no momento',
       title: message || 'Falha de nuvem detectada. O modo local continua ativo.',
       disabled: false,
     };
@@ -103,8 +115,8 @@ function getCloudState(syncStatus) {
     return {
       tone: 'muted',
       icon: 'local',
-      label: 'Dados locais ativos',
-      detail: 'Nuvem pausada',
+      label: 'Nuvem pausada',
+      detail: 'Modo local ativo',
       title: 'Sincronização com Supabase desativada neste navegador',
       disabled: false,
     };
@@ -113,7 +125,7 @@ function getCloudState(syncStatus) {
   return {
     tone: 'local',
     icon: 'local',
-    label: 'Dados locais ativos',
+    label: 'Modo local',
     detail: 'Nuvem não verificada',
     title: 'Sincronização manual disponível',
     disabled: false,
@@ -311,6 +323,20 @@ export default function AppHeader({
           >
             <Clock3 size={13} className={cloudState.disabled ? 'ui-spin' : ''} />
           </button>
+          <div className="header-sync-actions" role="group" aria-label="Ações de nuvem">
+            <button type="button" className="header-sync-refresh header-sync-refresh--compact" onClick={syncStatus?.onTestCloud} disabled={Boolean(syncStatus?.testingCloud)} aria-label="Testar conexão">
+              <Package size={12} />
+              <span>Testar</span>
+            </button>
+            <button type="button" className="header-sync-refresh header-sync-refresh--compact" onClick={syncStatus?.onSyncNow} disabled={Boolean(syncStatus?.syncingCloud)} aria-label="Sincronizar">
+              <Clock3 size={12} className={syncStatus?.syncingCloud ? 'ui-spin' : ''} />
+              <span>Sync</span>
+            </button>
+            <button type="button" className="header-sync-refresh header-sync-refresh--compact" onClick={syncStatus?.onReconnectCloud} disabled={Boolean(syncStatus?.reconnectingCloud)} aria-label="Reconectar">
+              <Activity size={12} />
+              <span>Reconectar</span>
+            </button>
+          </div>
         </div>
 
         <div className="user-menu-wrap" ref={notifRef}>
