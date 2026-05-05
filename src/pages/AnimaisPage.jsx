@@ -195,7 +195,7 @@ export default function AnimaisPage({ db, setDb, onConfirmAction }) {
             <strong>{destaqueAdicionar.titulo}</strong>
             <p>{destaqueAdicionar.descricao}</p>
           </div>
-          <Button icon={<Plus size={16} />} onClick={() => abrirNovoPorModo(modoCadastro === 'individual' ? 'individual' : 'grupo')}>
+          <Button icon={<Plus size={16} />} disabled={!hasPermission('animais:editar')} onClick={() => abrirNovoPorModo(modoCadastro === 'individual' ? 'individual' : 'grupo')}>
             {modoCadastro === 'individual' ? 'Adicionar animal individual' : 'Adicionar grupo de animais'}
           </Button>
         </div>
@@ -208,7 +208,7 @@ export default function AnimaisPage({ db, setDb, onConfirmAction }) {
         </div>
         <div className="animais-mode-actions">
           <p>{modoCadastro === 'individual' ? 'Registre um animal com identificação única e vínculo opcional a lote.' : 'Mantenha o fluxo atual de lote com quantidade, genética, sexo, peso e desempenho.'}</p>
-          <Button size="sm" icon={<Plus size={14} />} onClick={() => abrirNovoPorModo(modoCadastro)}>
+          <Button size="sm" icon={<Plus size={14} />} disabled={!hasPermission('animais:editar')} onClick={() => abrirNovoPorModo(modoCadastro)}>
             {modoCadastro === 'individual' ? 'Novo animal individual' : 'Novo grupo/lote'}
           </Button>
         </div>
@@ -239,13 +239,13 @@ export default function AnimaisPage({ db, setDb, onConfirmAction }) {
             className="animais-list-card"
             title="Lista de animais"
             subtitle="Edite ou exclua registros de grupo e individuais mantendo a operacao consolidada."
-            action={<Button size="sm" icon={<Plus size={14} />} onClick={abrirNovo}>Adicionar</Button>}
+            action={<Button size="sm" icon={<Plus size={14} />} disabled={!hasPermission('animais:editar')} onClick={abrirNovo}>Adicionar</Button>}
           >
             {dadosTabela.length === 0 ? (
               <div className="animais-empty-state">
                 <strong>Nenhum registro de animais.</strong>
                 <span>Use o botao destacado acima para cadastrar o primeiro grupo do rebanho.</span>
-                <Button variant="outline" onClick={abrirNovo}>Cadastrar primeiro grupo</Button>
+                <Button variant="outline" disabled={!hasPermission('animais:editar')} onClick={abrirNovo}>Cadastrar primeiro grupo</Button>
               </div>
             ) : (
               <div className="table-responsive animais-table-wrap">
@@ -290,8 +290,8 @@ export default function AnimaisPage({ db, setDb, onConfirmAction }) {
                         <td className="cell-number">{formatarNumero(animal.consumo)} kg</td>
                         <td>
                           <div className="row-actions">
-                            <button className="action-btn" onClick={() => editarAnimal(animal)}>Editar</button>
-                            <button className="action-btn action-btn-danger" onClick={() => excluirAnimal(animal.id)}>Excluir</button>
+                            <button className="action-btn" disabled={!hasPermission('animais:editar')} onClick={() => editarAnimal(animal)}>Editar</button>
+                            <button className="action-btn action-btn-danger" disabled={!hasPermission('animais:excluir')} onClick={() => excluirAnimal(animal.id)}>Excluir</button>
                           </div>
                         </td>
                       </tr>

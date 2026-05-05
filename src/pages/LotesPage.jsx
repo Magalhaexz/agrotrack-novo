@@ -142,7 +142,7 @@ export default function LotesPage({
     <div className="page rebanho-page">
       <div className="rebanho-header">
         <div><h1>Rebanho</h1><p>Gestão completa de lotes, movimentações e indicadores zootécnicos.</p></div>
-        <Button icon={<Plus size={16} />} onClick={() => {
+        <Button icon={<Plus size={16} />} disabled={!hasPermission('lotes:editar')} onClick={() => {
           if (!hasPermission('lotes:editar')) {
             showToast({ type: 'error', message: mensagemSemPermissao });
             return;
@@ -194,8 +194,8 @@ export default function LotesPage({
             <p className={lote.resumo.lucroTotal >= 0 ? 'text-success' : 'text-danger'}>Resultado parcial: {formatCurrency(lote.resumo.lucroTotal || 0)}</p>
             <div className="lote-actions">
               <Button size="sm" variant="outline" icon={<ChevronRight size={14} />} onClick={() => { setActiveTab('visao'); setActiveLoteId(lote.id); }}>Ver Detalhes</Button>
-              <Button size="sm" variant="ghost" icon={<Truck size={14} />} onClick={() => abrirMovimentacao(lote)}>Registrar Movimentação</Button>
-              <Button size="sm" variant="ghost" icon={<Scale size={14} />} onClick={() => {
+              <Button size="sm" variant="ghost" icon={<Truck size={14} />} disabled={!hasPermission('animais:movimentar')} onClick={() => abrirMovimentacao(lote)}>Registrar Movimentação</Button>
+              <Button size="sm" variant="ghost" icon={<Scale size={14} />} disabled={!hasPermission('pesagens:editar')} onClick={() => {
                 if (!hasPermission('pesagens:editar')) {
                   showToast({ type: 'error', message: mensagemSemPermissao });
                   return;

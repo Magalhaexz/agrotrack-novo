@@ -46,6 +46,31 @@
 - Checkbox de “pago” desabilitado sem permissão de edição financeira.
 - Mensagem de orientação visível: “Acesso restrito ao perfil autorizado.”
 
+### Lotes
+- Botões sensíveis agora respeitam permissões na UI:
+  - novo lote (`lotes:editar`)
+  - registrar movimentação (`animais:movimentar`)
+  - nova pesagem (`pesagens:editar`)
+  - encerrar lote (`lotes:editar`)
+- Fluxos já possuíam validação em handlers; sprint reforçou com botões desabilitados para perfis sem acesso.
+
+### Animais
+- Ações de criar/editar/excluir agora também ficam desabilitadas na interface quando o perfil não possui permissão.
+- Mantido comportamento de leitura para perfis sem edição.
+
+### Estoque / Suplementos
+- Estoque: entradas/saídas e botões operacionais desabilitados sem `estoque:editar`.
+- Suplementação: cadastro/edição/exclusão de dieta e registro de consumo diário desabilitados sem permissão.
+- Fluxos já possuíam validação de ação; reforço foi aplicado na camada visual.
+
+### Sanitário / IATF-Reprodução
+- Botões de novo manejo, salvar protocolo IATF, editar e excluir manejo agora desabilitam sem permissões correspondentes.
+- Mantido acesso de visualização dos registros para leitura operacional.
+
+### Relatórios
+- Revisão concluída: fluxo atual está focado em leitura e filtros.
+- Mantido como leitura sem alteração de contratos de dados e sem bloqueio adicional nesta etapa para evitar regressão de acesso visual.
+
 ## Comportamento por perfil (UI)
 - VISUALIZADOR: mantém leitura de telas e dados permitidos; ações de edição/cadastro/exclusão ficam bloqueadas/desabilitadas.
 - OPERADOR/GERENTE/PROPRIETARIO: seguem regras já existentes em `hasPermission` para cada módulo.

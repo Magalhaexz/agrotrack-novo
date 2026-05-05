@@ -298,7 +298,7 @@ export default function SanitarioPage({ db, setDb, onConfirmAction }) {
       <PageHeader
         title="Manejo Sanitário"
         subtitle="Controle de vacinas, vermífugos e tratamentos do rebanho."
-        actions={<Button className="sanitario-cta" onClick={abrirNovo}>+ Novo Manejo</Button>}
+        actions={<Button className="sanitario-cta" disabled={!hasPermission('sanitario:editar')} onClick={abrirNovo}>+ Novo Manejo</Button>}
       />
 
       <div className="summary-cards-grid sanitario-summary-grid">
@@ -337,7 +337,7 @@ export default function SanitarioPage({ db, setDb, onConfirmAction }) {
             return evento ? formatarData(evento.data) : '—';
           })()}</p>
         </div>
-        <div style={{ marginTop: 10 }}><Button onClick={salvarIatf}>Salvar protocolo IATF</Button></div>
+        <div style={{ marginTop: 10 }}><Button disabled={!hasPermission('sanitario:editar')} onClick={salvarIatf}>Salvar protocolo IATF</Button></div>
       </Card>
 
 
@@ -380,12 +380,14 @@ export default function SanitarioPage({ db, setDb, onConfirmAction }) {
                       <div className="row-actions row-actions--tight">
                         <button
                           className="action-btn"
+                          disabled={!hasPermission('sanitario:editar')}
                           onClick={() => editarItem(item)}
                         >
                           Editar
                         </button>
                         <button
                           className="action-btn action-btn-danger"
+                          disabled={!hasPermission('sanitario:excluir')}
                           onClick={() => excluirItem(item.id)}
                         >
                           Excluir
