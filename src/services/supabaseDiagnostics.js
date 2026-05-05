@@ -1,6 +1,16 @@
-﻿import { supabase, validateSupabaseSessionForCloud } from '../lib/supabase.js';
+import { supabase } from '../lib/supabase.js';
 
 const DEFAULT_TIMEOUT_MS = 10000;
+const INVALID_SESSION_MESSAGE = 'Sessão inválida. Reconecte à nuvem.';
+
+async function getSafeAccessToken() {
+  const sessionResult = await supabase.auth.getSession();
+  const accessToken = sessionResult?.data?.session?.access_token || null;
+  const tokenLooksJwt = typeof accessToken === 'string' && accessToken.split('.').length === 3;
+  const tokenLength = typeof accessToken === 'string' ? accessToken.length : 0;
+  return { accessToken, hasAccessToken: Boolean(accessToken), tokenLooksJwt, tokenLength };
+}
+
 
 function normalizeEnvValue(value) {
   if (value === undefined || value === null) return '';
@@ -53,7 +63,7 @@ function classifyMinimalDiagnosticFailure({ error = null, status = null, code = 
   return { type: 'unknown', message: 'Falha de conexão do navegador com o Supabase.' };
 }
 
-async function runMinimalRestStep({ step, table, supabaseUrl, anonKey, token = null, timeoutMs = 8000 }) {
+async function _runMinimalRestStep({ step, table, supabaseUrl, anonKey, token = null, timeoutMs = 8000 }) {
   const endpointPath = `/rest/v1/${table}?select=id&limit=1`;
   const endpoint = `${String(supabaseUrl).replace(/\/$/, '')}${endpointPath}`;
   const headers = {
@@ -121,7 +131,7 @@ async function runMinimalRestStep({ step, table, supabaseUrl, anonKey, token = n
   }
 }
 
-async function runMinimalClientStep({ table, timeoutMs = 8000 }) {
+async function _runMinimalClientStep({ table, timeoutMs = 8000 }) {
   const endpointPath = `/rest/v1/${table}?select=id,nome,cloud_id&limit=1`;
   const controller = new AbortController();
   const timer = globalThis.setTimeout(() => controller.abort(), timeoutMs);
@@ -173,7 +183,7 @@ async function runMinimalClientStep({ table, timeoutMs = 8000 }) {
   }
 }
 
-function buildEnvStep() {
+function _buildEnvStep() {
   const rawUrl = normalizeEnvValue(import.meta?.env?.VITE_SUPABASE_URL || '');
   const rawAnonKey = normalizeEnvValue(import.meta?.env?.VITE_SUPABASE_ANON_KEY || '');
   let urlValid = false;
@@ -205,256 +215,73 @@ function buildEnvStep() {
   };
 }
 
-export async function runMinimalCloudDiagnostic({ table = 'lotes', session, timeoutMs = 8000 } = {}) {
-  const accessToken = session?.access_token || session?.session?.access_token || null;
-  if (!accessToken) {
+export async function runMinimalCloudDiagnostic({ table = 'lotes' } = {}) {
+  const tokenInfo = await getSafeAccessToken();
+  if (!tokenInfo.hasAccessToken || !tokenInfo.tokenLooksJwt) {
+    if (import.meta.env.DEV) {
+      console.groupCollapsed('[HERDON_SERVERLESS_CLOUD_DIAGNOSTIC]');
+      console.info({ endpoint: '/api/cloud-diagnostic', status: null, ok: false, checks: [], safeMessage: INVALID_SESSION_MESSAGE });
+      console.groupEnd();
+    }
     return {
       ok: false,
       table,
-      appOrigin: typeof window !== 'undefined' ? window.location.origin : null,
-      supabaseHost: null,
-      envStatus: buildEnvStep().envStatus,
-      authState: {
-        hasSession: Boolean(session?.user),
-        hasAccessToken: false,
-        tokenLooksJwt: null,
-        tokenExpired: null,
-        refreshAttempted: false,
-        refreshSucceeded: false,
-      },
       steps: [
         { step: 'env_check', ok: true, safeMessage: 'Ambiente configurado' },
-        { step: 'rest_without_session', ok: true, safeMessage: 'OK' },
-        { step: 'session_check', ok: false, status: 'missing', safeMessage: 'Sessão inválida ou expirada.' },
-        { step: 'rest_with_session', ok: false, safeMessage: 'Bloqueado por sessão inválida', skipped: true },
-        { step: 'client_select', ok: false, safeMessage: 'Bloqueado por sessão inválida', skipped: true },
+        { step: 'session_check', ok: false, status: 'invalid', safeMessage: INVALID_SESSION_MESSAGE },
       ],
       conclusion: 'session_failure',
-      conclusionMessage: 'Sessão expirada. Entre novamente para sincronizar com a nuvem.',
+      conclusionMessage: INVALID_SESSION_MESSAGE,
     };
   }
 
   try {
-    const serverResponse = await fetch('/api/cloud-diagnostic', {
+    const response = await fetch('/api/cloud-diagnostic', {
       method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        Authorization: `Bearer ${accessToken}`,
-      },
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${tokenInfo.accessToken}` },
       body: JSON.stringify({}),
     });
 
-    const serverJson = await serverResponse.json().catch(() => null);
-    if (serverResponse.ok && serverJson) {
-      const checks = Array.isArray(serverJson?.checks) ? serverJson.checks : [];
-      const mapCheck = (name, fallbackStep) => {
-        const hit = checks.find((item) => item?.name === name);
-        if (!hit) return null;
-        return {
-          step: fallbackStep,
-          table: hit?.table || table,
-          endpointPath: `/api/cloud-diagnostic:${name}`,
-          ok: hit?.status === 'success',
-          httpStatus: hit?.httpStatus ?? (hit?.status === 'success' ? 200 : null),
-          postgrestCode: hit?.code ?? null,
-          failureType: hit?.status === 'success' ? null : 'server_check_error',
-          safeMessage: hit?.message || (hit?.status === 'success' ? 'OK' : 'Erro no diagnóstico do servidor'),
-          source: 'server',
-        };
-      };
+    const payload = await response.json().catch(() => null);
+    const checks = Array.isArray(payload?.checks) ? payload.checks : [];
+    const mappedChecks = checks.map((item) => ({ name: item?.name || null, status: item?.status || 'error' }));
+    const ok = Boolean(response.ok && payload?.ok === true);
+    const safeMessage = ok
+      ? 'Nuvem conectada pelo servidor.'
+      : `Diagnóstico pelo servidor falhou${response?.status ? ` — status ${response.status}.` : '. O modo local continua ativo.'}`;
 
-      const envStep = {
-        step: 'env_check',
-        ok: checks.some((item) => item?.name === 'env' ? item?.status === 'success' : false),
-        envStatus: {
-          supabaseUrlPresent: true,
-          anonKeyPresent: true,
-          host: null,
-          urlValid: true,
-          anonKeyLooksValid: true,
-        },
-        safeMessage: checks.find((item) => item?.name === 'env')?.message || 'Ambiente configurado',
-        source: 'server',
-      };
-      const restNoAuth = mapCheck('table_lotes', 'rest_without_session') || {
-        step: 'rest_without_session',
-        table,
-        endpointPath: '/api/cloud-diagnostic:table_lotes',
-        ok: false,
-        httpStatus: null,
-        postgrestCode: null,
-        failureType: 'unknown',
-        safeMessage: 'Falha ao conectar o servidor à nuvem.',
-        source: 'server',
-      };
-      const sessionStep = {
-        step: 'session_check',
-        ok: Boolean(session?.user?.id),
-        status: session?.user?.id ? 'valid' : 'missing',
-        safeMessage: session?.user?.id ? 'Sessão válida' : 'Sessão inválida ou expirada.',
-        source: 'server',
-      };
-      const restWithAuth = mapCheck('table_lotes_owner', 'rest_with_session') || {
-        step: 'rest_with_session',
-        table,
-        endpointPath: '/api/cloud-diagnostic:table_lotes_owner',
-        ok: false,
-        httpStatus: null,
-        postgrestCode: null,
-        failureType: 'unknown',
-        safeMessage: 'Falha ao conectar o servidor à nuvem.',
-        source: 'server',
-      };
-      const clientStep = mapCheck('table_fazendas_owner', 'client_select') || {
-        step: 'client_select',
-        table: 'fazendas',
-        endpointPath: '/api/cloud-diagnostic:table_fazendas_owner',
-        ok: false,
-        httpStatus: null,
-        postgrestCode: null,
-        failureType: 'unknown',
-        safeMessage: 'Falha ao conectar o servidor à nuvem.',
-        source: 'server',
-      };
-
-      const steps = [envStep, restNoAuth, sessionStep, restWithAuth, clientStep];
-      const ok = steps.every((item) => item?.ok);
-      return {
-        ok,
-        table,
-        appOrigin: typeof window !== 'undefined' ? window.location.origin : null,
-        supabaseHost: null,
-        envStatus: envStep.envStatus,
-        authState: {
-          hasSession: Boolean(session?.user),
-          hasAccessToken: Boolean(session?.access_token || session?.session?.access_token),
-          tokenLooksJwt: null,
-          tokenExpired: null,
-          refreshAttempted: false,
-          refreshSucceeded: false,
-        },
-        steps,
-        conclusion: ok ? 'connectivity_ok' : 'server_bridge_failure',
-        conclusionMessage: ok
-          ? 'Nuvem conectada pelo servidor.'
-          : 'Não foi possível sincronizar pelo servidor. O modo local continua ativo.',
-      };
+    if (import.meta.env.DEV) {
+      console.groupCollapsed('[HERDON_SERVERLESS_CLOUD_DIAGNOSTIC]');
+      console.info({ endpoint: '/api/cloud-diagnostic', status: response.status, ok, checks: mappedChecks, safeMessage });
+      console.groupEnd();
     }
+
+    return {
+      ok,
+      table,
+      steps: [
+        { step: 'env_check', ok: checks.find((c) => c?.name === 'env')?.status === 'success', safeMessage: 'Ambiente: OK' },
+        { step: 'fazendas_check', ok: checks.find((c) => c?.name === 'table_fazendas')?.status === 'success', safeMessage: 'Fazendas: OK' },
+        { step: 'lotes_check', ok: checks.find((c) => c?.name === 'table_lotes')?.status === 'success', safeMessage: 'Lotes: OK' },
+      ],
+      conclusion: ok ? 'connectivity_ok' : 'server_bridge_failure',
+      conclusionMessage: safeMessage,
+    };
   } catch {
-    // fallback para diagnóstico direto
+    const safeMessage = 'Diagnóstico pelo servidor falhou. O modo local continua ativo.';
+    if (import.meta.env.DEV) {
+      console.groupCollapsed('[HERDON_SERVERLESS_CLOUD_DIAGNOSTIC]');
+      console.info({ endpoint: '/api/cloud-diagnostic', status: null, ok: false, checks: [], safeMessage });
+      console.groupEnd();
+    }
+    return {
+      ok: false,
+      table,
+      steps: [{ step: 'server_diagnostic', ok: false, safeMessage }],
+      conclusion: 'server_bridge_failure',
+      conclusionMessage: safeMessage,
+    };
   }
-
-  const envStep = buildEnvStep();
-  const supabaseUrl = normalizeEnvValue(import.meta?.env?.VITE_SUPABASE_URL || '');
-  const anonKey = normalizeEnvValue(import.meta?.env?.VITE_SUPABASE_ANON_KEY || '');
-
-  const token = session?.access_token || session?.session?.access_token || session?.user?.access_token || null;
-  const validatedSession = await validateSupabaseSessionForCloud();
-  const authState = validatedSession?.authState || {
-    hasSession: Boolean(session?.user),
-    hasAccessToken: Boolean(token),
-    tokenLooksJwt: false,
-    tokenExpired: false,
-    refreshAttempted: false,
-    refreshSucceeded: false,
-  };
-
-  const sessionStep = {
-    step: 'session_check',
-    ok: Boolean(validatedSession?.ok),
-    status: validatedSession?.status || 'missing',
-    safeMessage: validatedSession?.ok ? 'Sessão válida' : 'Sessão expirada. Entre novamente para sincronizar com a nuvem.',
-  };
-
-  const restNoAuth = envStep.ok
-    ? await runMinimalRestStep({
-      step: 'rest_without_session',
-      table,
-      supabaseUrl,
-      anonKey,
-      token: null,
-      timeoutMs,
-    })
-    : {
-      step: 'rest_without_session',
-      table,
-      endpointPath: `/rest/v1/${table}?select=id&limit=1`,
-      ok: false,
-      httpStatus: null,
-      postgrestCode: null,
-      failureType: 'config',
-      safeMessage: 'Erro de configuração',
-    };
-
-  const restWithAuth = validatedSession?.ok
-    ? await runMinimalRestStep({
-      step: 'rest_with_session',
-      table,
-      supabaseUrl,
-      anonKey,
-      token: validatedSession?.session?.access_token || token,
-      timeoutMs,
-    })
-    : {
-      step: 'rest_with_session',
-      table,
-      endpointPath: `/rest/v1/${table}?select=id&limit=1`,
-      ok: false,
-      httpStatus: null,
-      postgrestCode: null,
-      failureType: 'auth',
-      safeMessage: 'Bloqueado por sessão inválida',
-      skipped: true,
-    };
-
-  const clientStep = envStep.ok && validatedSession?.ok
-    ? await runMinimalClientStep({ table, timeoutMs })
-    : {
-      step: 'client_select',
-      table,
-      endpointPath: `/rest/v1/${table}?select=id,nome,cloud_id&limit=1`,
-      ok: false,
-      httpStatus: null,
-      postgrestCode: null,
-      failureType: 'auth',
-      safeMessage: 'Bloqueado por sessão inválida',
-      skipped: true,
-    };
-
-  const steps = [envStep, restNoAuth, sessionStep, restWithAuth, clientStep];
-  const ok = envStep.ok && restNoAuth.ok && sessionStep.ok && restWithAuth.ok && clientStep.ok;
-
-  let conclusion = 'sync_pipeline_issue';
-  let conclusionMessage = 'REST e cliente Supabase operacionais. O problema está no pipeline de sincronização.';
-
-  if (!restNoAuth.ok && ['network_reset', 'http2_protocol_error', 'timeout'].includes(restNoAuth.failureType)) {
-    conclusion = 'browser_network_failure';
-    conclusionMessage = 'Falha de conexão do navegador com o Supabase. O modo local continua ativo.';
-  } else if (!sessionStep.ok) {
-    conclusion = 'session_failure';
-    conclusionMessage = 'Sessão expirada. Entre novamente para sincronizar com a nuvem.';
-  } else if (restNoAuth.ok && !clientStep.ok) {
-    conclusion = 'supabase_client_failure';
-    conclusionMessage = 'Falha no cliente Supabase. Verifique sessão e configuração.';
-  } else if (!envStep.ok) {
-    conclusion = 'config_failure';
-    conclusionMessage = 'Erro de configuração';
-  } else if (ok) {
-    conclusion = 'connectivity_ok';
-    conclusionMessage = 'Conectividade com a nuvem validada.';
-  }
-
-  return {
-    ok,
-    table,
-    appOrigin: typeof window !== 'undefined' ? window.location.origin : null,
-    supabaseHost: envStep.envStatus?.host || null,
-    envStatus: envStep.envStatus,
-    authState,
-    steps,
-    conclusion,
-    conclusionMessage,
-  };
 }
 
 export async function runBrowserSafeCloudProbe({ timeoutMs = 8000, table = 'lotes', session } = {}) {

@@ -1168,10 +1168,25 @@ function NovoLoteModal({ db, setDb, onClose, showToast, hasPermission, session }
         }
       ] : prev.custos,
     }));
-    if (!lotePersist.persisted || !animalPersist.persisted || !custoPersist.persisted) {
-      showToast({ type: 'warning', message: 'Lote salvo parcialmente apenas no modo local.' });
+    const falhasCloud = [lotePersist, animalPersist, custoPersist].filter((item) => !item?.persisted);
+    if (falhasCloud.length === 0) {
+      showToast({ type: 'success', message: `Lote ${form.nome} criado e sincronizado com a nuvem.` });
+      onClose();
+      return;
     }
-    showToast({ type: 'success', message: `Lote ${form.nome} criado com sucesso!` });
+
+    const lotePersistido = Boolean(lotePersist?.persisted);
+    const animaisPersistidos = Boolean(animalPersist?.persisted);
+    const custoPersistido = Boolean(custoPersist?.persisted);
+
+    if (lotePersistido && (animaisPersistidos || custoPersistido)) {
+      showToast({ type: 'warning', message: 'Cadastro concluído com sincronização parcial. Parte dos dados permanece em modo local.' });
+    } else if (lotePersistido || animaisPersistidos || custoPersistido) {
+      showToast({ type: 'warning', message: 'Cadastro concluído parcialmente no modo local. Reconecte para sincronizar o restante.' });
+    } else {
+      showToast({ type: 'warning', message: 'Cadastro salvo apenas no modo local. A sincronização com a nuvem não foi concluída.' });
+    }
+
     onClose();
   }
 
