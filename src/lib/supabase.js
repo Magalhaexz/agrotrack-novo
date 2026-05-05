@@ -30,7 +30,7 @@ export function getSupabaseEnvStatus() {
     isTestEnvironment,
     message: supabaseEnvConfigured
       ? null
-      : 'Configuração do Supabase ausente. Verifique VITE_SUPABASE_URL e VITE_SUPABASE_ANON_KEY.',
+      : 'Configuração da nuvem incompleta.',
   };
 }
 
