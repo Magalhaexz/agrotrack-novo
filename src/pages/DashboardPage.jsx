@@ -34,6 +34,8 @@ import { gerarNovoId } from '../utils/id';
 import { createOperationalRecord, updateOperationalRecord } from '../services/operationalPersistence';
 import '../styles/dashboard.css';
 
+const getTodayIso = () => new Date().toISOString().slice(0, 10);
+
 const KPI_VARIANTS = {
   success: 'success',
   warning: 'warning',
@@ -63,6 +65,29 @@ export default function DashboardPage({
   }, []);
 
   const lotesMap = useMemo(() => new Map((db.lotes || []).map((lote) => [lote.id, lote])), [db.lotes]);
+
+  const pagamentosDiarios = useMemo(
+    () => (db.movimentacoes_financeiras || []).filter((item) => item?.tipo === 'despesa' && (item?.categoria === 'Pagamento Diário' || item?.categoria === 'Pagamento Diario')),
+    [db.movimentacoes_financeiras]
+  );
+
+  const pagamentosResumo = useMemo(() => {
+    const hoje = new Date();
+    hoje.setHours(0, 0, 0, 0);
+    let vencidos = 0; let hojeCount = 0; let proximos = 0; let totalPendente = 0; let totalPago = 0;
+    pagamentosDiarios.forEach((item) => {
+      const valor = Number(item.valor || 0);
+      const pago = Boolean(item.pago);
+      const dataBase = new Date(`${(item.data_vencimento || item.data || getTodayIso())}T00:00:00`);
+      if (pago) { totalPago += valor; return; }
+      totalPendente += valor;
+      if (dataBase < hoje) vencidos += 1;
+      else if (dataBase.getTime() === hoje.getTime()) hojeCount += 1;
+      else proximos += 1;
+    });
+    return { vencidos, hoje: hojeCount, proximos, totalPendente, totalPago };
+  }, [pagamentosDiarios]);
+
   const lotesAtivos = useMemo(() => (db.lotes || []).filter((lote) => lote.status === 'ativo'), [db.lotes]);
 
   const lotesStats = useMemo(
@@ -326,11 +351,11 @@ export default function DashboardPage({
       variant: cloudVerified ? KPI_VARIANTS.success : KPI_VARIANTS.warning,
     },
     {
-      title: 'Ações pendentes',
-      value: formatNumber(proximosPassos.length, 0),
-      variation: { direction: 'neutral', value: proximosPassos.length ? 'Rotina requer atenção' : 'Sem pendências críticas' },
+      title: 'Pagamentos pendentes',
+      value: formatNumber(pagamentosResumo.vencidos + pagamentosResumo.hoje + pagamentosResumo.proximos, 0),
+      variation: { direction: 'neutral', value: pagamentosResumo.totalPendente > 0 ? `Total pendente: ${formatCurrency(pagamentosResumo.totalPendente)}` : 'Nenhum pagamento pendente' },
       icon: BellRing,
-      variant: proximosPassos.length ? KPI_VARIANTS.warning : KPI_VARIANTS.success,
+      variant: pagamentosResumo.totalPendente > 0 ? KPI_VARIANTS.warning : KPI_VARIANTS.success,
     },
   ];
 
@@ -552,6 +577,21 @@ export default function DashboardPage({
                     </button>
                   ))
                 )}
+              </div>
+            </Card>
+
+
+            <Card
+              title="Lembretes de pagamentos"
+              subtitle="Acompanhe vencimentos e mantenha o caixa organizado."
+              action={<Button size="sm" variant="ghost" onClick={() => onNavigate?.('financeiro')}>Abrir financeiro</Button>}
+            >
+              <div className="dashboard-list">
+                <div className="dashboard-list-item"><div className="dashboard-list-copy"><strong>Pagamentos vencidos</strong><p>{formatNumber(pagamentosResumo.vencidos, 0)}</p></div></div>
+                <div className="dashboard-list-item"><div className="dashboard-list-copy"><strong>Vencem hoje</strong><p>{formatNumber(pagamentosResumo.hoje, 0)}</p></div></div>
+                <div className="dashboard-list-item"><div className="dashboard-list-copy"><strong>Próximos pagamentos</strong><p>{formatNumber(pagamentosResumo.proximos, 0)}</p></div></div>
+                <div className="dashboard-list-item"><div className="dashboard-list-copy"><strong>Total pendente</strong><p>{pagamentosResumo.totalPendente > 0 ? formatCurrency(pagamentosResumo.totalPendente) : 'Nenhum pagamento pendente'}</p></div></div>
+                <div className="dashboard-list-item"><div className="dashboard-list-copy"><strong>Total pago</strong><p>{formatCurrency(pagamentosResumo.totalPago)}</p></div></div>
               </div>
             </Card>
 
