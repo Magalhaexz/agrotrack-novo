@@ -107,6 +107,8 @@ export default function FazendasPage({ db, setDb, onConfirmAction }) {
     if (step === 'rest_without_session') return 'REST sem sessão';
     if (step === 'session_check') return 'Sessão';
     if (step === 'rest_with_session') return 'REST com sessão';
+    if (step === 'fazendas_check') return 'Fazendas';
+    if (step === 'lotes_check') return 'Lotes';
     if (step === 'client_select') return 'Supabase client';
     return 'Diagnóstico';
   }
@@ -165,16 +167,27 @@ export default function FazendasPage({ db, setDb, onConfirmAction }) {
           return;
         }
 
-        showToast({
-          type: item?.ok ? 'success' : 'warning',
-          message: `${traduzirStatusEtapa(item?.step)}: ${item?.ok ? 'OK' : 'Erro'}`,
-        });
+        if (item?.safeMessage && item.safeMessage.includes(': OK')) {
+          showToast({ type: 'success', message: item.safeMessage });
+        }
       });
 
       showToast({
         type: result?.ok ? 'success' : 'warning',
         message: result?.conclusionMessage || 'Falha ao executar diagnóstico da nuvem.',
       });
+
+      try {
+        window.dispatchEvent(new CustomEvent('herdon-cloud-diagnostic-state', {
+          detail: {
+            verified: Boolean(result?.ok),
+            message: result?.conclusionMessage || null,
+            checkedAt: Date.now(),
+          },
+        }));
+      } catch {
+        // noop
+      }
 
       if (result?.conclusion === 'session_failure') {
         showToast({

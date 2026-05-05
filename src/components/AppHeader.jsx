@@ -55,6 +55,18 @@ function getCloudState(syncStatus) {
   const source = syncStatus?.dataSource || 'signed_out';
   const message = syncStatus?.dataError?.message || '';
 
+
+  if (syncStatus?.cloudVerified) {
+    return {
+      tone: 'online',
+      icon: 'cloud',
+      label: 'Nuvem verificada',
+      detail: 'Nuvem ativa',
+      title: syncStatus?.cloudVerifiedMessage || 'Nuvem conectada pelo servidor.',
+      disabled: false,
+    };
+  }
+
   if (syncStatus?.isSyncing || source === 'syncing') {
     return {
       tone: 'syncing',
