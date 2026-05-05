@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import {
   AlertTriangle,
   ArrowDown,
@@ -51,6 +51,17 @@ export default function DashboardPage({
   setTabAtiva,
 }) {
   const [novaTarefa, setNovaTarefa] = useState({ titulo: '', funcionario_id: '', data_vencimento: '', descricao: '' });
+
+  const [cloudVerified, setCloudVerified] = useState(false);
+
+  useEffect(() => {
+    function handleCloudState(event) {
+      setCloudVerified(Boolean(event?.detail?.verified));
+    }
+    window.addEventListener('herdon-cloud-diagnostic-state', handleCloudState);
+    return () => window.removeEventListener('herdon-cloud-diagnostic-state', handleCloudState);
+  }, []);
+
   const lotesMap = useMemo(() => new Map((db.lotes || []).map((lote) => [lote.id, lote])), [db.lotes]);
   const lotesAtivos = useMemo(() => (db.lotes || []).filter((lote) => lote.status === 'ativo'), [db.lotes]);
 
@@ -234,6 +245,36 @@ export default function DashboardPage({
     return { melhorLote: melhor, piorLote: pior };
   }, [lotesStats]);
 
+
+  const indicadoresFinanceiros = useMemo(() => {
+    if (!lotesStats.length) {
+      return {
+        lucroTotal: 0,
+        lucroPorCabeca: null,
+        lucroPorArroba: null,
+        margemPct: null,
+        custoPorCabecaDia: null,
+      };
+    }
+
+    const base = lotesStats.reduce((acc, item) => {
+      acc.lucroTotal += Number(item.indicators.lucroTotal || 0);
+      acc.receitaTotal += Number(item.indicators.receitaTotal || 0);
+      acc.custoTotal += Number(item.indicators.custoTotal || 0);
+      acc.cabecas += Number(item.indicators.totalAnimais || 0);
+      acc.custoPorCabecaDia += Number(item.indicators.custoPorCabecaDia || 0);
+      return acc;
+    }, { lucroTotal: 0, receitaTotal: 0, custoTotal: 0, cabecas: 0, custoPorCabecaDia: 0 });
+
+    return {
+      lucroTotal: base.lucroTotal,
+      lucroPorCabeca: base.cabecas > 0 ? base.lucroTotal / base.cabecas : null,
+      lucroPorArroba: arrobaMedia > 0 && base.cabecas > 0 ? base.lucroTotal / (arrobaMedia * base.cabecas) : null,
+      margemPct: base.receitaTotal > 0 ? (base.lucroTotal / base.receitaTotal) * 100 : null,
+      custoPorCabecaDia: lotesStats.length > 0 ? base.custoPorCabecaDia / lotesStats.length : null,
+    };
+  }, [arrobaMedia, lotesStats]);
+
   const kpisMain = [
     {
       title: 'Cabecas ativas',
@@ -265,35 +306,54 @@ export default function DashboardPage({
     },
     {
       title: 'Resultado financeiro',
-      value: formatCurrency(resultadoMes),
-      variation: getVariation(resultadoMes, resultadoMes * 0.85),
+      value: formatCurrency(indicadoresFinanceiros.lucroTotal),
+      variation: getVariation(indicadoresFinanceiros.lucroTotal, indicadoresFinanceiros.lucroTotal * 0.85),
       icon: DollarSign,
-      variant: resultadoMes >= 0 ? KPI_VARIANTS.success : KPI_VARIANTS.danger,
+      variant: indicadoresFinanceiros.lucroTotal >= 0 ? KPI_VARIANTS.success : KPI_VARIANTS.danger,
     },
     {
-      title: 'Estoque critico',
-      value: formatNumber(estoqueCritico.length, 0),
-      variation: getVariation(estoqueCritico.length, Math.max(0, estoqueCritico.length - 1)),
-      icon: Package,
-      variant: estoqueCritico.length ? KPI_VARIANTS.warning : KPI_VARIANTS.success,
+      title: 'Margem consolidada',
+      value: indicadoresFinanceiros.margemPct === null ? 'Sem base' : `${formatNumber(indicadoresFinanceiros.margemPct, 1)}%`,
+      variation: getVariation(indicadoresFinanceiros.margemPct || 0, (indicadoresFinanceiros.margemPct || 0) * 0.95),
+      icon: Scale,
+      variant: (indicadoresFinanceiros.margemPct || 0) >= 0 ? KPI_VARIANTS.info : KPI_VARIANTS.warning,
+    },
+    {
+      title: 'Status nuvem',
+      value: cloudVerified ? 'Nuvem verificada' : 'Modo local',
+      variation: { direction: 'neutral', value: cloudVerified ? 'Sincronização disponível' : 'Reconectar para validar' },
+      icon: cloudVerified ? CheckCircle2 : AlertTriangle,
+      variant: cloudVerified ? KPI_VARIANTS.success : KPI_VARIANTS.warning,
+    },
+    {
+      title: 'Ações pendentes',
+      value: formatNumber(proximosPassos.length, 0),
+      variation: { direction: 'neutral', value: proximosPassos.length ? 'Rotina requer atenção' : 'Sem pendências críticas' },
+      icon: BellRing,
+      variant: proximosPassos.length ? KPI_VARIANTS.warning : KPI_VARIANTS.success,
     },
   ];
 
   const executiveSignals = [
     {
-      label: 'Alertas prioritarios',
+      label: 'Alertas prioritários',
       value: formatNumber(totalAlertasCriticos || alertasFormatados.length, 0),
-      helper: totalAlertasCriticos ? 'criticos aguardando acao' : 'alertas operacionais em leitura',
+      helper: totalAlertasCriticos ? 'críticos aguardando ação' : 'alertas operacionais em leitura',
     },
     {
-      label: 'Arroba media',
-      value: `${formatNumber(arrobaMedia, 2)} @`,
-      helper: 'media consolidada do rebanho ativo',
+      label: 'Lucro por cabeça',
+      value: indicadoresFinanceiros.lucroPorCabeca === null ? 'Sem base' : formatarMoeda(indicadoresFinanceiros.lucroPorCabeca),
+      helper: 'consolidado dos lotes ativos',
     },
     {
-      label: 'Valor em estoque',
-      value: formatarMoeda(valorTotalEstoque),
-      helper: 'base disponivel para operacao',
+      label: 'Custo/cabeça/dia',
+      value: indicadoresFinanceiros.custoPorCabecaDia === null ? 'Sem base' : formatarMoeda(indicadoresFinanceiros.custoPorCabecaDia),
+      helper: 'eficiência operacional média',
+    },
+    {
+      label: 'Lucro por arroba',
+      value: indicadoresFinanceiros.lucroPorArroba === null ? 'Sem base' : formatarMoeda(indicadoresFinanceiros.lucroPorArroba),
+      helper: 'indicador financeiro zootécnico',
     },
   ];
 
