@@ -17,6 +17,12 @@ const despCats = ['Compra Animal', 'Racao', 'Suplemento', 'Medicamento', 'Vacina
 const recCats = ['Venda Animal', 'Venda Produto', 'Outro'];
 const metodosPagamento = ['Dinheiro', 'Pix', 'Cartão', 'Boleto', 'Transferência', 'Cheque', 'Outro'];
 const getTodayIso = () => new Date().toISOString().slice(0, 10);
+const TAB_LABELS = {
+  dre: 'DRE',
+  lote: 'Por Lote',
+  lanc: 'Lançamentos',
+  pag: 'Pagamentos Diários',
+};
 
 export default function FinanceiroPage({ db, setDb }) {
   const { hasPermission, session } = useAuth();
@@ -226,9 +232,12 @@ export default function FinanceiroPage({ db, setDb }) {
   }
 
   return (
-    <div className="page rebanho-page">
-      <div className="rebanho-header">
-        <h1>Financeiro</h1>
+    <div className="page rebanho-page financeiro-page">
+      <div className="rebanho-header financeiro-header">
+        <div>
+          <h1>Financeiro</h1>
+          <p className="financeiro-subtitle">Acompanhe DRE, lotes, lançamentos e pagamentos diários em uma visão única.</p>
+        </div>
         <div className="lote-actions">
           <Button onClick={() => {
             if (!podeEditarFinanceiro()) return;
@@ -240,10 +249,10 @@ export default function FinanceiroPage({ db, setDb }) {
         </div>
       </div>
 
-      <div className="tab-buttons">
+      <div className="tab-buttons financeiro-tabs">
         {tabs.map((item) => (
-          <Button key={item} variant={tab === item ? 'primary' : 'ghost'} onClick={() => setTab(item)}>
-            item === 'dre' ? 'DRE' : item === 'lote' ? 'Por Lote' : item === 'lanc' ? 'Lançamentos' : 'Pagamentos Diários'
+          <Button key={item} className={`financeiro-tab-btn ${tab === item ? 'is-active' : ''}`} variant={tab === item ? 'primary' : 'ghost'} onClick={() => setTab(item)}>
+            {TAB_LABELS[item]}
           </Button>
         ))}
       </div>
@@ -681,4 +690,3 @@ function sumOtherCategories(items, excludedAliases) {
     .filter((item) => !aliasSet.has(String(item.name || '').toLowerCase()))
     .reduce((sum, item) => sum + Number(item.value || 0), 0);
 }
-

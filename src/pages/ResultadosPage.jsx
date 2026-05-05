@@ -108,9 +108,9 @@ export default function ResultadosPage({ db }) {
   const [draftFilters, setDraftFilters] = useState(defaultFilters);
   const [appliedFilters, setAppliedFilters] = useState(defaultFilters);
   const [isGenerating, setIsGenerating] = useState(false);
+  const [isExporting, setIsExporting] = useState(false);
   const [validationError, setValidationError] = useState('');
 
-  /* eslint-disable react-hooks/set-state-in-effect */
   useEffect(() => {
     setDraftFilters((prev) => ({
       ...defaultFilters,
@@ -125,7 +125,6 @@ export default function ResultadosPage({ db }) {
       status: prev?.status || defaultFilters.status,
     }));
   }, [defaultFilters]);
-  /* eslint-enable react-hooks/set-state-in-effect */
 
   useEffect(() => () => window.clearTimeout(timerRef.current), []);
 
@@ -234,6 +233,30 @@ export default function ResultadosPage({ db }) {
       dataInicio: range.start,
       dataFim: range.end,
     }));
+  }
+
+  function exportarCsv() {
+    const sheets = Array.isArray(activeReport?.exportConfig?.sheets) ? activeReport.exportConfig.sheets : [];
+    if (!sheets.length) {
+      setValidationError('Nenhum registro encontrado');
+      return;
+    }
+    setIsExporting(true);
+    setValidationError('');
+    try {
+      const csv = buildCsvFromSheets(sheets);
+      const blob = new Blob([`\uFEFF${csv}`], { type: 'text/csv;charset=utf-8;' });
+      const url = URL.createObjectURL(blob);
+      const anchor = document.createElement('a');
+      anchor.href = url;
+      anchor.download = `${activeReport.exportConfig.filename}.csv`;
+      document.body.appendChild(anchor);
+      anchor.click();
+      document.body.removeChild(anchor);
+      URL.revokeObjectURL(url);
+    } finally {
+      setIsExporting(false);
+    }
   }
 
   return (
@@ -495,9 +518,14 @@ export default function ResultadosPage({ db }) {
                       payload com filtros, metadados e resumo.
                     </p>
                   </div>
-                  <Button variant="outline" disabled>
-                    PDF / XLSX em breve
-                  </Button>
+                  <div className="report-export-actions">
+                    <Button variant="outline" onClick={() => window.print()}>
+                      Imprimir
+                    </Button>
+                    <Button variant="primary" onClick={exportarCsv} loading={isExporting}>
+                      Exportar CSV
+                    </Button>
+                  </div>
                 </div>
               </Card>
 
@@ -564,6 +592,7 @@ export default function ResultadosPage({ db }) {
               {activeReport.tables.map((table) => (
                 <Card
                   key={table.id}
+                  className="report-table-card"
                   title={table.title}
                   subtitle={table.description}
                   action={<Badge variant={table.badgeVariant}>{table.badgeLabel}</Badge>}
@@ -1321,6 +1350,7 @@ function createExportConfig(baseName, filters, sheets) {
     name: sheet.name,
     rowCount: sheet.rows.length,
     columns: sheet.rows.length ? Object.keys(sheet.rows[0]) : [],
+    rows: sheet.rows,
   }));
 
   return {
@@ -1328,6 +1358,58 @@ function createExportConfig(baseName, filters, sheets) {
     totalRows: sheets.reduce((total, sheet) => total + sheet.rows.length, 0),
     sheets: mappedSheets,
   };
+}
+
+function buildCsvFromSheets(sheets) {
+  const lines = [];
+  sheets.forEach((sheet, index) => {
+    const rows = Array.isArray(sheet.rows) ? sheet.rows : [];
+    const columns = rows.length ? Object.keys(rows[0]) : sheet.columns || [];
+    if (index > 0) lines.push('');
+    lines.push(`Aba: ${sheet.name}`);
+    if (!columns.length) {
+      lines.push('Observação;Nenhum registro encontrado');
+      return;
+    }
+    lines.push(columns.map((col) => toCsvCell(formatCsvHeader(col))).join(';'));
+    if (!rows.length) {
+      lines.push(toCsvCell('Nenhum registro encontrado'));
+      return;
+    }
+    rows.forEach((row) => {
+      lines.push(columns.map((col) => toCsvCell(toSafeExportValue(row[col]))).join(';'));
+    });
+  });
+  return lines.join('\n');
+}
+
+function toCsvCell(value) {
+  const text = String(value ?? '').replace(/"/g, '""');
+  return `"${text}"`;
+}
+
+function formatCsvHeader(key) {
+  const map = {
+    receita_realizada: 'Receita realizada',
+    receita_potencial: 'Receita potencial',
+    despesa: 'Despesa',
+    gmdEsperado: 'GMD esperado',
+    consumoInformado: 'Consumo informado',
+    consumoEstimado: 'Consumo estimado',
+    custoEstimado: 'Custo estimado',
+    dataPrevistaSaida: 'Data prevista de saída',
+  };
+  if (map[key]) return map[key];
+  return String(key)
+    .replace(/([a-z])([A-Z])/g, '$1 $2')
+    .replaceAll('_', ' ')
+    .replace(/^./, (char) => char.toUpperCase());
+}
+
+function toSafeExportValue(value) {
+  if (value == null || value === '') return 'Sem dados suficientes';
+  if (typeof value === 'number' && Number.isNaN(value)) return 'Estimativa indisponível';
+  return value;
 }
 
 function buildLotHighlights(rows) {
