@@ -1,4 +1,4 @@
-﻿import { useMemo, useRef, useState } from 'react';
+import { useMemo, useRef, useState } from 'react';
 import Button from '../components/ui/Button';
 import PageHeader from '../components/PageHeader';
 import FazendaCard from '../components/fazendas/FazendaCard';
@@ -6,13 +6,11 @@ import FazendaModal from '../components/fazendas/FazendaModal';
 import { gerarNovoId } from '../utils/id';
 import { useToast } from '../hooks/useToast';
 import { useAuth } from '../auth/useAuth';
-import { resetSupabaseAuthLocally, validateSupabaseSessionForCloud } from '../lib/supabase';
+import { resetSupabaseAuthLocally, supabase, validateSupabaseSessionForCloud } from '../lib/supabase';
 import {
   createOperationalRecord,
   deleteOperationalRecord,
   getCloudSyncCooldownState,
-  syncFazendasWithCloud,
-  syncLotesWithCloud,
   updateOperationalRecord,
 } from '../services/operationalPersistence';
 import { runMinimalCloudDiagnostic } from '../services/supabaseDiagnostics';
@@ -109,6 +107,8 @@ export default function FazendasPage({ db, setDb, onConfirmAction }) {
     if (step === 'rest_without_session') return 'REST sem sessão';
     if (step === 'session_check') return 'Sessão';
     if (step === 'rest_with_session') return 'REST com sessão';
+    if (step === 'fazendas_check') return 'Fazendas';
+    if (step === 'lotes_check') return 'Lotes';
     if (step === 'client_select') return 'Supabase client';
     return 'Diagnóstico';
   }
@@ -136,6 +136,10 @@ export default function FazendasPage({ db, setDb, onConfirmAction }) {
   }
 
   async function executarDiagnosticoNuvem() {
+    if (!hasPermission('fazendas:editar')) {
+      showToast({ type: 'error', message: 'Acesso restrito ao perfil autorizado.' });
+      return;
+    }
     if (!podeVerDiagnostico || diagnosticandoNuvem) return;
     setDiagnosticandoNuvem(true);
     try {
@@ -167,16 +171,27 @@ export default function FazendasPage({ db, setDb, onConfirmAction }) {
           return;
         }
 
-        showToast({
-          type: item?.ok ? 'success' : 'warning',
-          message: `${traduzirStatusEtapa(item?.step)}: ${item?.ok ? 'OK' : 'Erro'}`,
-        });
+        if (item?.safeMessage && item.safeMessage.includes(': OK')) {
+          showToast({ type: 'success', message: item.safeMessage });
+        }
       });
 
       showToast({
         type: result?.ok ? 'success' : 'warning',
         message: result?.conclusionMessage || 'Falha ao executar diagnóstico da nuvem.',
       });
+
+      try {
+        window.dispatchEvent(new CustomEvent('herdon-cloud-diagnostic-state', {
+          detail: {
+            verified: Boolean(result?.ok),
+            message: result?.conclusionMessage || null,
+            checkedAt: Date.now(),
+          },
+        }));
+      } catch {
+        // noop
+      }
 
       if (result?.conclusion === 'session_failure') {
         showToast({
@@ -248,6 +263,10 @@ export default function FazendasPage({ db, setDb, onConfirmAction }) {
   }
 
   async function reconectarNuvem() {
+    if (!hasPermission('fazendas:editar')) {
+      showToast({ type: 'error', message: 'Acesso restrito ao perfil autorizado.' });
+      return;
+    }
     if (sincronizandoFazendas || diagnosticandoNuvem || reconectandoNuvem) return;
     setReconectandoNuvem(true);
     try {
@@ -299,6 +318,10 @@ export default function FazendasPage({ db, setDb, onConfirmAction }) {
   }
 
   async function sincronizarFazendasComNuvem() {
+    if (!hasPermission('fazendas:editar')) {
+      showToast({ type: 'error', message: 'Somente perfis autorizados podem editar este registro.' });
+      return;
+    }
     const now = Date.now();
     if (sincronizandoFazendas || manualSyncRef.current.inFlight) return;
     if (now - manualSyncRef.current.lastStartAt < 1200) return;
@@ -340,17 +363,25 @@ export default function FazendasPage({ db, setDb, onConfirmAction }) {
     });
 
     try {
-      showToast({ type: 'info', message: 'Fazendas: sincronizando...' });
-      showToast({ type: 'info', message: 'Lotes: sincronizando...' });
+      showToast({ type: 'info', message: 'Sincronização iniciada. Aguarde...' });
 
       let fazendasSync = null;
       let lotesSync = null;
-      let usedServerBridge = false;
 
       try {
-        const accessToken = session?.access_token || session?.session?.access_token || null;
-        if (!accessToken) {
-          throw new Error('missing_access_token');
+        const sessionResult = await supabase.auth.getSession();
+        const accessToken = sessionResult?.data?.session?.access_token || null;
+        const hasAccessToken = Boolean(accessToken);
+        const tokenLooksJwt = typeof accessToken === 'string' && accessToken.split('.').length === 3;
+        const tokenLength = typeof accessToken === 'string' ? accessToken.length : 0;
+        if (import.meta.env.DEV || isAdmin) {
+          console.groupCollapsed('[HERDON_SERVERLESS_AUTH_HEADER_DIAGNOSTIC]');
+          console.info({ endpoint: '/api/cloud-sync', status: null, hasAccessToken, tokenLooksJwt, tokenLength, failureType: hasAccessToken && tokenLooksJwt ? null : 'invalid_session', safeMessage: hasAccessToken && tokenLooksJwt ? 'Pré-validação do token concluída.' : 'Sessão inválida. Reconecte à nuvem.' });
+          console.groupEnd();
+        }
+        if (!hasAccessToken || !tokenLooksJwt) {
+          showToast({ type: 'warning', message: 'Sessão inválida. Reconecte à nuvem.' });
+          return;
         }
         const response = await fetch('/api/cloud-sync', {
           method: 'POST',
@@ -363,11 +394,15 @@ export default function FazendasPage({ db, setDb, onConfirmAction }) {
             lotes,
           }),
         });
+        if (import.meta.env.DEV || isAdmin) {
+          console.groupCollapsed('[HERDON_SERVERLESS_AUTH_HEADER_DIAGNOSTIC]');
+          console.info({ endpoint: '/api/cloud-sync', status: response.status, hasAccessToken: true, tokenLooksJwt: true, tokenLength: accessToken.length, failureType: response.ok ? null : 'server_http_error', safeMessage: response.ok ? 'Sync pelo servidor respondeu com sucesso.' : 'Falha na sincronização pelo servidor. O modo local continua ativo.' });
+          console.groupEnd();
+        }
         const payload = await response.json().catch(() => null);
         if (!response.ok || !payload) {
           throw new Error('server_sync_failed');
         }
-        usedServerBridge = true;
         fazendasSync = {
           module: 'fazendas',
           status: payload?.fazendas?.status || 'error',
@@ -389,8 +424,13 @@ export default function FazendasPage({ db, setDb, onConfirmAction }) {
           code: payload?.lotes?.status === 'success' ? null : 'SERVER_SYNC_FAILED',
         };
       } catch {
-        fazendasSync = await syncFazendasWithCloud({ fazendas, session });
-        lotesSync = await syncLotesWithCloud({ lotes, session });
+        if (import.meta.env.DEV || isAdmin) {
+          console.groupCollapsed('[HERDON_SERVERLESS_AUTH_HEADER_DIAGNOSTIC]');
+          console.info({ endpoint: '/api/cloud-sync', status: 494, hasAccessToken: Boolean(session?.access_token || session?.session?.access_token), tokenLooksJwt: true, tokenLength: 0, failureType: 'server_network_error', safeMessage: 'Falha na sincronização pelo servidor. O modo local continua ativo.' });
+          console.groupEnd();
+        }
+        fazendasSync = { module: 'fazendas', status: 'error', message: 'Não foi possível sincronizar pelo servidor. O modo local continua ativo.', data: fazendas, httpStatus: 494, code: 'SERVER_SYNC_FAILED' };
+        lotesSync = { module: 'lotes', status: 'error', message: 'Não foi possível sincronizar pelo servidor. O modo local continua ativo.', data: lotes, httpStatus: 494, code: 'SERVER_SYNC_FAILED' };
       }
 
       if (Array.isArray(fazendasSync?.data) || Array.isArray(lotesSync?.data)) {
@@ -402,19 +442,11 @@ export default function FazendasPage({ db, setDb, onConfirmAction }) {
       }
 
       if (fazendasSync?.status === 'success' && lotesSync?.status === 'success') {
-        if (usedServerBridge) {
-          showToast({ type: 'success', message: 'Nuvem conectada pelo servidor.' });
-          showToast({ type: 'success', message: 'Fazendas sincronizadas com a nuvem.' });
-          showToast({ type: 'success', message: 'Lotes sincronizados com a nuvem.' });
-        } else {
-          showToast({ type: 'success', message: 'Fazendas sincronizadas. Lotes sincronizados.' });
-        }
-      } else if (fazendasSync?.status === 'success') {
-        showToast({ type: 'warning', message: `Fazendas sincronizadas. Falha ao sincronizar lotes: ${lotesSync?.message || 'ver diagnóstico.'}` });
-      } else if (lotesSync?.status === 'success') {
-        showToast({ type: 'warning', message: `Fazendas: ${fazendasSync?.message || 'erro ao sincronizar.'} Lotes sincronizados.` });
+        showToast({ type: 'success', message: 'Fazendas e lotes sincronizados com a nuvem.' });
+      } else if (fazendasSync?.status === 'success' || lotesSync?.status === 'success') {
+        showToast({ type: 'warning', message: 'Sincronização parcial concluída. Parte dos dados permanece em modo local.' });
       } else {
-        showToast({ type: 'warning', message: 'Não foi possível sincronizar pelo servidor. O modo local continua ativo.' });
+        showToast({ type: 'warning', message: 'Falha na sincronização. O modo local continua ativo.' });
       }
 
       if (fazendasSync?.status !== 'success' || lotesSync?.status !== 'success') {
@@ -466,6 +498,7 @@ export default function FazendasPage({ db, setDb, onConfirmAction }) {
             <Button
               variant="secondary"
               onClick={sincronizarFazendasComNuvem}
+              disabled={!hasPermission('fazendas:editar')}
               disabled={sincronizandoFazendas || diagnosticandoNuvem || reconectandoNuvem}
             >
               {sincronizandoFazendas ? 'Sincronizando fazendas e lotes...' : 'Sincronizar fazendas e lotes com a nuvem'}
@@ -474,6 +507,7 @@ export default function FazendasPage({ db, setDb, onConfirmAction }) {
               <Button
                 variant="ghost"
                 onClick={executarDiagnosticoNuvem}
+                disabled={!hasPermission('fazendas:editar')}
                 disabled={sincronizandoFazendas || diagnosticandoNuvem || reconectandoNuvem}
               >
                 {diagnosticandoNuvem ? 'Testando conexão com a nuvem...' : 'Testar conexão com a nuvem'}
@@ -482,11 +516,12 @@ export default function FazendasPage({ db, setDb, onConfirmAction }) {
             <Button
               variant="outline"
               onClick={reconectarNuvem}
+              disabled={!hasPermission('fazendas:editar')}
               disabled={sincronizandoFazendas || diagnosticandoNuvem || reconectandoNuvem}
             >
               {reconectandoNuvem ? 'Reconectando...' : 'Reconectar à nuvem'}
             </Button>
-            <Button onClick={() => {
+            <Button disabled={!hasPermission('fazendas:editar')} onClick={() => {
               if (!hasPermission('fazendas:editar')) {
                 showToast({ type: 'error', message: mensagemSemPermissao });
                 return;

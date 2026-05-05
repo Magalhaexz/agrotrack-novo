@@ -95,7 +95,7 @@ export default function EstoquePage({ db, setDb, onRegistrarSaidaEstoque }) {
       <div className="rebanho-header">
         <h1>Estoque</h1>
         <div className="lote-actions">
-          <Button icon={<ArrowUpCircle size={14} />} onClick={() => {
+          <Button icon={<ArrowUpCircle size={14} />} disabled={!hasPermission('estoque:editar')} onClick={() => {
             if (!hasPermission('estoque:editar')) {
               showToast({ type: 'error', message: mensagemSemPermissao });
               return;
@@ -105,7 +105,7 @@ export default function EstoquePage({ db, setDb, onRegistrarSaidaEstoque }) {
           >
             Entrada
           </Button>
-          <Button variant="outline" icon={<ArrowDownCircle size={14} />} onClick={() => {
+          <Button variant="outline" icon={<ArrowDownCircle size={14} />} disabled={!hasPermission('estoque:editar')} onClick={() => {
             if (!hasPermission('estoque:editar')) {
               showToast({ type: 'error', message: mensagemSemPermissao });
               return;
@@ -165,7 +165,7 @@ export default function EstoquePage({ db, setDb, onRegistrarSaidaEstoque }) {
                   <div className="estoque-detail-row"><span>Dias restantes</span><span>{item.diasRest > 900 ? '—' : `${formatNumber(item.diasRest, 0)} dias`}</span></div>
                 </div>
                 <div className="estoque-card-actions lote-actions">
-                  <button type="button" className="btn-entrada" onClick={() => {
+                  <button type="button" className="btn-entrada" disabled={!hasPermission('estoque:editar')} onClick={() => {
                     if (!hasPermission('estoque:editar')) {
                       showToast({ type: 'error', message: mensagemSemPermissao });
                       return;
@@ -175,7 +175,7 @@ export default function EstoquePage({ db, setDb, onRegistrarSaidaEstoque }) {
                   >
                     Entrada
                   </button>
-                  <button type="button" className="btn-saida" onClick={() => {
+                  <button type="button" className="btn-saida" disabled={!hasPermission('estoque:editar')} onClick={() => {
                     if (!hasPermission('estoque:editar')) {
                       showToast({ type: 'error', message: mensagemSemPermissao });
                       return;

@@ -75,7 +75,7 @@ function saveDietasCompat(setDb, updater) {
 
 export default function SuplementacaoPage({ db, setDb }) {
   const { showToast } = useToast();
-  const { session } = useAuth();
+  const { session, hasPermission } = useAuth();
   const [openDieta, setOpenDieta] = useState(false);
   const [openConsumo, setOpenConsumo] = useState(false);
   const [dietaEditando, setDietaEditando] = useState(null);
@@ -171,8 +171,8 @@ export default function SuplementacaoPage({ db, setDb }) {
         <h1>Suplementacao</h1>
         <p>Gerencie dietas, acompanhe o consumo diario e proteja o saldo de estoque sem quebrar o fluxo operacional.</p>
         <div className="page-actions">
-          <Button onClick={() => { setDietaEditando(null); setOpenDieta(true); }}>Cadastrar dieta</Button>
-          <Button variant="outline" onClick={() => setOpenConsumo(true)}>Registrar consumo diario</Button>
+          <Button disabled={!hasPermission('estoque:editar')} onClick={() => { setDietaEditando(null); setOpenDieta(true); }}>Cadastrar dieta</Button>
+          <Button variant="outline" disabled={!hasPermission('estoque:editar')} onClick={() => setOpenConsumo(true)}>Registrar consumo diario</Button>
         </div>
       </header>
 
@@ -212,11 +212,11 @@ export default function SuplementacaoPage({ db, setDb }) {
                     </td>
                     <td className="cell-actions">
                       <div className="row-actions row-actions--tight">
-                        <button className="action-btn" type="button" onClick={() => handleEditDieta(row.dieta || { lote_id: row.lote.id, nome: '', itens: [] })}>
+                        <button className="action-btn" disabled={!hasPermission('estoque:editar')} type="button" onClick={() => handleEditDieta(row.dieta || { lote_id: row.lote.id, nome: '', itens: [] })}>
                           {row.dieta ? 'Editar' : 'Criar'}
                         </button>
                         {row.dieta ? (
-                          <button className="action-btn action-btn-danger" type="button" onClick={() => handleDeleteDieta(row.dieta.id)}>
+                          <button className="action-btn action-btn-danger" disabled={!hasPermission('estoque:editar')} type="button" onClick={() => handleDeleteDieta(row.dieta.id)}>
                             Excluir
                           </button>
                         ) : null}

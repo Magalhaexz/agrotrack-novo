@@ -109,6 +109,7 @@ export default function App() {
   const [fazendaSelecionada, setFazendaSelecionada] = useState(null);
   const [forcarTelaLogin, setForcarTelaLogin] = useState(false);
   const [showBootRecovery, setShowBootRecovery] = useState(false);
+  const [cloudDiagnosticState, setCloudDiagnosticState] = useState({ verified: false, checkedAt: null, message: '' });
   const [confirmState, setConfirmState] = useState({
     open: false,
     title: '',
@@ -198,6 +199,21 @@ export default function App() {
 
     return () => window.clearTimeout(timer);
   }, [forcarTelaLogin, user]);
+
+
+  useEffect(() => {
+    function handleCloudDiagnosticState(event) {
+      const detail = event?.detail || {};
+      setCloudDiagnosticState({
+        verified: Boolean(detail?.verified),
+        checkedAt: Number(detail?.checkedAt) || Date.now(),
+        message: String(detail?.message || ''),
+      });
+    }
+
+    window.addEventListener('herdon-cloud-diagnostic-state', handleCloudDiagnosticState);
+    return () => window.removeEventListener('herdon-cloud-diagnostic-state', handleCloudDiagnosticState);
+  }, []);
 
   useEffect(() => {
     const timer = window.setTimeout(() => {
@@ -542,6 +558,9 @@ export default function App() {
             isSyncing: isOperationalSyncing,
             lastSyncAt,
             onSyncNow: syncNow,
+            cloudVerified: cloudDiagnosticState.verified,
+            cloudVerifiedAt: cloudDiagnosticState.checkedAt,
+            cloudVerifiedMessage: cloudDiagnosticState.message,
           }}
           onResolveAlert={marcarAlertaComoFeito}
           onSnoozeAlert={(alert) => showToast({ type: 'warning', message: `Alerta adiado: ${alert.title}` })}
