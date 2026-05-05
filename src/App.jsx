@@ -19,6 +19,7 @@ import {
 } from './domain/alertas';
 import { useOperationalData } from './hooks/useOperationalData';
 import { useToast } from './hooks/useToast';
+import { useCloudControls } from './hooks/useCloudControls';
 import {
   limparPersistenciaSessao,
   limparMarcadoresFluxoAuth,
@@ -118,6 +119,7 @@ export default function App() {
     resolver: null,
   });
   const deniedToastRef = useRef({ permission: '', timestamp: 0 });
+  const cloudControls = useCloudControls({ db, setDb, session, hasPermission, showToast, dismissToast: removeToast, forceLocalSignOut });
   const showAuthDebug = useMemo(() => {
     try {
       return localStorage.getItem('HERDON_SHOW_AUTH_DEBUG') === 'true';
@@ -557,7 +559,12 @@ export default function App() {
             dataReady,
             isSyncing: isOperationalSyncing,
             lastSyncAt,
-            onSyncNow: syncNow,
+            onSyncNow: cloudControls.sincronizarNuvem || syncNow,
+            onTestCloud: cloudControls.testarConexaoNuvem,
+            onReconnectCloud: cloudControls.reconectarNuvem,
+            syncingCloud: cloudControls.sincronizandoNuvem,
+            testingCloud: cloudControls.diagnosticandoNuvem,
+            reconnectingCloud: cloudControls.reconectandoNuvem,
             cloudVerified: cloudDiagnosticState.verified,
             cloudVerifiedAt: cloudDiagnosticState.checkedAt,
             cloudVerifiedMessage: cloudDiagnosticState.message,

@@ -135,7 +135,7 @@ export default function FazendasPage({ db, setDb, onConfirmAction }) {
     return `${code || status || 'erro'} / ${item?.safeMessage || 'Falha'}`;
   }
 
-  async function executarDiagnosticoNuvem() {
+  async function _executarDiagnosticoNuvem() {
     if (!hasPermission('fazendas:editar')) {
       showToast({ type: 'error', message: 'Acesso restrito ao perfil autorizado.' });
       return;
@@ -262,7 +262,7 @@ export default function FazendasPage({ db, setDb, onConfirmAction }) {
     }
   }
 
-  async function reconectarNuvem() {
+  async function _reconectarNuvem() {
     if (!hasPermission('fazendas:editar')) {
       showToast({ type: 'error', message: 'Acesso restrito ao perfil autorizado.' });
       return;
@@ -317,7 +317,7 @@ export default function FazendasPage({ db, setDb, onConfirmAction }) {
     }
   }
 
-  async function sincronizarFazendasComNuvem() {
+  async function _sincronizarFazendasComNuvem() {
     if (!hasPermission('fazendas:editar')) {
       showToast({ type: 'error', message: 'Somente perfis autorizados podem editar este registro.' });
       return;
@@ -495,32 +495,6 @@ export default function FazendasPage({ db, setDb, onConfirmAction }) {
         subtitle="Gestão completa das propriedades e suas capacidades"
         actions={(
           <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-            <Button
-              variant="secondary"
-              onClick={sincronizarFazendasComNuvem}
-              disabled={!hasPermission('fazendas:editar')}
-              disabled={sincronizandoFazendas || diagnosticandoNuvem || reconectandoNuvem}
-            >
-              {sincronizandoFazendas ? 'Sincronizando fazendas e lotes...' : 'Sincronizar fazendas e lotes com a nuvem'}
-            </Button>
-            {podeVerDiagnostico ? (
-              <Button
-                variant="ghost"
-                onClick={executarDiagnosticoNuvem}
-                disabled={!hasPermission('fazendas:editar')}
-                disabled={sincronizandoFazendas || diagnosticandoNuvem || reconectandoNuvem}
-              >
-                {diagnosticandoNuvem ? 'Testando conexão com a nuvem...' : 'Testar conexão com a nuvem'}
-              </Button>
-            ) : null}
-            <Button
-              variant="outline"
-              onClick={reconectarNuvem}
-              disabled={!hasPermission('fazendas:editar')}
-              disabled={sincronizandoFazendas || diagnosticandoNuvem || reconectandoNuvem}
-            >
-              {reconectandoNuvem ? 'Reconectando...' : 'Reconectar à nuvem'}
-            </Button>
             <Button disabled={!hasPermission('fazendas:editar')} onClick={() => {
               if (!hasPermission('fazendas:editar')) {
                 showToast({ type: 'error', message: mensagemSemPermissao });
