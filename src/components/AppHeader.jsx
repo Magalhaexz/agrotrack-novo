@@ -60,8 +60,8 @@ function getCloudState(syncStatus) {
     return {
       tone: 'online',
       icon: 'cloud',
-      label: 'Nuvem verificada',
-      detail: syncStatus?.lastSyncAt ? `Última sync: ${formatSyncTime(syncStatus.lastSyncAt)}` : 'Nuvem ativa',
+      label: 'Nuvem ativa',
+      detail: syncStatus?.lastSyncAt ? `Última sync: ${formatSyncTime(syncStatus.lastSyncAt)}` : 'Nuvem não verificada',
       title: syncStatus?.cloudVerifiedMessage || 'Nuvem conectada pelo servidor.',
       disabled: false,
     };
@@ -72,7 +72,7 @@ function getCloudState(syncStatus) {
       tone: 'syncing',
       icon: 'loading',
       label: 'Sincronizando...',
-      detail: 'Sincronizando módulos',
+      detail: syncStatus?.lastSyncAt ? `Última sync: ${formatSyncTime(syncStatus.lastSyncAt)}` : 'Nuvem não verificada',
       title: 'Sincronização manual em andamento',
       disabled: true,
     };
@@ -82,8 +82,8 @@ function getCloudState(syncStatus) {
     return {
       tone: 'warning',
       icon: 'warning',
-      label: 'Sessão expirada',
-      detail: 'Reconectar à nuvem',
+      label: 'Modo local',
+      detail: 'Nuvem não verificada',
       title: 'Sessão expirada. Reconecte para voltar a sincronizar.',
       disabled: false,
     };
@@ -323,15 +323,20 @@ export default function AppHeader({
           >
             <Clock3 size={13} className={cloudState.disabled ? 'ui-spin' : ''} />
           </button>
-          <button type="button" className="header-sync-refresh" onClick={syncStatus?.onTestCloud} disabled={Boolean(syncStatus?.testingCloud)} aria-label="Testar conexão">
-            Testar conexão
-          </button>
-          <button type="button" className="header-sync-refresh" onClick={syncStatus?.onSyncNow} disabled={Boolean(syncStatus?.syncingCloud)} aria-label="Sincronizar">
-            {syncStatus?.syncingCloud ? 'Sincronizando...' : 'Sincronizar'}
-          </button>
-          <button type="button" className="header-sync-refresh" onClick={syncStatus?.onReconnectCloud} disabled={Boolean(syncStatus?.reconnectingCloud)} aria-label="Reconectar">
-            Reconectar
-          </button>
+          <div className="header-sync-actions" role="group" aria-label="Ações de nuvem">
+            <button type="button" className="header-sync-refresh header-sync-refresh--compact" onClick={syncStatus?.onTestCloud} disabled={Boolean(syncStatus?.testingCloud)} aria-label="Testar conexão">
+              <Package size={12} />
+              <span>Testar</span>
+            </button>
+            <button type="button" className="header-sync-refresh header-sync-refresh--compact" onClick={syncStatus?.onSyncNow} disabled={Boolean(syncStatus?.syncingCloud)} aria-label="Sincronizar">
+              <Clock3 size={12} className={syncStatus?.syncingCloud ? 'ui-spin' : ''} />
+              <span>Sync</span>
+            </button>
+            <button type="button" className="header-sync-refresh header-sync-refresh--compact" onClick={syncStatus?.onReconnectCloud} disabled={Boolean(syncStatus?.reconnectingCloud)} aria-label="Reconectar">
+              <Activity size={12} />
+              <span>Reconectar</span>
+            </button>
+          </div>
         </div>
 
         <div className="user-menu-wrap" ref={notifRef}>

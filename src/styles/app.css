@@ -7328,3 +7328,72 @@ button:hover,
     max-width: 100%;
   }
 }
+
+/* Sprint 18A3 - Header cloud controls layout hotfix */
+.header-sync-chip {
+  display: grid;
+  grid-template-columns: auto minmax(140px, 1fr) auto;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+
+.header-sync-copy {
+  min-width: 0;
+}
+
+.header-sync-copy strong,
+.header-sync-copy small {
+  display: block;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.header-sync-actions {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: nowrap;
+}
+
+.header-sync-refresh--compact {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 8px;
+  font-size: 11px;
+  white-space: nowrap;
+}
+
+.top-header-actions {
+  align-items: center;
+  gap: 8px;
+}
+
+@media (max-width: 1280px) {
+  .header-sync-refresh--compact span {
+    display: none;
+  }
+
+  .header-sync-refresh--compact {
+    padding: 4px 6px;
+  }
+}
+
+@media (max-width: 1024px) {
+  .top-header-actions {
+    flex-wrap: wrap;
+    justify-content: flex-end;
+  }
+
+  .header-sync-chip {
+    grid-template-columns: auto 1fr;
+    row-gap: 6px;
+  }
+
+  .header-sync-actions {
+    grid-column: 1 / -1;
+    justify-content: flex-start;
+  }
+}
