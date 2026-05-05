@@ -52,3 +52,12 @@
 - O campo `saida` não é gravado como saída real no momento do cadastro; a projeção permanece no nível de planejamento/UI.
 - Custos de consumo só são calculados quando existe preço por kg utilizável (direto ou derivado por embalagem/peso).
 - Quando não há base de custo por kg: "Custo estimado indisponível: informe o custo do produto no estoque."
+
+## Variação por produto/suplemento (não hardcoded)
+- O consumo não é fixo em 0,2% e depende do produto/suplemento selecionado.
+- Suporta dois modos:
+  - `% do peso vivo`
+  - `kg/cabeça/dia`
+- Quando o produto possui configuração compatível no estoque, o formulário sugere padrão automaticamente.
+- Permite override manual seguro no cadastro para estratégias diferentes por lote.
+- Se não houver regra configurada para o produto: "Informe a regra de consumo deste produto."
