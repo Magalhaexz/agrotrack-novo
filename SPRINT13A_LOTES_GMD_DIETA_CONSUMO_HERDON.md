@@ -44,3 +44,11 @@
 - `rg -n "^(<<<<<<<|=======|>>>>>>>)" -S .` → sem conflitos.
 - `npm run build` → sucesso.
 - `npm run lint` → sucesso com warnings preexistentes (sem erros).
+
+
+## Correção aplicada (hotfix)
+- Data prevista de saída é calculada automaticamente com base em data de entrada + dias estimados.
+- O produtor não informa manualmente data de saída neste fluxo de cadastro.
+- O campo `saida` não é gravado como saída real no momento do cadastro; a projeção permanece no nível de planejamento/UI.
+- Custos de consumo só são calculados quando existe preço por kg utilizável (direto ou derivado por embalagem/peso).
+- Quando não há base de custo por kg: "Custo estimado indisponível: informe o custo do produto no estoque."

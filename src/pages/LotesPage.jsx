@@ -1058,7 +1058,6 @@ function NovoLoteModal({ db, setDb, onClose, showToast, hasPermission, session }
     qtd_inicial: '',
     custo_aquisicao: '',
     peso_alvo: '',
-    saida_meta: '',
     gmd_esperado: String(configGeral.gmd_meta_padrao || ''),
     dieta_nome: '',
     produto_vinculado: '',
@@ -1067,10 +1066,18 @@ function NovoLoteModal({ db, setDb, onClose, showToast, hasPermission, session }
   });
   const [errors, setErrors] = useState({});
 
-  const produtosEstoque = useMemo(
-    () => (db.estoque || []).map((item) => ({ id: item.id, nome: item.produto || item.nome || `Produto ${item.id}` })),
-    [db.estoque]
-  );
+  const produtosEstoque = useMemo(() => {
+    return (db.estoque || []).map((item) => {
+      const nome = item.produto || item.nome || `Produto ${item.id}`;
+      const precoKgDireto = Number(item.preco_por_kg ?? item.preco_kg ?? item.valor_kg ?? 0);
+      const precoEmbalagem = Number(item.preco_unitario ?? item.preco ?? item.valor ?? 0);
+      const pesoEmbalagemKg = Number(item.peso_embalagem_kg ?? item.peso_kg ?? item.peso_embalagem ?? 0);
+      const precoKg = precoKgDireto > 0
+        ? precoKgDireto
+        : (precoEmbalagem > 0 && pesoEmbalagemKg > 0 ? precoEmbalagem / pesoEmbalagemKg : null);
+      return { id: item.id, nome, precoKg };
+    });
+  }, [db.estoque]);
 
   const pesoInicialNum = Number(form.peso_inicial || 0);
   const pesoAlvoNum = Number(form.peso_alvo || 0);
@@ -1083,11 +1090,23 @@ function NovoLoteModal({ db, setDb, onClose, showToast, hasPermission, session }
     ? new Date(new Date(`${form.entrada}T00:00:00`).getTime() + diasEstimados * 86400000).toISOString().slice(0, 10)
     : null;
   const pesoMedioPeriodo = pesoInicialNum > 0 && pesoAlvoNum > 0 ? (pesoInicialNum + pesoAlvoNum) / 2 : null;
-  const consumoDecimal = consumoPctNum > 1 ? consumoPctNum / 100 : consumoPctNum;
+  const consumoDecimal = consumoPctNum > 0 ? consumoPctNum / 100 : 0;
   const consumoDiarioPorAnimal = pesoMedioPeriodo !== null && consumoDecimal > 0 ? pesoMedioPeriodo * consumoDecimal : null;
   const consumoPeriodoPorAnimal = consumoDiarioPorAnimal !== null && diasEstimados !== null ? consumoDiarioPorAnimal * diasEstimados : null;
   const consumoTotalLote = consumoPeriodoPorAnimal !== null && Number(form.qtd_inicial || 0) > 0
     ? consumoPeriodoPorAnimal * Number(form.qtd_inicial || 0)
+    : null;
+
+  const produtoSelecionado = produtosEstoque.find((item) => item.nome === form.produto_vinculado) || null;
+  const precoProdutoKg = Number(produtoSelecionado?.precoKg || 0) > 0 ? Number(produtoSelecionado.precoKg) : null;
+  const custoDiarioPorAnimal = consumoDiarioPorAnimal !== null && precoProdutoKg !== null
+    ? consumoDiarioPorAnimal * precoProdutoKg
+    : null;
+  const custoPeriodoPorAnimal = consumoPeriodoPorAnimal !== null && precoProdutoKg !== null
+    ? consumoPeriodoPorAnimal * precoProdutoKg
+    : null;
+  const custoTotalLote = consumoTotalLote !== null && precoProdutoKg !== null
+    ? consumoTotalLote * precoProdutoKg
     : null;
 
 
@@ -1095,7 +1114,7 @@ function NovoLoteModal({ db, setDb, onClose, showToast, hasPermission, session }
     const e = {};
     if (!form.nome.trim()) e.nome = 'Nome é obrigatório';
     if (!form.faz_id) e.faz_id = 'Fazenda é obrigatória';
-    if (!form.entrada) e.entrada = 'Data de entrada é obrigatória';
+    if (!form.entrada) e.entrada = 'Informe a data de entrada para projetar a saída.';
     if (Number(form.qtd_inicial || 0) <= 0) e.qtd_inicial = 'Quantidade inicial deve ser maior que zero';
     if (Number(form.peso_inicial || 0) <= 0) e.peso_inicial = 'Peso inicial deve ser maior que zero';
     if (Number(form.gmd_esperado || 0) <= 0) e.gmd_esperado = 'Informe um GMD esperado válido.';
@@ -1121,7 +1140,7 @@ function NovoLoteModal({ db, setDb, onClose, showToast, hasPermission, session }
       nome: form.nome,
       faz_id: Number(form.faz_id),
       entrada: form.entrada,
-      saida: form.saida_meta || dataPrevistaSaida || null,
+      saida: null,
       investimento: custoAquisicao,
       status: 'ativo',
       tipo: 'engorda',
@@ -1273,7 +1292,7 @@ function NovoLoteModal({ db, setDb, onClose, showToast, hasPermission, session }
           </select>
         </label>
         <Input label="Percentual de consumo do produto" suffix="% do peso vivo" type="number" error={errors.consumo_pct} value={form.consumo_pct} onChange={(e) => setForm((p) => ({ ...p, consumo_pct: e.target.value }))} />
-        <Input label="Data alvo de saída" type="date" value={form.saida_meta} onChange={(e) => setForm((p) => ({ ...p, saida_meta: e.target.value }))} />
+        <Input label="Data prevista de saída" type="text" value={dataPrevistaSaida ? formatDate(dataPrevistaSaida) : 'Informe dados válidos para projetar a saída'} readOnly />
 
         <div className="ui-card full" style={{ padding: 12, borderStyle: 'dashed' }}>
           <strong>Estimativas do lote</strong>
@@ -1282,6 +1301,9 @@ function NovoLoteModal({ db, setDb, onClose, showToast, hasPermission, session }
           <p>Consumo diário por animal: {consumoDiarioPorAnimal !== null ? `${formatNumber(consumoDiarioPorAnimal, 3)} kg/dia` : 'Informe o percentual de consumo do produto.'}</p>
           <p>Consumo por animal no período: {consumoPeriodoPorAnimal !== null ? `${formatNumber(consumoPeriodoPorAnimal, 2)} kg` : 'Informe dados válidos para calcular.'}</p>
           <p>Consumo total estimado do lote: {consumoTotalLote !== null ? `${formatNumber(consumoTotalLote, 2)} kg` : 'Informe quantidade de cabeças para calcular.'}</p>
+          <p>Custo diário por animal: {custoDiarioPorAnimal !== null ? formatCurrency(custoDiarioPorAnimal) : 'Custo estimado indisponível: informe o custo do produto no estoque.'}</p>
+          <p>Custo estimado por animal no período: {custoPeriodoPorAnimal !== null ? formatCurrency(custoPeriodoPorAnimal) : 'Custo estimado indisponível: informe o custo do produto no estoque.'}</p>
+          <p>Custo estimado total do lote: {custoTotalLote !== null ? formatCurrency(custoTotalLote) : 'Custo estimado indisponível: informe o custo do produto no estoque.'}</p>
           <p>Dieta escolhida: {form.dieta_nome || 'Não informada'}</p>
           <p>Produto/suplemento vinculado ao estoque: {form.produto_vinculado || 'Produto não vinculado ao estoque'}</p>
         </div>
