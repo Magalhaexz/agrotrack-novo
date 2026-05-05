@@ -178,6 +178,31 @@ export default function DashboardPage({
     [db.sanitario, lotesMap]
   );
 
+  const lembretesReprodutivos = useMemo(() => {
+    const hojeIso = new Date().toISOString().slice(0, 10);
+    const iatfItens = (db.sanitario || [])
+      .filter((item) => String(item.tipo || '').toUpperCase() === 'IATF' || String(item.obs || '').includes('Protocolo IATF'))
+      .map((item) => {
+        const lote = lotesMap.get(item.lote_id);
+        const dataRef = item.proxima || item.data_aplic;
+        return {
+          ...item,
+          loteNome: lote?.nome || 'Sem lote',
+          dias: daysUntil(dataRef),
+          dataRef,
+          emAndamento: String(item.obs || '').includes('Status: Em andamento'),
+        };
+      })
+      .filter((item) => item.dataRef)
+      .sort((a, b) => (a.dias ?? 9999) - (b.dias ?? 9999));
+
+    const hoje = iatfItens.filter((item) => item.dataRef === hojeIso);
+    const proximas = iatfItens.filter((item) => Number.isFinite(item.dias) && item.dias > 0 && item.dias <= 14);
+    const emAndamento = iatfItens.filter((item) => item.emAndamento);
+
+    return { hoje, proximas, emAndamento, total: iatfItens.length };
+  }, [db.sanitario, lotesMap]);
+
   const tarefasUrgentes = useMemo(
     () =>
       (db.tarefas || [])
@@ -592,6 +617,32 @@ export default function DashboardPage({
                 <div className="dashboard-list-item"><div className="dashboard-list-copy"><strong>Próximos pagamentos</strong><p>{formatNumber(pagamentosResumo.proximos, 0)}</p></div></div>
                 <div className="dashboard-list-item"><div className="dashboard-list-copy"><strong>Total pendente</strong><p>{pagamentosResumo.totalPendente > 0 ? formatCurrency(pagamentosResumo.totalPendente) : 'Nenhum pagamento pendente'}</p></div></div>
                 <div className="dashboard-list-item"><div className="dashboard-list-copy"><strong>Total pago</strong><p>{formatCurrency(pagamentosResumo.totalPago)}</p></div></div>
+              </div>
+            </Card>
+
+            <Card
+              title="Lembretes reprodutivos"
+              subtitle="Acompanhe ações de IATF/Reprodução planejadas no manejo sanitário."
+              action={<Button size="sm" variant="ghost" onClick={() => onNavigate?.('sanitario')}>Abrir sanitário</Button>}
+            >
+              <div className="dashboard-list">
+                {lembretesReprodutivos.total === 0 ? (
+                  <p className="dashboard-empty-copy">Nenhuma ação reprodutiva pendente.</p>
+                ) : (
+                  <>
+                    <div className="dashboard-list-item"><div className="dashboard-list-copy"><strong>IATF hoje</strong><p>{formatNumber(lembretesReprodutivos.hoje.length, 0)}</p></div></div>
+                    <div className="dashboard-list-item"><div className="dashboard-list-copy"><strong>Próximas ações reprodutivas</strong><p>{formatNumber(lembretesReprodutivos.proximas.length, 0)}</p></div></div>
+                    <div className="dashboard-list-item"><div className="dashboard-list-copy"><strong>Protocolos em andamento</strong><p>{formatNumber(lembretesReprodutivos.emAndamento.length, 0)}</p></div></div>
+                    {lembretesReprodutivos.proximas.slice(0, 2).map((item) => (
+                      <div key={`iatf-next-${item.id}`} className="dashboard-list-item">
+                        <div className="dashboard-list-copy">
+                          <strong>{item.desc || 'Protocolo IATF'}</strong>
+                          <p>{item.loteNome} • {formatDate(item.dataRef)}</p>
+                        </div>
+                      </div>
+                    ))}
+                  </>
+                )}
               </div>
             </Card>
 
