@@ -1059,9 +1059,37 @@ function NovoLoteModal({ db, setDb, onClose, showToast, hasPermission, session }
     custo_aquisicao: '',
     peso_alvo: '',
     saida_meta: '',
+    gmd_esperado: String(configGeral.gmd_meta_padrao || ''),
+    dieta_nome: '',
+    produto_vinculado: '',
+    consumo_pct: '',
     obs: '',
   });
   const [errors, setErrors] = useState({});
+
+  const produtosEstoque = useMemo(
+    () => (db.estoque || []).map((item) => ({ id: item.id, nome: item.produto || item.nome || `Produto ${item.id}` })),
+    [db.estoque]
+  );
+
+  const pesoInicialNum = Number(form.peso_inicial || 0);
+  const pesoAlvoNum = Number(form.peso_alvo || 0);
+  const gmdEsperadoNum = Number(form.gmd_esperado || 0);
+  const consumoPctNum = Number(form.consumo_pct || 0);
+
+  const diferencaPeso = pesoAlvoNum - pesoInicialNum;
+  const diasEstimados = gmdEsperadoNum > 0 && diferencaPeso > 0 ? Math.ceil(diferencaPeso / gmdEsperadoNum) : null;
+  const dataPrevistaSaida = diasEstimados !== null && form.entrada
+    ? new Date(new Date(`${form.entrada}T00:00:00`).getTime() + diasEstimados * 86400000).toISOString().slice(0, 10)
+    : null;
+  const pesoMedioPeriodo = pesoInicialNum > 0 && pesoAlvoNum > 0 ? (pesoInicialNum + pesoAlvoNum) / 2 : null;
+  const consumoDecimal = consumoPctNum > 1 ? consumoPctNum / 100 : consumoPctNum;
+  const consumoDiarioPorAnimal = pesoMedioPeriodo !== null && consumoDecimal > 0 ? pesoMedioPeriodo * consumoDecimal : null;
+  const consumoPeriodoPorAnimal = consumoDiarioPorAnimal !== null && diasEstimados !== null ? consumoDiarioPorAnimal * diasEstimados : null;
+  const consumoTotalLote = consumoPeriodoPorAnimal !== null && Number(form.qtd_inicial || 0) > 0
+    ? consumoPeriodoPorAnimal * Number(form.qtd_inicial || 0)
+    : null;
+
 
   function validate() {
     const e = {};
@@ -1070,6 +1098,9 @@ function NovoLoteModal({ db, setDb, onClose, showToast, hasPermission, session }
     if (!form.entrada) e.entrada = 'Data de entrada é obrigatória';
     if (Number(form.qtd_inicial || 0) <= 0) e.qtd_inicial = 'Quantidade inicial deve ser maior que zero';
     if (Number(form.peso_inicial || 0) <= 0) e.peso_inicial = 'Peso inicial deve ser maior que zero';
+    if (Number(form.gmd_esperado || 0) <= 0) e.gmd_esperado = 'Informe um GMD esperado válido.';
+    if (Number(form.peso_alvo || 0) <= Number(form.peso_inicial || 0)) e.peso_alvo = 'O peso alvo deve ser maior que o peso inicial.';
+    if (Number(form.consumo_pct || 0) <= 0) e.consumo_pct = 'Informe o percentual de consumo do produto.';
     setErrors(e);
     return !Object.keys(e).length;
   }
@@ -1090,12 +1121,12 @@ function NovoLoteModal({ db, setDb, onClose, showToast, hasPermission, session }
       nome: form.nome,
       faz_id: Number(form.faz_id),
       entrada: form.entrada,
-      saida: form.saida_meta,
+      saida: form.saida_meta || dataPrevistaSaida || null,
       investimento: custoAquisicao,
       status: 'ativo',
       tipo: 'engorda',
       sistema: 'confinamento',
-      gmd_meta: configGeral.gmd_meta_padrao || 1,
+      gmd_meta: Number(form.gmd_esperado || configGeral.gmd_meta_padrao || 1),
       preco_arroba: configGeral.preco_arroba_padrao || 290,
       rendimento_carcaca: configGeral.rendimento_carcaca_padrao || 52,
       peso_alvo: Number(form.peso_alvo || 0),
@@ -1227,8 +1258,34 @@ function NovoLoteModal({ db, setDb, onClose, showToast, hasPermission, session }
         <Input label="Peso médio inicial" type="number" error={errors.peso_inicial} value={form.peso_inicial} onChange={(e) => setForm((p) => ({ ...p, peso_inicial: e.target.value }))} />
         <Input label="Quantidade inicial" type="number" error={errors.qtd_inicial} value={form.qtd_inicial} onChange={(e) => setForm((p) => ({ ...p, qtd_inicial: e.target.value }))} />
         <Input label="Custo de aquisição" prefix="R$" type="number" value={form.custo_aquisicao} onChange={(e) => setForm((p) => ({ ...p, custo_aquisicao: e.target.value }))} />
-        <Input label="Peso alvo" suffix="kg" type="number" value={form.peso_alvo} onChange={(e) => setForm((p) => ({ ...p, peso_alvo: e.target.value }))} />
+        <Input label="Peso alvo" suffix="kg" type="number" error={errors.peso_alvo} value={form.peso_alvo} onChange={(e) => setForm((p) => ({ ...p, peso_alvo: e.target.value }))} />
+
+        <Input label="GMD esperado" suffix="kg/dia" type="number" error={errors.gmd_esperado} value={form.gmd_esperado} onChange={(e) => setForm((p) => ({ ...p, gmd_esperado: e.target.value }))} />
+        <label className="ui-input-wrap">
+          <span className="ui-input-label">Qual dieta este lote receberá?</span>
+          <input className="ui-input" value={form.dieta_nome} onChange={(e) => setForm((p) => ({ ...p, dieta_nome: e.target.value }))} placeholder="Ex.: Dieta de terminação" />
+        </label>
+        <label className="ui-input-wrap">
+          <span className="ui-input-label">Produto/suplemento vinculado ao estoque</span>
+          <select className="ui-input" value={form.produto_vinculado} onChange={(e) => setForm((p) => ({ ...p, produto_vinculado: e.target.value }))}>
+            <option value="">Produto não vinculado ao estoque</option>
+            {produtosEstoque.map((item) => <option key={item.id} value={item.nome}>{item.nome}</option>)}
+          </select>
+        </label>
+        <Input label="Percentual de consumo do produto" suffix="% do peso vivo" type="number" error={errors.consumo_pct} value={form.consumo_pct} onChange={(e) => setForm((p) => ({ ...p, consumo_pct: e.target.value }))} />
         <Input label="Data alvo de saída" type="date" value={form.saida_meta} onChange={(e) => setForm((p) => ({ ...p, saida_meta: e.target.value }))} />
+
+        <div className="ui-card full" style={{ padding: 12, borderStyle: 'dashed' }}>
+          <strong>Estimativas do lote</strong>
+          <p>Dias estimados na fazenda: {diasEstimados !== null ? `${formatNumber(diasEstimados, 0)} dias` : 'Informe um GMD esperado válido.'}</p>
+          <p>Data prevista de saída: {dataPrevistaSaida ? formatDate(dataPrevistaSaida) : 'Informe dados válidos para calcular.'}</p>
+          <p>Consumo diário por animal: {consumoDiarioPorAnimal !== null ? `${formatNumber(consumoDiarioPorAnimal, 3)} kg/dia` : 'Informe o percentual de consumo do produto.'}</p>
+          <p>Consumo por animal no período: {consumoPeriodoPorAnimal !== null ? `${formatNumber(consumoPeriodoPorAnimal, 2)} kg` : 'Informe dados válidos para calcular.'}</p>
+          <p>Consumo total estimado do lote: {consumoTotalLote !== null ? `${formatNumber(consumoTotalLote, 2)} kg` : 'Informe quantidade de cabeças para calcular.'}</p>
+          <p>Dieta escolhida: {form.dieta_nome || 'Não informada'}</p>
+          <p>Produto/suplemento vinculado ao estoque: {form.produto_vinculado || 'Produto não vinculado ao estoque'}</p>
+        </div>
+
         <label className="ui-input-wrap full">
           <span className="ui-input-label">Observações</span>
           <textarea className="ui-input" value={form.obs} onChange={(e) => setForm((p) => ({ ...p, obs: e.target.value }))} />
