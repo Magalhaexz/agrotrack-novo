@@ -185,9 +185,9 @@ export default function FinanceiroPage({ db, setDb }) {
         <Card title="Resultado detalhado">
           <div className="metrics-2col">
             <p>Custo de aquisicao: <strong>{formatCurrency(detalhe.lote.investimento || 0)}</strong></p>
-            <p>Custo de alimentacao: <strong>{formatCurrency(findCategoryValue(detalheCustosCat, ['alimentacao', 'alimentaçao', 'alimentaÃ§Ã£o']))}</strong></p>
-            <p>Custo sanitario: <strong>{formatCurrency(findCategoryValue(detalheCustosCat, ['sanitario', 'sanitÃ¡rio']))}</strong></p>
-            <p>Outros custos: <strong>{formatCurrency(sumOtherCategories(detalheCustosCat, ['alimentacao', 'alimentaçao', 'alimentaÃ§Ã£o', 'sanitario', 'sanitÃ¡rio']))}</strong></p>
+            <p>Custo de alimentação: <strong>{formatCurrency(findCategoryValue(detalheCustosCat, ['alimentacao', 'alimentaçao', 'alimentação']))}</strong></p>
+            <p>Custo sanitário: <strong>{formatCurrency(findCategoryValue(detalheCustosCat, ['sanitario', 'sanitário']))}</strong></p>
+            <p>Outros custos: <strong>{formatCurrency(sumOtherCategories(detalheCustosCat, ['alimentacao', 'alimentaçao', 'alimentação', 'sanitario', 'sanitário']))}</strong></p>
             <p><strong>Custo total: {formatCurrency(detalhe.custoTotal)}</strong></p>
             <p>Receita bruta: <strong>{formatCurrency(detalhe.receitaTotal)}</strong></p>
             <p>Deducoes: <strong>{formatCurrency(detalhe.deducoes)}</strong></p>

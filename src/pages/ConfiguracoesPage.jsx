@@ -728,8 +728,8 @@ export default function ConfiguracoesPage({ db, setDb, onConfirmAction }) {
           <div className="config-data-stack">
             <div className="config-actions-wrap config-actions-wrap--data">
               <div className="config-panel-intro">
-                <span className="config-panel-kicker">Backup e manutenÃ§Ã£o</span>
-                <p>Exporte, importe e limpe dados de demonstraÃ§Ã£o com uma hierarquia visual mais clara e segura.</p>
+                <span className="config-panel-kicker">Backup e manutenção</span>
+                <p>Exporte, importe e limpe dados de demonstração com uma hierarquia visual mais clara e segura.</p>
               </div>
               <div className="config-action-cluster">
                 <Button icon={<FileText size={14} />} onClick={exportarDados}>Exportar todos os dados</Button>

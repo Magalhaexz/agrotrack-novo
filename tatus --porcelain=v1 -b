@@ -1,0 +1,47 @@
+Binary file [35msrc/assets/hero.png[m matches
+Binary file [35msrc/assets/logo_app1.png[m matches
+[35msrc/data/mockData.js[m[36m:[m[32m2[m[36m:[m  // REMOVER ANTES DE PRODUÇ[1;31mÃ[mO: dados de demonstração para ambiente local.
+[35msrc/data/mockData.js[m[36m:[m[32m108[m[36m:[m  // REMOVER ANTES DE PRODUÇ[1;31mÃ[mO: massa inicial fictícia para testes de interface.
+[35msrc/data/mockData.js[m[36m:[m[32m258[m[36m:[m  // REMOVER ANTES DE PRODUÇ[1;31mÃ[mO: itens de estoque de exemplo.
+[35msrc/pages/ConfiguracoesPage.jsx[m[36m:[m[32m731[m[36m:[m                <span className="config-panel-kicker">Backup e manuten[1;31mÃ[m§[1;31mÃ[m£o</span>
+[35msrc/pages/ConfiguracoesPage.jsx[m[36m:[m[32m732[m[36m:[m                <p>Exporte, importe e limpe dados de demonstra[1;31mÃ[m§[1;31mÃ[m£o com uma hierarquia visual mais clara e segura.</p>
+[35msrc/pages/FinanceiroPage.jsx[m[36m:[m[32m188[m[36m:[m            <p>Custo de alimentacao: <strong>{formatCurrency(findCategoryValue(detalheCustosCat, ['alimentacao', 'alimentaçao', 'alimenta[1;31mÃ[m§[1;31mÃ[m£o']))}</strong></p>
+[35msrc/pages/FinanceiroPage.jsx[m[36m:[m[32m189[m[36m:[m            <p>Custo sanitario: <strong>{formatCurrency(findCategoryValue(detalheCustosCat, ['sanitario', 'sanit[1;31mÃ[m¡rio']))}</strong></p>
+[35msrc/pages/FinanceiroPage.jsx[m[36m:[m[32m190[m[36m:[m            <p>Outros custos: <strong>{formatCurrency(sumOtherCategories(detalheCustosCat, ['alimentacao', 'alimentaçao', 'alimenta[1;31mÃ[m§[1;31mÃ[m£o', 'sanitario', 'sanit[1;31mÃ[m¡rio']))}</strong></p>
+[35msrc/pages/ResultadosPage.jsx[m[36m:[m[32m1082[m[36m:[m          emptySubtitle: '[1;31m�[m0 preciso haver lotes ativos e pesagens para montar o ranking.',
+[35msrc/pages/ResultadosPage.jsx[m[36m:[m[32m1282[m[36m:[m      label: '[1;31m�[maltima movimentação registrada',
+[35msrc/recharts.jsx[m[36m:[m[32m10[m[36m:[m * Componente de cont[1;31mÃ[mªiner responsivo.
+[35msrc/recharts.jsx[m[36m:[m[32m12[m[36m:[m * @param {string|number} [props.width='100%'] - A largura do cont[1;31mÃ[mªiner.
+[35msrc/recharts.jsx[m[36m:[m[32m13[m[36m:[m * @param {string|number} [props.height=300] - A altura do cont[1;31mÃ[mªiner.
+[35msrc/recharts.jsx[m[36m:[m[32m24[m[36m:[m * Componente de gr[1;31mÃ[m¡fico de linha SVG customizado.
+[35msrc/recharts.jsx[m[36m:[m[32m25[m[36m:[m * Renderiza linhas, eixos X e Y, e um tooltip b[1;31mÃ[m¡sico.
+[35msrc/recharts.jsx[m[36m:[m[32m28[m[36m:[m * @param {Array<object>} [props.data=[]] - Os dados a serem exibidos no gr[1;31mÃ[m¡fico.
+[35msrc/recharts.jsx[m[36m:[m[32m30[m[36m:[m * @returns {JSX.Element} Um div contendo o SVG do gr[1;31mÃ[m¡fico de linha.
+[35msrc/recharts.jsx[m[36m:[m[32m33[m[36m:[m  // Dimens[1;31mÃ[mµes fixas para o viewBox, o redimensionamento [1;31mÃ[m© feito pelo SVG width/height
+[35msrc/recharts.jsx[m[36m:[m[32m36[m[36m:[m  const padding = 30; // Espa[1;31mÃ[m§amento interno para os eixos
+[35msrc/recharts.jsx[m[36m:[m[32m38[m[36m:[m  // Filtra os filhos para encontrar os componentes espec[1;31mÃ[m­ficos do gr[1;31mÃ[m¡fico
+[35msrc/recharts.jsx[m[36m:[m[32m44[m[36m:[m  // Determina a chave para o eixo X (padr[1;31mÃ[m£o 'label')
+[35msrc/recharts.jsx[m[36m:[m[32m51[m[36m:[m  const yMin = Math.min(...yValues, 0); // Garante que o m[1;31mÃ[m­nimo seja pelo menos 0
+[35msrc/recharts.jsx[m[36m:[m[32m52[m[36m:[m  const yMax = Math.max(...yValues, 1); // Garante que o m[1;31mÃ[m¡ximo seja pelo menos 1
+[35msrc/recharts.jsx[m[36m:[m[32m54[m[36m:[m  // Fun[1;31mÃ[m§[1;31mÃ[mµes de escala para mapear dados para coordenadas SVG
+[35msrc/recharts.jsx[m[36m:[m[32m66[m[36m:[m        {/* Renderiza as linhas do gr[1;31mÃ[m¡fico */}
+[35msrc/recharts.jsx[m[36m:[m[32m90[m[36m:[m        {/* R[1;31mÃ[m³tulos do eixo X */}
+[35msrc/recharts.jsx[m[36m:[m[32m97[m[36m:[m        {/* R[1;31mÃ[m³tulo da unidade do eixo Y */}
+[35msrc/recharts.jsx[m[36m:[m[32m105[m[36m:[m      {/* Renderiza o conte[1;31mÃ[mºdo do Tooltip, se fornecido */}
+[35msrc/recharts.jsx[m[36m:[m[32m110[m[36m:[m      {/* Mensagem de instru[1;31mÃ[m§[1;31mÃ[m£o para o usu[1;31mÃ[m¡rio */}
+[35msrc/recharts.jsx[m[36m:[m[32m124[m[36m:[m        Toque no gr[1;31mÃ[m¡fico para detalhes
+[35msrc/recharts.jsx[m[36m:[m[32m130[m[36m:[m// Componentes de "placeholder" para definir as props dos gr[1;31mÃ[m¡ficos
+[35msrc/recharts.jsx[m[36m:[m[32m150[m[36m:[m * Componente de gr[1;31mÃ[m¡fico de pizza SVG customizado.
+[35msrc/recharts.jsx[m[36m:[m[32m154[m[36m:[m * @returns {JSX.Element} Um div contendo o SVG do gr[1;31mÃ[m¡fico de pizza.
+[35msrc/recharts.jsx[m[36m:[m[32m172[m[36m:[m * @param {string} [props.dataKey='value'] - A chave para o valor num[1;31mÃ[m©rico de cada fatia.
+[35msrc/recharts.jsx[m[36m:[m[32m179[m[36m:[m  const cx = 150; // Centro X do c[1;31mÃ[m­rculo
+[35msrc/recharts.jsx[m[36m:[m[32m180[m[36m:[m  const cy = 110; // Centro Y do c[1;31mÃ[m­rculo
+[35msrc/recharts.jsx[m[36m:[m[32m182[m[36m:[m  // Calcula os segmentos (in[1;31mÃ[m­cio e fim acumulado) para cada fatia
+[35msrc/recharts.jsx[m[36m:[m[32m199[m[36m:[m        // Calcula os [1;31mÃ[m¢ngulos de in[1;31mÃ[m­cio e fim para cada fatia
+[35msrc/recharts.jsx[m[36m:[m[32m209[m[36m:[m        // Determina se o arco [1;31mÃ[m© grande (maior que 180 graus)
+[35msrc/recharts.jsx[m[36m:[m[32m212[m[36m:[m        // Constr[1;31mÃ[m³i o comando path SVG para a fatia
+[35msrc/recharts.jsx[m[36m:[m[32m233[m[36m:[m * Componente de gr[1;31mÃ[m¡fico de barras SVG customizado.
+[35msrc/recharts.jsx[m[36m:[m[32m236[m[36m:[m * @param {Array<object>} [props.data=[]] - Os dados a serem exibidos no gr[1;31mÃ[m¡fico.
+[35msrc/recharts.jsx[m[36m:[m[32m238[m[36m:[m * @returns {JSX.Element} Um div contendo o SVG do gr[1;31mÃ[m¡fico de barras.
+[35msrc/styles/tokens.css[m[36m:[m[32m26[m[36m:[m  /* ── SEM[1;31mÂ[mNTICAS ── */
+[35msrc/utils/calculations.js[m[36m:[m[32m73[m[36m:[m * baseadas em `db.custos` + parâmetros do lote e N[1;31mÃ[mO representam a fonte financeira oficial.

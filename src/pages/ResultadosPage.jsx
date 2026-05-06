@@ -1079,7 +1079,7 @@ function buildReportBundle(db, filters) {
           badgeLabel: `${performanceAboveMeta}/${performanceRows.length} na meta`,
           badgeVariant: performanceAboveMeta === performanceRows.length && performanceRows.length ? 'success' : 'warning',
           emptyTitle: 'Nenhum lote com desempenho calculado',
-          emptySubtitle: '�0 preciso haver lotes ativos e pesagens para montar o ranking.',
+          emptySubtitle: 'É preciso haver lotes ativos e pesagens para montar o ranking.',
           mobileTitleKey: 'lote',
           mobileSubtitleKey: 'fazenda',
           columns: [
@@ -1279,7 +1279,7 @@ function buildStockHighlights(items, movements) {
       detail: maiorValor.valor,
     },
     {
-      label: '�altima movimentação registrada',
+      label: 'Última movimentação registrada',
       value: ultimoMovimento ? `${ultimoMovimento.item} - ${ultimoMovimento.tipo}` : 'Sem movimentação no período',
       detail: ultimoMovimento?.data || 'Sem data',
     },

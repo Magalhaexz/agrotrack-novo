@@ -7,10 +7,10 @@ function sanitizeNonNegative(value, fallback = 0) {
 }
 
 /**
- * Componente de contÃªiner responsivo.
+ * Componente de contêiner responsivo.
  * @param {object} props - As propriedades do componente.
- * @param {string|number} [props.width='100%'] - A largura do contÃªiner.
- * @param {string|number} [props.height=300] - A altura do contÃªiner.
+ * @param {string|number} [props.width='100%'] - A largura do contêiner.
+ * @param {string|number} [props.height=300] - A altura do contêiner.
  * @param {React.ReactNode} props.children - Os elementos filhos a serem renderizados.
  * @returns {JSX.Element} Um div com largura e altura especificadas.
  */
@@ -21,37 +21,37 @@ export function ResponsiveContainer({ width = '100%', height = 300, children }) 
 }
 
 /**
- * Componente de grÃ¡fico de linha SVG customizado.
- * Renderiza linhas, eixos X e Y, e um tooltip bÃ¡sico.
+ * Componente de gráfico de linha SVG customizado.
+ * Renderiza linhas, eixos X e Y, e um tooltip básico.
  *
  * @param {object} props - As propriedades do componente.
- * @param {Array<object>} [props.data=[]] - Os dados a serem exibidos no grÃ¡fico.
+ * @param {Array<object>} [props.data=[]] - Os dados a serem exibidos no gráfico.
  * @param {React.ReactNode} props.children - Componentes Line, XAxis, YAxis, Tooltip.
- * @returns {JSX.Element} Um div contendo o SVG do grÃ¡fico de linha.
+ * @returns {JSX.Element} Um div contendo o SVG do gráfico de linha.
  */
 export function LineChart({ data = [], children }) {
-  // DimensÃµes fixas para o viewBox, o redimensionamento Ã© feito pelo SVG width/height
+  // Dimensões fixas para o viewBox, o redimensionamento é feito pelo SVG width/height
   const width = 900;
   const height = 300;
-  const padding = 30; // EspaÃ§amento interno para os eixos
+  const padding = 30; // Espaçamento interno para os eixos
 
-  // Filtra os filhos para encontrar os componentes especÃ­ficos do grÃ¡fico
+  // Filtra os filhos para encontrar os componentes específicos do gráfico
   const lines = Children.toArray(children).filter((child) => child?.type?.displayName === 'Line');
   const xAxisComp = Children.toArray(children).find((child) => child?.type?.displayName === 'XAxis');
   const yAxisComp = Children.toArray(children).find((child) => child?.type?.displayName === 'YAxis');
   const tooltipComp = Children.toArray(children).find((child) => child?.type?.displayName === 'Tooltip');
 
-  // Determina a chave para o eixo X (padrÃ£o 'label')
+  // Determina a chave para o eixo X (padrão 'label')
   const xKey = xAxisComp?.props?.dataKey || 'label';
 
   // Extrai todos os valores Y de todas as linhas para determinar a escala do eixo Y
   const yValues = data.flatMap((row) =>
     lines.map((ln) => Number(row[ln.props.dataKey])).filter((v) => !Number.isNaN(v))
   );
-  const yMin = Math.min(...yValues, 0); // Garante que o mÃ­nimo seja pelo menos 0
-  const yMax = Math.max(...yValues, 1); // Garante que o mÃ¡ximo seja pelo menos 1
+  const yMin = Math.min(...yValues, 0); // Garante que o mínimo seja pelo menos 0
+  const yMax = Math.max(...yValues, 1); // Garante que o máximo seja pelo menos 1
 
-  // FunÃ§Ãµes de escala para mapear dados para coordenadas SVG
+  // Funções de escala para mapear dados para coordenadas SVG
   const scaleX = (idx) => padding + (idx * (width - padding * 2)) / Math.max(data.length - 1, 1);
   const scaleY = (v) => height - padding - ((v - yMin) / Math.max(yMax - yMin, 1)) * (height - padding * 2);
 
@@ -63,7 +63,7 @@ export function LineChart({ data = [], children }) {
         {/* Eixo Y */}
         <line x1={padding} y1={padding} x2={padding} y2={height - padding} stroke="#5C7A58" />
 
-        {/* Renderiza as linhas do grÃ¡fico */}
+        {/* Renderiza as linhas do gráfico */}
         {lines.map((line) => {
           const points = data
             .map((row, idx) => {
@@ -87,14 +87,14 @@ export function LineChart({ data = [], children }) {
           );
         })}
 
-        {/* RÃ³tulos do eixo X */}
+        {/* Rótulos do eixo X */}
         {data.map((row, idx) => (
           <text key={idx} x={scaleX(idx)} y={height - 8} fontSize="10" textAnchor="middle" fill="#5C7A58">
             {row[xKey]}
           </text>
         ))}
 
-        {/* RÃ³tulo da unidade do eixo Y */}
+        {/* Rótulo da unidade do eixo Y */}
         {yAxisComp?.props?.unit ? (
           <text x={5} y={15} fontSize="11" fill="#5C7A58">
             {yAxisComp.props.unit}
@@ -102,12 +102,12 @@ export function LineChart({ data = [], children }) {
         ) : null}
       </svg>
 
-      {/* Renderiza o conteÃºdo do Tooltip, se fornecido */}
+      {/* Renderiza o conteúdo do Tooltip, se fornecido */}
       {tooltipComp?.props?.content ? (
         cloneElement(tooltipComp.props.content, { active: false, payload: [], label: '' })
       ) : null}
 
-      {/* Mensagem de instruÃ§Ã£o para o usuÃ¡rio */}
+      {/* Mensagem de instrução para o usuário */}
       <div
         style={{
           position: 'absolute',
@@ -121,13 +121,13 @@ export function LineChart({ data = [], children }) {
           color: '#E8F0E6',
         }}
       >
-        Toque no grÃ¡fico para detalhes
+        Toque no gráfico para detalhes
       </div>
     </div>
   );
 }
 
-// Componentes de "placeholder" para definir as props dos grÃ¡ficos
+// Componentes de "placeholder" para definir as props dos gráficos
 export function Line() { return null; }
 Line.displayName = 'Line';
 
@@ -147,11 +147,11 @@ export function ReferenceLine() { return null; }
 ReferenceLine.displayName = 'ReferenceLine';
 
 /**
- * Componente de grÃ¡fico de pizza SVG customizado.
+ * Componente de gráfico de pizza SVG customizado.
  *
  * @param {object} props - As propriedades do componente.
  * @param {React.ReactNode} props.children - Componentes Pie.
- * @returns {JSX.Element} Um div contendo o SVG do grÃ¡fico de pizza.
+ * @returns {JSX.Element} Um div contendo o SVG do gráfico de pizza.
  */
 export function PieChart({ children }) {
   return (
@@ -169,17 +169,17 @@ PieChart.displayName = 'PieChart';
  *
  * @param {object} props - As propriedades do componente.
  * @param {Array<object>} [props.data=[]] - Os dados para as fatias da pizza.
- * @param {string} [props.dataKey='value'] - A chave para o valor numÃ©rico de cada fatia.
+ * @param {string} [props.dataKey='value'] - A chave para o valor numérico de cada fatia.
  * @param {string} [props.nameKey='name'] - A chave para o nome de cada fatia.
  * @param {number} [props.outerRadius=80] - O raio externo da pizza.
  * @returns {JSX.Element} Um fragmento contendo os elementos path SVG para as fatias.
  */
 export function Pie({ data = [], dataKey = 'value', nameKey = 'name', outerRadius = 80 }) {
   const total = data.reduce((s, i) => s + Number(i[dataKey] || 0), 0) || 1;
-  const cx = 150; // Centro X do cÃ­rculo
-  const cy = 110; // Centro Y do cÃ­rculo
+  const cx = 150; // Centro X do círculo
+  const cy = 110; // Centro Y do círculo
 
-  // Calcula os segmentos (inÃ­cio e fim acumulado) para cada fatia
+  // Calcula os segmentos (início e fim acumulado) para cada fatia
   const segmentos = data
     .map((item) => Number(item[dataKey] || 0))
     .reduce(
@@ -196,7 +196,7 @@ export function Pie({ data = [], dataKey = 'value', nameKey = 'name', outerRadiu
   return (
     <>
       {data.map((item, idx) => {
-        // Calcula os Ã¢ngulos de inÃ­cio e fim para cada fatia
+        // Calcula os ângulos de início e fim para cada fatia
         const startAngle = (segmentos[idx].inicio / total) * Math.PI * 2 - Math.PI / 2;
         const endAngle = (segmentos[idx].fim / total) * Math.PI * 2 - Math.PI / 2;
 
@@ -206,10 +206,10 @@ export function Pie({ data = [], dataKey = 'value', nameKey = 'name', outerRadiu
         const x2 = cx + Math.cos(endAngle) * outerRadius;
         const y2 = cy + Math.sin(endAngle) * outerRadius;
 
-        // Determina se o arco Ã© grande (maior que 180 graus)
+        // Determina se o arco é grande (maior que 180 graus)
         const largeArcFlag = endAngle - startAngle > Math.PI ? 1 : 0;
 
-        // ConstrÃ³i o comando path SVG para a fatia
+        // Constrói o comando path SVG para a fatia
         const path = `M ${cx} ${cy} L ${x1} ${y1} A ${outerRadius} ${outerRadius} 0 ${largeArcFlag} 1 ${x2} ${y2} Z`;
 
         // Cores predefinidas para as fatias
@@ -230,12 +230,12 @@ export function Cell() { return null; }
 export function Legend() { return null; }
 
 /**
- * Componente de grÃ¡fico de barras SVG customizado.
+ * Componente de gráfico de barras SVG customizado.
  *
  * @param {object} props - As propriedades do componente.
- * @param {Array<object>} [props.data=[]] - Os dados a serem exibidos no grÃ¡fico.
+ * @param {Array<object>} [props.data=[]] - Os dados a serem exibidos no gráfico.
  * @param {React.ReactNode} props.children - Componentes Bar.
- * @returns {JSX.Element} Um div contendo o SVG do grÃ¡fico de barras.
+ * @returns {JSX.Element} Um div contendo o SVG do gráfico de barras.
  */
 export function BarChart({ data = [], children }) {
   const width = 900;
