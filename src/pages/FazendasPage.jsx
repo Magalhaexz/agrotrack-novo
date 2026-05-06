@@ -64,16 +64,20 @@ export default function FazendasPage({ db, setDb, onConfirmAction }) {
           f.id === editando.id ? { ...f, ...(persisted.data || payload) } : f
         ),
       }));
-      if (!persisted.persisted) showToast({ type: 'warning', message: 'AlteraÃ§Ã£o salva apenas localmente.' });
-      if (persisted.syncStatus === 'cloud_success') showToast({ type: 'success', message: 'Registro salvo na nuvem. (cloud_success)' });
+      if (persisted.syncStatus === 'cloud_success') showToast({ type: 'success', message: 'Registro salvo na nuvem.' });
+      if (persisted.syncStatus === 'pending_sync' || persisted.syncStatus === 'local_only') {
+        showToast({ type: 'warning', message: `Registro salvo localmente. Sincronização pendente.${import.meta.env.DEV ? ` Motivo: ${persisted.error || persisted.code || 'unknown'}.` : ''}` });
+      }
     } else {
       const persisted = await createOperationalRecord('fazendas', payload, session);
       setDb((prev) => ({
         ...prev,
         fazendas: [...prev.fazendas, persisted.data || { id: gerarNovoId(prev.fazendas), ...payload }],
       }));
-      if (!persisted.persisted) showToast({ type: 'warning', message: 'Cadastro salvo apenas localmente.' });
-      if (persisted.syncStatus === 'cloud_success') showToast({ type: 'success', message: 'Registro salvo na nuvem. (cloud_success)' });
+      if (persisted.syncStatus === 'cloud_success') showToast({ type: 'success', message: 'Registro salvo na nuvem.' });
+      if (persisted.syncStatus === 'pending_sync' || persisted.syncStatus === 'local_only') {
+        showToast({ type: 'warning', message: `Registro salvo localmente. Sincronização pendente.${import.meta.env.DEV ? ` Motivo: ${persisted.error || persisted.code || 'unknown'}.` : ''}` });
+      }
     }
     setOpenModal(false);
     setEditando(null);

@@ -60,6 +60,73 @@ const ConfiguracoesPage = lazy(() => import('./pages/ConfiguracoesPage'));
 const LoginPage = lazy(() => import('./pages/LoginPage'));
 const TODAY_BOOT_ISO = new Date().toISOString().slice(0, 10);
 const MENSAGEM_SEM_PERMISSAO = 'Você não tem permissão para executar esta ação.';
+const ALERTAS_RESOLVIDOS_STORAGE_KEY = 'herdon-alertas-resolvidos';
+const ALERTAS_ADIADOS_STORAGE_KEY = 'herdon-alertas-adiados';
+
+function getAlertAckKey(alert) {
+  if (alert?.ackKey) return String(alert.ackKey);
+  if (alert?.id) return String(alert.id);
+  const tipo = String(alert?.type || alert?.tipo || alert?.category || 'geral').trim().toLowerCase();
+  const titulo = String(alert?.title || alert?.titulo || '').trim().toLowerCase();
+  const rota = String(alert?.route || alert?.rota || alert?.acao?.rota || alert?.pagina || 'dashboard').trim().toLowerCase();
+  const referencia = String(
+    alert?.date
+    || alert?.data
+    || alert?.dueDate
+    || alert?.proxima
+    || alert?.reference
+    || alert?.referencia
+    || ''
+  ).slice(0, 10);
+  return `${tipo}-${titulo}-${rota}-${referencia}`;
+}
+
+function readJsonStorage(key, fallback) {
+  try {
+    const raw = localStorage.getItem(key);
+    if (!raw) return fallback;
+    const parsed = JSON.parse(raw);
+    return parsed ?? fallback;
+  } catch {
+    return fallback;
+  }
+}
+
+function writeJsonStorage(key, value) {
+  try {
+    localStorage.setItem(key, JSON.stringify(value));
+  } catch {
+    // storage indisponivel
+  }
+}
+
+function normalizeResolvedAlertEntries(entries = []) {
+  return (Array.isArray(entries) ? entries : [])
+    .map((item) => {
+      if (typeof item === 'string') return item;
+      if (item && typeof item === 'object') return item.chave || item.ackKey || item.id || null;
+      return null;
+    })
+    .filter(Boolean)
+    .map((item) => String(item));
+}
+
+function normalizeSnoozedAlertEntries(entries = []) {
+  return (Array.isArray(entries) ? entries : [])
+    .map((item) => {
+      if (!item) return null;
+      if (typeof item === 'string') return null;
+      const chave = item.chave || item.ackKey || item.id || null;
+      const ate = item.ate || item.snoozeUntil || null;
+      if (!chave || !ate) return null;
+      return {
+        chave: String(chave),
+        ate: String(ate),
+        snoozeUntil: String(item.snoozeUntil || ate),
+      };
+    })
+    .filter(Boolean);
+}
 
 const pageMap = {
   dashboard: DashboardPage,
@@ -219,6 +286,7 @@ export default function App() {
     return () => window.removeEventListener('herdon-cloud-diagnostic-state', handleCloudDiagnosticState);
   }, []);
 
+
   useEffect(() => {
     const timer = window.setTimeout(() => {
       const fazendas = Array.isArray(db?.fazendas) ? db.fazendas : [];
@@ -321,30 +389,22 @@ export default function App() {
   const alertasResolvidos = Array.isArray(db?.alertas_resolvidos) ? db.alertas_resolvidos : [];
   const alertasAdiados = Array.isArray(db?.alertas_adiados) ? db.alertas_adiados : [];
 
-  const getAlertStableKey = (alert) => {
-    if (alert?.ackKey) return String(alert.ackKey);
-    if (alert?.id) return String(alert.id);
-    const tipo = String(alert?.type || alert?.tipo || 'geral').toLowerCase();
-    const rota = String(alert?.route || alert?.rota || alert?.acao?.rota || alert?.pagina || 'dashboard').toLowerCase();
-    const titulo = String(alert?.title || alert?.titulo || '').trim().toLowerCase();
-    const dataRef = String(alert?.date || alert?.data || alert?.dueDate || alert?.proxima || '').slice(0, 10);
-    return [tipo, rota, titulo, dataRef].join('|');
-  };
+  const resolvedAlertKeys = useMemo(() => {
+    const dbKeys = normalizeResolvedAlertEntries(alertasResolvidos);
+    const storageKeys = normalizeResolvedAlertEntries(readJsonStorage(ALERTAS_RESOLVIDOS_STORAGE_KEY, []));
+    return new Set([...dbKeys, ...storageKeys]);
+  }, [alertasResolvidos]);
 
-  const resolvedAlertKeys = useMemo(
-    () =>
-      new Set(
-        alertasResolvidos
-          .map((item) => {
-            if (typeof item === 'string') return item;
-            if (item && typeof item === 'object') return item.chave || item.ackKey || item.id || null;
-            return null;
-          })
-          .filter(Boolean)
-          .map((item) => String(item))
-      ),
-    [alertasResolvidos]
-  );
+  const snoozedAlerts = useMemo(() => {
+    const dbEntries = normalizeSnoozedAlertEntries(alertasAdiados);
+    const storageEntries = normalizeSnoozedAlertEntries(readJsonStorage(ALERTAS_ADIADOS_STORAGE_KEY, []));
+    const merged = new Map();
+    [...dbEntries, ...storageEntries].forEach((item) => {
+      if (!item?.chave) return;
+      merged.set(item.chave, item);
+    });
+    return Array.from(merged.values());
+  }, [alertasAdiados]);
 
   const rawAlerts = useMemo(() => {
     const legacy = buildAlerts(db);
@@ -357,41 +417,67 @@ export default function App() {
     return ordenarAlertas([...legacy, ...automaticos]).map((alert) => ({
       ...alert,
       route: alert?.route || alert?.rota || alert?.acao?.rota || alert?.pagina || null,
-      ackKey: getAlertStableKey(alert),
+      ackKey: getAlertAckKey(alert),
     }));
   }, [db]);
 
   const alerts = useMemo(
     () => rawAlerts.filter((alert) => {
-      const chave = getAlertStableKey(alert);
+      const chave = getAlertAckKey(alert);
       if (resolvedAlertKeys.has(chave)) return false;
-      const adiado = alertasAdiados.find((item) => item?.chave === chave);
+      const adiado = snoozedAlerts.find((item) => item?.chave === chave);
       const ate = adiado?.ate || adiado?.snoozeUntil || null;
       if (!ate) return true;
       return String(ate) < TODAY_BOOT_ISO;
     }),
-    [alertasAdiados, rawAlerts, resolvedAlertKeys]
+    [rawAlerts, resolvedAlertKeys, snoozedAlerts]
   );
+
+  function logAlertAction(action, ackKey, beforeCount, afterCount) {
+    if (!import.meta.env.DEV) return;
+    console.info('[HERDON_ALERT_ACTION]', {
+      action,
+      ackKey,
+      beforeCount,
+      afterCount,
+    });
+  }
 
   async function marcarAlertaComoFeito(alert) {
     if (!hasPermission('tarefas:editar')) {
       showToast({ type: 'error', message: MENSAGEM_SEM_PERMISSAO });
       return;
     }
-    const chave = getAlertStableKey(alert);
+    const chave = getAlertAckKey(alert);
     if (!chave) {
       return;
     }
 
-    const persisted = await createOperationalRecord('alertas_resolvidos', { chave }, session);
+    const beforeCount = alerts.length;
+    setDb((prev) => {
+      const atuais = normalizeResolvedAlertEntries(prev?.alertas_resolvidos || []);
+      return {
+        ...prev,
+        alertas_resolvidos: Array.from(new Set([...atuais, chave])),
+      };
+    });
+    const atuaisStorage = normalizeResolvedAlertEntries(readJsonStorage(ALERTAS_RESOLVIDOS_STORAGE_KEY, []));
+    writeJsonStorage(ALERTAS_RESOLVIDOS_STORAGE_KEY, Array.from(new Set([...atuaisStorage, chave])));
+    logAlertAction('resolver', chave, beforeCount, Math.max(beforeCount - 1, 0));
+    showToast({ type: 'success', message: 'Notificação resolvida.' });
+
+    const persisted = await createOperationalRecord('alertas_resolvidos', {
+      chave,
+      resolvedAt: new Date().toISOString(),
+      origem: 'header_notificacoes',
+    }, session);
     setDb((prev) => ({
       ...prev,
-      alertas_resolvidos: Array.from(new Set([...(prev?.alertas_resolvidos || []), chave])),
+      alertas_resolvidos: Array.from(new Set([...normalizeResolvedAlertEntries(prev?.alertas_resolvidos || []), chave])),
     }));
     if (!persisted.persisted) {
       showToast({ type: 'warning', message: 'Alerta resolvido apenas localmente.' });
     }
-    showToast({ type: 'success', message: 'Notificação resolvida.' });
   }
 
   async function adiarAlerta(alert, opcao = '1') {
@@ -399,7 +485,7 @@ export default function App() {
       showToast({ type: 'error', message: MENSAGEM_SEM_PERMISSAO });
       return;
     }
-    const chave = getAlertStableKey(alert);
+    const chave = getAlertAckKey(alert);
     if (!chave) return;
     const ate = parseSnoozeDate(opcao);
     if (!ate) {
@@ -407,16 +493,24 @@ export default function App() {
       return;
     }
     const payload = { chave, ate, snoozeUntil: ate };
-    const persisted = await createOperationalRecord('alertas_adiados', payload, session);
+    const beforeCount = alerts.length;
     setDb((prev) => ({
       ...prev,
       alertas_adiados: [
-        ...(prev?.alertas_adiados || []).filter((item) => item?.chave !== chave),
-        persisted.data || payload,
+        ...normalizeSnoozedAlertEntries(prev?.alertas_adiados || []).filter((item) => item?.chave !== chave),
+        payload,
       ],
     }));
-    if (!persisted.persisted) showToast({ type: 'warning', message: 'Lembrete adiado apenas localmente.' });
+    const storageAtual = normalizeSnoozedAlertEntries(readJsonStorage(ALERTAS_ADIADOS_STORAGE_KEY, []))
+      .filter((item) => item?.chave !== chave);
+    writeJsonStorage(ALERTAS_ADIADOS_STORAGE_KEY, [...storageAtual, payload]);
+    logAlertAction('adiar', chave, beforeCount, Math.max(beforeCount - 1, 0));
     showToast({ type: 'success', message: 'Lembrete adiado.' });
+    const persisted = await createOperationalRecord('alertas_adiados', {
+      ...payload,
+      origem: 'header_notificacoes',
+    }, session);
+    if (!persisted.persisted) showToast({ type: 'warning', message: 'Lembrete adiado apenas localmente.' });
   }
 
   const userContext = { id: user?.id || null, email: user?.email || '' };
@@ -659,6 +753,8 @@ export default function App() {
           onSelectFazenda={setFazendaSelecionada}
           tabAtiva={tabAtiva}
           onTabChange={setTabAtiva}
+          getAlertAckKey={getAlertAckKey}
+          alertDebugState={{ resolvedAlertKeys, snoozedAlerts }}
         />
 
         <div key={pageKey} className="page-wrapper">

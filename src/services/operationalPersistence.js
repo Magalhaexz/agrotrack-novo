@@ -160,6 +160,34 @@ function logOperationalSync(event = {}, level = 'debug') {
   });
 }
 
+function classifyCloudSaveCode(rawCode, error = null) {
+  const code = String(rawCode || error?.code || '').toUpperCase();
+  const message = String(getErrorMessage(error) || '').toLowerCase();
+  if (code.includes('ENV') || code.includes('CONFIG')) return 'config_error';
+  if (code.includes('SESSION') || code.includes('AUTH')) return 'auth_not_ready';
+  if (code === '42501' || message.includes('row-level security') || message.includes('permission denied')) return 'permission_denied';
+  if (code === 'PGRST204' || code === '42703' || code === '42P01' || message.includes('schema') || message.includes('column') || message.includes('relation')) return 'schema_error';
+  if (isNetworkError(error) || message.includes('network')) return 'network_error';
+  return 'unknown';
+}
+
+function emitCloudSaveState({ table, action, syncStatus, code, message, session, cloudConfigured }) {
+  if (typeof window === 'undefined' || typeof window.dispatchEvent !== 'function') return;
+  window.dispatchEvent(new CustomEvent('herdon-cloud-save-state', {
+    detail: {
+      table: table || null,
+      action: action || null,
+      syncStatus: syncStatus || 'local_only',
+      code: code || 'unknown',
+      message: message || '',
+      checkedAt: Date.now(),
+      cloudConfigured: Boolean(cloudConfigured),
+      sessionPresent: Boolean(session),
+      userIdPresent: Boolean(getSessionUserId(session)),
+    },
+  }));
+}
+
 export async function ensureSupabaseRequestReadiness(session, context = {}) {
   const envStatus = getSupabaseEnvStatus();
   if (!envStatus.configured) {
@@ -541,7 +569,17 @@ function sanitizeAuditDetails(input) {
 export async function createOperationalRecord(table, record, session) {
   const readiness = await ensureSupabaseRequestReadiness(session, { action: 'create', table });
   if (!readiness.ok) {
-    return buildFallback(readiness.message, sanitizeRecord(record), readiness.code || 'CLOUD_NOT_READY');
+    const fallback = buildFallback(readiness.message, sanitizeRecord(record), readiness.code || 'CLOUD_NOT_READY');
+    emitCloudSaveState({
+      table,
+      action: 'create',
+      syncStatus: fallback.syncStatus,
+      code: classifyCloudSaveCode(readiness.code),
+      message: readiness.message,
+      session,
+      cloudConfigured: readiness.code !== 'SUPABASE_ENV_MISSING',
+    });
+    return fallback;
   }
   const userId = getSessionUserId(session);
 
@@ -560,6 +598,15 @@ export async function createOperationalRecord(table, record, session) {
       throw error;
     }
     notifyCloudHealthy('Registro salvo na nuvem.');
+    emitCloudSaveState({
+      table,
+      action: 'create',
+      syncStatus: 'cloud_success',
+      code: null,
+      message: 'Registro salvo na nuvem.',
+      session,
+      cloudConfigured: true,
+    });
     return { persisted: true, data, error: null, syncStatus: 'cloud_success', code: null };
   } catch (error) {
     logOperationalSync({
@@ -572,19 +619,39 @@ export async function createOperationalRecord(table, record, session) {
       errorType: getErrorMessage(error),
       errorCode: error?.code || null,
     }, 'warn');
-    return buildFallback(
+    const fallback = buildFallback(
       classifyOperationalError(error, 'Falha ao persistir cadastro na nuvem. Dados locais mantidos.', table),
       sanitizeRecord(record),
       error?.code || 'WRITE_FAILED',
       'pending_sync'
     );
+    emitCloudSaveState({
+      table,
+      action: 'create',
+      syncStatus: fallback.syncStatus,
+      code: classifyCloudSaveCode(error?.code, error),
+      message: fallback.error,
+      session,
+      cloudConfigured: true,
+    });
+    return fallback;
   }
 }
 
 export async function updateOperationalRecord(table, id, patch, session) {
   const readiness = await ensureSupabaseRequestReadiness(session, { action: 'update', table });
   if (!readiness.ok) {
-    return buildFallback(readiness.message, sanitizeRecord(patch), readiness.code || 'CLOUD_NOT_READY');
+    const fallback = buildFallback(readiness.message, sanitizeRecord(patch), readiness.code || 'CLOUD_NOT_READY');
+    emitCloudSaveState({
+      table,
+      action: 'update',
+      syncStatus: fallback.syncStatus,
+      code: classifyCloudSaveCode(readiness.code),
+      message: readiness.message,
+      session,
+      cloudConfigured: readiness.code !== 'SUPABASE_ENV_MISSING',
+    });
+    return fallback;
   }
   const userId = getSessionUserId(session);
 
@@ -602,6 +669,15 @@ export async function updateOperationalRecord(table, id, patch, session) {
       throw error;
     }
     notifyCloudHealthy('Registro salvo na nuvem.');
+    emitCloudSaveState({
+      table,
+      action: 'update',
+      syncStatus: 'cloud_success',
+      code: null,
+      message: 'Registro salvo na nuvem.',
+      session,
+      cloudConfigured: true,
+    });
     return { persisted: true, data, error: null, syncStatus: 'cloud_success', code: null };
   } catch (error) {
     logOperationalSync({
@@ -614,19 +690,39 @@ export async function updateOperationalRecord(table, id, patch, session) {
       errorType: getErrorMessage(error),
       errorCode: error?.code || null,
     }, 'warn');
-    return buildFallback(
+    const fallback = buildFallback(
       classifyOperationalError(error, 'Falha ao persistir atualizacao na nuvem. Dados locais mantidos.', table),
       sanitizeRecord(patch),
       error?.code || 'WRITE_FAILED',
       'pending_sync'
     );
+    emitCloudSaveState({
+      table,
+      action: 'update',
+      syncStatus: fallback.syncStatus,
+      code: classifyCloudSaveCode(error?.code, error),
+      message: fallback.error,
+      session,
+      cloudConfigured: true,
+    });
+    return fallback;
   }
 }
 
 export async function deleteOperationalRecord(table, id, session) {
   const readiness = await ensureSupabaseRequestReadiness(session, { action: 'delete', table });
   if (!readiness.ok) {
-    return buildFallback(readiness.message, null, readiness.code || 'CLOUD_NOT_READY');
+    const fallback = buildFallback(readiness.message, null, readiness.code || 'CLOUD_NOT_READY');
+    emitCloudSaveState({
+      table,
+      action: 'delete',
+      syncStatus: fallback.syncStatus,
+      code: classifyCloudSaveCode(readiness.code),
+      message: readiness.message,
+      session,
+      cloudConfigured: readiness.code !== 'SUPABASE_ENV_MISSING',
+    });
+    return fallback;
   }
   const userId = getSessionUserId(session);
 
@@ -641,6 +737,15 @@ export async function deleteOperationalRecord(table, id, session) {
       throw error;
     }
     notifyCloudHealthy('Nuvem ativa com atualização confirmada.');
+    emitCloudSaveState({
+      table,
+      action: 'delete',
+      syncStatus: 'cloud_success',
+      code: null,
+      message: 'Registro salvo na nuvem.',
+      session,
+      cloudConfigured: true,
+    });
     return { persisted: true, data: null, error: null, syncStatus: 'cloud_success', code: null };
   } catch (error) {
     logOperationalSync({
@@ -653,12 +758,22 @@ export async function deleteOperationalRecord(table, id, session) {
       errorType: getErrorMessage(error),
       errorCode: error?.code || null,
     }, 'warn');
-    return buildFallback(
+    const fallback = buildFallback(
       classifyOperationalError(error, 'Falha ao persistir exclusao na nuvem. Dados locais mantidos.', table),
       null,
       error?.code || 'WRITE_FAILED',
       'pending_sync'
     );
+    emitCloudSaveState({
+      table,
+      action: 'delete',
+      syncStatus: fallback.syncStatus,
+      code: classifyCloudSaveCode(error?.code, error),
+      message: fallback.error,
+      session,
+      cloudConfigured: true,
+    });
+    return fallback;
   }
 }
 

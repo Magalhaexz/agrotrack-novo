@@ -7558,6 +7558,26 @@ button:hover,
   align-items: center;
 }
 
+.notif-debug-line,
+.notif-dev-debug small {
+  display: block;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 0.72rem;
+  line-height: 1.5;
+  color: rgba(189, 201, 196, 0.78);
+  word-break: break-word;
+}
+
+.notif-dev-debug {
+  display: grid;
+  gap: 4px;
+  padding: 10px 12px;
+  margin-bottom: 10px;
+  border-radius: 12px;
+  border: 1px dashed rgba(255, 255, 255, 0.12);
+  background: rgba(255, 255, 255, 0.02);
+}
+
 .notif-actions .ui-button {
   min-height: 30px;
   padding: 6px 10px;

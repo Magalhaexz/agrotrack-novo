@@ -330,9 +330,11 @@ function CadastroItemModal({ setDb, onClose, hasPermission, showToast, session }
       ],
     }));
 
-    if (!persisted.persisted) {
-      showToast({ type: 'warning', message: 'Cadastro salvo apenas localmente.' });
-    if (persisted.syncStatus === 'cloud_success') showToast({ type: 'success', message: 'Registro salvo na nuvem. (cloud_success)' });
+    if (persisted.syncStatus === 'cloud_success') {
+      showToast({ type: 'success', message: 'Registro salvo na nuvem.' });
+    }
+    if (persisted.syncStatus === 'pending_sync' || persisted.syncStatus === 'local_only') {
+      showToast({ type: 'warning', message: `Registro salvo localmente. Sincronização pendente.${import.meta.env.DEV ? ` Motivo: ${persisted.error || persisted.code || 'unknown'}.` : ''}` });
     }
     showToast({ type: 'success', message: 'Item cadastrado com sucesso.' });
     onClose();
