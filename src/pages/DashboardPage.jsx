@@ -35,6 +35,7 @@ const KPI_VARIANTS = {
 export default function DashboardPage({
   db,
   setDb,
+  session = null,
   alerts = [],
   onNavigate = null,
   onResolveAlert = null,
@@ -214,7 +215,7 @@ export default function DashboardPage({
       status: 'pendente',
       prioridade: 'media',
     };
-    const persisted = await createOperationalRecord('tarefas', payload, null);
+    const persisted = await createOperationalRecord('tarefas', payload, session);
     const registro = persisted.data || { id: gerarNovoId(db.tarefas || []), ...payload };
     setDb?.((prev) => ({ ...prev, tarefas: [...(prev.tarefas || []), registro] }));
     setNovaTarefa({ titulo: '', funcionario_id: '', data_vencimento: '', descricao: '' });
@@ -225,7 +226,7 @@ export default function DashboardPage({
       showToast({ type: 'error', message: mensagemSemPermissao });
       return;
     }
-    await updateOperationalRecord('tarefas', tarefa.id, { status: 'concluida' }, null);
+    await updateOperationalRecord('tarefas', tarefa.id, { status: 'concluida' }, session);
     setDb?.((prev) => ({
       ...prev,
       tarefas: (prev.tarefas || []).map((item) => (item.id === tarefa.id ? { ...item, status: 'concluida' } : item)),

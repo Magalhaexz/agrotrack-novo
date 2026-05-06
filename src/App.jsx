@@ -325,11 +325,26 @@ export default function App() {
     if (alert?.ackKey) return String(alert.ackKey);
     if (alert?.id) return String(alert.id);
     const tipo = String(alert?.type || alert?.tipo || 'geral').toLowerCase();
-    const rota = String(alert?.route || alert?.rota || 'dashboard').toLowerCase();
+    const rota = String(alert?.route || alert?.rota || alert?.acao?.rota || alert?.pagina || 'dashboard').toLowerCase();
     const titulo = String(alert?.title || alert?.titulo || '').trim().toLowerCase();
-    const dataRef = String(alert?.date || alert?.data || alert?.dueDate || '').slice(0, 10);
+    const dataRef = String(alert?.date || alert?.data || alert?.dueDate || alert?.proxima || '').slice(0, 10);
     return [tipo, rota, titulo, dataRef].join('|');
   };
+
+  const resolvedAlertKeys = useMemo(
+    () =>
+      new Set(
+        alertasResolvidos
+          .map((item) => {
+            if (typeof item === 'string') return item;
+            if (item && typeof item === 'object') return item.chave || item.ackKey || item.id || null;
+            return null;
+          })
+          .filter(Boolean)
+          .map((item) => String(item))
+      ),
+    [alertasResolvidos]
+  );
 
   const rawAlerts = useMemo(() => {
     const legacy = buildAlerts(db);
@@ -339,18 +354,23 @@ export default function App() {
       ...gerarAlertasPesagem(db),
       ...gerarAlertasLote(db),
     ];
-    return ordenarAlertas([...legacy, ...automaticos]).map((alert) => ({ ...alert, ackKey: getAlertStableKey(alert) }));
+    return ordenarAlertas([...legacy, ...automaticos]).map((alert) => ({
+      ...alert,
+      route: alert?.route || alert?.rota || alert?.acao?.rota || alert?.pagina || null,
+      ackKey: getAlertStableKey(alert),
+    }));
   }, [db]);
 
   const alerts = useMemo(
     () => rawAlerts.filter((alert) => {
       const chave = getAlertStableKey(alert);
-      if (alertasResolvidos.includes(chave)) return false;
+      if (resolvedAlertKeys.has(chave)) return false;
       const adiado = alertasAdiados.find((item) => item?.chave === chave);
-      if (!adiado?.ate) return true;
-      return String(adiado.ate) < TODAY_BOOT_ISO;
+      const ate = adiado?.ate || adiado?.snoozeUntil || null;
+      if (!ate) return true;
+      return String(ate) < TODAY_BOOT_ISO;
     }),
-    [alertasAdiados, alertasResolvidos, rawAlerts]
+    [alertasAdiados, rawAlerts, resolvedAlertKeys]
   );
 
   async function marcarAlertaComoFeito(alert) {
@@ -386,7 +406,7 @@ export default function App() {
       showToast({ type: 'warning', message: 'Data inválida para adiamento.' });
       return;
     }
-    const payload = { chave, ate };
+    const payload = { chave, ate, snoozeUntil: ate };
     const persisted = await createOperationalRecord('alertas_adiados', payload, session);
     setDb((prev) => ({
       ...prev,
@@ -621,8 +641,9 @@ export default function App() {
           onResolveAlert={marcarAlertaComoFeito}
           onSnoozeAlert={adiarAlerta}
           onAlertNavigate={(alert) => {
-            if (alert?.route) {
-              navigateWithPermission(alert.route);
+            const route = alert?.route || alert?.rota || alert?.acao?.rota || alert?.pagina || null;
+            if (route) {
+              navigateWithPermission(route);
               return;
             }
             showToast({ type: 'info', message: 'Não há destino configurado para este alerta.' });
@@ -658,14 +679,16 @@ export default function App() {
                 <ActivePage
                   db={pageKey === 'dashboard' ? dbDashboard : db}
                   setDb={setDb}
+                  session={session}
                   navigationIntent={navigationIntent}
                   alerts={alerts}
                   onNavigate={navigateWithPermission}
                   onResolveAlert={marcarAlertaComoFeito}
                   onSnoozeAlert={adiarAlerta}
                   onAlertNavigate={(alert) => {
-                    if (alert?.route) {
-                      navigateWithPermission(alert.route);
+                    const route = alert?.route || alert?.rota || alert?.acao?.rota || alert?.pagina || null;
+                    if (route) {
+                      navigateWithPermission(route);
                       return;
                     }
                     showToast({ type: 'info', message: 'Não há destino configurado para este alerta.' });

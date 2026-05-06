@@ -242,14 +242,25 @@ export async function ensureSupabaseRequestReadiness(session, context = {}) {
   }
 }
 
-function buildFallback(message, data = null, code = 'LOCAL_FALLBACK') {
+function buildFallback(message, data = null, code = 'LOCAL_FALLBACK', syncStatus = 'local_only') {
   return {
     persisted: false,
     data,
     error: message,
-    syncStatus: 'local_only',
+    syncStatus,
     code,
   };
+}
+
+function notifyCloudHealthy(message = 'Nuvem ativa com salvamento confirmado.') {
+  if (typeof window === 'undefined' || typeof window.dispatchEvent !== 'function') return;
+  window.dispatchEvent(new CustomEvent('herdon-cloud-diagnostic-state', {
+    detail: {
+      verified: true,
+      checkedAt: Date.now(),
+      message,
+    },
+  }));
 }
 
 function sanitizeRecord(record = {}) {
@@ -546,9 +557,9 @@ export async function createOperationalRecord(table, record, session) {
       .single();
 
     if (error) {
-      throw new Error(error.message || 'Falha ao criar registro.');
+      throw error;
     }
-
+    notifyCloudHealthy('Registro salvo na nuvem.');
     return { persisted: true, data, error: null, syncStatus: 'cloud_success', code: null };
   } catch (error) {
     logOperationalSync({
@@ -564,7 +575,8 @@ export async function createOperationalRecord(table, record, session) {
     return buildFallback(
       classifyOperationalError(error, 'Falha ao persistir cadastro na nuvem. Dados locais mantidos.', table),
       sanitizeRecord(record),
-      error?.code || 'WRITE_FAILED'
+      error?.code || 'WRITE_FAILED',
+      'pending_sync'
     );
   }
 }
@@ -587,9 +599,9 @@ export async function updateOperationalRecord(table, id, patch, session) {
       .single();
 
     if (error) {
-      throw new Error(error.message || 'Falha ao atualizar registro.');
+      throw error;
     }
-
+    notifyCloudHealthy('Registro salvo na nuvem.');
     return { persisted: true, data, error: null, syncStatus: 'cloud_success', code: null };
   } catch (error) {
     logOperationalSync({
@@ -605,7 +617,8 @@ export async function updateOperationalRecord(table, id, patch, session) {
     return buildFallback(
       classifyOperationalError(error, 'Falha ao persistir atualizacao na nuvem. Dados locais mantidos.', table),
       sanitizeRecord(patch),
-      error?.code || 'WRITE_FAILED'
+      error?.code || 'WRITE_FAILED',
+      'pending_sync'
     );
   }
 }
@@ -625,10 +638,10 @@ export async function deleteOperationalRecord(table, id, session) {
       .eq('owner_user_id', userId);
 
     if (error) {
-      throw new Error(error.message || 'Falha ao excluir registro.');
+      throw error;
     }
-
-    return { persisted: true, data: null, error: null };
+    notifyCloudHealthy('Nuvem ativa com atualização confirmada.');
+    return { persisted: true, data: null, error: null, syncStatus: 'cloud_success', code: null };
   } catch (error) {
     logOperationalSync({
       stage: 'delete_error',
@@ -643,7 +656,8 @@ export async function deleteOperationalRecord(table, id, session) {
     return buildFallback(
       classifyOperationalError(error, 'Falha ao persistir exclusao na nuvem. Dados locais mantidos.', table),
       null,
-      error?.code || 'WRITE_FAILED'
+      error?.code || 'WRITE_FAILED',
+      'pending_sync'
     );
   }
 }
