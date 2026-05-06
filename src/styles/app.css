@@ -7397,3 +7397,123 @@ button:hover,
     justify-content: flex-start;
   }
 }
+
+/* Sprint 18A4 - Header cloud dropdown compact fix */
+.header.top-header .top-header-actions {
+  margin-left: auto;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: nowrap;
+  min-width: 0;
+}
+
+.header-sync-chip {
+  display: grid;
+  grid-template-columns: auto minmax(130px, 1fr) auto;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  max-width: min(390px, 100%);
+}
+
+.header-sync-copy {
+  min-width: 0;
+}
+
+.header-sync-copy strong,
+.header-sync-copy small {
+  display: block;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.header-sync-menu-wrap {
+  position: relative;
+}
+
+.header-sync-menu-trigger {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 9px;
+  white-space: nowrap;
+  min-height: 30px;
+}
+
+.header-sync-dropdown {
+  position: absolute;
+  top: calc(100% + 8px);
+  right: 0;
+  min-width: 176px;
+  padding: 6px;
+  border-radius: 12px;
+  border: 1px solid color-mix(in srgb, var(--color-border) 88%, #9ca3af 12%);
+  background: rgba(9, 14, 12, 0.96);
+  box-shadow: 0 14px 30px rgba(0, 0, 0, 0.45);
+  display: grid;
+  gap: 4px;
+  z-index: 340;
+}
+
+.header-sync-dropdown-item {
+  width: 100%;
+  text-align: left;
+  border-radius: 9px;
+  border: 1px solid transparent;
+  padding: 8px 10px;
+  font-size: 12px;
+  color: var(--color-text);
+  background: transparent;
+}
+
+.header-sync-dropdown-item:hover:not(:disabled) {
+  background: rgba(47, 181, 107, 0.12);
+  border-color: rgba(47, 181, 107, 0.28);
+}
+
+.header-sync-dropdown-item:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+@media (max-width: 1180px) {
+  .header-sync-chip {
+    max-width: min(340px, 100%);
+  }
+
+  .header-sync-menu-trigger span {
+    display: none;
+  }
+
+  .header-sync-menu-trigger {
+    padding: 5px 7px;
+  }
+}
+
+@media (max-width: 1024px) {
+  .header.top-header .top-header-actions {
+    flex-wrap: wrap;
+    justify-content: flex-end;
+    row-gap: 6px;
+  }
+
+  .header-sync-chip {
+    max-width: 100%;
+    flex: 1 1 250px;
+  }
+}
+
+@media (max-width: 640px) {
+  .header-sync-chip {
+    grid-template-columns: auto minmax(0, 1fr) auto;
+    width: 100%;
+  }
+
+  .header-sync-dropdown {
+    right: 0;
+    left: auto;
+    min-width: 168px;
+  }
+}

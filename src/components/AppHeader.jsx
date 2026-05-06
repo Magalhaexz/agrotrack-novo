@@ -1,4 +1,4 @@
-﻿import { Activity, AlertTriangle, Bell, ChevronDown, Clock3, Loader2, LogOut, Menu, Package, Settings, User } from 'lucide-react';
+import { Activity, AlertTriangle, Bell, ChevronDown, Clock3, Loader2, LogOut, Menu, Package, Settings, User } from 'lucide-react';
 import { createPortal } from 'react-dom';
 import { useEffect, useRef, useState } from 'react';
 import { obterLabelPerfil } from '../auth/perfis';
@@ -48,7 +48,7 @@ function formatSyncTime(value) {
 
 function messageIsSessionError(message) {
   const text = String(message || '').toLowerCase();
-  return text.includes('sessão expirada') || text.includes('sessao expirada') || text.includes('sessão inválida') || text.includes('sessao invalida');
+  return text.includes('sessÒ£o expirada') || text.includes('sessao expirada') || text.includes('sessÒ£o invÒ¡lida') || text.includes('sessao invalida');
 }
 
 function getCloudState(syncStatus) {
@@ -61,7 +61,7 @@ function getCloudState(syncStatus) {
       tone: 'online',
       icon: 'cloud',
       label: 'Nuvem ativa',
-      detail: syncStatus?.lastSyncAt ? `Última sync: ${formatSyncTime(syncStatus.lastSyncAt)}` : 'Nuvem não verificada',
+      detail: syncStatus?.lastSyncAt ? `Òšltima sync: ${formatSyncTime(syncStatus.lastSyncAt)}` : 'Nuvem nÒ£o verificada',
       title: syncStatus?.cloudVerifiedMessage || 'Nuvem conectada pelo servidor.',
       disabled: false,
     };
@@ -72,8 +72,8 @@ function getCloudState(syncStatus) {
       tone: 'syncing',
       icon: 'loading',
       label: 'Sincronizando...',
-      detail: syncStatus?.lastSyncAt ? `Última sync: ${formatSyncTime(syncStatus.lastSyncAt)}` : 'Nuvem não verificada',
-      title: 'Sincronização manual em andamento',
+      detail: syncStatus?.lastSyncAt ? `Òšltima sync: ${formatSyncTime(syncStatus.lastSyncAt)}` : 'Nuvem nÒ£o verificada',
+      title: 'SincronizaÒ§Ò£o manual em andamento',
       disabled: true,
     };
   }
@@ -83,8 +83,8 @@ function getCloudState(syncStatus) {
       tone: 'warning',
       icon: 'warning',
       label: 'Modo local',
-      detail: 'Nuvem não verificada',
-      title: 'Sessão expirada. Reconecte para voltar a sincronizar.',
+      detail: 'Nuvem nÒ£o verificada',
+      title: 'SessÒ£o expirada. Reconecte para voltar a sincronizar.',
       disabled: false,
     };
   }
@@ -105,7 +105,7 @@ function getCloudState(syncStatus) {
       tone: 'warning',
       icon: 'warning',
       label: 'Modo local',
-      detail: message || 'Nuvem indisponível no momento',
+      detail: message || 'Nuvem indisponÒ­vel no momento',
       title: message || 'Falha de nuvem detectada. O modo local continua ativo.',
       disabled: false,
     };
@@ -117,7 +117,7 @@ function getCloudState(syncStatus) {
       icon: 'local',
       label: 'Nuvem pausada',
       detail: 'Modo local ativo',
-      title: 'Sincronização com Supabase desativada neste navegador',
+      title: 'SincronizaÒ§Ò£o com Supabase desativada neste navegador',
       disabled: false,
     };
   }
@@ -126,8 +126,8 @@ function getCloudState(syncStatus) {
     tone: 'local',
     icon: 'local',
     label: 'Modo local',
-    detail: 'Nuvem não verificada',
-    title: 'Sincronização manual disponível',
+    detail: 'Nuvem nÒ£o verificada',
+    title: 'SincronizaÒ§Ò£o manual disponÒ­vel',
     disabled: false,
   };
 }
@@ -155,6 +155,7 @@ export default function AppHeader({
   const [userMenuRef, openUserMenu, setOpenUserMenu] = useDropdown(false);
   const [notifRef, openNotif, setOpenNotif] = useDropdown(false);
   const [farmsRef, openFarms, setOpenFarms] = useDropdown(false);
+  const [cloudMenuRef, openCloudMenu, setOpenCloudMenu] = useDropdown(false);
   const notifButtonRef = useRef(null);
   const [notifPosition, setNotifPosition] = useState({
     top: 0,
@@ -188,7 +189,7 @@ export default function AppHeader({
     return 'success';
   }
 
-  const nomeExibicao = usuarioLogado?.nome || 'Usuário';
+  const nomeExibicao = usuarioLogado?.nome || 'UsuÒ¡rio';
   const perfilExibicao = obterLabelPerfil(usuarioLogado?.perfilLabel || usuarioLogado?.perfil);
   const cloudState = getCloudState(syncStatus);
 
@@ -314,28 +315,62 @@ export default function AppHeader({
             <strong>{cloudState.label}</strong>
             <small>{cloudState.detail}</small>
           </span>
-          <button
-            type="button"
-            className="header-sync-refresh"
-            onClick={syncStatus?.onSyncNow}
-            disabled={cloudState.disabled}
-            aria-label="Sincronizar agora"
-          >
-            <Clock3 size={13} className={cloudState.disabled ? 'ui-spin' : ''} />
-          </button>
-          <div className="header-sync-actions" role="group" aria-label="Ações de nuvem">
-            <button type="button" className="header-sync-refresh header-sync-refresh--compact" onClick={syncStatus?.onTestCloud} disabled={Boolean(syncStatus?.testingCloud)} aria-label="Testar conexão">
-              <Package size={12} />
-              <span>Testar</span>
+          <div className="header-sync-menu-wrap" ref={cloudMenuRef}>
+            <button
+              type="button"
+              className="header-sync-refresh header-sync-menu-trigger"
+              onClick={() => setOpenCloudMenu((value) => !value)}
+              aria-expanded={openCloudMenu}
+              aria-controls="cloud-dropdown-menu"
+              aria-label="Abrir ações de nuvem"
+            >
+              <span>Ações</span>
+              <ChevronDown
+                size={12}
+                style={{ transform: openCloudMenu ? 'rotate(180deg)' : 'rotate(0deg)', transition: 'transform 0.2s' }}
+              />
             </button>
-            <button type="button" className="header-sync-refresh header-sync-refresh--compact" onClick={syncStatus?.onSyncNow} disabled={Boolean(syncStatus?.syncingCloud)} aria-label="Sincronizar">
-              <Clock3 size={12} className={syncStatus?.syncingCloud ? 'ui-spin' : ''} />
-              <span>Sync</span>
-            </button>
-            <button type="button" className="header-sync-refresh header-sync-refresh--compact" onClick={syncStatus?.onReconnectCloud} disabled={Boolean(syncStatus?.reconnectingCloud)} aria-label="Reconectar">
-              <Activity size={12} />
-              <span>Reconectar</span>
-            </button>
+
+            {openCloudMenu && (
+              <div id="cloud-dropdown-menu" className="header-sync-dropdown" role="menu" aria-label="Ações de nuvem">
+                <button
+                  type="button"
+                  className="header-sync-dropdown-item"
+                  onClick={() => {
+                    syncStatus?.onTestCloud?.();
+                    setOpenCloudMenu(false);
+                  }}
+                  disabled={Boolean(syncStatus?.testingCloud)}
+                  role="menuitem"
+                >
+                  Testar conexão
+                </button>
+                <button
+                  type="button"
+                  className="header-sync-dropdown-item"
+                  onClick={() => {
+                    syncStatus?.onSyncNow?.();
+                    setOpenCloudMenu(false);
+                  }}
+                  disabled={Boolean(syncStatus?.syncingCloud) || cloudState.disabled}
+                  role="menuitem"
+                >
+                  Sincronizar
+                </button>
+                <button
+                  type="button"
+                  className="header-sync-dropdown-item"
+                  onClick={() => {
+                    syncStatus?.onReconnectCloud?.();
+                    setOpenCloudMenu(false);
+                  }}
+                  disabled={Boolean(syncStatus?.reconnectingCloud)}
+                  role="menuitem"
+                >
+                  Reconectar
+                </button>
+              </div>
+            )}
           </div>
         </div>
 
@@ -344,7 +379,7 @@ export default function AppHeader({
             type="button"
             className="header-notification-btn notif-btn"
             ref={notifButtonRef}
-            aria-label={`Notificações: ${notifications} ${notifications === 1 ? 'alerta' : 'alertas'} pendentes`}
+            aria-label={`NotificaÒ§Òµes: ${notifications} ${notifications === 1 ? 'alerta' : 'alertas'} pendentes`}
             onClick={() => setOpenNotif((value) => !value)}
             aria-expanded={openNotif}
             aria-controls="notification-dropdown-menu"
@@ -390,7 +425,7 @@ export default function AppHeader({
               </button>
               <button type="button" className="user-dropdown-item" onClick={() => { onNavigateSettings?.(); setOpenUserMenu(false); }}>
                 <Settings size={15} />
-                Configurações
+                ConfiguraÒ§Òµes
               </button>
               <div className="user-dropdown-divider" />
               <button type="button" className="user-dropdown-item logout" onClick={handleLogout}>
@@ -408,7 +443,7 @@ export default function AppHeader({
             <button
               type="button"
               className="notif-overlay"
-              aria-label="Fechar notificações"
+              aria-label="Fechar notificaÒ§Òµes"
               onClick={() => setOpenNotif(false)}
             />
             <div
@@ -426,7 +461,7 @@ export default function AppHeader({
                 <div>
                   <span className="notif-panel-kicker">Central de alertas</span>
                   <strong>{notifications > 0 ? `${notifications} pendentes` : 'Tudo em dia'}</strong>
-                  <small>Alertas operacionais, sanitários, estoque e lembretes do HERDON.</small>
+                  <small>Alertas operacionais, sanitÒ¡rios, estoque e lembretes do HERDON.</small>
                 </div>
                 <span className="notif-panel-pill">{notifications}</span>
               </div>
@@ -448,7 +483,7 @@ export default function AppHeader({
                             <span className="notif-item-meta">{destino}</span>
                           </div>
                           <span className={`notif-item-tag notif-item-tag--${tone}`}>
-                            {tone === 'danger' ? 'Crítico' : tone === 'warning' ? 'Atenção' : tone === 'info' ? 'Monitorar' : 'Operacional'}
+                            {tone === 'danger' ? 'CrÒ­tico' : tone === 'warning' ? 'AtenÒ§Ò£o' : tone === 'info' ? 'Monitorar' : 'Operacional'}
                           </span>
                         </div>
                         <small>{alert.description || alert.mensagem}</small>
@@ -470,3 +505,4 @@ export default function AppHeader({
     </header>
   );
 }
+
