@@ -7528,3 +7528,93 @@ button:hover,
   line-height: 1.25;
   font-weight: 500;
 }
+/* SPRINT18I - Notification panel and compact visual polish */
+.notif-dropdown {
+  width: min(560px, calc(100vw - 24px)) !important;
+  max-width: calc(100vw - 24px);
+  overflow: hidden;
+}
+
+.notif-list {
+  max-height: min(58vh, 460px);
+  overflow-y: auto;
+  overflow-x: hidden;
+  padding-right: 2px;
+}
+
+.notif-item {
+  gap: 10px;
+}
+
+.notif-item small {
+  white-space: normal;
+  word-break: break-word;
+}
+
+.notif-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+}
+
+.notif-actions .ui-button {
+  min-height: 30px;
+  padding: 6px 10px;
+}
+
+.notif-snooze-wrap {
+  position: relative;
+}
+
+.notif-snooze-menu {
+  position: absolute;
+  top: calc(100% + 6px);
+  left: 0;
+  z-index: 4;
+  min-width: 124px;
+  display: grid;
+  gap: 4px;
+  padding: 6px;
+  border-radius: 10px;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  background: rgba(8, 12, 18, 0.96);
+  box-shadow: 0 14px 34px rgba(0, 0, 0, 0.38);
+}
+
+.notif-snooze-menu button {
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  background: rgba(255, 255, 255, 0.03);
+  color: var(--text-primary);
+  border-radius: 8px;
+  padding: 6px 8px;
+  text-align: left;
+  cursor: pointer;
+}
+
+.notif-snooze-menu button:hover {
+  background: rgba(255, 255, 255, 0.08);
+}
+
+@media (max-width: 900px) {
+  .notif-dropdown {
+    width: calc(100vw - 16px) !important;
+    left: 8px !important;
+  }
+
+  .notif-list {
+    max-height: 52vh;
+  }
+}
+
+.sidebar-section {
+  margin-bottom: 8px;
+}
+
+.sidebar-group-copy {
+  gap: 2px;
+}
+
+.sidebar-group-description {
+  line-height: 1.25;
+}

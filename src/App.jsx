@@ -1,4 +1,4 @@
-import { Suspense, lazy, useEffect, useMemo, useRef, useState } from 'react';
+﻿import { Suspense, lazy, useEffect, useMemo, useRef, useState } from 'react';
 import { initialDb } from './data/mockData';
 import { useAuth } from './auth/useAuth';
 import { permissoesPorPagina } from './auth/perfis';
@@ -59,6 +59,7 @@ const PerfilPage = lazy(() => import('./pages/PerfilPage'));
 const ConfiguracoesPage = lazy(() => import('./pages/ConfiguracoesPage'));
 const LoginPage = lazy(() => import('./pages/LoginPage'));
 const TODAY_BOOT_ISO = new Date().toISOString().slice(0, 10);
+const MENSAGEM_SEM_PERMISSAO = 'Você não tem permissão para executar esta ação.';
 
 const pageMap = {
   dashboard: DashboardPage,
@@ -320,6 +321,16 @@ export default function App() {
   const alertasResolvidos = Array.isArray(db?.alertas_resolvidos) ? db.alertas_resolvidos : [];
   const alertasAdiados = Array.isArray(db?.alertas_adiados) ? db.alertas_adiados : [];
 
+  const getAlertStableKey = (alert) => {
+    if (alert?.ackKey) return String(alert.ackKey);
+    if (alert?.id) return String(alert.id);
+    const tipo = String(alert?.type || alert?.tipo || 'geral').toLowerCase();
+    const rota = String(alert?.route || alert?.rota || 'dashboard').toLowerCase();
+    const titulo = String(alert?.title || alert?.titulo || '').trim().toLowerCase();
+    const dataRef = String(alert?.date || alert?.data || alert?.dueDate || '').slice(0, 10);
+    return [tipo, rota, titulo, dataRef].join('|');
+  };
+
   const rawAlerts = useMemo(() => {
     const legacy = buildAlerts(db);
     const automaticos = [
@@ -328,12 +339,12 @@ export default function App() {
       ...gerarAlertasPesagem(db),
       ...gerarAlertasLote(db),
     ];
-    return ordenarAlertas([...legacy, ...automaticos]);
+    return ordenarAlertas([...legacy, ...automaticos]).map((alert) => ({ ...alert, ackKey: getAlertStableKey(alert) }));
   }, [db]);
 
   const alerts = useMemo(
     () => rawAlerts.filter((alert) => {
-      const chave = alert.ackKey || alert.id;
+      const chave = getAlertStableKey(alert);
       if (alertasResolvidos.includes(chave)) return false;
       const adiado = alertasAdiados.find((item) => item?.chave === chave);
       if (!adiado?.ate) return true;
@@ -343,7 +354,11 @@ export default function App() {
   );
 
   async function marcarAlertaComoFeito(alert) {
-    const chave = alert?.ackKey || alert?.id;
+    if (!hasPermission('tarefas:editar')) {
+      showToast({ type: 'error', message: MENSAGEM_SEM_PERMISSAO });
+      return;
+    }
+    const chave = getAlertStableKey(alert);
     if (!chave) {
       return;
     }
@@ -359,15 +374,13 @@ export default function App() {
     showToast({ type: 'success', message: 'Notificação resolvida.' });
   }
 
-  async function adiarAlerta(alert) {
+  async function adiarAlerta(alert, opcao = '1') {
     if (!hasPermission('tarefas:editar')) {
-      showToast({ type: 'error', message: 'Você não tem permissão para executar esta ação.' });
+      showToast({ type: 'error', message: MENSAGEM_SEM_PERMISSAO });
       return;
     }
-    const chave = alert?.ackKey || alert?.id;
+    const chave = getAlertStableKey(alert);
     if (!chave) return;
-    const opcao = window.prompt('Adiar notificação para: 1 (amanhã), 3, 7 dias ou data YYYY-MM-DD', '1');
-    if (!opcao) return;
     const ate = parseSnoozeDate(opcao);
     if (!ate) {
       showToast({ type: 'warning', message: 'Data inválida para adiamento.' });
@@ -577,12 +590,12 @@ export default function App() {
       <main className="main">
         {isOperationalSyncing ? (
           <div style={{ padding: '8px 16px 0', fontSize: 12, color: 'var(--text-secondary, #6b7280)' }}>
-            Sincronizando dados da operação...
+            Sincronizando dados da opera??o...
           </div>
         ) : null}
         {(dataSource === 'fallback_error' || dataSource === 'fallback_timeout') ? (
           <div style={{ padding: '8px 16px 0', fontSize: 12, color: 'var(--text-secondary, #6b7280)' }}>
-            Sincronização instável. Seus dados locais continuam disponíveis.
+            Sincroniza??o inst?vel. Seus dados locais continuam dispon?veis.
           </div>
         ) : null}
         <AppHeader
@@ -610,7 +623,9 @@ export default function App() {
           onAlertNavigate={(alert) => {
             if (alert?.route) {
               navigateWithPermission(alert.route);
+              return;
             }
+            showToast({ type: 'info', message: 'Não há destino configurado para este alerta.' });
           }}
           onSignOut={handleLogout}
           onNavigateProfile={() => navigateWithPermission('perfil')}
@@ -679,8 +694,8 @@ export default function App() {
       <Modal
         open={menuExtraAberto}
         onClose={() => setMenuExtraAberto(false)}
-        title="Mais opções"
-        subtitle="Todos os módulos do app continuam acessíveis no mobile"
+        title="Mais op??es"
+        subtitle="Todos os m?dulos do app continuam acess?veis no mobile"
       >
         <div className="mobile-nav-modal">
           {mobileNavGroups.map((group) => (
@@ -745,3 +760,5 @@ function parseSnoozeDate(option) {
   data.setDate(data.getDate() + dias);
   return data.toISOString().slice(0, 10);
 }
+
+

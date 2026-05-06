@@ -156,6 +156,7 @@ export default function AppHeader({
   const [notifRef, openNotif, setOpenNotif] = useDropdown(false);
   const [farmsRef, openFarms, setOpenFarms] = useDropdown(false);
   const [cloudMenuRef, openCloudMenu, setOpenCloudMenu] = useDropdown(false);
+  const [snoozeMenuFor, setSnoozeMenuFor] = useState(null);
   const notifButtonRef = useRef(null);
   const [notifPosition, setNotifPosition] = useState({
     top: 0,
@@ -189,7 +190,7 @@ export default function AppHeader({
     return 'success';
   }
 
-  const nomeExibicao = usuarioLogado?.nome || 'UsuÃƒÆ’Ã¢â‚¬â„¢Ãƒâ€šÃ‚Â¡rio';
+  const nomeExibicao = usuarioLogado?.nome || 'Usuário';
   const perfilExibicao = obterLabelPerfil(usuarioLogado?.perfilLabel || usuarioLogado?.perfil);
   const cloudState = getCloudState(syncStatus);
 
@@ -420,7 +421,7 @@ export default function AppHeader({
               </button>
               <button type="button" className="user-dropdown-item" onClick={() => { onNavigateSettings?.(); setOpenUserMenu(false); }}>
                 <Settings size={15} />
-                ConfiguraÃƒÆ’Ã¢â‚¬â„¢Ãƒâ€šÃ‚Â§ÃƒÆ’Ã¢â‚¬â„¢Ãƒâ€šÃ‚Âµes
+                                Configurações
               </button>
               <div className="user-dropdown-divider" />
               <button type="button" className="user-dropdown-item logout" onClick={handleLogout}>
@@ -438,7 +439,7 @@ export default function AppHeader({
             <button
               type="button"
               className="notif-overlay"
-              aria-label="Fechar notificaÃƒÆ’Ã¢â‚¬â„¢Ãƒâ€šÃ‚Â§ÃƒÆ’Ã¢â‚¬â„¢Ãƒâ€šÃ‚Âµes"
+              aria-label="Fechar notificações"
               onClick={() => setOpenNotif(false)}
             />
             <div
@@ -456,7 +457,7 @@ export default function AppHeader({
                 <div>
                   <span className="notif-panel-kicker">Central de alertas</span>
                   <strong>{notifications > 0 ? `${notifications} pendentes` : 'Tudo em dia'}</strong>
-                  <small>Alertas operacionais, sanitÃƒÆ’Ã¢â‚¬â„¢Ãƒâ€šÃ‚Â¡rios, estoque e lembretes do HERDON.</small>
+                  <small>Alertas operacionais, sanitários, estoque e lembretes do HERDON.</small>
                 </div>
                 <span className="notif-panel-pill">{notifications}</span>
               </div>
@@ -478,13 +479,30 @@ export default function AppHeader({
                             <span className="notif-item-meta">{destino}</span>
                           </div>
                           <span className={`notif-item-tag notif-item-tag--${tone}`}>
-                            {tone === 'danger' ? 'CrÃƒÆ’Ã¢â‚¬â„¢Ãƒâ€šÃ‚Â­tico' : tone === 'warning' ? 'AtenÃƒÆ’Ã¢â‚¬â„¢Ãƒâ€šÃ‚Â§ÃƒÆ’Ã¢â‚¬â„¢Ãƒâ€šÃ‚Â£o' : tone === 'info' ? 'Monitorar' : 'Operacional'}
+                            {tone === 'danger' ? 'Crítico' : tone === 'warning' ? 'Atenção' : tone === 'info' ? 'Monitorar' : 'Operacional'}
                           </span>
                         </div>
                         <small>{alert.description || alert.mensagem}</small>
                         <div className="notif-actions">
                           <Button size="sm" variant="outline" onClick={() => { onResolveAlert?.(alert); setOpenNotif(false); }}>Resolver</Button>
-                          <Button size="sm" variant="ghost" icon={<Clock3 size={12} />} onClick={() => { onSnoozeAlert?.(alert); setOpenNotif(false); }}>Adiar</Button>
+                          <div className="notif-snooze-wrap">
+                            <Button
+                              size="sm"
+                              variant="ghost"
+                              icon={<Clock3 size={12} />}
+                              aria-label="Adiar lembrete"
+                              onClick={() => setSnoozeMenuFor((prev) => (prev === (alert.ackKey || alert.id) ? null : (alert.ackKey || alert.id)))}
+                            >
+                              Adiar
+                            </Button>
+                            {snoozeMenuFor === (alert.ackKey || alert.id) ? (
+                              <div className="notif-snooze-menu">
+                                <button type="button" onClick={() => { onSnoozeAlert?.(alert, '1'); setSnoozeMenuFor(null); setOpenNotif(false); }}>Amanhã</button>
+                                <button type="button" onClick={() => { onSnoozeAlert?.(alert, '3'); setSnoozeMenuFor(null); setOpenNotif(false); }}>3 dias</button>
+                                <button type="button" onClick={() => { onSnoozeAlert?.(alert, '7'); setSnoozeMenuFor(null); setOpenNotif(false); }}>7 dias</button>
+                              </div>
+                            ) : null}
+                          </div>
                           <Button size="sm" variant="ghost" onClick={() => { onAlertNavigate?.(alert); setOpenNotif(false); }}>Abrir</Button>
                         </div>
                       </div>
