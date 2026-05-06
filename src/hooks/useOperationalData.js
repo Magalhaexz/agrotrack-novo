@@ -16,11 +16,14 @@ const OPERACIONAL_TABLES = [
   'funcionarios',
   'rotinas',
   'alertas_resolvidos',
+  'alertas_adiados',
   'usuarios',
   'configuracoes',
 ];
 
-const OWNER_SCOPED_TABLES = new Set(OPERACIONAL_TABLES);
+const OWNER_SCOPED_TABLES = new Set(
+  OPERACIONAL_TABLES.filter((table) => !['alertas_resolvidos', 'alertas_adiados'].includes(table))
+);
 const HYDRATION_CONCURRENCY_LIMIT = 3;
 const HYDRATION_MAX_ATTEMPTS = 2;
 const HYDRATION_BACKOFF_MS = 350;
@@ -118,6 +121,7 @@ function normalizeDb(baseDb) {
   return {
     ...baseDb,
     alertas_resolvidos: Array.isArray(baseDb?.alertas_resolvidos) ? baseDb.alertas_resolvidos : [],
+    alertas_adiados: Array.isArray(baseDb?.alertas_adiados) ? baseDb.alertas_adiados : [],
     funcionarios: Array.isArray(baseDb?.funcionarios) ? baseDb.funcionarios : [],
     lotes: Array.isArray(baseDb?.lotes)
       ? baseDb.lotes.map((lote) => ({

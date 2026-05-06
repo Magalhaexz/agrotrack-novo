@@ -1,6 +1,10 @@
 import { getSupabaseEnvStatus, supabase, validateSupabaseSessionForCloud } from '../lib/supabase.js';
 const NETWORK_CIRCUIT_OPEN_MS = 45000;
 const moduleNetworkCircuit = new Map();
+const OWNER_SCOPE_OPTIONAL_TABLES = new Set([
+  'alertas_resolvidos',
+  'alertas_adiados',
+]);
 
 function getSessionUserId(session) {
   return session?.user?.id || null;
@@ -33,6 +37,12 @@ function getHttpStatus(error) {
 function getPostgrestCode(error) {
   const code = String(error?.code || '').toUpperCase();
   return code || null;
+}
+
+function getSafeErrorDetails(error) {
+  const details = error?.details ? String(error.details) : null;
+  const hint = error?.hint ? String(error.hint) : null;
+  return { details, hint };
 }
 
 function shouldOpenNetworkCircuit(error) {
@@ -157,15 +167,23 @@ function logOperationalSync(event = {}, level = 'debug') {
     envConfigured: Boolean(event.envConfigured),
     errorType: event.errorType || null,
     errorCode: event.errorCode || null,
+    httpStatus: event.httpStatus || null,
+    syncStatus: event.syncStatus || null,
+    safeDetails: event.safeDetails || null,
+    safeHint: event.safeHint || null,
   });
 }
 
-function classifyCloudSaveCode(rawCode, error = null) {
+function classifyCloudSaveCode(rawCode, error = null, status = null) {
   const code = String(rawCode || error?.code || '').toUpperCase();
   const message = String(getErrorMessage(error) || '').toLowerCase();
+  const httpStatus = Number(status || error?.status) || null;
   if (code.includes('ENV') || code.includes('CONFIG')) return 'config_error';
   if (code.includes('SESSION') || code.includes('AUTH')) return 'auth_not_ready';
+  if (httpStatus === 401) return 'auth_not_ready';
   if (code === '42501' || message.includes('row-level security') || message.includes('permission denied')) return 'permission_denied';
+  if (httpStatus === 403) return 'permission_denied';
+  if (httpStatus === 400) return 'schema_error';
   if (code === 'PGRST204' || code === '42703' || code === '42P01' || message.includes('schema') || message.includes('column') || message.includes('relation')) return 'schema_error';
   if (isNetworkError(error) || message.includes('network')) return 'network_error';
   return 'unknown';
@@ -295,6 +313,72 @@ function sanitizeRecord(record = {}) {
   if (!record || typeof record !== 'object') return {};
   const { owner_user_id: _ignoredOwner, ...safeRecord } = record;
   return safeRecord;
+}
+
+function tableSupportsOwnerScope(table) {
+  return !OWNER_SCOPE_OPTIONAL_TABLES.has(String(table || '').toLowerCase());
+}
+
+function toIsoDate(value) {
+  if (!value) return new Date().toISOString();
+  try {
+    const date = new Date(value);
+    if (Number.isNaN(date.getTime())) return new Date().toISOString();
+    return date.toISOString();
+  } catch {
+    return new Date().toISOString();
+  }
+}
+
+function buildAlertResolvedPayload(record, userId) {
+  const safe = sanitizeRecord(record);
+  const payload = {
+    chave: String(safe?.chave || safe?.ackKey || safe?.id || '').trim(),
+    resolved_at: toIsoDate(safe?.resolvedAt),
+    origem: String(safe?.origem || 'app_header').trim(),
+    observacao: String(safe?.observacao || safe?.descricao || '').trim() || null,
+  };
+  if (!payload.chave) return null;
+  if (tableSupportsOwnerScope('alertas_resolvidos') && userId) {
+    payload.owner_user_id = userId;
+  }
+  return payload;
+}
+
+function buildAlertSnoozedPayload(record, userId) {
+  const safe = sanitizeRecord(record);
+  const chave = String(safe?.chave || safe?.ackKey || safe?.id || '').trim();
+  const ate = String(safe?.ate || safe?.snoozeUntil || '').trim();
+  if (!chave || !ate) return null;
+  const payload = {
+    chave,
+    ate,
+    snooze_until: ate,
+    origem: String(safe?.origem || 'app_header').trim(),
+    observacao: String(safe?.observacao || safe?.descricao || '').trim() || null,
+  };
+  if (tableSupportsOwnerScope('alertas_adiados') && userId) {
+    payload.owner_user_id = userId;
+  }
+  return payload;
+}
+
+function buildOperationalCreatePayload(table, record, userId) {
+  const normalizedTable = String(table || '').toLowerCase();
+  if (normalizedTable === 'alertas_resolvidos') {
+    return buildAlertResolvedPayload(record, userId);
+  }
+  if (normalizedTable === 'alertas_adiados') {
+    return buildAlertSnoozedPayload(record, userId);
+  }
+  const safe = sanitizeRecord(record);
+  if (tableSupportsOwnerScope(normalizedTable)) {
+    return {
+      ...safe,
+      owner_user_id: userId,
+    };
+  }
+  return safe;
 }
 
 function toNullableString(value) {
@@ -584,10 +668,25 @@ export async function createOperationalRecord(table, record, session) {
   const userId = getSessionUserId(session);
 
   try {
-    const payload = {
-      ...sanitizeRecord(record),
-      owner_user_id: userId,
-    };
+    const payload = buildOperationalCreatePayload(table, record, userId);
+    if (!payload || typeof payload !== 'object') {
+      const fallback = buildFallback(
+        'Registro salvo localmente. Sincronização pendente.',
+        sanitizeRecord(record),
+        'PAYLOAD_INCOMPATIBLE',
+        'pending_sync'
+      );
+      emitCloudSaveState({
+        table,
+        action: 'create',
+        syncStatus: fallback.syncStatus,
+        code: 'schema_error',
+        message: fallback.error,
+        session,
+        cloudConfigured: true,
+      });
+      return fallback;
+    }
     const { data, error } = await supabase
       .from(table)
       .insert(payload)
@@ -609,6 +708,9 @@ export async function createOperationalRecord(table, record, session) {
     });
     return { persisted: true, data, error: null, syncStatus: 'cloud_success', code: null };
   } catch (error) {
+    const status = getHttpStatus(error);
+    const safe = getSafeErrorDetails(error);
+    const classifiedCode = classifyCloudSaveCode(error?.code, error, status);
     logOperationalSync({
       stage: 'create_error',
       action: 'create',
@@ -618,18 +720,22 @@ export async function createOperationalRecord(table, record, session) {
       envConfigured: true,
       errorType: getErrorMessage(error),
       errorCode: error?.code || null,
+      httpStatus: status,
+      syncStatus: 'pending_sync',
+      safeDetails: safe.details,
+      safeHint: safe.hint,
     }, 'warn');
     const fallback = buildFallback(
-      classifyOperationalError(error, 'Falha ao persistir cadastro na nuvem. Dados locais mantidos.', table),
+      'Registro salvo localmente. Sincronização pendente.',
       sanitizeRecord(record),
-      error?.code || 'WRITE_FAILED',
+      classifiedCode,
       'pending_sync'
     );
     emitCloudSaveState({
       table,
       action: 'create',
       syncStatus: fallback.syncStatus,
-      code: classifyCloudSaveCode(error?.code, error),
+      code: classifiedCode,
       message: fallback.error,
       session,
       cloudConfigured: true,
@@ -657,13 +763,14 @@ export async function updateOperationalRecord(table, id, patch, session) {
 
   try {
     const payload = sanitizeRecord(patch);
-    const { data, error } = await supabase
+    let query = supabase
       .from(table)
       .update(payload)
-      .eq('id', id)
-      .eq('owner_user_id', userId)
-      .select('*')
-      .single();
+      .eq('id', id);
+    if (tableSupportsOwnerScope(table)) {
+      query = query.eq('owner_user_id', userId);
+    }
+    const { data, error } = await query.select('*').single();
 
     if (error) {
       throw error;
@@ -680,6 +787,9 @@ export async function updateOperationalRecord(table, id, patch, session) {
     });
     return { persisted: true, data, error: null, syncStatus: 'cloud_success', code: null };
   } catch (error) {
+    const status = getHttpStatus(error);
+    const safe = getSafeErrorDetails(error);
+    const classifiedCode = classifyCloudSaveCode(error?.code, error, status);
     logOperationalSync({
       stage: 'update_error',
       action: 'update',
@@ -689,18 +799,22 @@ export async function updateOperationalRecord(table, id, patch, session) {
       envConfigured: true,
       errorType: getErrorMessage(error),
       errorCode: error?.code || null,
+      httpStatus: status,
+      syncStatus: 'pending_sync',
+      safeDetails: safe.details,
+      safeHint: safe.hint,
     }, 'warn');
     const fallback = buildFallback(
-      classifyOperationalError(error, 'Falha ao persistir atualizacao na nuvem. Dados locais mantidos.', table),
+      'Registro salvo localmente. Sincronização pendente.',
       sanitizeRecord(patch),
-      error?.code || 'WRITE_FAILED',
+      classifiedCode,
       'pending_sync'
     );
     emitCloudSaveState({
       table,
       action: 'update',
       syncStatus: fallback.syncStatus,
-      code: classifyCloudSaveCode(error?.code, error),
+      code: classifiedCode,
       message: fallback.error,
       session,
       cloudConfigured: true,
@@ -727,11 +841,14 @@ export async function deleteOperationalRecord(table, id, session) {
   const userId = getSessionUserId(session);
 
   try {
-    const { error } = await supabase
+    let query = supabase
       .from(table)
       .delete()
-      .eq('id', id)
-      .eq('owner_user_id', userId);
+      .eq('id', id);
+    if (tableSupportsOwnerScope(table)) {
+      query = query.eq('owner_user_id', userId);
+    }
+    const { error } = await query;
 
     if (error) {
       throw error;
@@ -748,6 +865,9 @@ export async function deleteOperationalRecord(table, id, session) {
     });
     return { persisted: true, data: null, error: null, syncStatus: 'cloud_success', code: null };
   } catch (error) {
+    const status = getHttpStatus(error);
+    const safe = getSafeErrorDetails(error);
+    const classifiedCode = classifyCloudSaveCode(error?.code, error, status);
     logOperationalSync({
       stage: 'delete_error',
       action: 'delete',
@@ -757,18 +877,22 @@ export async function deleteOperationalRecord(table, id, session) {
       envConfigured: true,
       errorType: getErrorMessage(error),
       errorCode: error?.code || null,
+      httpStatus: status,
+      syncStatus: 'pending_sync',
+      safeDetails: safe.details,
+      safeHint: safe.hint,
     }, 'warn');
     const fallback = buildFallback(
-      classifyOperationalError(error, 'Falha ao persistir exclusao na nuvem. Dados locais mantidos.', table),
+      'Registro salvo localmente. Sincronização pendente.',
       null,
-      error?.code || 'WRITE_FAILED',
+      classifiedCode,
       'pending_sync'
     );
     emitCloudSaveState({
       table,
       action: 'delete',
       syncStatus: fallback.syncStatus,
-      code: classifyCloudSaveCode(error?.code, error),
+      code: classifiedCode,
       message: fallback.error,
       session,
       cloudConfigured: true,

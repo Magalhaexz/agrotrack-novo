@@ -254,6 +254,31 @@ export async function runMinimalCloudDiagnostic({ table = 'lotes' } = {}) {
     });
 
     const payload = await response.json().catch(() => null);
+    const isLocalhost = typeof window !== 'undefined'
+      ? ['localhost', '127.0.0.1', '::1'].includes(window.location.hostname)
+      : false;
+    if (isLocalhost && response.status === 404) {
+      const safeMessage = 'Diagnóstico serverless indisponível no localhost. Use Vercel Preview ou vercel dev para testar.';
+      if (import.meta.env.DEV) {
+        console.groupCollapsed('[HERDON_SERVERLESS_CLOUD_DIAGNOSTIC]');
+        console.info({
+          endpoint: '/api/cloud-diagnostic',
+          status: 404,
+          ok: false,
+          checks: [],
+          classification: 'local_serverless_unavailable',
+          safeMessage,
+        });
+        console.groupEnd();
+      }
+      return {
+        ok: false,
+        table,
+        steps: [{ step: 'server_diagnostic', ok: false, safeMessage }],
+        conclusion: 'local_serverless_unavailable',
+        conclusionMessage: safeMessage,
+      };
+    }
     const checks = Array.isArray(payload?.checks) ? payload.checks : [];
     const mappedChecks = checks.map((item) => ({ name: item?.name || null, status: item?.status || 'error' }));
     const ok = Boolean(response.ok && payload?.ok === true);
