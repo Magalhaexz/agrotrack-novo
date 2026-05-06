@@ -1,31 +1,17 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useMemo, useState } from 'react';
 import {
   AlertTriangle,
   ArrowDown,
   ArrowUp,
   Bell,
   BellRing,
-  CalendarClock,
   CheckCircle2,
-  CheckSquare,
   DollarSign,
   Package,
-  Scale,
   Tractor,
   Users,
-  Weight,
 } from 'lucide-react';
-import {
-  CartesianGrid,
-  Line,
-  LineChart,
-  ResponsiveContainer,
-  Tooltip,
-  XAxis,
-  YAxis,
-} from 'recharts';
 import Card from '../components/ui/Card';
-import Badge from '../components/ui/Badge';
 import Button from '../components/ui/Button';
 import { getResumoLote } from '../domain/resumoLote';
 import { formatCurrency, formatDate, formatNumber } from '../utils/calculations';
@@ -58,18 +44,6 @@ export default function DashboardPage({
   const { showToast } = useToast();
   const mensagemSemPermissao = 'Você não tem permissão para executar esta ação.';
   const [novaTarefa, setNovaTarefa] = useState({ titulo: '', funcionario_id: '', data_vencimento: '', descricao: '' });
-
-  const [cloudVerified, setCloudVerified] = useState(false);
-
-  useEffect(() => {
-    function handleCloudState(event) {
-      setCloudVerified(Boolean(event?.detail?.verified));
-    }
-    window.addEventListener('herdon-cloud-diagnostic-state', handleCloudState);
-    return () => window.removeEventListener('herdon-cloud-diagnostic-state', handleCloudState);
-  }, []);
-
-  const lotesMap = useMemo(() => new Map((db.lotes || []).map((lote) => [lote.id, lote])), [db.lotes]);
 
   const pagamentosDiarios = useMemo(
     () => (db.movimentacoes_financeiras || []).filter((item) => item?.tipo === 'despesa' && (item?.categoria === 'Pagamento Diário' || item?.categoria === 'Pagamento Diario')),
@@ -133,17 +107,10 @@ export default function DashboardPage({
     [lotesAggregates.pesoPonderado, totalCabecasAtivas]
   );
 
-  const arrobaMedia = useMemo(() => pesoMedioAtual / 15, [pesoMedioAtual]);
-
   const receitaMes = lotesAggregates.receitaMes;
   const custoMes = lotesAggregates.custoMes;
 
   const resultadoMes = useMemo(() => receitaMes - custoMes, [receitaMes, custoMes]);
-
-  const gmdMedio = useMemo(
-    () => (lotesStats.length ? lotesAggregates.gmdTotal / lotesStats.length : 0),
-    [lotesAggregates.gmdTotal, lotesStats.length]
-  );
 
   const estoqueCritico = useMemo(
     () =>
@@ -169,166 +136,18 @@ export default function DashboardPage({
     [db.estoque]
   );
 
-  const eventosCalendario = useMemo(
+  const alertasFormatados = useMemo(
     () =>
-      (db.sanitario || [])
-        .map((item) => {
-          const lote = lotesMap.get(item.lote_id);
-          const dias = daysUntil(item.proxima);
-          return { ...item, loteNome: lote?.nome || 'Sem lote', dias };
-        })
-        .filter((item) => Number.isFinite(item.dias))
-        .sort((a, b) => a.dias - b.dias)
-        .slice(0, 6),
-    [db.sanitario, lotesMap]
-  );
-
-  const lembretesReprodutivos = useMemo(() => {
-    const hojeIso = new Date().toISOString().slice(0, 10);
-    const iatfItens = (db.sanitario || [])
-      .filter((item) => String(item.tipo || '').toUpperCase() === 'IATF' || String(item.obs || '').includes('Protocolo IATF'))
-      .map((item) => {
-        const lote = lotesMap.get(item.lote_id);
-        const dataRef = item.proxima || item.data_aplic;
-        return {
-          ...item,
-          loteNome: lote?.nome || 'Sem lote',
-          dias: daysUntil(dataRef),
-          dataRef,
-          emAndamento: String(item.obs || '').includes('Status: Em andamento'),
-        };
-      })
-      .filter((item) => item.dataRef)
-      .sort((a, b) => (a.dias ?? 9999) - (b.dias ?? 9999));
-
-    const hoje = iatfItens.filter((item) => item.dataRef === hojeIso);
-    const proximas = iatfItens.filter((item) => Number.isFinite(item.dias) && item.dias > 0 && item.dias <= 14);
-    const emAndamento = iatfItens.filter((item) => item.emAndamento);
-
-    return { hoje, proximas, emAndamento, total: iatfItens.length };
-  }, [db.sanitario, lotesMap]);
-
-  const tarefasUrgentes = useMemo(
-    () =>
-      (db.tarefas || [])
-        .map((item) => ({
-          ...item,
-          dias: daysUntil(item.data_vencimento),
-        }))
-        .filter((item) => item.status !== 'concluida')
-        .sort((a, b) => {
-          const rankDiff = prioridadeRank(b.prioridade) - prioridadeRank(a.prioridade);
-          if (rankDiff !== 0) return rankDiff;
-          return a.dias - b.dias;
-        })
-        .slice(0, 5),
-    [db.tarefas]
-  );
-
-  const { alertasFormatados, totalAlertasCriticos } = useMemo(() => {
-    const aggregated = (alerts || []).reduce((acc, alert, index) => {
-      const urgency = urgencyVariant(alert);
-      const formatado = {
+      (alerts || []).map((alert, index) => ({
         ...alert,
         id: alert.id || alert.ackKey || `alert-${index}`,
         titulo: alert.titulo || alert.title || 'Alerta do sistema',
         descricao: alert.descricao || alert.description || 'Sem descricao',
-        prioridade: alert.prioridade || (urgency === 'danger' ? 'alta' : urgency === 'warning' ? 'media' : 'baixa'),
+        prioridade: alert.prioridade || 'media',
         acao: alert.acao || { label: 'Abrir', rota: alert.route || 'dashboard' },
-      };
-      return {
-        criticos: acc.criticos + (urgency === 'danger' ? 1 : 0),
-        formatados: [...acc.formatados, formatado],
-      };
-    }, { criticos: 0, formatados: [] });
-
-    return { alertasFormatados: aggregated.formatados, totalAlertasCriticos: aggregated.criticos };
-  }, [alerts]);
-
-  const alertasOperacionais = useMemo(
-    () =>
-      alertasFormatados
-        .slice()
-        .sort((a, b) => urgencyRank(a) - urgencyRank(b))
-        .slice(0, 5),
-    [alertasFormatados]
+      })),
+    [alerts]
   );
-
-  const lotesEmAtencao = useMemo(
-    () =>
-      lotesStats
-        .map((item) => {
-          const metaGmd = Number(item.lote.gmd_meta || 0);
-          const deltaPesoPct = item.indicators.pesoInicialMedio
-            ? ((item.indicators.pesoAtualMedio - item.indicators.pesoInicialMedio) /
-                item.indicators.pesoInicialMedio) *
-              100
-            : 0;
-
-          const motivos = [];
-          if (metaGmd > 0 && item.indicators.gmdMedio < metaGmd * 0.9) motivos.push('GMD abaixo da meta');
-          if (item.indicators.lucroTotal < 0) motivos.push('Margem negativa');
-          if (item.indicators.diasEstoque < 7) motivos.push('Suplemento curto');
-          if (deltaPesoPct < 0) motivos.push('Perda de peso');
-
-          return {
-            ...item,
-            deltaPesoPct,
-            motivos,
-          };
-        })
-        .filter((item) => item.motivos.length > 0)
-        .sort((a, b) => {
-          if (b.motivos.length !== a.motivos.length) return b.motivos.length - a.motivos.length;
-          return a.deltaPesoPct - b.deltaPesoPct;
-        })
-        .slice(0, 5),
-    [lotesStats]
-  );
-
-  const { melhorLote, piorLote } = useMemo(() => {
-    let melhor = null;
-    let pior = null;
-    for (const item of lotesStats) {
-      if (!melhor || item.indicators.lucroTotal > melhor.indicators.lucroTotal) {
-        melhor = item;
-      }
-      if (!pior || item.indicators.lucroTotal < pior.indicators.lucroTotal) {
-        pior = item;
-      }
-    }
-    return { melhorLote: melhor, piorLote: pior };
-  }, [lotesStats]);
-
-
-  const indicadoresFinanceiros = useMemo(() => {
-    if (!lotesStats.length) {
-      return {
-        lucroTotal: 0,
-        lucroPorCabeca: null,
-        lucroPorArroba: null,
-        margemPct: null,
-        custoPorCabecaDia: null,
-      };
-    }
-
-    const base = lotesStats.reduce((acc, item) => {
-      acc.lucroTotal += Number(item.indicators.lucroTotal || 0);
-      acc.receitaTotal += Number(item.indicators.receitaTotal || 0);
-      acc.custoTotal += Number(item.indicators.custoTotal || 0);
-      acc.cabecas += Number(item.indicators.totalAnimais || 0);
-      acc.custoPorCabecaDia += Number(item.indicators.custoPorCabecaDia || 0);
-      return acc;
-    }, { lucroTotal: 0, receitaTotal: 0, custoTotal: 0, cabecas: 0, custoPorCabecaDia: 0 });
-
-    return {
-      lucroTotal: base.lucroTotal,
-      lucroPorCabeca: base.cabecas > 0 ? base.lucroTotal / base.cabecas : null,
-      lucroPorArroba: arrobaMedia > 0 && base.cabecas > 0 ? base.lucroTotal / (arrobaMedia * base.cabecas) : null,
-      margemPct: base.receitaTotal > 0 ? (base.lucroTotal / base.receitaTotal) * 100 : null,
-      custoPorCabecaDia: lotesStats.length > 0 ? base.custoPorCabecaDia / lotesStats.length : null,
-    };
-  }, [arrobaMedia, lotesStats]);
 
   const kpisMain = [
     {
@@ -346,39 +165,11 @@ export default function DashboardPage({
       variant: KPI_VARIANTS.neutral,
     },
     {
-      title: 'GMD medio',
-      value: `${formatNumber(gmdMedio, 3)} kg/dia`,
-      variation: getVariation(gmdMedio, gmdMedio * 0.96),
-      icon: Scale,
-      variant: KPI_VARIANTS.success,
-    },
-    {
-      title: 'Peso medio atual',
-      value: `${formatNumber(pesoMedioAtual, 1)} kg`,
-      variation: getVariation(pesoMedioAtual, pesoMedioAtual * 0.95),
-      icon: Weight,
-      variant: KPI_VARIANTS.info,
-    },
-    {
       title: 'Resultado financeiro',
-      value: formatCurrency(indicadoresFinanceiros.lucroTotal),
-      variation: getVariation(indicadoresFinanceiros.lucroTotal, indicadoresFinanceiros.lucroTotal * 0.85),
+      value: formatCurrency(resultadoMes),
+      variation: getVariation(resultadoMes, resultadoMes * 0.85),
       icon: DollarSign,
-      variant: indicadoresFinanceiros.lucroTotal >= 0 ? KPI_VARIANTS.success : KPI_VARIANTS.danger,
-    },
-    {
-      title: 'Margem consolidada',
-      value: indicadoresFinanceiros.margemPct === null ? 'Sem base' : `${formatNumber(indicadoresFinanceiros.margemPct, 1)}%`,
-      variation: getVariation(indicadoresFinanceiros.margemPct || 0, (indicadoresFinanceiros.margemPct || 0) * 0.95),
-      icon: Scale,
-      variant: (indicadoresFinanceiros.margemPct || 0) >= 0 ? KPI_VARIANTS.info : KPI_VARIANTS.warning,
-    },
-    {
-      title: 'Status nuvem',
-      value: cloudVerified ? 'Nuvem verificada' : 'Modo local',
-      variation: { direction: 'neutral', value: cloudVerified ? 'Sincronização disponível' : 'Reconectar para validar' },
-      icon: cloudVerified ? CheckCircle2 : AlertTriangle,
-      variant: cloudVerified ? KPI_VARIANTS.success : KPI_VARIANTS.warning,
+      variant: resultadoMes >= 0 ? KPI_VARIANTS.success : KPI_VARIANTS.danger,
     },
     {
       title: 'Pagamentos pendentes',
@@ -388,77 +179,6 @@ export default function DashboardPage({
       variant: pagamentosResumo.totalPendente > 0 ? KPI_VARIANTS.warning : KPI_VARIANTS.success,
     },
   ];
-
-  const executiveSignals = [
-    {
-      label: 'Alertas prioritários',
-      value: formatNumber(totalAlertasCriticos || alertasFormatados.length, 0),
-      helper: totalAlertasCriticos ? 'críticos aguardando ação' : 'alertas operacionais em leitura',
-    },
-    {
-      label: 'Lucro por cabeça',
-      value: indicadoresFinanceiros.lucroPorCabeca === null ? 'Sem base' : formatarMoeda(indicadoresFinanceiros.lucroPorCabeca),
-      helper: 'consolidado dos lotes ativos',
-    },
-    {
-      label: 'Custo/cabeça/dia',
-      value: indicadoresFinanceiros.custoPorCabecaDia === null ? 'Sem base' : formatarMoeda(indicadoresFinanceiros.custoPorCabecaDia),
-      helper: 'eficiência operacional média',
-    },
-    {
-      label: 'Lucro por arroba',
-      value: indicadoresFinanceiros.lucroPorArroba === null ? 'Sem base' : formatarMoeda(indicadoresFinanceiros.lucroPorArroba),
-      helper: 'indicador financeiro zootécnico',
-    },
-  ];
-
-  const alertasPrioritarios = useMemo(() => {
-    const operacionais = alertasOperacionais.map((alert) => ({
-      id: `alerta-${alert.id}`,
-      titulo: alert.titulo,
-      descricao: alert.descricao,
-      badge: urgencyVariant(alert) === 'danger' ? 'Critico' : urgencyVariant(alert) === 'warning' ? 'Atencao' : 'Monitorar',
-      variant: urgencyVariant(alert),
-      action: () => onNavigate?.(alert.acao?.rota || 'dashboard'),
-    }));
-
-    const lotesCriticos = lotesEmAtencao.map((item) => ({
-      id: `lote-${item.lote.id}`,
-      titulo: item.lote.nome,
-      descricao: item.motivos.join(' · '),
-      badge: item.indicators.lucroTotal >= 0 ? 'Monitorar' : 'Critico',
-      variant: item.indicators.lucroTotal >= 0 ? 'warning' : 'danger',
-      action: () => onNavigate?.('lotes'),
-    }));
-
-    return [...operacionais, ...lotesCriticos].slice(0, 6);
-  }, [alertasOperacionais, lotesEmAtencao, onNavigate]);
-
-  const proximosPassos = useMemo(() => {
-    const tarefas = tarefasUrgentes.map((item) => ({
-      id: `tarefa-${item.id}`,
-      titulo: item.titulo,
-      descricao: `${formatDate(item.data_vencimento)} · ${item.prioridade}`,
-      badge: item.dias < 0 ? 'Vencida' : item.dias === 0 ? 'Hoje' : `${item.dias}d`,
-      variant: item.dias < 0 ? 'danger' : item.dias <= 1 ? 'warning' : 'info',
-      action: () => onNavigate?.('tarefas'),
-      sortScore: item.dias,
-    }));
-
-    const agenda = eventosCalendario.map((item) => ({
-      id: `agenda-${item.id}`,
-      titulo: item.desc,
-      descricao: `${item.loteNome} · ${formatDate(item.proxima)}`,
-      badge: item.dias < 0 ? 'Atrasado' : item.dias <= 3 ? 'Urgente' : 'Programado',
-      variant: item.dias < 0 ? 'danger' : item.dias <= 3 ? 'warning' : 'success',
-      action: () => onNavigate?.('calendarioOperacional'),
-      sortScore: item.dias,
-    }));
-
-    return [...tarefas, ...agenda]
-      .sort((a, b) => a.sortScore - b.sortScore)
-      .slice(0, 6);
-  }, [eventosCalendario, tarefasUrgentes, onNavigate]);
 
   const funcionariosMap = useMemo(() => new Map((db.funcionarios || []).map((item) => [Number(item.id), item])), [db.funcionarios]);
 
@@ -541,147 +261,8 @@ export default function DashboardPage({
             ))}
           </section>
 
-          <section className="dashboard-executive-strip">
-            {executiveSignals.map((item) => (
-              <div key={item.label} className="dashboard-executive-chip">
-                <span>{item.label}</span>
-                <strong>{item.value}</strong>
-                <small>{item.helper}</small>
-              </div>
-            ))}
-          </section>
-
-          <section className="dashboard-grid dashboard-grid--operations">
-            <Card
-              title="Alertas prioritarios"
-              subtitle="O que mais pesa na demonstracao comercial e na rotina operacional."
-              action={
-                <Button size="sm" variant="ghost" onClick={() => setTabAtiva?.('alertas')}>
-                  Ver todos
-                </Button>
-              }
-            >
-              <div className="dashboard-list">
-                {alertasPrioritarios.length === 0 ? (
-                  <p className="dashboard-empty-copy">Nenhum alerta prioritario no momento.</p>
-                ) : (
-                  alertasPrioritarios.map((item) => (
-                    <button
-                      key={item.id}
-                      type="button"
-                      className="dashboard-list-item dashboard-list-item--button"
-                      onClick={item.action}
-                    >
-                      <div className="dashboard-list-copy">
-                        <strong>{item.titulo}</strong>
-                        <p>{item.descricao}</p>
-                      </div>
-                      <Badge variant={item.variant}>{item.badge}</Badge>
-                    </button>
-                  ))
-                )}
-              </div>
-            </Card>
-
-            <Card
-              title="Tarefas e proximos passos"
-              subtitle="Pendencias, agenda sanitaria e follow-ups para manter a operacao fluindo."
-              action={
-                <Button size="sm" variant="ghost" onClick={() => onNavigate?.('tarefas')}>
-                  Abrir rotina
-                </Button>
-              }
-            >
-              <div className="dashboard-list">
-                {proximosPassos.length === 0 ? (
-                  <p className="dashboard-empty-copy">Nenhuma pendencia imediata registrada.</p>
-                ) : (
-                  proximosPassos.map((item) => (
-                    <button
-                      key={item.id}
-                      type="button"
-                      className="dashboard-list-item dashboard-list-item--button"
-                      onClick={item.action}
-                    >
-                      <div className="dashboard-list-copy">
-                        <strong>{item.titulo}</strong>
-                        <p>
-                          {item.descricao}
-                        </p>
-                      </div>
-                      <Badge variant={item.variant}>
-                        {item.badge}
-                      </Badge>
-                    </button>
-                  ))
-                )}
-              </div>
-            </Card>
-
-
-            <Card
-              title="Lembretes de pagamentos"
-              subtitle="Acompanhe vencimentos e mantenha o caixa organizado."
-              action={<Button size="sm" variant="ghost" onClick={() => onNavigate?.('financeiro')}>Abrir financeiro</Button>}
-            >
-              <div className="dashboard-list">
-                <div className="dashboard-list-item"><div className="dashboard-list-copy"><strong>Pagamentos vencidos</strong><p>{formatNumber(pagamentosResumo.vencidos, 0)}</p></div></div>
-                <div className="dashboard-list-item"><div className="dashboard-list-copy"><strong>Vencem hoje</strong><p>{formatNumber(pagamentosResumo.hoje, 0)}</p></div></div>
-                <div className="dashboard-list-item"><div className="dashboard-list-copy"><strong>Próximos pagamentos</strong><p>{formatNumber(pagamentosResumo.proximos, 0)}</p></div></div>
-                <div className="dashboard-list-item"><div className="dashboard-list-copy"><strong>Total pendente</strong><p>{pagamentosResumo.totalPendente > 0 ? formatCurrency(pagamentosResumo.totalPendente) : 'Nenhum pagamento pendente'}</p></div></div>
-                <div className="dashboard-list-item"><div className="dashboard-list-copy"><strong>Total pago</strong><p>{formatCurrency(pagamentosResumo.totalPago)}</p></div></div>
-              </div>
-            </Card>
-
-            <Card
-              title="Lembretes reprodutivos"
-              subtitle="Acompanhe ações de IATF/Reprodução planejadas no manejo sanitário."
-              action={<Button size="sm" variant="ghost" onClick={() => onNavigate?.('sanitario')}>Abrir sanitário</Button>}
-            >
-              <div className="dashboard-list">
-                {lembretesReprodutivos.total === 0 ? (
-                  <p className="dashboard-empty-copy">Nenhuma ação reprodutiva pendente.</p>
-                ) : (
-                  <>
-                    <div className="dashboard-list-item"><div className="dashboard-list-copy"><strong>IATF hoje</strong><p>{formatNumber(lembretesReprodutivos.hoje.length, 0)}</p></div></div>
-                    <div className="dashboard-list-item"><div className="dashboard-list-copy"><strong>Próximas ações reprodutivas</strong><p>{formatNumber(lembretesReprodutivos.proximas.length, 0)}</p></div></div>
-                    <div className="dashboard-list-item"><div className="dashboard-list-copy"><strong>Protocolos em andamento</strong><p>{formatNumber(lembretesReprodutivos.emAndamento.length, 0)}</p></div></div>
-                    {lembretesReprodutivos.proximas.slice(0, 2).map((item) => (
-                      <div key={`iatf-next-${item.id}`} className="dashboard-list-item">
-                        <div className="dashboard-list-copy">
-                          <strong>{item.desc || 'Protocolo IATF'}</strong>
-                          <p>{item.loteNome} • {formatDate(item.dataRef)}</p>
-                        </div>
-                      </div>
-                    ))}
-                  </>
-                )}
-              </div>
-            </Card>
-
-            <Card
-              title="Acoes rapidas uteis"
-              subtitle="Atalhos diretos para os fluxos que mais importam em uma demo."
-            >
-              <div className="dashboard-action-grid">
-                <Button fullWidth disabled={!hasPermission('pesagens:editar')} onClick={() => onNavigate?.('pesagens', { action: 'novo' })}>
-                  Nova pesagem
-                </Button>
-                <Button fullWidth variant="outline" disabled={!hasPermission('lotes:editar')} onClick={() => onNavigate?.('lotes')}>
-                  Novo lote
-                </Button>
-                <Button fullWidth variant="outline" disabled={!hasPermission('sanitario:editar')} onClick={() => onNavigate?.('sanitario')}>
-                  Registrar manejo
-                </Button>
-                <Button fullWidth variant="outline" disabled={!hasPermission('estoque:editar')} onClick={() => onNavigate?.('suplementacao')}>
-                  Registrar consumo
-                </Button>
-              </div>
-            </Card>
-          </section>
-
           <section className="dashboard-task-board">
-            <Card title="Quadro de tarefas" subtitle="Registre tarefas com responsavel e acompanhe por status no dashboard.">
+            <Card title="Quadro de tarefas" subtitle="Tarefas acionaveis do dia com status claro para a equipe.">
               <div className="dashboard-task-create">
                 <input className="ui-input" placeholder="Titulo da tarefa" value={novaTarefa.titulo} onChange={(e) => setNovaTarefa((p) => ({ ...p, titulo: e.target.value }))} />
                 <select className="ui-input" value={novaTarefa.funcionario_id} onChange={(e) => setNovaTarefa((p) => ({ ...p, funcionario_id: e.target.value }))}>
@@ -716,77 +297,29 @@ export default function DashboardPage({
 
           <section className="dashboard-grid dashboard-grid--dual">
             <Card
-              title="Estoque critico"
-              subtitle="Cobertura baixa, reposicao e itens que merecem atencao comercial."
+              title="Resumo financeiro"
+              subtitle="Situacao diaria de pagamentos pendentes e liquidados."
               action={
-                <Button size="sm" variant="ghost" onClick={() => onNavigate?.('estoque')}>
-                  Abrir estoque
+                <Button size="sm" variant="ghost" onClick={() => onNavigate?.('financeiro')}>
+                  Abrir financeiro
                 </Button>
               }
             >
-              <div className="stock-list">
-                {estoqueCritico.length === 0 ? (
-                  <p className="dashboard-empty-copy">Sem itens criticos no momento.</p>
-                ) : (
-                  estoqueCritico.map((item) => (
-                    <div key={item.id} className="stock-item">
-                      <div className="stock-head">
-                        <span>{item.produto || item.nome}</span>
-                        <span>{formatNumber(item.ratio, 0)}%</span>
-                      </div>
-                      <div className="stock-bar">
-                        <span style={{ width: `${Math.max(item.ratio, 4)}%` }} />
-                      </div>
-                    </div>
-                  ))
-                )}
+              <div className="dashboard-list">
+                <div className="dashboard-list-item"><div className="dashboard-list-copy"><strong>Pagamentos vencidos</strong><p>{formatNumber(pagamentosResumo.vencidos, 0)}</p></div></div>
+                <div className="dashboard-list-item"><div className="dashboard-list-copy"><strong>Vencem hoje</strong><p>{formatNumber(pagamentosResumo.hoje, 0)}</p></div></div>
+                <div className="dashboard-list-item"><div className="dashboard-list-copy"><strong>Proximos pagamentos</strong><p>{formatNumber(pagamentosResumo.proximos, 0)}</p></div></div>
+                <div className="dashboard-list-item"><div className="dashboard-list-copy"><strong>Total pendente</strong><p>{pagamentosResumo.totalPendente > 0 ? formatCurrency(pagamentosResumo.totalPendente) : 'Nenhum pagamento pendente'}</p></div></div>
+                <div className="dashboard-list-item"><div className="dashboard-list-copy"><strong>Total pago</strong><p>{formatCurrency(pagamentosResumo.totalPago)}</p></div></div>
               </div>
             </Card>
 
-            <Card
-              title="Resultado financeiro"
-              subtitle="Receita, custo e leitura executiva para a conversa comercial."
-              className="dashboard-summary-card"
-            >
-              <div className="dashboard-summary-grid">
-                <div className="dashboard-summary-metric">
-                  <small>Receita estimada</small>
-                  <strong>{formatCurrency(receitaMes)}</strong>
-                </div>
-                <div className="dashboard-summary-metric">
-                  <small>Custo operacional</small>
-                  <strong>{formatCurrency(custoMes)}</strong>
-                </div>
-                <div className="dashboard-summary-metric">
-                  <small>Resultado do mes</small>
-                  <strong className={resultadoMes >= 0 ? 'positive' : 'negative'}>
-                    {formatCurrency(resultadoMes)}
-                  </strong>
-                </div>
-                <div className="dashboard-summary-metric">
-                  <small>Valor em estoque</small>
-                  <strong>{formatarMoeda(valorTotalEstoque)}</strong>
-                </div>
-              </div>
-
-              <div className="dashboard-summary-divider" />
-
-              <div className="dashboard-summary-list">
-                <div className="dashboard-summary-line">
-                  <span>Melhor margem</span>
-                  <strong>{melhorLote?.lote?.nome || '-'}</strong>
-                  <small>{melhorLote ? formatCurrency(melhorLote.indicators.lucroTotal) : '-'}</small>
-                </div>
-                <div className="dashboard-summary-line">
-                  <span>Maior atencao financeira</span>
-                  <strong>{piorLote?.lote?.nome || '-'}</strong>
-                  <small>{piorLote ? formatCurrency(piorLote.indicators.lucroTotal) : '-'}</small>
-                </div>
-                <div className="dashboard-summary-line">
-                  <span>Arroba media atual</span>
-                  <strong>{formatNumber(arrobaMedia, 2)} @</strong>
-                  <small>media consolidada do rebanho ativo</small>
-                </div>
+            <Card title="Resumo do rebanho" subtitle="Visao objetiva para decisao diaria da operacao.">
+              <div className="dashboard-list">
+                <div className="dashboard-list-item"><div className="dashboard-list-copy"><strong>Cabecas ativas</strong><p>{formatNumber(totalCabecasAtivas, 0)}</p></div></div>
+                <div className="dashboard-list-item"><div className="dashboard-list-copy"><strong>Lotes ativos</strong><p>{formatNumber(lotesAtivos.length, 0)}</p></div></div>
+                <div className="dashboard-list-item"><div className="dashboard-list-copy"><strong>Peso medio atual</strong><p>{formatNumber(pesoMedioAtual, 1)} kg</p></div></div>
+                <div className="dashboard-list-item"><div className="dashboard-list-copy"><strong>Resultado do mes</strong><p className={resultadoMes >= 0 ? 'positive' : 'negative'}>{formatCurrency(resultadoMes)}</p></div></div>
               </div>
             </Card>
           </section>
@@ -996,49 +529,3 @@ function getVariation(current, previous) {
   return ((current - previous) / Math.abs(previous)) * 100;
 }
 
-function prioridadeRank(valor) {
-  if (valor === 'critica') return 4;
-  if (valor === 'alta') return 3;
-  if (valor === 'media') return 2;
-  return 1;
-}
-
-function daysUntil(dateStr) {
-  if (!dateStr) return Number.POSITIVE_INFINITY;
-  const now = new Date();
-  now.setHours(0, 0, 0, 0);
-  const target = new Date(dateStr);
-  target.setHours(0, 0, 0, 0);
-  return Math.round((target - now) / 86400000);
-}
-
-function urgencyVariant(alert) {
-  const text = `${alert.title || alert.titulo || ''} ${alert.description || alert.descricao || ''}`.toLowerCase();
-  if (text.includes('atrasad') || text.includes('venc') || text.includes('crit')) return 'danger';
-  if (text.includes('3 dia') || text.includes('urg') || text.includes('alerta')) return 'warning';
-  return 'success';
-}
-
-function urgencyRank(alert) {
-  const variant = urgencyVariant(alert);
-  if (variant === 'danger') return 0;
-  if (variant === 'warning') return 1;
-  return 2;
-}
-
-function PesoTooltip({ active, payload, label }) {
-  if (!active || !payload?.length) return null;
-
-  return (
-    <div className="peso-tooltip">
-      <strong>{label}</strong>
-      {payload
-        .filter((item) => item.value != null)
-        .map((item) => (
-          <div key={item.dataKey}>
-            {item.dataKey}: {formatNumber(item.value, 1)} kg ({formatNumber(item.value / 15, 2)} @)
-          </div>
-        ))}
-    </div>
-  );
-}
