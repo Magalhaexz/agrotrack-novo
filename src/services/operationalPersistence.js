@@ -1,10 +1,8 @@
 import { getSupabaseEnvStatus, supabase, validateSupabaseSessionForCloud } from '../lib/supabase.js';
 const NETWORK_CIRCUIT_OPEN_MS = 45000;
 const moduleNetworkCircuit = new Map();
-const OWNER_SCOPE_OPTIONAL_TABLES = new Set([
-  'alertas_resolvidos',
-  'alertas_adiados',
-]);
+const OWNER_SCOPE_OPTIONAL_TABLES = new Set([]);
+const tableCapabilityCache = new Map();
 
 function getSessionUserId(session) {
   return session?.user?.id || null;
@@ -43,6 +41,57 @@ function getSafeErrorDetails(error) {
   const details = error?.details ? String(error.details) : null;
   const hint = error?.hint ? String(error.hint) : null;
   return { details, hint };
+}
+
+function getTableCapability(table) {
+  const key = String(table || '').toLowerCase();
+  return tableCapabilityCache.get(key) || {
+    ownerScope: !OWNER_SCOPE_OPTIONAL_TABLES.has(key),
+    metadata: true,
+    createdAt: true,
+  };
+}
+
+function updateTableCapability(table, patch = {}) {
+  const key = String(table || '').toLowerCase();
+  const current = getTableCapability(key);
+  tableCapabilityCache.set(key, { ...current, ...patch });
+}
+
+function tableSupportsOwnerScope(table) {
+  return Boolean(getTableCapability(table).ownerScope);
+}
+
+function tableSupportsMetadata(table) {
+  return Boolean(getTableCapability(table).metadata);
+}
+
+function tableSupportsCreatedAt(table) {
+  return Boolean(getTableCapability(table).createdAt);
+}
+
+function isOwnerColumnSchemaError(error) {
+  const code = String(error?.code || '').toUpperCase();
+  const message = String(getErrorMessage(error) || '').toLowerCase();
+  const details = String(error?.details || '').toLowerCase();
+  return (
+    code === '42703'
+    || code === 'PGRST204'
+    || message.includes('owner_user_id')
+    || details.includes('owner_user_id')
+  );
+}
+
+function isCreatedAtSchemaError(error) {
+  const code = String(error?.code || '').toUpperCase();
+  const message = String(getErrorMessage(error) || '').toLowerCase();
+  const details = String(error?.details || '').toLowerCase();
+  return (
+    code === '42703'
+    || code === 'PGRST204'
+    || message.includes('created_at')
+    || details.includes('created_at')
+  );
 }
 
 function shouldOpenNetworkCircuit(error) {
@@ -160,6 +209,7 @@ function logOperationalSync(event = {}, level = 'debug') {
   const logger = level === 'warn' ? console.warn : console.debug;
   logger('[HERDON_OPERATIONAL_SYNC]', {
     stage: event.stage || null,
+    requestStage: event.requestStage || null,
     action: event.action || null,
     table: event.table || null,
     hasSessionUser: Boolean(event.hasSessionUser),
@@ -315,10 +365,6 @@ function sanitizeRecord(record = {}) {
   return safeRecord;
 }
 
-function tableSupportsOwnerScope(table) {
-  return !OWNER_SCOPE_OPTIONAL_TABLES.has(String(table || '').toLowerCase());
-}
-
 function toIsoDate(value) {
   if (!value) return new Date().toISOString();
   try {
@@ -332,13 +378,24 @@ function toIsoDate(value) {
 
 function buildAlertResolvedPayload(record, userId) {
   const safe = sanitizeRecord(record);
+  const chave = String(safe?.chave || safe?.ackKey || safe?.id || '').trim();
   const payload = {
-    chave: String(safe?.chave || safe?.ackKey || safe?.id || '').trim(),
+    chave,
+    ack_key: chave || null,
     resolved_at: toIsoDate(safe?.resolvedAt),
-    origem: String(safe?.origem || 'app_header').trim(),
-    observacao: String(safe?.observacao || safe?.descricao || '').trim() || null,
+    origem: String(safe?.origem || 'app_header').trim() || 'app_header',
+    metadata: isObject(safe?.metadata)
+      ? safe.metadata
+      : {
+          local_id: safe?.id ?? null,
+          source: 'herdon_alert_resolve',
+        },
   };
   if (!payload.chave) return null;
+  if (tableSupportsCreatedAt('alertas_resolvidos')) {
+    payload.created_at = toIsoDate(safe?.created_at);
+    payload.updated_at = toIsoDate(safe?.updated_at);
+  }
   if (tableSupportsOwnerScope('alertas_resolvidos') && userId) {
     payload.owner_user_id = userId;
   }
@@ -348,15 +405,25 @@ function buildAlertResolvedPayload(record, userId) {
 function buildAlertSnoozedPayload(record, userId) {
   const safe = sanitizeRecord(record);
   const chave = String(safe?.chave || safe?.ackKey || safe?.id || '').trim();
-  const ate = String(safe?.ate || safe?.snoozeUntil || '').trim();
+  const ateRaw = String(safe?.ate || safe?.snoozeUntil || '').trim();
+  const ate = ateRaw ? toIsoDate(ateRaw) : '';
   if (!chave || !ate) return null;
   const payload = {
     chave,
     ate,
     snooze_until: ate,
-    origem: String(safe?.origem || 'app_header').trim(),
-    observacao: String(safe?.observacao || safe?.descricao || '').trim() || null,
+    origem: String(safe?.origem || 'app_header').trim() || 'app_header',
+    metadata: isObject(safe?.metadata)
+      ? safe.metadata
+      : {
+          local_id: safe?.id ?? null,
+          source: 'herdon_alert_snooze',
+        },
   };
+  if (tableSupportsCreatedAt('alertas_adiados')) {
+    payload.created_at = toIsoDate(safe?.created_at);
+    payload.updated_at = toIsoDate(safe?.updated_at);
+  }
   if (tableSupportsOwnerScope('alertas_adiados') && userId) {
     payload.owner_user_id = userId;
   }
@@ -371,6 +438,54 @@ function buildOperationalCreatePayload(table, record, userId) {
   if (normalizedTable === 'alertas_adiados') {
     return buildAlertSnoozedPayload(record, userId);
   }
+  if (normalizedTable === 'fazendas') {
+    const safe = sanitizeRecord(record);
+    const nome = toNullableString(safe?.nome);
+    if (!nome) return null;
+    const localId = safe?.id ?? null;
+    const cloudUuid = normalizeCloudUuid(safe?.cloud_id ?? safe?.metadata?.cloud_id);
+    const metadata = {
+      ...(isObject(safe?.metadata) ? safe.metadata : {}),
+      local_id: localId,
+      source: 'herdon_fazendas_create',
+    };
+    const payload = {
+      nome,
+      proprietario: toNullableString(safe?.proprietario),
+      responsavel: toNullableString(safe?.responsavel),
+      cidade: toNullableString(safe?.cidade),
+      estado: toNullableString(safe?.estado),
+      area_total_ha: toNullableNumber(safe?.area_total_ha),
+      area_pastagem_ha: toNullableNumber(safe?.area_pastagem_ha),
+      capacidade_ua: toNullableNumber(safe?.capacidade_ua),
+      tipo_producao: toNullableString(safe?.tipo_producao),
+      inscricao_estadual: toNullableString(safe?.inscricao_estadual),
+      cnpj_cpf: toNullableString(safe?.cnpj_cpf),
+      telefone: toNullableString(safe?.telefone),
+      email: toNullableString(safe?.email),
+      endereco: toNullableString(safe?.endereco),
+      status: toNullableString(safe?.status) || 'ativa',
+      observacoes: toNullableString(safe?.observacoes),
+      metadata,
+      hectares: toNullableNumber(safe?.hectares),
+      area: toNullableNumber(safe?.area),
+      hectares_pastagem: toNullableNumber(safe?.hectares_pastagem),
+      capacidade_lotacao: toNullableNumber(safe?.capacidade_lotacao),
+      synced_from: toNullableString(safe?.synced_from) || 'herdon_app',
+      cloud_id: cloudUuid,
+    };
+    // bigint `id` is generated by Supabase; never send local `id` in create payload.
+    delete payload.id;
+    if (tableSupportsMetadata('fazendas')) {
+      payload.metadata = isObject(payload.metadata) ? payload.metadata : {};
+    } else {
+      delete payload.metadata;
+    }
+    if (tableSupportsOwnerScope('fazendas') && userId) {
+      payload.owner_user_id = userId;
+    }
+    return payload;
+  }
   const safe = sanitizeRecord(record);
   if (tableSupportsOwnerScope(normalizedTable)) {
     return {
@@ -379,6 +494,30 @@ function buildOperationalCreatePayload(table, record, userId) {
     };
   }
   return safe;
+}
+
+async function tryInsertPayloadVariants(table, payloadOrVariants) {
+  const variants = Array.isArray(payloadOrVariants) ? payloadOrVariants : [payloadOrVariants];
+  let lastError = null;
+  for (let index = 0; index < variants.length; index += 1) {
+    const payload = variants[index];
+    const { data, error } = await supabase
+      .from(table)
+      .insert(payload)
+      .select('*')
+      .single();
+    if (!error) {
+      return { data, error: null };
+    }
+    lastError = error;
+    if (isOwnerColumnSchemaError(error)) {
+      updateTableCapability(table, { ownerScope: false });
+    }
+    if (String(table || '').toLowerCase() === 'fazendas' && isCreatedAtSchemaError(error)) {
+      updateTableCapability(table, { createdAt: false });
+    }
+  }
+  return { data: null, error: lastError };
 }
 
 function toNullableString(value) {
@@ -687,11 +826,7 @@ export async function createOperationalRecord(table, record, session) {
       });
       return fallback;
     }
-    const { data, error } = await supabase
-      .from(table)
-      .insert(payload)
-      .select('*')
-      .single();
+    const { data, error } = await tryInsertPayloadVariants(table, payload);
 
     if (error) {
       throw error;
@@ -710,9 +845,12 @@ export async function createOperationalRecord(table, record, session) {
   } catch (error) {
     const status = getHttpStatus(error);
     const safe = getSafeErrorDetails(error);
-    const classifiedCode = classifyCloudSaveCode(error?.code, error, status);
+    const classifiedCode = status === 400
+      ? 'schema_error'
+      : classifyCloudSaveCode(error?.code, error, status);
     logOperationalSync({
       stage: 'create_error',
+      requestStage: 'insert',
       action: 'create',
       table,
       hasSessionUser: Boolean(userId),
@@ -763,18 +901,21 @@ export async function updateOperationalRecord(table, id, patch, session) {
 
   try {
     const payload = sanitizeRecord(patch);
-    let query = supabase
-      .from(table)
-      .update(payload)
-      .eq('id', id);
-    if (tableSupportsOwnerScope(table)) {
-      query = query.eq('owner_user_id', userId);
+    const withOwner = tableSupportsOwnerScope(table);
+    const runUpdate = async (useOwnerScope) => {
+      let query = supabase
+        .from(table)
+        .update(payload)
+        .eq('id', id);
+      if (useOwnerScope) query = query.eq('owner_user_id', userId);
+      return query.select('*').single();
+    };
+    let { data, error } = await runUpdate(withOwner);
+    if (error && withOwner && isOwnerColumnSchemaError(error)) {
+      updateTableCapability(table, { ownerScope: false });
+      ({ data, error } = await runUpdate(false));
     }
-    const { data, error } = await query.select('*').single();
-
-    if (error) {
-      throw error;
-    }
+    if (error) throw error;
     notifyCloudHealthy('Registro salvo na nuvem.');
     emitCloudSaveState({
       table,
@@ -789,9 +930,15 @@ export async function updateOperationalRecord(table, id, patch, session) {
   } catch (error) {
     const status = getHttpStatus(error);
     const safe = getSafeErrorDetails(error);
-    const classifiedCode = classifyCloudSaveCode(error?.code, error, status);
+    if (isOwnerColumnSchemaError(error)) {
+      updateTableCapability(table, { ownerScope: false });
+    }
+    const classifiedCode = status === 400
+      ? 'schema_error'
+      : classifyCloudSaveCode(error?.code, error, status);
     logOperationalSync({
       stage: 'update_error',
+      requestStage: 'update',
       action: 'update',
       table,
       hasSessionUser: Boolean(userId),
@@ -841,18 +988,21 @@ export async function deleteOperationalRecord(table, id, session) {
   const userId = getSessionUserId(session);
 
   try {
-    let query = supabase
-      .from(table)
-      .delete()
-      .eq('id', id);
-    if (tableSupportsOwnerScope(table)) {
-      query = query.eq('owner_user_id', userId);
+    const withOwner = tableSupportsOwnerScope(table);
+    const runDelete = async (useOwnerScope) => {
+      let query = supabase
+        .from(table)
+        .delete()
+        .eq('id', id);
+      if (useOwnerScope) query = query.eq('owner_user_id', userId);
+      return query;
+    };
+    let { error } = await runDelete(withOwner);
+    if (error && withOwner && isOwnerColumnSchemaError(error)) {
+      updateTableCapability(table, { ownerScope: false });
+      ({ error } = await runDelete(false));
     }
-    const { error } = await query;
-
-    if (error) {
-      throw error;
-    }
+    if (error) throw error;
     notifyCloudHealthy('Nuvem ativa com atualização confirmada.');
     emitCloudSaveState({
       table,
@@ -867,9 +1017,15 @@ export async function deleteOperationalRecord(table, id, session) {
   } catch (error) {
     const status = getHttpStatus(error);
     const safe = getSafeErrorDetails(error);
-    const classifiedCode = classifyCloudSaveCode(error?.code, error, status);
+    if (isOwnerColumnSchemaError(error)) {
+      updateTableCapability(table, { ownerScope: false });
+    }
+    const classifiedCode = status === 400
+      ? 'schema_error'
+      : classifyCloudSaveCode(error?.code, error, status);
     logOperationalSync({
       stage: 'delete_error',
+      requestStage: 'delete',
       action: 'delete',
       table,
       hasSessionUser: Boolean(userId),

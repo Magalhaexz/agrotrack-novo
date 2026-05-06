@@ -21,9 +21,7 @@ const OPERACIONAL_TABLES = [
   'configuracoes',
 ];
 
-const OWNER_SCOPED_TABLES = new Set(
-  OPERACIONAL_TABLES.filter((table) => !['alertas_resolvidos', 'alertas_adiados'].includes(table))
-);
+const OWNER_SCOPED_TABLES = new Set(OPERACIONAL_TABLES);
 const HYDRATION_CONCURRENCY_LIMIT = 3;
 const HYDRATION_MAX_ATTEMPTS = 2;
 const HYDRATION_BACKOFF_MS = 350;
@@ -35,6 +33,7 @@ const HERDON_DISABLE_SUPABASE_SYNC = 'HERDON_DISABLE_SUPABASE_SYNC';
 const inFlightSnapshots = new Map();
 const failedHydrationAt = new Map();
 const schemaWarningTables = new Set();
+const ownerScopeCapabilityByTable = new Map();
 let autoSyncDisabledLogged = false;
 
 function nowMs() {
@@ -181,12 +180,24 @@ async function fetchOperationalTableWithCircuit(table, userId, shouldApply, circ
 
     const startedAt = nowMs();
     try {
-      let query = supabase.from(table).select('*');
-      if (OWNER_SCOPED_TABLES.has(table)) {
-        query = query.eq('owner_user_id', userId);
+      const tableOwnerScope = ownerScopeCapabilityByTable.has(table)
+        ? ownerScopeCapabilityByTable.get(table)
+        : OWNER_SCOPED_TABLES.has(table);
+      const runSelect = async (useOwnerScope) => {
+        let query = supabase.from(table).select('*');
+        if (useOwnerScope) query = query.eq('owner_user_id', userId);
+        return query;
+      };
+      let { data, error } = await runSelect(Boolean(tableOwnerScope));
+      const errMessage = String(getErrorMessage(error) || '').toLowerCase();
+      const ownerColumnMissing = Boolean(
+        error
+        && (error?.code === '42703' || error?.code === 'PGRST204' || errMessage.includes('owner_user_id'))
+      );
+      if (error && tableOwnerScope && ownerColumnMissing) {
+        ownerScopeCapabilityByTable.set(table, false);
+        ({ data, error } = await runSelect(false));
       }
-
-      const { data, error } = await query;
       if (error) throw error;
 
       const durationMs = Number((nowMs() - startedAt).toFixed(1));
