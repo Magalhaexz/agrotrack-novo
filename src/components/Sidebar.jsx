@@ -151,7 +151,10 @@ export default function Sidebar({
                   aria-expanded={section.isOpen}
                   aria-controls={`nav-section-${section.id}`}
                 >
-                  <span>{section.title}</span>
+                  <div className="sidebar-group-copy">
+                    <span>{section.title}</span>
+                    {section.description ? <small className="sidebar-group-description">{section.description}</small> : null}
+                  </div>
                   <ChevronDown size={14} className={`nav-group-arrow ${section.isOpen ? 'open' : ''}`} aria-hidden="true" />
                 </button>
               ) : null}

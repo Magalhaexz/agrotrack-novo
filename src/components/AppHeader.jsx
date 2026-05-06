@@ -1,4 +1,4 @@
-import { Activity, AlertTriangle, Bell, ChevronDown, Clock3, Loader2, LogOut, Menu, Package, Settings, User } from 'lucide-react';
+import { Activity, AlertTriangle, Bell, ChevronDown, Clock3, Loader2, LogOut, Menu, MoreHorizontal, Package, Settings, User } from 'lucide-react';
 import { createPortal } from 'react-dom';
 import { useEffect, useRef, useState } from 'react';
 import { obterLabelPerfil } from '../auth/perfis';
@@ -48,7 +48,7 @@ function formatSyncTime(value) {
 
 function messageIsSessionError(message) {
   const text = String(message || '').toLowerCase();
-  return text.includes('sessÒ£o expirada') || text.includes('sessao expirada') || text.includes('sessÒ£o invÒ¡lida') || text.includes('sessao invalida');
+  return text.includes('sessao expirada') || text.includes('sessao invalida');
 }
 
 function getCloudState(syncStatus) {
@@ -61,7 +61,7 @@ function getCloudState(syncStatus) {
       tone: 'online',
       icon: 'cloud',
       label: 'Nuvem ativa',
-      detail: syncStatus?.lastSyncAt ? `Òšltima sync: ${formatSyncTime(syncStatus.lastSyncAt)}` : 'Nuvem nÒ£o verificada',
+      detail: syncStatus?.lastSyncAt ? `ÃƒÆ’Ã¢â‚¬â„¢Ãƒâ€¦Ã‚Â¡ltima sync: ${formatSyncTime(syncStatus.lastSyncAt)}` : 'Nuvem nÃƒÆ’Ã¢â‚¬â„¢Ãƒâ€šÃ‚Â£o verificada',
       title: syncStatus?.cloudVerifiedMessage || 'Nuvem conectada pelo servidor.',
       disabled: false,
     };
@@ -72,8 +72,8 @@ function getCloudState(syncStatus) {
       tone: 'syncing',
       icon: 'loading',
       label: 'Sincronizando...',
-      detail: syncStatus?.lastSyncAt ? `Òšltima sync: ${formatSyncTime(syncStatus.lastSyncAt)}` : 'Nuvem nÒ£o verificada',
-      title: 'SincronizaÒ§Ò£o manual em andamento',
+      detail: syncStatus?.lastSyncAt ? `ÃƒÆ’Ã¢â‚¬â„¢Ãƒâ€¦Ã‚Â¡ltima sync: ${formatSyncTime(syncStatus.lastSyncAt)}` : 'Nuvem nÃƒÆ’Ã¢â‚¬â„¢Ãƒâ€šÃ‚Â£o verificada',
+      title: 'SincronizaÃƒÆ’Ã¢â‚¬â„¢Ãƒâ€šÃ‚Â§ÃƒÆ’Ã¢â‚¬â„¢Ãƒâ€šÃ‚Â£o manual em andamento',
       disabled: true,
     };
   }
@@ -83,8 +83,8 @@ function getCloudState(syncStatus) {
       tone: 'warning',
       icon: 'warning',
       label: 'Modo local',
-      detail: 'Nuvem nÒ£o verificada',
-      title: 'SessÒ£o expirada. Reconecte para voltar a sincronizar.',
+      detail: 'Nuvem nÃƒÆ’Ã¢â‚¬â„¢Ãƒâ€šÃ‚Â£o verificada',
+      title: 'SessÃƒÆ’Ã¢â‚¬â„¢Ãƒâ€šÃ‚Â£o expirada. Reconecte para voltar a sincronizar.',
       disabled: false,
     };
   }
@@ -105,7 +105,7 @@ function getCloudState(syncStatus) {
       tone: 'warning',
       icon: 'warning',
       label: 'Modo local',
-      detail: message || 'Nuvem indisponÒ­vel no momento',
+      detail: message || 'Nuvem indisponÃƒÆ’Ã¢â‚¬â„¢Ãƒâ€šÃ‚Â­vel no momento',
       title: message || 'Falha de nuvem detectada. O modo local continua ativo.',
       disabled: false,
     };
@@ -117,7 +117,7 @@ function getCloudState(syncStatus) {
       icon: 'local',
       label: 'Nuvem pausada',
       detail: 'Modo local ativo',
-      title: 'SincronizaÒ§Ò£o com Supabase desativada neste navegador',
+      title: 'SincronizaÃƒÆ’Ã¢â‚¬â„¢Ãƒâ€šÃ‚Â§ÃƒÆ’Ã¢â‚¬â„¢Ãƒâ€šÃ‚Â£o com Supabase desativada neste navegador',
       disabled: false,
     };
   }
@@ -126,8 +126,8 @@ function getCloudState(syncStatus) {
     tone: 'local',
     icon: 'local',
     label: 'Modo local',
-    detail: 'Nuvem nÒ£o verificada',
-    title: 'SincronizaÒ§Ò£o manual disponÒ­vel',
+    detail: 'Nuvem nÃƒÆ’Ã¢â‚¬â„¢Ãƒâ€šÃ‚Â£o verificada',
+    title: 'SincronizaÃƒÆ’Ã¢â‚¬â„¢Ãƒâ€šÃ‚Â§ÃƒÆ’Ã¢â‚¬â„¢Ãƒâ€šÃ‚Â£o manual disponÃƒÆ’Ã¢â‚¬â„¢Ãƒâ€šÃ‚Â­vel',
     disabled: false,
   };
 }
@@ -189,7 +189,7 @@ export default function AppHeader({
     return 'success';
   }
 
-  const nomeExibicao = usuarioLogado?.nome || 'UsuÒ¡rio';
+  const nomeExibicao = usuarioLogado?.nome || 'UsuÃƒÆ’Ã¢â‚¬â„¢Ãƒâ€šÃ‚Â¡rio';
   const perfilExibicao = obterLabelPerfil(usuarioLogado?.perfilLabel || usuarioLogado?.perfil);
   const cloudState = getCloudState(syncStatus);
 
@@ -322,17 +322,13 @@ export default function AppHeader({
               onClick={() => setOpenCloudMenu((value) => !value)}
               aria-expanded={openCloudMenu}
               aria-controls="cloud-dropdown-menu"
-              aria-label="Abrir ações de nuvem"
+              aria-label="Acoes de nuvem"
             >
-              <span>Ações</span>
-              <ChevronDown
-                size={12}
-                style={{ transform: openCloudMenu ? 'rotate(180deg)' : 'rotate(0deg)', transition: 'transform 0.2s' }}
-              />
+              <MoreHorizontal size={14} aria-hidden="true" />
             </button>
 
             {openCloudMenu && (
-              <div id="cloud-dropdown-menu" className="header-sync-dropdown" role="menu" aria-label="Ações de nuvem">
+              <div id="cloud-dropdown-menu" className="header-sync-dropdown" role="menu" aria-label="Acoes de nuvem">
                 <button
                   type="button"
                   className="header-sync-dropdown-item"
@@ -343,8 +339,7 @@ export default function AppHeader({
                   disabled={Boolean(syncStatus?.testingCloud)}
                   role="menuitem"
                 >
-                  Testar conexão
-                </button>
+                  Testar conexao</button>
                 <button
                   type="button"
                   className="header-sync-dropdown-item"
@@ -379,7 +374,7 @@ export default function AppHeader({
             type="button"
             className="header-notification-btn notif-btn"
             ref={notifButtonRef}
-            aria-label={`NotificaÒ§Òµes: ${notifications} ${notifications === 1 ? 'alerta' : 'alertas'} pendentes`}
+            aria-label={`Notificacoes: ${notifications} ${notifications === 1 ? 'alerta' : 'alertas'} pendentes`}
             onClick={() => setOpenNotif((value) => !value)}
             aria-expanded={openNotif}
             aria-controls="notification-dropdown-menu"
@@ -425,7 +420,7 @@ export default function AppHeader({
               </button>
               <button type="button" className="user-dropdown-item" onClick={() => { onNavigateSettings?.(); setOpenUserMenu(false); }}>
                 <Settings size={15} />
-                ConfiguraÒ§Òµes
+                ConfiguraÃƒÆ’Ã¢â‚¬â„¢Ãƒâ€šÃ‚Â§ÃƒÆ’Ã¢â‚¬â„¢Ãƒâ€šÃ‚Âµes
               </button>
               <div className="user-dropdown-divider" />
               <button type="button" className="user-dropdown-item logout" onClick={handleLogout}>
@@ -443,7 +438,7 @@ export default function AppHeader({
             <button
               type="button"
               className="notif-overlay"
-              aria-label="Fechar notificaÒ§Òµes"
+              aria-label="Fechar notificaÃƒÆ’Ã¢â‚¬â„¢Ãƒâ€šÃ‚Â§ÃƒÆ’Ã¢â‚¬â„¢Ãƒâ€šÃ‚Âµes"
               onClick={() => setOpenNotif(false)}
             />
             <div
@@ -461,7 +456,7 @@ export default function AppHeader({
                 <div>
                   <span className="notif-panel-kicker">Central de alertas</span>
                   <strong>{notifications > 0 ? `${notifications} pendentes` : 'Tudo em dia'}</strong>
-                  <small>Alertas operacionais, sanitÒ¡rios, estoque e lembretes do HERDON.</small>
+                  <small>Alertas operacionais, sanitÃƒÆ’Ã¢â‚¬â„¢Ãƒâ€šÃ‚Â¡rios, estoque e lembretes do HERDON.</small>
                 </div>
                 <span className="notif-panel-pill">{notifications}</span>
               </div>
@@ -483,7 +478,7 @@ export default function AppHeader({
                             <span className="notif-item-meta">{destino}</span>
                           </div>
                           <span className={`notif-item-tag notif-item-tag--${tone}`}>
-                            {tone === 'danger' ? 'CrÒ­tico' : tone === 'warning' ? 'AtenÒ§Ò£o' : tone === 'info' ? 'Monitorar' : 'Operacional'}
+                            {tone === 'danger' ? 'CrÃƒÆ’Ã¢â‚¬â„¢Ãƒâ€šÃ‚Â­tico' : tone === 'warning' ? 'AtenÃƒÆ’Ã¢â‚¬â„¢Ãƒâ€šÃ‚Â§ÃƒÆ’Ã¢â‚¬â„¢Ãƒâ€šÃ‚Â£o' : tone === 'info' ? 'Monitorar' : 'Operacional'}
                           </span>
                         </div>
                         <small>{alert.description || alert.mensagem}</small>

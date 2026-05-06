@@ -168,8 +168,8 @@ export default function SuplementacaoPage({ db, setDb }) {
   return (
     <div className="page suplementacao-page">
       <header className="page-header">
-        <h1>Suplementacao</h1>
-        <p>Gerencie dietas, acompanhe o consumo diario e proteja o saldo de estoque sem quebrar o fluxo operacional.</p>
+        <h1>Nutricao / Suplementacao</h1>
+        <p>Dietas, suplementos e planejamento alimentar dos lotes.</p>
         <div className="page-actions">
           <Button disabled={!hasPermission('estoque:editar')} onClick={() => { setDietaEditando(null); setOpenDieta(true); }}>Cadastrar dieta</Button>
           <Button variant="outline" disabled={!hasPermission('estoque:editar')} onClick={() => setOpenConsumo(true)}>Registrar consumo diario</Button>

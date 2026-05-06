@@ -28,10 +28,17 @@ export default function EstoquePage({ db, setDb, onRegistrarSaidaEstoque }) {
   const mensagemSemPermissao = 'Você não tem permissão para executar esta ação.';
 
   const [showOnlyCrit, setShowOnlyCrit] = useState(false);
+  const [escopoEstoque, setEscopoEstoque] = useState('geral');
   const [openEntrada, setOpenEntrada] = useState(false);
   const [openSaida, setOpenSaida] = useState(false);
   const [selectedItem, setSelectedItem] = useState(null);
   const [filters, setFilters] = useState({ item: 'todos', tipo: 'todos', lote: 'todos', periodo: 'todos' });
+
+  function itemEhNutricao(item) {
+    const categoria = String(item?.categoria || item?.tipo || '').toLowerCase();
+    const nome = String(item?.produto || '').toLowerCase();
+    return categoria.includes('insumo') || categoria.includes('suplement') || nome.includes('sal') || nome.includes('nucleo') || nome.includes('protein');
+  }
 
   // Pré-indexar lotes e estoque para buscas eficientes
   const lotesMap = useMemo(() => new Map((db.lotes || []).map(l => [l.id, l])), [db.lotes]);
@@ -39,7 +46,15 @@ export default function EstoquePage({ db, setDb, onRegistrarSaidaEstoque }) {
 
   // Processamento principal dos itens de estoque (MEMOIZADO)
   const itens = useMemo(() => {
-    return (db.estoque || []).map((item) => {
+    const base = (db.estoque || []).filter((item) => (
+      escopoEstoque === 'todos'
+        ? true
+        : escopoEstoque === 'nutricao'
+          ? itemEhNutricao(item)
+          : !itemEhNutricao(item)
+    ));
+
+    return base.map((item) => {
       const hist = (db.movimentacoes_estoque || []).filter((m) => Number(m.item_estoque_id) === Number(item.id));
       const pico = Math.max(Number(item.quantidade_atual || 0), ...hist.map((h) => Number(h.quantidade || 0)));
       const saldo = Number(item.quantidade_atual || 0);
@@ -50,7 +65,7 @@ export default function EstoquePage({ db, setDb, onRegistrarSaidaEstoque }) {
       const status = ratio < 10 ? 'critico' : ratio < 20 ? 'baixo' : 'normal';
       return { ...item, pico, saldo, ratio, mediaConsumo, diasRest, valorTotal: saldo * Number(item.valor_unitario || 0), status };
     });
-  }, [db.estoque, db.movimentacoes_estoque]);
+  }, [db.estoque, db.movimentacoes_estoque, escopoEstoque]);
 
   // Itens de estoque filtrados para exibição (MEMOIZADO)
   const itensView = useMemo(() => {
@@ -66,11 +81,14 @@ export default function EstoquePage({ db, setDb, onRegistrarSaidaEstoque }) {
 
   // Movimentações de estoque filtradas e ordenadas (MEMOIZADO)
   const movs = useMemo(() => (db.movimentacoes_estoque || []).filter((m) => {
+    const itemMov = (db.estoque || []).find((item) => Number(item.id) === Number(m.item_estoque_id));
+    if (escopoEstoque === 'nutricao' && !itemEhNutricao(itemMov)) return false;
+    if (escopoEstoque === 'geral' && itemEhNutricao(itemMov)) return false;
     if (filters.item !== 'todos' && Number(m.item_estoque_id) !== Number(filters.item)) return false;
     if (filters.tipo !== 'todos' && m.tipo !== filters.tipo) return false;
     if (filters.lote !== 'todos' && Number(m.lote_id) !== Number(filters.lote)) return false;
     return true;
-  }).sort((a, b) => new Date(b.data) - new Date(a.data)), [db.movimentacoes_estoque, filters]);
+  }).sort((a, b) => new Date(b.data) - new Date(a.data)), [db.movimentacoes_estoque, db.estoque, escopoEstoque, filters]);
 
   /**
    * Exporta as movimentações de estoque para um arquivo CSV.
@@ -94,7 +112,13 @@ export default function EstoquePage({ db, setDb, onRegistrarSaidaEstoque }) {
     <div className="page rebanho-page page--estoque">
       <div className="rebanho-header">
         <h1>Estoque</h1>
+        <p className="financeiro-subtitle">Medicamentos, vacinas, materiais e insumos gerais.</p>
         <div className="lote-actions">
+          <select className="ui-input" value={escopoEstoque} onChange={(e) => setEscopoEstoque(e.target.value)} style={{ minWidth: 210 }}>
+            <option value="geral">Estoque geral</option>
+            <option value="nutricao">Nutricao / suplementacao</option>
+            <option value="todos">Todos os itens</option>
+          </select>
           <Button icon={<ArrowUpCircle size={14} />} disabled={!hasPermission('estoque:editar')} onClick={() => {
             if (!hasPermission('estoque:editar')) {
               showToast({ type: 'error', message: mensagemSemPermissao });
