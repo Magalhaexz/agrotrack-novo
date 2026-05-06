@@ -390,16 +390,16 @@ export default function App() {
   const alertasAdiados = Array.isArray(db?.alertas_adiados) ? db.alertas_adiados : [];
 
   const resolvedAlertKeys = useMemo(() => {
-    const dbKeys = normalizeResolvedAlertEntries(alertasResolvidos);
     const storageKeys = normalizeResolvedAlertEntries(readJsonStorage(ALERTAS_RESOLVIDOS_STORAGE_KEY, []));
-    return new Set([...dbKeys, ...storageKeys]);
+    const dbKeys = normalizeResolvedAlertEntries(alertasResolvidos);
+    return new Set([...storageKeys, ...dbKeys]);
   }, [alertasResolvidos]);
 
   const snoozedAlerts = useMemo(() => {
-    const dbEntries = normalizeSnoozedAlertEntries(alertasAdiados);
     const storageEntries = normalizeSnoozedAlertEntries(readJsonStorage(ALERTAS_ADIADOS_STORAGE_KEY, []));
+    const dbEntries = normalizeSnoozedAlertEntries(alertasAdiados);
     const merged = new Map();
-    [...dbEntries, ...storageEntries].forEach((item) => {
+    [...storageEntries, ...dbEntries].forEach((item) => {
       if (!item?.chave) return;
       merged.set(item.chave, item);
     });

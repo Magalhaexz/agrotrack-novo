@@ -7556,6 +7556,9 @@ button:hover,
   flex-wrap: wrap;
   gap: 8px;
   align-items: center;
+  position: relative;
+  z-index: 3;
+  pointer-events: auto;
 }
 
 .notif-debug-line,
@@ -7568,52 +7571,39 @@ button:hover,
   word-break: break-word;
 }
 
-.notif-dev-debug {
-  display: grid;
-  gap: 4px;
-  padding: 10px 12px;
-  margin-bottom: 10px;
-  border-radius: 12px;
-  border: 1px dashed rgba(255, 255, 255, 0.12);
-  background: rgba(255, 255, 255, 0.02);
-}
-
-.notif-actions .ui-button {
+.notif-action-btn {
   min-height: 30px;
   padding: 6px 10px;
-}
-
-.notif-snooze-wrap {
-  position: relative;
-}
-
-.notif-snooze-menu {
-  position: absolute;
-  top: calc(100% + 6px);
-  left: 0;
-  z-index: 4;
-  min-width: 124px;
-  display: grid;
-  gap: 4px;
-  padding: 6px;
-  border-radius: 10px;
-  border: 1px solid rgba(255, 255, 255, 0.12);
-  background: rgba(8, 12, 18, 0.96);
-  box-shadow: 0 14px 34px rgba(0, 0, 0, 0.38);
-}
-
-.notif-snooze-menu button {
-  border: 1px solid rgba(255, 255, 255, 0.1);
-  background: rgba(255, 255, 255, 0.03);
-  color: var(--text-primary);
   border-radius: 8px;
-  padding: 6px 8px;
-  text-align: left;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  background: rgba(255, 255, 255, 0.04);
+  color: var(--text-primary);
   cursor: pointer;
+  pointer-events: auto;
+  position: relative;
+  z-index: 2;
 }
 
-.notif-snooze-menu button:hover {
-  background: rgba(255, 255, 255, 0.08);
+.notification-action-btn,
+.notification-action-row button {
+  pointer-events: auto;
+  position: relative;
+  z-index: 2;
+}
+
+.notif-action-btn:hover,
+.notif-action-btn:focus-visible {
+  border-color: rgba(121, 255, 169, 0.36);
+  background: rgba(121, 255, 169, 0.1);
+  outline: none;
+}
+
+.notif-action-btn--resolve {
+  border-color: rgba(121, 255, 169, 0.3);
+}
+
+.notif-action-btn--open {
+  border-color: rgba(94, 165, 255, 0.3);
 }
 
 @media (max-width: 900px) {

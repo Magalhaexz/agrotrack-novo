@@ -1,10 +1,12 @@
-import { Activity, AlertTriangle, Bell, ChevronDown, Clock3, Loader2, LogOut, Menu, MoreHorizontal, Package, Settings, User } from 'lucide-react';
+import { Activity, AlertTriangle, Bell, ChevronDown, Loader2, LogOut, Menu, MoreHorizontal, Package, Settings, User } from 'lucide-react';
 import { createPortal } from 'react-dom';
 import { useEffect, useRef, useState } from 'react';
 import { obterLabelPerfil } from '../auth/perfis';
 import { getNavLabel } from '../navigation/navConfig';
-import Button from './ui/Button';
 import UserAvatar from './ui/UserAvatar';
+
+const ALERTAS_RESOLVIDOS_STORAGE_KEY = 'herdon-alertas-resolvidos';
+const ALERTAS_ADIADOS_STORAGE_KEY = 'herdon-alertas-adiados';
 
 function useDropdown(initialState = false) {
   const [isOpen, setIsOpen] = useState(initialState);
@@ -155,10 +157,11 @@ export default function AppHeader({
   alertDebugState = null,
 }) {
   const [userMenuRef, openUserMenu, setOpenUserMenu] = useDropdown(false);
-  const [notifRef, openNotif, setOpenNotif] = useDropdown(false);
+  const [openNotif, setOpenNotif] = useState(false);
+  const notifRef = useRef(null);
+  const notifPanelRef = useRef(null);
   const [farmsRef, openFarms, setOpenFarms] = useDropdown(false);
   const [cloudMenuRef, openCloudMenu, setOpenCloudMenu] = useDropdown(false);
-  const [snoozeMenuFor, setSnoozeMenuFor] = useState(null);
   const notifButtonRef = useRef(null);
   const [notifPosition, setNotifPosition] = useState({
     top: 0,
@@ -167,6 +170,55 @@ export default function AppHeader({
     maxHeight: 520,
     mobile: false,
   });
+  const [dismissedAlertKeys, setDismissedAlertKeys] = useState(() => new Set());
+  const lastHandledRef = useRef({ signature: '', timestamp: 0 });
+
+  function readJsonStorage(key, fallback) {
+    try {
+      const raw = localStorage.getItem(key);
+      if (!raw) return fallback;
+      const parsed = JSON.parse(raw);
+      return parsed ?? fallback;
+    } catch {
+      return fallback;
+    }
+  }
+
+  function writeJsonStorage(key, value) {
+    try {
+      localStorage.setItem(key, JSON.stringify(value));
+      if (import.meta.env.DEV) {
+        console.debug('[HERDON_ALERT_LOCALSTORAGE]', { key, value });
+      }
+    } catch {
+      // storage indisponivel
+    }
+  }
+
+  function normalizeResolved(entries = []) {
+    return (Array.isArray(entries) ? entries : [])
+      .map((item) => (typeof item === 'string' ? item : item?.chave || item?.ackKey || item?.id || null))
+      .filter(Boolean)
+      .map((item) => String(item));
+  }
+
+  function normalizeSnoozed(entries = []) {
+    return (Array.isArray(entries) ? entries : [])
+      .map((item) => {
+        if (!item || typeof item === 'string') return null;
+        const chave = item?.chave || item?.ackKey || item?.id || null;
+        const ate = item?.ate || item?.snoozeUntil || null;
+        if (!chave || !ate) return null;
+        return { chave: String(chave), ate: String(ate), snoozeUntil: String(item?.snoozeUntil || ate) };
+      })
+      .filter(Boolean);
+  }
+
+  function parseSnoozeDate(days = 1) {
+    const date = new Date();
+    date.setDate(date.getDate() + Number(days || 1));
+    return date.toISOString().slice(0, 10);
+  }
 
   async function handleLogout() {
     const confirmado = await onConfirmAction?.({
@@ -197,6 +249,95 @@ export default function AppHeader({
   const cloudState = getCloudState(syncStatus);
   const resolvedAlertKeys = alertDebugState?.resolvedAlertKeys || new Set();
   const snoozedAlerts = Array.isArray(alertDebugState?.snoozedAlerts) ? alertDebugState.snoozedAlerts : [];
+  const renderedAlerts = alerts.filter((alert) => !dismissedAlertKeys.has(getAlertAckKey(alert)));
+
+  function routeFromAlert(alert, routeFromButton = null) {
+    return routeFromButton || alert?.route || alert?.rota || alert?.acao?.rota || alert?.pagina || null;
+  }
+
+  function shouldIgnoreDuplicate(action, ackKey) {
+    const signature = `${action}:${ackKey}`;
+    const now = Date.now();
+    if (
+      lastHandledRef.current.signature === signature
+      && now - lastHandledRef.current.timestamp < 300
+    ) {
+      return true;
+    }
+    lastHandledRef.current = { signature, timestamp: now };
+    return false;
+  }
+
+  function markDismissed(ackKey) {
+    setDismissedAlertKeys((previous) => {
+      const next = new Set(previous);
+      next.add(String(ackKey));
+      return next;
+    });
+  }
+
+  function handleNotificationAction(action, alert, routeHint = null) {
+    const ackKey = getAlertAckKey(alert);
+    if (!ackKey || shouldIgnoreDuplicate(action, ackKey)) return;
+    const route = routeFromAlert(alert, routeHint);
+
+    if (import.meta.env.DEV) {
+      console.debug('[HERDON_ALERT_CLICK]', { action, ackKey, route });
+    }
+
+    if (action === 'resolve') {
+      const current = normalizeResolved(readJsonStorage(ALERTAS_RESOLVIDOS_STORAGE_KEY, []));
+      writeJsonStorage(ALERTAS_RESOLVIDOS_STORAGE_KEY, Array.from(new Set([...current, ackKey])));
+      markDismissed(ackKey);
+      onResolveAlert?.(alert);
+      setOpenNotif(false);
+      return;
+    }
+
+    if (action === 'snooze') {
+      const snoozeUntil = parseSnoozeDate(1);
+      const payload = { chave: ackKey, ate: snoozeUntil, snoozeUntil };
+      const current = normalizeSnoozed(readJsonStorage(ALERTAS_ADIADOS_STORAGE_KEY, []))
+        .filter((item) => item?.chave !== ackKey);
+      writeJsonStorage(ALERTAS_ADIADOS_STORAGE_KEY, [...current, payload]);
+      markDismissed(ackKey);
+      onSnoozeAlert?.(alert, '1');
+      setOpenNotif(false);
+      return;
+    }
+
+    if (action === 'open') {
+      if (import.meta.env.DEV) {
+        console.debug('[HERDON_ALERT_OPEN]', { ackKey, route });
+      }
+      if (route) onAlertNavigate?.({ ...alert, route });
+      else onAlertNavigate?.(alert);
+      setOpenNotif(false);
+    }
+  }
+
+  function handleDelegatedNotificationClick(event) {
+    const target = event?.target;
+    if (!(target instanceof Element)) return;
+    const actionNode = target.closest('[data-alert-action]');
+    if (!actionNode) return;
+
+    const action = actionNode.getAttribute('data-alert-action');
+    const ackKey = actionNode.getAttribute('data-alert-key');
+    const route = actionNode.getAttribute('data-alert-route') || null;
+    if (!action || !ackKey) return;
+
+    event.preventDefault();
+    event.stopPropagation();
+
+    if (import.meta.env.DEV) {
+      console.debug('[HERDON_ALERT_CLICK_CAPTURE]', { action, ackKey, route });
+    }
+
+    const alert = renderedAlerts.find((item) => getAlertAckKey(item) === ackKey);
+    if (!alert) return;
+    handleNotificationAction(action, alert, route);
+  }
 
   useEffect(() => {
     if (!openNotif) return undefined;
@@ -236,6 +377,31 @@ export default function AppHeader({
     return () => {
       window.removeEventListener('resize', updateNotifPosition);
       window.removeEventListener('scroll', updateNotifPosition, true);
+    };
+  }, [openNotif]);
+
+  useEffect(() => {
+    if (!openNotif) return undefined;
+
+    function handleOutside(event) {
+      const target = event?.target;
+      if (!(target instanceof Node)) return;
+      if (notifRef.current?.contains(target)) return;
+      if (notifPanelRef.current?.contains(target)) return;
+      setOpenNotif(false);
+    }
+
+    function handleEsc(event) {
+      if (event.key === 'Escape') {
+        setOpenNotif(false);
+      }
+    }
+
+    document.addEventListener('mousedown', handleOutside);
+    document.addEventListener('keydown', handleEsc);
+    return () => {
+      document.removeEventListener('mousedown', handleOutside);
+      document.removeEventListener('keydown', handleEsc);
     };
   }, [openNotif]);
 
@@ -448,6 +614,7 @@ export default function AppHeader({
             />
             <div
               id="notification-dropdown-menu"
+              ref={notifPanelRef}
               className={`notif-dropdown ${notifPosition.mobile ? 'notif-dropdown--mobile' : ''}`}
               style={{
                 position: 'fixed',
@@ -467,15 +634,20 @@ export default function AppHeader({
               </div>
 
 
-              {alerts.length === 0 ? (
+              {renderedAlerts.length === 0 ? (
                 <p className="notif-empty">Sem alertas ativos no momento.</p>
               ) : (
-                <div className="notif-list">
-                  {alerts.map((alert) => {
+                <div
+                  className="notif-list"
+                  onClickCapture={handleDelegatedNotificationClick}
+                  onPointerDownCapture={handleDelegatedNotificationClick}
+                >
+                  {renderedAlerts.map((alert) => {
                     const tone = getAlertTone(alert);
                     const destino = getNavLabel(alert?.route || 'dashboard');
                     const ackKey = getAlertAckKey(alert);
-                    const hasRoute = Boolean(alert?.route || alert?.rota || alert?.acao?.rota || alert?.pagina);
+                    const resolvedRoute = routeFromAlert(alert);
+                    const hasRoute = Boolean(resolvedRoute);
                     const isResolved = resolvedAlertKeys.has(ackKey);
                     const isSnoozed = snoozedAlerts.some((item) => item?.chave === ackKey);
 
@@ -496,27 +668,46 @@ export default function AppHeader({
                           <small className="notif-debug-line">ackKey: {ackKey} | resolved: {isResolved ? 'sim' : 'não'} | adiado: {isSnoozed ? 'sim' : 'não'} | route found: {hasRoute ? 'sim' : 'não'}</small>
                         ) : null}
                         <div className="notif-actions">
-                          <Button type="button" size="sm" variant="outline" onClick={(event) => { event.preventDefault(); event.stopPropagation(); onResolveAlert?.(alert); setOpenNotif(false); }}>Resolver</Button>
-                          <div className="notif-snooze-wrap">
-                            <Button
-                              type="button"
-                              size="sm"
-                              variant="ghost"
-                              icon={<Clock3 size={12} />}
-                              aria-label="Adiar lembrete"
-                              onClick={(event) => { event.preventDefault(); event.stopPropagation(); setSnoozeMenuFor((prev) => (prev === ackKey ? null : ackKey)); }}
-                            >
-                              Adiar
-                            </Button>
-                            {snoozeMenuFor === ackKey ? (
-                              <div className="notif-snooze-menu">
-                                <button type="button" onClick={(event) => { event.preventDefault(); event.stopPropagation(); onSnoozeAlert?.(alert, '1'); setSnoozeMenuFor(null); setOpenNotif(false); }}>Amanhã</button>
-                                <button type="button" onClick={(event) => { event.preventDefault(); event.stopPropagation(); onSnoozeAlert?.(alert, '3'); setSnoozeMenuFor(null); setOpenNotif(false); }}>3 dias</button>
-                                <button type="button" onClick={(event) => { event.preventDefault(); event.stopPropagation(); onSnoozeAlert?.(alert, '7'); setSnoozeMenuFor(null); setOpenNotif(false); }}>7 dias</button>
-                              </div>
-                            ) : null}
-                          </div>
-                          <Button type="button" size="sm" variant="ghost" onClick={(event) => { event.preventDefault(); event.stopPropagation(); onAlertNavigate?.(alert); setOpenNotif(false); }}>Abrir</Button>
+                          <button
+                            type="button"
+                            className="notif-action-btn notif-action-btn--resolve"
+                            data-alert-action="resolve"
+                            data-alert-key={ackKey}
+                            onClick={(event) => {
+                              event.preventDefault();
+                              event.stopPropagation();
+                              handleNotificationAction('resolve', alert);
+                            }}
+                          >
+                            Resolver
+                          </button>
+                          <button
+                            type="button"
+                            className="notif-action-btn notif-action-btn--snooze"
+                            data-alert-action="snooze"
+                            data-alert-key={ackKey}
+                            onClick={(event) => {
+                              event.preventDefault();
+                              event.stopPropagation();
+                              handleNotificationAction('snooze', alert);
+                            }}
+                          >
+                            Adiar
+                          </button>
+                          <button
+                            type="button"
+                            className="notif-action-btn notif-action-btn--open"
+                            data-alert-action="open"
+                            data-alert-key={ackKey}
+                            data-alert-route={resolvedRoute || ''}
+                            onClick={(event) => {
+                              event.preventDefault();
+                              event.stopPropagation();
+                              handleNotificationAction('open', alert, resolvedRoute);
+                            }}
+                          >
+                            Abrir
+                          </button>
                         </div>
                       </div>
                     );
