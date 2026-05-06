@@ -25,26 +25,23 @@ export const navSections = [
   {
     id: 'cadastros',
     title: 'Cadastros',
-    description: 'Base da operacao: fazendas, lotes, animais e equipe.',
     items: [
       { id: 'fazendas', label: 'Fazendas', icon: MapPin },
       { id: 'lotes', label: 'Lotes', icon: Beef },
       { id: 'animais', label: 'Animais', icon: ClipboardList },
-      { id: 'funcionarios', label: 'Funcionarios', icon: Users },
+      { id: 'funcionarios', label: 'Funcionários', icon: Users },
     ],
   },
   {
     id: 'nutricao',
-    title: 'Nutricao / Suplementacao',
-    description: 'Dietas, suplementos e planejamento alimentar dos lotes.',
+    title: 'Nutrição / Suplementação',
     items: [
-      { id: 'suplementacao', label: 'Nutricao e Suplementacao', icon: ShieldPlus },
+      { id: 'suplementacao', label: 'Nutrição e Suplementação', icon: ShieldPlus },
     ],
   },
   {
     id: 'estoque',
     title: 'Estoque',
-    description: 'Medicamentos, vacinas, materiais e insumos gerais.',
     items: [
       { id: 'estoque', label: 'Estoque Geral', icon: Package },
     ],
@@ -52,43 +49,40 @@ export const navSections = [
   {
     id: 'financeiro',
     title: 'Financeiro',
-    description: 'Controle de lancamentos, pagamentos e resultado.',
     items: [
       { id: 'financeiro', label: 'Financeiro', icon: DollarSign },
     ],
   },
   {
     id: 'operacao',
-    title: 'Operacao',
-    description: 'Rotina de manejo, agenda e saude do rebanho.',
+    title: 'Operação',
     items: [
       { id: 'pesagens', label: 'Pesagens', icon: Scale },
-      { id: 'sanitario', label: 'Sanitario', icon: Syringe },
+      { id: 'sanitario', label: 'Sanitário', icon: Syringe },
       { id: 'tarefas', label: 'Tarefas', icon: CheckSquare },
-      { id: 'calendarioOperacional', label: 'Calendario', icon: CalendarDays },
+      { id: 'calendarioOperacional', label: 'Calendário', icon: CalendarDays },
     ],
   },
   {
     id: 'analises_relatorios',
-    title: 'Analises e Relatorios',
-    description: 'Comparativos e relatorios executivos da operacao.',
+    title: 'Análises e Relatórios',
     items: [
       { id: 'comparativo', label: 'Comparativo', icon: TrendingUp },
-      { id: 'resultados', label: 'Relatorios', icon: ClipboardList },
+      { id: 'resultados', label: 'Relatórios', icon: ClipboardList },
     ],
   },
   {
     id: 'configuracoes',
-    title: 'Configuracoes',
+    title: 'Configurações',
     items: [
-      { id: 'configuracoes', label: 'Configuracoes', icon: Settings },
+      { id: 'configuracoes', label: 'Configurações', icon: Settings },
     ],
   },
 ];
 
 export const secondaryNavItems = [
   { id: 'perfil', label: 'Meu Perfil', icon: User },
-  { id: 'configuracoes', label: 'Configuracoes', icon: Settings },
+  { id: 'configuracoes', label: 'Configurações', icon: Settings },
 ];
 
 export const navLabelMap = [...navSections.flatMap((section) => section.items), ...secondaryNavItems].reduce(

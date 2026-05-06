@@ -26,7 +26,7 @@ export default function Sidebar({
 
   const usuarioLogado = {
     id: user?.id || null,
-    nome: user?.nome || user?.user_metadata?.name || user?.email?.split('@')[0] || 'Usuario',
+    nome: user?.nome || user?.user_metadata?.name || user?.email?.split('@')[0] || 'Usuário',
     email: user?.email || '',
     perfil: user?.perfil || obterPerfilDoUsuario(user) || 'Visualizador',
     foto_url: user?.foto_url || user?.user_metadata?.avatar_url || null,
@@ -85,7 +85,7 @@ export default function Sidebar({
           type="button"
           className="mobile-menu-btn"
           onClick={() => setIsMobileMenuOpen(true)}
-          aria-label="Abrir menu de navegacao"
+          aria-label="Abrir menu de navegação"
         >
           <Menu size={18} aria-hidden="true" />
         </button>
@@ -114,7 +114,7 @@ export default function Sidebar({
         <div className="mobile-overlay" onClick={() => setIsMobileMenuOpen(false)} aria-hidden="true" />
       ) : null}
 
-      <aside className={`sidebar sb ${isMobileMenuOpen ? 'mobile-open' : ''}`} aria-label="Navegacao principal">
+      <aside className={`sidebar sb ${isMobileMenuOpen ? 'mobile-open' : ''}`} aria-label="Navegação principal">
         <div className="sidebar-logo">
           <div className="sidebar-logo-content">
             <div className="shell-logo-mark sidebar-logo-mark">
@@ -134,7 +134,7 @@ export default function Sidebar({
             type="button"
             className="sidebar-collapse-btn mobile-close-btn"
             onClick={() => setIsMobileMenuOpen(false)}
-            aria-label="Fechar menu de navegacao"
+            aria-label="Fechar menu de navegação"
           >
             <X size={14} aria-hidden="true" />
           </button>
@@ -153,7 +153,6 @@ export default function Sidebar({
                 >
                   <div className="sidebar-group-copy">
                     <span>{section.title}</span>
-                    {section.description ? <small className="sidebar-group-description">{section.description}</small> : null}
                   </div>
                   <ChevronDown size={14} className={`nav-group-arrow ${section.isOpen ? 'open' : ''}`} aria-hidden="true" />
                 </button>
@@ -202,7 +201,7 @@ export default function Sidebar({
             onClick={() => setDropdownAberto((prev) => !prev)}
             aria-haspopup="menu"
             aria-expanded={dropdownAberto}
-            aria-label="Menu do usuario"
+            aria-label="Menu do usuário"
           >
             <UserAvatar usuario={usuarioLogado} size={40} />
             <div className="sidebar-user-info">

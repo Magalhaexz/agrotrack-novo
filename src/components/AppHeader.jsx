@@ -484,9 +484,10 @@ export default function AppHeader({
                         </div>
                         <small>{alert.description || alert.mensagem}</small>
                         <div className="notif-actions">
-                          <Button size="sm" variant="outline" onClick={() => { onResolveAlert?.(alert); setOpenNotif(false); }}>Resolver</Button>
+                          <Button type="button" size="sm" variant="outline" onClick={() => { onResolveAlert?.(alert); setOpenNotif(false); }}>Resolver</Button>
                           <div className="notif-snooze-wrap">
                             <Button
+                              type="button"
                               size="sm"
                               variant="ghost"
                               icon={<Clock3 size={12} />}
@@ -503,7 +504,7 @@ export default function AppHeader({
                               </div>
                             ) : null}
                           </div>
-                          <Button size="sm" variant="ghost" onClick={() => { onAlertNavigate?.(alert); setOpenNotif(false); }}>Abrir</Button>
+                          <Button type="button" size="sm" variant="ghost" onClick={() => { onAlertNavigate?.(alert); setOpenNotif(false); }}>Abrir</Button>
                         </div>
                       </div>
                     );

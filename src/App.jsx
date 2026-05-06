@@ -348,7 +348,7 @@ export default function App() {
       if (alertasResolvidos.includes(chave)) return false;
       const adiado = alertasAdiados.find((item) => item?.chave === chave);
       if (!adiado?.ate) return true;
-      return String(adiado.ate) <= TODAY_BOOT_ISO;
+      return String(adiado.ate) < TODAY_BOOT_ISO;
     }),
     [alertasAdiados, alertasResolvidos, rawAlerts]
   );
@@ -590,12 +590,12 @@ export default function App() {
       <main className="main">
         {isOperationalSyncing ? (
           <div style={{ padding: '8px 16px 0', fontSize: 12, color: 'var(--text-secondary, #6b7280)' }}>
-            Sincronizando dados da opera??o...
+            Sincronizando dados da operação...
           </div>
         ) : null}
         {(dataSource === 'fallback_error' || dataSource === 'fallback_timeout') ? (
           <div style={{ padding: '8px 16px 0', fontSize: 12, color: 'var(--text-secondary, #6b7280)' }}>
-            Sincroniza??o inst?vel. Seus dados locais continuam dispon?veis.
+            Sincronização instável. Seus dados locais continuam disponíveis.
           </div>
         ) : null}
         <AppHeader
@@ -694,8 +694,8 @@ export default function App() {
       <Modal
         open={menuExtraAberto}
         onClose={() => setMenuExtraAberto(false)}
-        title="Mais op??es"
-        subtitle="Todos os m?dulos do app continuam acess?veis no mobile"
+        title="Mais opções"
+        subtitle="Todos os módulos do app continuam acessíveis no mobile"
       >
         <div className="mobile-nav-modal">
           {mobileNavGroups.map((group) => (
