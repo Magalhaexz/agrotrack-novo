@@ -61,7 +61,7 @@ function getCloudState(syncStatus) {
       tone: 'online',
       icon: 'cloud',
       label: 'Nuvem ativa',
-      detail: syncStatus?.lastSyncAt ? `ÃƒÆ’Ã¢â‚¬â„¢Ãƒâ€¦Ã‚Â¡ltima sync: ${formatSyncTime(syncStatus.lastSyncAt)}` : 'Nuvem nÃƒÆ’Ã¢â‚¬â„¢Ãƒâ€šÃ‚Â£o verificada',
+      detail: syncStatus?.lastSyncAt ? `Ultima sync: ${formatSyncTime(syncStatus.lastSyncAt)}` : 'Nuvem nao verificada',
       title: syncStatus?.cloudVerifiedMessage || 'Nuvem conectada pelo servidor.',
       disabled: false,
     };
@@ -72,8 +72,8 @@ function getCloudState(syncStatus) {
       tone: 'syncing',
       icon: 'loading',
       label: 'Sincronizando...',
-      detail: syncStatus?.lastSyncAt ? `ÃƒÆ’Ã¢â‚¬â„¢Ãƒâ€¦Ã‚Â¡ltima sync: ${formatSyncTime(syncStatus.lastSyncAt)}` : 'Nuvem nÃƒÆ’Ã¢â‚¬â„¢Ãƒâ€šÃ‚Â£o verificada',
-      title: 'SincronizaÃƒÆ’Ã¢â‚¬â„¢Ãƒâ€šÃ‚Â§ÃƒÆ’Ã¢â‚¬â„¢Ãƒâ€šÃ‚Â£o manual em andamento',
+      detail: syncStatus?.lastSyncAt ? `Ultima sync: ${formatSyncTime(syncStatus.lastSyncAt)}` : 'Nuvem nao verificada',
+      title: 'Sincronizacao manual em andamento',
       disabled: true,
     };
   }
@@ -83,8 +83,8 @@ function getCloudState(syncStatus) {
       tone: 'warning',
       icon: 'warning',
       label: 'Modo local',
-      detail: 'Nuvem nÃƒÆ’Ã¢â‚¬â„¢Ãƒâ€šÃ‚Â£o verificada',
-      title: 'SessÃƒÆ’Ã¢â‚¬â„¢Ãƒâ€šÃ‚Â£o expirada. Reconecte para voltar a sincronizar.',
+      detail: 'Nuvem nao verificada',
+      title: 'Sessao expirada. Reconecte para voltar a sincronizar.',
       disabled: false,
     };
   }
@@ -105,7 +105,7 @@ function getCloudState(syncStatus) {
       tone: 'warning',
       icon: 'warning',
       label: 'Modo local',
-      detail: message || 'Nuvem indisponÃƒÆ’Ã¢â‚¬â„¢Ãƒâ€šÃ‚Â­vel no momento',
+      detail: message || 'Nuvem indisponivel no momento',
       title: message || 'Falha de nuvem detectada. O modo local continua ativo.',
       disabled: false,
     };
@@ -117,7 +117,7 @@ function getCloudState(syncStatus) {
       icon: 'local',
       label: 'Nuvem pausada',
       detail: 'Modo local ativo',
-      title: 'SincronizaÃƒÆ’Ã¢â‚¬â„¢Ãƒâ€šÃ‚Â§ÃƒÆ’Ã¢â‚¬â„¢Ãƒâ€šÃ‚Â£o com Supabase desativada neste navegador',
+      title: 'Sincronizacao com Supabase desativada neste navegador',
       disabled: false,
     };
   }
@@ -126,8 +126,8 @@ function getCloudState(syncStatus) {
     tone: 'local',
     icon: 'local',
     label: 'Modo local',
-    detail: 'Nuvem nÃƒÆ’Ã¢â‚¬â„¢Ãƒâ€šÃ‚Â£o verificada',
-    title: 'SincronizaÃƒÆ’Ã¢â‚¬â„¢Ãƒâ€šÃ‚Â§ÃƒÆ’Ã¢â‚¬â„¢Ãƒâ€šÃ‚Â£o manual disponÃƒÆ’Ã¢â‚¬â„¢Ãƒâ€šÃ‚Â­vel',
+    detail: 'Nuvem nao verificada',
+    title: 'Sincronizacao manual disponivel',
     disabled: false,
   };
 }

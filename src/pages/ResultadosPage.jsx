@@ -28,7 +28,7 @@ const REPORT_TYPES = [
   {
     id: 'lote',
     group: 'Lotes',
-    title: 'Relatórios por lote',
+    title: 'RelatÃ³rios por lote',
     description: 'Indicadores produtivos, financeiros e operacionais por lote.',
     purpose: 'Ideal para fechar leitura de lote, conferir custo e acompanhar peso e margem.',
     output: 'Resumo executivo e tabela operacional por lote.',
@@ -37,17 +37,17 @@ const REPORT_TYPES = [
   {
     id: 'fazenda',
     group: 'Rebanho',
-    title: 'Relatórios por fazenda',
-    description: 'Consolidação dos resultados por fazenda e capacidade operacional.',
+    title: 'RelatÃ³rios por fazenda',
+    description: 'ConsolidaÃ§Ã£o dos resultados por fazenda e capacidade operacional.',
     purpose: 'Bom para comparar unidades, capacidade operacional e concentracao do rebanho.',
     output: 'Consolidado por fazenda com leitura de margem e receita.',
     icon: MapPin,
   },
   {
     id: 'sanitario',
-    group: 'Sanitário',
-    title: 'Relatórios sanitários',
-    description: 'Protocolos aplicados, pendências, responsáveis e agenda de manejo.',
+    group: 'SanitÃ¡rio',
+    title: 'RelatÃ³rios sanitÃ¡rios',
+    description: 'Protocolos aplicados, pendÃªncias, responsÃ¡veis e agenda de manejo.',
     purpose: 'Ajuda a priorizar vencimentos, proximos manejos e gargalos sanitarios.',
     output: 'Agenda sanitaria e base de protocolos filtrados.',
     icon: Pill,
@@ -55,8 +55,8 @@ const REPORT_TYPES = [
   {
     id: 'estoque',
     group: 'Operacional',
-    title: 'Relatórios de estoque',
-    description: 'Saldo, criticidade, movimentações e cobertura operacional.',
+    title: 'RelatÃ³rios de estoque',
+    description: 'Saldo, criticidade, movimentaÃ§Ãµes e cobertura operacional.',
     purpose: 'Serve para compras, reposicao, leitura de saldo e monitoramento de validade.',
     output: 'Saldo consolidado e movimentacoes do periodo.',
     icon: Package,
@@ -64,8 +64,8 @@ const REPORT_TYPES = [
   {
     id: 'financeiro',
     group: 'Financeiro',
-    title: 'Relatórios financeiros',
-    description: 'Despesas, receitas, categorias e visão pronta para DRE.',
+    title: 'RelatÃ³rios financeiros',
+    description: 'Despesas, receitas, categorias e visÃ£o pronta para DRE.',
     purpose: 'Apoia fechamento operacional, leitura de caixa e preparacao para DRE.',
     output: 'Lancamentos filtrados e resumo financeiro do escopo.',
     icon: DollarSign,
@@ -73,15 +73,13 @@ const REPORT_TYPES = [
   {
     id: 'desempenho',
     group: 'Pesagens',
-    title: 'Relatórios de desempenho',
-    description: 'Ranking zootécnico, metas de GMD e evolução recente de peso.',
+    title: 'RelatÃ³rios de desempenho',
+    description: 'Ranking zootÃ©cnico, metas de GMD e evoluÃ§Ã£o recente de peso.',
     purpose: 'Facilita priorizacao dos lotes acima ou abaixo da meta de desempenho.',
     output: 'Ranking zootecnico e destaques do periodo.',
     icon: TrendingUp,
   },
 ];
-
-const REPORT_CATEGORIES = ['Rebanho', 'Lotes', 'Pesagens', 'Financeiro', 'Sanitário', 'Operacional'];
 
 const STATUS_OPTIONS = [
   { value: 'todos', label: 'Todos os status' },
@@ -143,70 +141,18 @@ export default function ResultadosPage({ db }) {
     () => REPORT_TYPES.find((report) => report.id === selectedReport) || REPORT_TYPES[0],
     [selectedReport]
   );
-  const reportCatalogSummary = useMemo(
-    () => [
-      {
-        label: 'Modulo ativo',
-        value: selectedReportMeta.title
-          .replace('Relatórios por ', '')
-          .replace('Relatórios de ', '')
-          .replace('Relatório ', ''),
-        helper: 'leitura principal selecionada',
-      },
-      { label: 'Escopo atual', value: activeReport.exportConfig.sheets.length, helper: 'abas consolidadas nesta visao' },
-      { label: 'Base exportavel', value: activeReport.exportConfig.totalRows, helper: 'linhas preparadas para futura exportacao' },
-    ],
-    [activeReport, selectedReportMeta]
-  );
-  const filterSummary = useMemo(
-    () => [
-      {
-        label: 'Periodo aplicado',
-        value: activeReport.periodLabel,
-        helper: 'janela mestre usada em todos os cards e tabelas',
-      },
-      {
-        label: 'Escopo operacional',
-        value: activeReport.scopeLabel,
-        helper: 'fazenda, lote e status refletidos na mesma leitura',
-      },
-      {
-        label: 'Saida sugerida',
-        value: selectedReportMeta.output,
-        helper: 'estrutura pronta para leitura e futura exportacao',
-      },
-    ],
-    [activeReport.periodLabel, activeReport.scopeLabel, selectedReportMeta.output]
-  );
-  const workflowSteps = useMemo(
-    () => [
-      {
-        label: '1. Defina o escopo',
-        value: 'Use o filtro mestre para travar periodo, fazenda, lote e status antes da leitura.',
-      },
-      {
-        label: '2. Escolha o relatorio',
-        value: selectedReportMeta.purpose,
-      },
-      {
-        label: '3. Leia e exporte',
-        value: 'A tela ja entrega resumo, destaques, tabelas e base preparada para PDF ou XLSX.',
-      },
-    ],
-    [selectedReportMeta.purpose]
-  );
-  const reportGroups = useMemo(
+  const reportTabs = useMemo(
     () =>
-      REPORT_CATEGORIES.map((category) => ({
-        category,
-        reports: REPORT_TYPES.filter((report) => report.group === category),
+      REPORT_TYPES.map((report) => ({
+        id: report.id,
+        label: report.group === 'Financeiro' ? 'Financeiro' : report.title.replace('Relat??rios ', '').replace('Relat??rio ', ''),
       })),
     []
   );
 
   function applyFilters() {
     if (draftFilters.dataInicio && draftFilters.dataFim && draftFilters.dataInicio > draftFilters.dataFim) {
-      setValidationError('A data inicial precisa ser menor ou igual à data final.');
+      setValidationError('A data inicial precisa ser menor ou igual Ã  data final.');
       return;
     }
 
@@ -260,361 +206,177 @@ export default function ResultadosPage({ db }) {
   }
 
   return (
-    <div className="reports-page">
+    <div className="reports-page reports-page--rebuilt">
       <PageHeader
-        title="Relatórios"
-        subtitle="Fechamento operacional completo com filtros por período, leitura executiva e base pronta para exportação futura."
+        title="Relatorios"
+        subtitle="Filtros rapidos, leitura executiva e tabelas prontas para exportacao."
         actions={(
           <div className="reports-page-actions">
-            <Badge variant="info">Deploy ready</Badge>
-            <Button variant="outline" onClick={resetFilters}>
-              Limpar filtros
-            </Button>
-            <Button loading={isGenerating} onClick={applyFilters}>
-              Atualizar visão
-            </Button>
+            <Button variant="outline" onClick={resetFilters}>Limpar filtros</Button>
+            <Button variant="outline" onClick={() => window.print()}>Imprimir</Button>
+            <Button variant="primary" onClick={exportarCsv} loading={isExporting}>Exportar CSV</Button>
+            <Button loading={isGenerating} onClick={applyFilters}>Atualizar visao</Button>
           </div>
         )}
       />
 
-      <div className="reports-module-strip">
-        {reportCatalogSummary.map((item) => (
-          <div key={item.label} className="reports-module-chip">
-            <span>{item.label}</span>
-            <strong>{item.value}</strong>
-            <small>{item.helper}</small>
+      <Card className="reports-filter-card reports-filter-card--top" title="Filtros" subtitle="Defina periodo, fazenda, lote e status para montar os relatorios.">
+        <div className="reports-preset-row">
+          {[
+            { id: 'all', label: 'Tudo' },
+            { id: '30', label: '30d' },
+            { id: '90', label: '90d' },
+            { id: 'year', label: 'Ano-base' },
+            { id: 'custom', label: 'Customizado' },
+          ].map((preset) => (
+            <button
+              key={preset.id}
+              type="button"
+              className={`reports-preset-button ${draftFilters.periodo === preset.id ? 'active' : ''}`}
+              onClick={() => applyPreset(preset.id)}
+            >
+              {preset.label}
+            </button>
+          ))}
+        </div>
+
+        <div className="reports-filter-grid reports-filter-grid--compact">
+          <Input
+            label="Data inicial"
+            type="date"
+            value={draftFilters.dataInicio}
+            onChange={(event) => setDraftFilters((prev) => ({ ...prev, periodo: 'custom', dataInicio: event.target.value }))}
+          />
+          <Input
+            label="Data final"
+            type="date"
+            value={draftFilters.dataFim}
+            onChange={(event) => setDraftFilters((prev) => ({ ...prev, periodo: 'custom', dataFim: event.target.value }))}
+          />
+
+          <label className="ui-input-wrap">
+            <span className="ui-input-label">Fazenda</span>
+            <select
+              className="ui-input"
+              value={draftFilters.fazendaId}
+              onChange={(event) => {
+                const fazendaId = event.target.value;
+                setDraftFilters((prev) => ({ ...prev, fazendaId, loteId: fazendaId === 'todas' ? prev.loteId : 'todos' }));
+              }}
+            >
+              <option value="todas">Todas as fazendas</option>
+              {fazendas.map((fazenda) => (
+                <option key={fazenda.id} value={String(fazenda.id)}>{fazenda.nome}</option>
+              ))}
+            </select>
+          </label>
+
+          <label className="ui-input-wrap">
+            <span className="ui-input-label">Lote</span>
+            <select
+              className="ui-input"
+              value={draftFilters.loteId}
+              onChange={(event) => setDraftFilters((prev) => ({ ...prev, loteId: event.target.value }))}
+            >
+              <option value="todos">Todos os lotes</option>
+              {lotes.map((lote) => (
+                <option key={lote.id} value={String(lote.id)}>{lote.nome}</option>
+              ))}
+            </select>
+          </label>
+
+          <label className="ui-input-wrap">
+            <span className="ui-input-label">Status do lote</span>
+            <select className="ui-input" value={draftFilters.status} onChange={(event) => setDraftFilters((prev) => ({ ...prev, status: event.target.value }))}>
+              {STATUS_OPTIONS.map((status) => (
+                <option key={status.value} value={status.value}>{status.label}</option>
+              ))}
+            </select>
+          </label>
+        </div>
+
+        {validationError ? (
+          <div className="reports-error-banner">
+            <AlertTriangle size={16} />
+            <span>{validationError}</span>
           </div>
-        ))}
-      </div>
+        ) : null}
+      </Card>
 
-      <div className="reports-layout">
-        <Card className="reports-filter-card" title="Filtro mestre" subtitle="Defina um escopo único para leitura, comparação e futura exportação do módulo inteiro.">
-          <div className="reports-filter-meta">
-            <Badge variant="neutral">Base: {formatDate(dateBounds.min) || '--'} até {formatDate(dateBounds.max) || '--'}</Badge>
-            <Badge variant="info">Exportação futura preparada</Badge>
-          </div>
+      <Card className="reports-tabs-card" title="Selecione o relatorio" subtitle={selectedReportMeta.description}>
+        <div className="reports-tabs-row">
+          {reportTabs.map((tab) => (
+            <button
+              key={tab.id}
+              type="button"
+              className={`reports-tab-button ${selectedReport === tab.id ? 'active' : ''}`}
+              onClick={() => setSelectedReport(tab.id)}
+            >
+              {tab.label}
+            </button>
+          ))}
+        </div>
+      </Card>
 
-          <div className="reports-preset-row">
-            {[
-              { id: 'all', label: 'Tudo' },
-              { id: '30', label: '30d' },
-              { id: '90', label: '90d' },
-              { id: 'year', label: 'Ano-base' },
-              { id: 'custom', label: 'Customizado' },
-            ].map((preset) => (
-              <button
-                key={preset.id}
-                type="button"
-                className={`reports-preset-button ${draftFilters.periodo === preset.id ? 'active' : ''}`}
-                onClick={() => applyPreset(preset.id)}
-              >
-                {preset.label}
-              </button>
-            ))}
-          </div>
-
-          <div className="reports-filter-grid">
-            <Input
-              label="Data inicial"
-              type="date"
-              value={draftFilters.dataInicio}
-              onChange={(event) => setDraftFilters((prev) => ({ ...prev, periodo: 'custom', dataInicio: event.target.value }))}
-            />
-            <Input
-              label="Data final"
-              type="date"
-              value={draftFilters.dataFim}
-              onChange={(event) => setDraftFilters((prev) => ({ ...prev, periodo: 'custom', dataFim: event.target.value }))}
-            />
-
-            <label className="ui-input-wrap">
-              <span className="ui-input-label">Fazenda</span>
-              <select
-                className="ui-input"
-                value={draftFilters.fazendaId}
-                onChange={(event) => {
-                  const fazendaId = event.target.value;
-                  setDraftFilters((prev) => ({
-                    ...prev,
-                    fazendaId,
-                    loteId: fazendaId === 'todas' ? prev.loteId : 'todos',
-                  }));
-                }}
-              >
-                <option value="todas">Todas as fazendas</option>
-                {fazendas.map((fazenda) => (
-                  <option key={fazenda.id} value={String(fazenda.id)}>
-                    {fazenda.nome}
-                  </option>
-                ))}
-              </select>
-            </label>
-
-            <label className="ui-input-wrap">
-              <span className="ui-input-label">Lote</span>
-              <select
-                className="ui-input"
-                value={draftFilters.loteId}
-                onChange={(event) => setDraftFilters((prev) => ({ ...prev, loteId: event.target.value }))}
-              >
-                <option value="todos">Todos os lotes</option>
-                {lotes.map((lote) => (
-                  <option key={lote.id} value={String(lote.id)}>
-                    {lote.nome}
-                  </option>
-                ))}
-              </select>
-            </label>
-
-            <label className="ui-input-wrap full">
-              <span className="ui-input-label">Status do lote</span>
-              <select
-                className="ui-input"
-                value={draftFilters.status}
-                onChange={(event) => setDraftFilters((prev) => ({ ...prev, status: event.target.value }))}
-              >
-                {STATUS_OPTIONS.map((status) => (
-                  <option key={status.value} value={status.value}>
-                    {status.label}
-                  </option>
-                ))}
-              </select>
-            </label>
-          </div>
-
-          {validationError ? (
-            <div className="reports-error-banner">
-              <AlertTriangle size={16} />
-              <span>{validationError}</span>
-            </div>
-          ) : null}
-
-          <div className="reports-filter-foot">
+      {isGenerating ? (
+        <Card className="reports-loading-card">
+          <div className="reports-loading-state">
+            <Loader2 size={22} className="ui-spin" />
             <div>
-              <span className="reports-filter-label">Escopo atual</span>
-              <strong>{activeReport.scopeLabel}</strong>
+              <strong>Atualizando relatorios</strong>
+              <p>Aplicando periodo e escopo operacional.</p>
             </div>
-            <Button variant="outline" onClick={applyFilters} loading={isGenerating}>
-              Aplicar filtros
-            </Button>
           </div>
-
-          <div className="reports-filter-summary-grid">
-            {filterSummary.map((item) => (
-              <div key={item.label} className="reports-filter-summary-card">
+        </Card>
+      ) : (
+        <>
+          <div className="reports-kpi-grid reports-kpi-grid--compact">
+            {activeReport.summary.map((item) => (
+              <article key={item.label} className={`report-stat-card report-stat-card--${item.variant}`}>
                 <span>{item.label}</span>
                 <strong>{item.value}</strong>
                 <small>{item.helper}</small>
-              </div>
-            ))}
-          </div>
-        </Card>
-
-        <div className="reports-content">
-          <div className="reports-catalog-grid">
-            {reportGroups.map((group) => (
-              <section key={group.category} className="reports-category-block">
-                <div className="reports-category-head">
-                  <h3>{group.category}</h3>
-                  <span>{group.reports.length} relatório(s)</span>
-                </div>
-
-                {group.reports.length === 0 ? (
-                  <div className="reports-category-empty">
-                    <strong>Nenhum relatório nesta categoria.</strong>
-                    <span>Assim que houver base operacional, esta categoria será habilitada.</span>
-                  </div>
-                ) : (
-                  <div className="reports-type-grid">
-                    {group.reports.map((report) => {
-                      const Icon = report.icon;
-                      const data = reportBundle[report.id];
-                      const active = selectedReport === report.id;
-
-                      return (
-                        <article
-                          key={report.id}
-                          className={`report-type-card ${active ? 'active' : ''}`}
-                        >
-                          <div className="report-type-card-head">
-                            <div className="report-type-icon">
-                              <Icon size={18} aria-hidden="true" />
-                            </div>
-                            <Badge variant={data.catalogTone}>{data.catalogBadge}</Badge>
-                          </div>
-                          <span className="report-type-group">{report.group}</span>
-                          <strong>{report.title}</strong>
-                          <p>{report.description}</p>
-                          <div className="report-type-card-copy">
-                            <span>Serve para</span>
-                            <small>{report.purpose}</small>
-                          </div>
-                          <div className="report-type-card-foot">
-                            <span>{data.catalogMetric}</span>
-                            <small>{report.output}</small>
-                          </div>
-                          <Button size="sm" variant={active ? 'primary' : 'outline'} onClick={() => setSelectedReport(report.id)}>
-                            {active ? 'Relatório ativo' : 'Abrir relatório'}
-                          </Button>
-                        </article>
-                      );
-                    })}
-                  </div>
-                )}
-              </section>
+              </article>
             ))}
           </div>
 
-          <div className="reports-context-band">
-            <div className="reports-context-head">
-              <div>
-                <span className="reports-context-kicker">Faixa contextual</span>
-                <strong>{selectedReportMeta.title}</strong>
-                <p>{selectedReportMeta.purpose}</p>
-              </div>
-              <Badge variant="info">{activeReport.periodLabel}</Badge>
-            </div>
-
-            <div className="reports-workflow-strip">
-              {workflowSteps.map((step) => (
-                <div key={step.label} className="reports-workflow-card">
-                  <span>{step.label}</span>
-                  <strong>{step.value}</strong>
-                </div>
-              ))}
-            </div>
-          </div>
-
-          {isGenerating ? (
-            <Card className="reports-loading-card">
-              <div className="reports-loading-state">
-                <Loader2 size={22} className="ui-spin" />
-                <div>
-                  <strong>Atualizando relatórios</strong>
-                  <p>Aplicando período, escopo operacional e preparando a base visual e futura de exportação.</p>
-                </div>
-              </div>
-            </Card>
-          ) : (
-            <>
-              <Card
-                className="report-hero-card"
-                title={activeReport.title}
-                subtitle={activeReport.description}
-                action={<Badge variant="info">Estrutura pronta para exportação</Badge>}
-              >
-                <div className="report-hero-badges">
-                  <Badge variant="neutral">{activeReport.scopeLabel}</Badge>
-                  <Badge variant="neutral">{activeReport.periodLabel}</Badge>
-                  <Badge variant={activeReport.healthTone}>{activeReport.healthLabel}</Badge>
-                </div>
-
-                <div className="report-export-summary">
+          {activeReport.notes.length ? (
+            <div className="report-note-stack">
+              {activeReport.notes.map((note) => (
+                <div key={note.title} className={`report-note report-note--${note.variant}`}>
+                  {note.variant === 'warning' ? <AlertTriangle size={16} /> : note.variant === 'success' ? <CheckCircle2 size={16} /> : <Info size={16} />}
                   <div>
-                    <span className="report-export-label">Arquivo sugerido</span>
-                    <strong>{activeReport.exportConfig.filename}</strong>
-                    <p>
-                      {activeReport.exportConfig.sheets.length} abas prontas, {activeReport.exportConfig.totalRows} linhas mapeadas e
-                      payload com filtros, metadados e resumo.
-                    </p>
-                  </div>
-                  <div className="report-export-actions">
-                    <Button variant="outline" onClick={() => window.print()}>
-                      Imprimir
-                    </Button>
-                    <Button variant="primary" onClick={exportarCsv} loading={isExporting}>
-                      Exportar CSV
-                    </Button>
+                    <strong>{note.title}</strong>
+                    <span>{note.text}</span>
                   </div>
                 </div>
-              </Card>
-
-              {activeReport.notes.length ? (
-                <div className="report-note-stack">
-                  {activeReport.notes.map((note) => (
-                    <div key={note.title} className={`report-note report-note--${note.variant}`}>
-                      {note.variant === 'warning' ? <AlertTriangle size={16} /> : note.variant === 'success' ? <CheckCircle2 size={16} /> : <Info size={16} />}
-                      <div>
-                        <strong>{note.title}</strong>
-                        <span>{note.text}</span>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              ) : null}
-
-              <div className="reports-kpi-grid">
-                {activeReport.summary.map((item) => (
-                  <article key={item.label} className={`report-stat-card report-stat-card--${item.variant}`}>
-                    <span>{item.label}</span>
-                    <strong>{item.value}</strong>
-                    <small>{item.helper}</small>
-                  </article>
-                ))}
-              </div>
-
-              <div className="reports-detail-grid">
-                <Card title="Leitura executiva" subtitle="Destaques do período e pontos de atenção">
-                  {activeReport.highlights.length ? (
-                    <div className="report-highlight-list">
-                      {activeReport.highlights.map((highlight) => (
-                        <div key={highlight.label} className="report-highlight-item">
-                          <div>
-                            <strong>{highlight.label}</strong>
-                            <p>{highlight.value}</p>
-                          </div>
-                          <span>{highlight.detail}</span>
-                        </div>
-                      ))}
-                    </div>
-                  ) : (
-                    <EmptyState
-                      compact
-                      title="Nenhum destaque calculado"
-                      subtitle="Ajuste o período ou amplie o escopo para gerar uma leitura executiva."
-                    />
-                  )}
-                </Card>
-
-                <Card title="Base para exportação futura" subtitle="A mesma estrutura já serve para PDF, XLSX ou integrações">
-                  <div className="report-export-sheet-list">
-                    {activeReport.exportConfig.sheets.map((sheet) => (
-                      <div key={sheet.name} className="report-export-sheet">
-                        <strong>{sheet.name}</strong>
-                        <span>{sheet.rowCount} linhas</span>
-                        <small>{sheet.columns.join(' • ') || 'Sem colunas mapeadas'}</small>
-                      </div>
-                    ))}
-                  </div>
-                </Card>
-              </div>
-
-              {activeReport.tables.map((table) => (
-                <Card
-                  key={table.id}
-                  className="report-table-card"
-                  title={table.title}
-                  subtitle={table.description}
-                  action={<Badge variant={table.badgeVariant}>{table.badgeLabel}</Badge>}
-                >
-                  <Table
-                    columns={table.columns}
-                    rows={table.rows}
-                    emptyTitle={table.emptyTitle}
-                    emptySubtitle={table.emptySubtitle}
-                    mobileTitleKey={table.mobileTitleKey}
-                    mobileSubtitleKey={table.mobileSubtitleKey}
-                  />
-                </Card>
               ))}
-            </>
-          )}
-        </div>
-      </div>
+            </div>
+          ) : null}
+
+          {activeReport.tables.map((table) => (
+            <Card
+              key={table.id}
+              className="report-table-card"
+              title={table.title}
+              subtitle={table.description}
+              action={<Badge variant={table.badgeVariant}>{table.badgeLabel}</Badge>}
+            >
+              <Table
+                columns={table.columns}
+                rows={table.rows}
+                emptyTitle={table.emptyTitle}
+                emptySubtitle={table.emptySubtitle}
+                mobileTitleKey={table.mobileTitleKey}
+                mobileSubtitleKey={table.mobileSubtitleKey}
+              />
+            </Card>
+          ))}
+        </>
+      )}
     </div>
   );
 }
-
 function buildReportBundle(db, filters) {
   const fazendas = Array.isArray(db?.fazendas) ? db.fazendas : [];
   const lotes = Array.isArray(db?.lotes) ? db.lotes : [];
@@ -704,7 +466,7 @@ function buildReportBundle(db, filters) {
     const saldo = Number(item.quantidade_atual || 0);
     const minimo = Number(item.quantidade_minima || 0);
     const ratio = minimo > 0 ? saldo / minimo : saldo > 0 ? 2 : 0;
-    const status = ratio <= 1 ? 'Crítico' : ratio <= 1.4 ? 'Baixo' : 'Saudável';
+    const status = ratio <= 1 ? 'CrÃ­tico' : ratio <= 1.4 ? 'Baixo' : 'SaudÃ¡vel';
     const movimentosRelacionados = movimentacoesEstoque.filter((movimento) => Number(movimento.item_estoque_id) === Number(item.id));
     const consumos = movimentosRelacionados.filter((movimento) => ['saida', 'consumo', 'tratamento', 'perda'].includes(movimento.tipo));
     const consumoMedio = consumos.length
@@ -742,7 +504,7 @@ function buildReportBundle(db, filters) {
       data: formatDate(movimento.data),
       item: estoqueMap.get(Number(movimento.item_estoque_id))?.produto || '-',
       tipo: capitalize(movimento.tipo || '-'),
-      lote: loteMap.get(Number(movimento.lote_id))?.nome || 'Operação geral',
+      lote: loteMap.get(Number(movimento.lote_id))?.nome || 'OperaÃ§Ã£o geral',
       quantidade: formatNumber(movimento.quantidade, 1),
       valor: formatCurrency(movimento.valor_total || 0),
     }))
@@ -787,7 +549,7 @@ function buildReportBundle(db, filters) {
     }));
 
   const ledgerRows = [...financialRows, ...animalRevenueRows];
-  const pagamentosDiariosRows = ledgerRows.filter((row) => row.categoria === 'Pagamento Diário' || row.categoria === 'Pagamento Diario');
+  const pagamentosDiariosRows = ledgerRows.filter((row) => row.categoria === 'Pagamento DiÃ¡rio' || row.categoria === 'Pagamento Diario');
   const ledgerExpense = ledgerRows.filter((row) => row.tipo !== 'Receita').reduce((total, row) => total + row.valor, 0);
   const ledgerRevenue = ledgerRows.filter((row) => row.tipo === 'Receita').reduce((total, row) => total + row.valor, 0);
   const potentialRevenue = visibleLotes.reduce((total, item) => total + Number(item.indicadores.receitaTotal || 0), 0);
@@ -801,9 +563,9 @@ function buildReportBundle(db, filters) {
       produto: plano.produto || 'Sem dados suficientes',
       consumoTipo: plano.consumoTipo || 'Sem dados suficientes',
       consumoInformado: plano.consumoInformado || 'Sem dados suficientes',
-      dataPrevistaSaida: plano.dataPrevistaSaida || 'Estimativa indisponível',
-      consumoEstimado: plano.consumoEstimado || 'Estimativa indisponível',
-      custoEstimado: plano.custoEstimado || 'Estimativa indisponível',
+      dataPrevistaSaida: plano.dataPrevistaSaida || 'Estimativa indisponÃ­vel',
+      consumoEstimado: plano.consumoEstimado || 'Estimativa indisponÃ­vel',
+      custoEstimado: plano.custoEstimado || 'Estimativa indisponÃ­vel',
     };
   });
   const iatfRows = sanitaryRows.filter((row) => String(row.tipo || '').toUpperCase() === 'IATF' || String(row.descricao || '').toUpperCase().includes('IATF'));
@@ -873,7 +635,7 @@ function buildReportBundle(db, filters) {
     sanidadePendente: item.sanitarioPeriodo.filter((registro) => resolveSanitaryStatus(registro) !== 'Em dia').length,
   }));
 
-  const stockCriticalCount = stockItemRows.filter((item) => item.status === 'Crítico').length;
+  const stockCriticalCount = stockItemRows.filter((item) => item.status === 'CrÃ­tico').length;
   const lotMarginTotal = lotReportRows.reduce((total, item) => total + item.margem, 0);
   const totalAnimals = lotReportRows.reduce((total, item) => total + item.animais, 0);
   const performanceAboveMeta = performanceRows.filter((item) => item.gap >= 0).length;
@@ -883,8 +645,8 @@ function buildReportBundle(db, filters) {
 
   const reports = {
     lote: {
-      title: 'Relatório por lote',
-      description: 'Panorama executivo de lote com foco em margem, evolução e pressão sanitária.',
+      title: 'RelatÃ³rio por lote',
+      description: 'Panorama executivo de lote com foco em margem, evoluÃ§Ã£o e pressÃ£o sanitÃ¡ria.',
       scopeLabel: describeScope(filters, visibleLotes.length),
       periodLabel: describePeriod(filters.dataInicio, filters.dataFim),
       healthLabel: lotMarginTotal >= 0 ? 'Margem consolidada positiva' : 'Margem consolidada em alerta',
@@ -897,7 +659,7 @@ function buildReportBundle(db, filters) {
         createSummary('Lotes analisados', String(lotReportRows.length), 'Com filtros aplicados', 'info'),
         createSummary('Animais no escopo', formatNumber(totalAnimals, 0), 'Base atual consolidada', 'neutral'),
         createSummary(
-          'Custos no período',
+          'Custos no perÃ­odo',
           formatCurrency(lotReportRows.reduce((total, item) => total + item.custoPeriodo, 0)),
           'Somente despesas operacionais filtradas',
           'warning'
@@ -913,11 +675,11 @@ function buildReportBundle(db, filters) {
         {
           id: 'lotes',
           title: 'Panorama por lote',
-          description: 'Resumo produtivo, financeiro e sanitário em uma única visão.',
+          description: 'Resumo produtivo, financeiro e sanitÃ¡rio em uma Ãºnica visÃ£o.',
           badgeLabel: `${lotReportRows.length} registros`,
           badgeVariant: 'neutral',
           emptyTitle: 'Nenhum lote encontrado',
-          emptySubtitle: 'Amplie o período ou remova filtros específicos para visualizar os lotes.',
+          emptySubtitle: 'Amplie o perÃ­odo ou remova filtros especÃ­ficos para visualizar os lotes.',
           mobileTitleKey: 'lote',
           mobileSubtitleKey: 'fazenda',
           columns: [
@@ -925,7 +687,7 @@ function buildReportBundle(db, filters) {
             { key: 'fazenda', label: 'Fazenda' },
             { key: 'animais', label: 'Animais', render: (row) => formatNumber(row.animais, 0) },
             { key: 'gmd', label: 'GMD', render: (row) => `${formatNumber(row.gmd, 3)} kg/dia` },
-            { key: 'pesoAtual', label: 'Peso médio', render: (row) => `${formatNumber(row.pesoAtual, 1)} kg` },
+            { key: 'pesoAtual', label: 'Peso mÃ©dio', render: (row) => `${formatNumber(row.pesoAtual, 1)} kg` },
             { key: 'custoPeriodo', label: 'Custos', render: (row) => formatCurrency(row.custoPeriodo) },
             { key: 'margem', label: 'Margem', render: (row) => <span className={row.margem >= 0 ? 'text-success' : 'text-danger'}>{formatCurrency(row.margem)}</span> },
             { key: 'status', label: 'Status', render: (row) => <Badge variant={row.status === 'ativo' ? 'success' : 'neutral'}>{capitalize(row.status)}</Badge> },
@@ -935,19 +697,19 @@ function buildReportBundle(db, filters) {
       ],
     },
     fazenda: {
-      title: 'Relatório por fazenda',
-      description: 'Consolidação dos lotes, estoque e pressão econômica por unidade produtiva.',
+      title: 'RelatÃ³rio por fazenda',
+      description: 'ConsolidaÃ§Ã£o dos lotes, estoque e pressÃ£o econÃ´mica por unidade produtiva.',
       scopeLabel: describeScope(filters, farmRows.length),
       periodLabel: describePeriod(filters.dataInicio, filters.dataFim),
-      healthLabel: farmRows.length ? 'Consolidação disponível' : 'Sem fazendas no escopo',
+      healthLabel: farmRows.length ? 'ConsolidaÃ§Ã£o disponÃ­vel' : 'Sem fazendas no escopo',
       healthTone: farmRows.length ? 'success' : 'warning',
       catalogBadge: farmRows.length ? 'Consolidado' : 'Sem dados',
       catalogTone: farmRows.length ? 'success' : 'neutral',
       catalogMetric: `${farmRows.length} fazendas no recorte`,
       notes: [],
       summary: [
-        createSummary('Fazendas consolidadas', String(farmRows.length), 'Somente fazendas com lotes visíveis', 'info'),
-        createSummary('Lotes distribuídos', formatNumber(visibleLotes.length, 0), 'Operação acompanhada', 'neutral'),
+        createSummary('Fazendas consolidadas', String(farmRows.length), 'Somente fazendas com lotes visÃ­veis', 'info'),
+        createSummary('Lotes distribuÃ­dos', formatNumber(visibleLotes.length, 0), 'OperaÃ§Ã£o acompanhada', 'neutral'),
         createSummary(
           'Receita potencial',
           formatCurrency(farmRows.reduce((total, item) => total + item.receita, 0)),
@@ -969,12 +731,12 @@ function buildReportBundle(db, filters) {
       tables: [
         {
           id: 'fazendas',
-          title: 'Consolidação por fazenda',
+          title: 'ConsolidaÃ§Ã£o por fazenda',
           description: 'Capacidade, estoque e resultado potencial lado a lado.',
           badgeLabel: `${farmRows.length} fazendas`,
           badgeVariant: 'neutral',
           emptyTitle: 'Nenhuma fazenda encontrada',
-          emptySubtitle: 'Crie uma fazenda ou ajuste o escopo dos relatórios.',
+          emptySubtitle: 'Crie uma fazenda ou ajuste o escopo dos relatÃ³rios.',
           mobileTitleKey: 'fazenda',
           columns: [
             { key: 'fazenda', label: 'Fazenda' },
@@ -983,53 +745,53 @@ function buildReportBundle(db, filters) {
             { key: 'receita', label: 'Receita potencial', render: (row) => formatCurrency(row.receita) },
             { key: 'custoPeriodo', label: 'Custos', render: (row) => formatCurrency(row.custoPeriodo) },
             { key: 'margem', label: 'Margem', render: (row) => formatCurrency(row.margem) },
-            { key: 'consumoEstoque', label: 'Insumos no período', render: (row) => formatCurrency(row.consumoEstoque) },
-            { key: 'ocupacao', label: 'Ocupação' },
+            { key: 'consumoEstoque', label: 'Insumos no perÃ­odo', render: (row) => formatCurrency(row.consumoEstoque) },
+            { key: 'ocupacao', label: 'OcupaÃ§Ã£o' },
           ],
           rows: farmRows,
         },
       ],
     },
     sanitario: {
-      title: 'Relatório sanitário',
-      description: 'Pendências, agenda próxima, histórico do período e responsáveis por manejo.',
+      title: 'RelatÃ³rio sanitÃ¡rio',
+      description: 'PendÃªncias, agenda prÃ³xima, histÃ³rico do perÃ­odo e responsÃ¡veis por manejo.',
       scopeLabel: describeScope(filters, sanitaryRows.length),
       periodLabel: describePeriod(filters.dataInicio, filters.dataFim),
-      healthLabel: sanitaryRows.some((row) => row.status === 'Vencido') ? 'Existem protocolos vencidos' : 'Calendário está controlado',
+      healthLabel: sanitaryRows.some((row) => row.status === 'Vencido') ? 'Existem protocolos vencidos' : 'CalendÃ¡rio estÃ¡ controlado',
       healthTone: sanitaryRows.some((row) => row.status === 'Vencido') ? 'warning' : 'success',
-      catalogBadge: sanitaryRows.some((row) => row.status === 'Vencido') ? 'Atenção' : 'Em dia',
+      catalogBadge: sanitaryRows.some((row) => row.status === 'Vencido') ? 'AtenÃ§Ã£o' : 'Em dia',
       catalogTone: sanitaryRows.some((row) => row.status === 'Vencido') ? 'warning' : 'success',
-      catalogMetric: `${sanitaryRows.length} manejos no período`,
+      catalogMetric: `${sanitaryRows.length} manejos no perÃ­odo`,
       notes: sanitaryRows.length
         ? []
         : [
             {
-              title: 'Sem manejos no período',
-              text: 'O módulo continua pronto; basta ampliar a janela de datas para recuperar o histórico.',
+              title: 'Sem manejos no perÃ­odo',
+              text: 'O mÃ³dulo continua pronto; basta ampliar a janela de datas para recuperar o histÃ³rico.',
               variant: 'info',
             },
           ],
       summary: [
-        createSummary('Manejos no período', formatNumber(sanitaryRows.length, 0), 'Vacinas, vermífugos e tratamentos', 'info'),
+        createSummary('Manejos no perÃ­odo', formatNumber(sanitaryRows.length, 0), 'Vacinas, vermÃ­fugos e tratamentos', 'info'),
         createSummary(
-          'Protocolos concluídos',
+          'Protocolos concluÃ­dos',
           formatNumber(sanitaryRows.filter((row) => row.status === 'Em dia').length, 0),
-          'Sem pendências imediatas',
+          'Sem pendÃªncias imediatas',
           'success'
         ),
         createSummary(
-          'Próximos ou vencidos',
+          'PrÃ³ximos ou vencidos',
           formatNumber(sanitaryRows.filter((row) => row.status !== 'Em dia').length, 0),
           'Requer acompanhamento',
           'warning'
         ),
         createSummary(
-          'Lotes com pressão sanitária',
+          'Lotes com pressÃ£o sanitÃ¡ria',
           formatNumber(new Set(sanitaryRows.filter((row) => row.status !== 'Em dia').map((row) => row.lote)).size, 0),
           'Escopo com risco ativo',
           'danger'
         ),
-        createSummary('Protocolos IATF', formatNumber(iatfRows.length, 0), 'Registros reprodutivos dentro do contrato sanitário', iatfRows.length ? 'info' : 'neutral'),
+        createSummary('Protocolos IATF', formatNumber(iatfRows.length, 0), 'Registros reprodutivos dentro do contrato sanitÃ¡rio', iatfRows.length ? 'info' : 'neutral'),
       ],
       highlights: buildSanitaryHighlights(sanitaryRows),
       exportConfig: createExportConfig('relatorio-sanitario', filters, [
@@ -1038,42 +800,42 @@ function buildReportBundle(db, filters) {
       tables: [
         {
           id: 'sanitario',
-          title: 'Agenda sanitária',
-          description: 'Lista ordenada por prioridade e pronta para conferência em campo.',
+          title: 'Agenda sanitÃ¡ria',
+          description: 'Lista ordenada por prioridade e pronta para conferÃªncia em campo.',
           badgeLabel: `${sanitaryRows.length} registros`,
           badgeVariant: 'neutral',
-          emptyTitle: 'Nenhum registro sanitário encontrado',
+          emptyTitle: 'Nenhum registro sanitÃ¡rio encontrado',
           emptySubtitle: 'Cadastre manejos ou revise o intervalo selecionado.',
           mobileTitleKey: 'descricao',
-          mobileSubtitleKey: (row) => `${row.lote} • ${row.status}`,
+          mobileSubtitleKey: (row) => `${row.lote} â€¢ ${row.status}`,
           columns: [
             { key: 'tipo', label: 'Tipo' },
-            { key: 'descricao', label: 'Descrição' },
+            { key: 'descricao', label: 'DescriÃ§Ã£o' },
             { key: 'lote', label: 'Lote' },
             { key: 'fazenda', label: 'Fazenda' },
-            { key: 'aplicacao', label: 'Aplicação' },
-            { key: 'proxima', label: 'Próxima' },
-            { key: 'responsavel', label: 'Responsável' },
+            { key: 'aplicacao', label: 'AplicaÃ§Ã£o' },
+            { key: 'proxima', label: 'PrÃ³xima' },
+            { key: 'responsavel', label: 'ResponsÃ¡vel' },
             { key: 'status', label: 'Status', render: (row) => <Badge variant={sanitizeBadge(row.status)}>{row.status}</Badge> },
           ],
           rows: sanitaryRows,
         },
         {
           id: 'iatf',
-          title: 'Agenda IATF / Reprodução',
-          description: 'Protocolos IATF registrados no sanitário para acompanhamento de agenda.',
+          title: 'Agenda IATF / ReproduÃ§Ã£o',
+          description: 'Protocolos IATF registrados no sanitÃ¡rio para acompanhamento de agenda.',
           badgeLabel: `${iatfRows.length} protocolos`,
           badgeVariant: 'neutral',
           emptyTitle: 'Nenhum registro encontrado',
-          emptySubtitle: 'Cadastre protocolos IATF no módulo sanitário para visualizar este quadro.',
+          emptySubtitle: 'Cadastre protocolos IATF no mÃ³dulo sanitÃ¡rio para visualizar este quadro.',
           mobileTitleKey: 'descricao',
-          mobileSubtitleKey: (row) => `${row.lote} • ${row.proxima}`,
+          mobileSubtitleKey: (row) => `${row.lote} â€¢ ${row.proxima}`,
           columns: [
             { key: 'descricao', label: 'Protocolo' },
             { key: 'lote', label: 'Lote' },
             { key: 'fazenda', label: 'Fazenda' },
-            { key: 'aplicacao', label: 'Início' },
-            { key: 'proxima', label: 'Próxima ação' },
+            { key: 'aplicacao', label: 'InÃ­cio' },
+            { key: 'proxima', label: 'PrÃ³xima aÃ§Ã£o' },
             { key: 'status', label: 'Status', render: (row) => <Badge variant={sanitizeBadge(row.status)}>{row.status}</Badge> },
           ],
           rows: iatfRows,
@@ -1081,34 +843,34 @@ function buildReportBundle(db, filters) {
       ],
     },
     estoque: {
-      title: 'Relatório de estoque',
-      description: 'Saldo atual, itens críticos, validade e movimentações com contexto operacional.',
+      title: 'RelatÃ³rio de estoque',
+      description: 'Saldo atual, itens crÃ­ticos, validade e movimentaÃ§Ãµes com contexto operacional.',
       scopeLabel: describeScope(filters, stockItemRows.length),
       periodLabel: describePeriod(filters.dataInicio, filters.dataFim),
-      healthLabel: stockCriticalCount > 0 ? 'Existem itens críticos' : 'Cobertura operacional está estável',
+      healthLabel: stockCriticalCount > 0 ? 'Existem itens crÃ­ticos' : 'Cobertura operacional estÃ¡ estÃ¡vel',
       healthTone: stockCriticalCount > 0 ? 'warning' : 'success',
-      catalogBadge: stockCriticalCount > 0 ? 'Críticos' : 'Estável',
+      catalogBadge: stockCriticalCount > 0 ? 'CrÃ­ticos' : 'EstÃ¡vel',
       catalogTone: stockCriticalCount > 0 ? 'warning' : 'success',
       catalogMetric: `${stockItemRows.length} itens em estoque`,
       notes: stockMovementRows.length
         ? []
         : [
             {
-              title: 'Sem movimentações no período',
-              text: 'Os saldos continuam visíveis e a estrutura já está pronta para exportar entradas e saídas futuramente.',
+              title: 'Sem movimentaÃ§Ãµes no perÃ­odo',
+              text: 'Os saldos continuam visÃ­veis e a estrutura jÃ¡ estÃ¡ pronta para exportar entradas e saÃ­das futuramente.',
               variant: 'info',
             },
           ],
       summary: [
-        createSummary('Itens cadastrados', formatNumber(stockItemRows.length, 0), 'Inventário atual', 'info'),
-        createSummary('Itens críticos', formatNumber(stockCriticalCount, 0), 'Abaixo ou próximos do mínimo', stockCriticalCount > 0 ? 'warning' : 'success'),
+        createSummary('Itens cadastrados', formatNumber(stockItemRows.length, 0), 'InventÃ¡rio atual', 'info'),
+        createSummary('Itens crÃ­ticos', formatNumber(stockCriticalCount, 0), 'Abaixo ou prÃ³ximos do mÃ­nimo', stockCriticalCount > 0 ? 'warning' : 'success'),
         createSummary(
           'Valor em estoque',
           formatCurrency(stockItemRows.reduce((total, item) => total + currencyToNumber(item.valor), 0)),
-          'Saldo financeiro do inventário',
+          'Saldo financeiro do inventÃ¡rio',
           'neutral'
         ),
-        createSummary('Movimentações no período', formatNumber(stockMovementRows.length, 0), 'Entradas, saídas e consumos', 'info'),
+        createSummary('MovimentaÃ§Ãµes no perÃ­odo', formatNumber(stockMovementRows.length, 0), 'Entradas, saÃ­das e consumos', 'info'),
       ],
       highlights: buildStockHighlights(stockItemRows, stockMovementRows),
       exportConfig: createExportConfig('relatorio-estoque', filters, [
@@ -1119,18 +881,18 @@ function buildReportBundle(db, filters) {
         {
           id: 'saldo',
           title: 'Saldo por item',
-          description: 'Leitura rápida para operação, compras e validade.',
-          badgeLabel: `${stockCriticalCount} críticos`,
+          description: 'Leitura rÃ¡pida para operaÃ§Ã£o, compras e validade.',
+          badgeLabel: `${stockCriticalCount} crÃ­ticos`,
           badgeVariant: stockCriticalCount > 0 ? 'warning' : 'success',
           emptyTitle: 'Nenhum item de estoque cadastrado',
-          emptySubtitle: 'Adicione itens para liberar o relatório de estoque.',
+          emptySubtitle: 'Adicione itens para liberar o relatÃ³rio de estoque.',
           mobileTitleKey: 'item',
           mobileSubtitleKey: 'categoria',
           columns: [
             { key: 'item', label: 'Item' },
             { key: 'categoria', label: 'Categoria' },
             { key: 'saldo', label: 'Saldo' },
-            { key: 'minimo', label: 'Mínimo' },
+            { key: 'minimo', label: 'MÃ­nimo' },
             { key: 'cobertura', label: 'Cobertura' },
             { key: 'valor', label: 'Valor' },
             { key: 'validade', label: 'Validade' },
@@ -1140,14 +902,14 @@ function buildReportBundle(db, filters) {
         },
         {
           id: 'movimentacoes',
-          title: 'Movimentações do período',
-          description: 'Histórico operacional filtrado por período, lote e fazenda.',
+          title: 'MovimentaÃ§Ãµes do perÃ­odo',
+          description: 'HistÃ³rico operacional filtrado por perÃ­odo, lote e fazenda.',
           badgeLabel: `${stockMovementRows.length} movimentos`,
           badgeVariant: 'neutral',
-          emptyTitle: 'Nenhuma movimentação encontrada',
-          emptySubtitle: 'O saldo continua monitorado, mas não houve entradas ou saídas no período selecionado.',
+          emptyTitle: 'Nenhuma movimentaÃ§Ã£o encontrada',
+          emptySubtitle: 'O saldo continua monitorado, mas nÃ£o houve entradas ou saÃ­das no perÃ­odo selecionado.',
           mobileTitleKey: 'item',
-          mobileSubtitleKey: (row) => `${row.tipo} • ${row.data}`,
+          mobileSubtitleKey: (row) => `${row.tipo} â€¢ ${row.data}`,
           columns: [
             { key: 'data', label: 'Data' },
             { key: 'item', label: 'Item' },
@@ -1161,11 +923,11 @@ function buildReportBundle(db, filters) {
       ],
     },
     financeiro: {
-      title: 'Relatório financeiro',
-      description: 'Visão consolidada de despesas, receitas registradas e receita potencial da operação.',
+      title: 'RelatÃ³rio financeiro',
+      description: 'VisÃ£o consolidada de despesas, receitas registradas e receita potencial da operaÃ§Ã£o.',
       scopeLabel: describeScope(filters, ledgerRows.length || visibleLotes.length),
       periodLabel: describePeriod(filters.dataInicio, filters.dataFim),
-      healthLabel: ledgerRevenue > 0 ? 'Fluxo realizado disponível' : 'Receita realizada ainda não lançada',
+      healthLabel: ledgerRevenue > 0 ? 'Fluxo realizado disponÃ­vel' : 'Receita realizada ainda nÃ£o lanÃ§ada',
       healthTone: ledgerRevenue > 0 ? 'success' : 'warning',
       catalogBadge: ledgerRows.length ? 'Fluxo' : 'Potencial',
       catalogTone: ledgerRows.length ? 'info' : 'warning',
@@ -1174,22 +936,22 @@ function buildReportBundle(db, filters) {
         ? [
             {
               title: 'Receita realizada ainda zerada',
-              text: 'Enquanto os lançamentos ou vendas não forem registrados, o relatório usa a receita potencial dos lotes para apoiar a leitura executiva.',
+              text: 'Enquanto os lanÃ§amentos ou vendas nÃ£o forem registrados, o relatÃ³rio usa a receita potencial dos lotes para apoiar a leitura executiva.',
               variant: 'warning',
             },
           ]
         : [],
       summary: [
-        createSummary('Despesas do período', formatCurrency(ledgerExpense), 'Custos operacionais + despesas lançadas', 'danger'),
-        createSummary('Receita realizada', formatCurrency(ledgerRevenue), 'Lançamentos financeiros e vendas registradas', 'success'),
+        createSummary('Despesas do perÃ­odo', formatCurrency(ledgerExpense), 'Custos operacionais + despesas lanÃ§adas', 'danger'),
+        createSummary('Receita realizada', formatCurrency(ledgerRevenue), 'LanÃ§amentos financeiros e vendas registradas', 'success'),
         createSummary('Receita potencial', formatCurrency(potentialRevenue), 'Estimativa atual dos lotes filtrados', 'info'),
         createSummary(
-          'Resultado líquido',
+          'Resultado lÃ­quido',
           formatCurrency(ledgerRevenue - ledgerExpense),
-          'Somente o que já foi efetivamente lançado',
+          'Somente o que jÃ¡ foi efetivamente lanÃ§ado',
           ledgerRevenue - ledgerExpense >= 0 ? 'success' : 'danger'
         ),
-        createSummary('Pagamentos diários', formatNumber(pagamentosDiariosRows.length, 0), 'Lidos de movimentações financeiras', 'info'),
+        createSummary('Pagamentos diÃ¡rios', formatNumber(pagamentosDiariosRows.length, 0), 'Lidos de movimentaÃ§Ãµes financeiras', 'info'),
       ],
       highlights: buildFinancialHighlights(ledgerRows, potentialRevenue, ledgerExpense),
       exportConfig: createExportConfig('relatorio-financeiro', filters, [
@@ -1199,14 +961,14 @@ function buildReportBundle(db, filters) {
       tables: [
         {
           id: 'financeiro-ledger',
-          title: 'Lançamentos consolidados',
-          description: 'Base única para futuro PDF, XLSX e integrações contábeis.',
+          title: 'LanÃ§amentos consolidados',
+          description: 'Base Ãºnica para futuro PDF, XLSX e integraÃ§Ãµes contÃ¡beis.',
           badgeLabel: `${ledgerRows.length} linhas`,
           badgeVariant: 'neutral',
-          emptyTitle: 'Sem lançamentos financeiros no período',
+          emptyTitle: 'Sem lanÃ§amentos financeiros no perÃ­odo',
           emptySubtitle: 'Cadastre receitas e despesas ou mantenha a leitura apenas pela receita potencial.',
           mobileTitleKey: 'categoria',
-          mobileSubtitleKey: (row) => `${row.tipo} • ${row.data}`,
+          mobileSubtitleKey: (row) => `${row.tipo} â€¢ ${row.data}`,
           columns: [
             { key: 'data', label: 'Data' },
             { key: 'tipo', label: 'Tipo', render: (row) => <Badge variant={row.tipo === 'Receita' ? 'success' : 'danger'}>{row.tipo}</Badge> },
@@ -1220,14 +982,14 @@ function buildReportBundle(db, filters) {
         },
         {
           id: 'financeiro-pagamentos-diarios',
-          title: 'Pagamentos diários',
-          description: 'Pagamentos categorizados como Pagamento Diário no financeiro.',
+          title: 'Pagamentos diÃ¡rios',
+          description: 'Pagamentos categorizados como Pagamento DiÃ¡rio no financeiro.',
           badgeLabel: `${pagamentosDiariosRows.length} pagamentos`,
           badgeVariant: 'neutral',
           emptyTitle: 'Nenhum registro encontrado',
-          emptySubtitle: 'Sem pagamentos diários para os filtros selecionados.',
+          emptySubtitle: 'Sem pagamentos diÃ¡rios para os filtros selecionados.',
           mobileTitleKey: 'categoria',
-          mobileSubtitleKey: (row) => `${row.data} • ${formatCurrency(row.valor)}`,
+          mobileSubtitleKey: (row) => `${row.data} â€¢ ${formatCurrency(row.valor)}`,
           columns: [
             { key: 'data', label: 'Data' },
             { key: 'categoria', label: 'Categoria' },
@@ -1241,7 +1003,7 @@ function buildReportBundle(db, filters) {
         {
           id: 'financeiro-planejamento-lotes',
           title: 'Planejamento de lote e estimativas',
-          description: 'Representação de GMD, dieta/consumo e estimativas persistidas em campos compatíveis.',
+          description: 'RepresentaÃ§Ã£o de GMD, dieta/consumo e estimativas persistidas em campos compatÃ­veis.',
           badgeLabel: `${planejamentoLoteRows.length} lotes`,
           badgeVariant: 'neutral',
           emptyTitle: 'Nenhum lote encontrado',
@@ -1255,7 +1017,7 @@ function buildReportBundle(db, filters) {
             { key: 'produto', label: 'Dieta/produto' },
             { key: 'consumoTipo', label: 'Tipo de consumo' },
             { key: 'consumoInformado', label: 'Consumo informado' },
-            { key: 'dataPrevistaSaida', label: 'Data prevista (projeção)' },
+            { key: 'dataPrevistaSaida', label: 'Data prevista (projeÃ§Ã£o)' },
             { key: 'consumoEstimado', label: 'Consumo estimado' },
             { key: 'custoEstimado', label: 'Custo estimado' },
           ],
@@ -1264,8 +1026,8 @@ function buildReportBundle(db, filters) {
       ],
     },
     desempenho: {
-      title: 'Relatório de desempenho',
-      description: 'Ranking zootécnico com foco em GMD, peso médio, custo por cabeça e aderência à meta.',
+      title: 'RelatÃ³rio de desempenho',
+      description: 'Ranking zootÃ©cnico com foco em GMD, peso mÃ©dio, custo por cabeÃ§a e aderÃªncia Ã  meta.',
       scopeLabel: describeScope(filters, performanceRows.length),
       periodLabel: describePeriod(filters.dataInicio, filters.dataFim),
       healthLabel: performanceAboveMeta === performanceRows.length && performanceRows.length ? 'Metas sustentadas no recorte' : 'Existem lotes abaixo da meta',
@@ -1277,13 +1039,13 @@ function buildReportBundle(db, filters) {
         ? []
         : [
             {
-              title: 'Sem pesagens suficientes no período',
-              text: 'O ranking fica disponível assim que houver pesagens ou lotes ativos dentro do escopo.',
+              title: 'Sem pesagens suficientes no perÃ­odo',
+              text: 'O ranking fica disponÃ­vel assim que houver pesagens ou lotes ativos dentro do escopo.',
               variant: 'info',
             },
           ],
       summary: [
-        createSummary('GMD médio', `${formatNumber(averageGmd, 3)} kg/dia`, 'Média dos lotes filtrados', 'info'),
+        createSummary('GMD mÃ©dio', `${formatNumber(averageGmd, 3)} kg/dia`, 'MÃ©dia dos lotes filtrados', 'info'),
         createSummary(
           'Acima da meta',
           formatNumber(performanceAboveMeta, 0),
@@ -1291,11 +1053,11 @@ function buildReportBundle(db, filters) {
           performanceAboveMeta === performanceRows.length && performanceRows.length ? 'success' : 'warning'
         ),
         createSummary(
-          'Peso médio atual',
+          'Peso mÃ©dio atual',
           performanceRows.length
             ? `${formatNumber(performanceRows.reduce((total, item) => total + item.pesoAtual, 0) / performanceRows.length, 1)} kg`
             : '--',
-          'Base mais recente disponível',
+          'Base mais recente disponÃ­vel',
           'neutral'
         ),
         createSummary(
@@ -1313,11 +1075,11 @@ function buildReportBundle(db, filters) {
         {
           id: 'performance',
           title: 'Ranking de desempenho',
-          description: 'Ordenado por GMD para facilitar a tomada de decisão.',
+          description: 'Ordenado por GMD para facilitar a tomada de decisÃ£o.',
           badgeLabel: `${performanceAboveMeta}/${performanceRows.length} na meta`,
           badgeVariant: performanceAboveMeta === performanceRows.length && performanceRows.length ? 'success' : 'warning',
           emptyTitle: 'Nenhum lote com desempenho calculado',
-          emptySubtitle: 'É preciso haver lotes ativos e pesagens para montar o ranking.',
+          emptySubtitle: 'Ã‰ preciso haver lotes ativos e pesagens para montar o ranking.',
           mobileTitleKey: 'lote',
           mobileSubtitleKey: 'fazenda',
           columns: [
@@ -1368,7 +1130,7 @@ function buildCsvFromSheets(sheets) {
     if (index > 0) lines.push('');
     lines.push(`Aba: ${sheet.name}`);
     if (!columns.length) {
-      lines.push('Observação;Nenhum registro encontrado');
+      lines.push('ObservaÃ§Ã£o;Nenhum registro encontrado');
       return;
     }
     lines.push(columns.map((col) => toCsvCell(formatCsvHeader(col))).join(';'));
@@ -1397,7 +1159,7 @@ function formatCsvHeader(key) {
     consumoInformado: 'Consumo informado',
     consumoEstimado: 'Consumo estimado',
     custoEstimado: 'Custo estimado',
-    dataPrevistaSaida: 'Data prevista de saída',
+    dataPrevistaSaida: 'Data prevista de saÃ­da',
   };
   if (map[key]) return map[key];
   return String(key)
@@ -1408,7 +1170,7 @@ function formatCsvHeader(key) {
 
 function toSafeExportValue(value) {
   if (value == null || value === '') return 'Sem dados suficientes';
-  if (typeof value === 'number' && Number.isNaN(value)) return 'Estimativa indisponível';
+  if (typeof value === 'number' && Number.isNaN(value)) return 'Estimativa indisponÃ­vel';
   return value;
 }
 
@@ -1428,12 +1190,12 @@ function buildLotHighlights(rows) {
       detail: formatCurrency(bestMargin.margem),
     },
     {
-      label: 'Melhor ganho médio diário',
+      label: 'Melhor ganho mÃ©dio diÃ¡rio',
       value: bestGmd.lote,
       detail: `${formatNumber(bestGmd.gmd, 3)} kg/dia`,
     },
     {
-      label: 'Maior custo no período',
+      label: 'Maior custo no perÃ­odo',
       value: highestCost.lote,
       detail: formatCurrency(highestCost.custoPeriodo),
     },
@@ -1461,9 +1223,9 @@ function buildFarmHighlights(rows) {
       detail: formatCurrency(maiorReceita.receita),
     },
     {
-      label: 'Maior concentração animal',
+      label: 'Maior concentraÃ§Ã£o animal',
       value: maiorRebanho.fazenda,
-      detail: `${formatNumber(maiorRebanho.animais, 0)} cabeças`,
+      detail: `${formatNumber(maiorRebanho.animais, 0)} cabeÃ§as`,
     },
   ];
 }
@@ -1474,24 +1236,24 @@ function buildSanitaryHighlights(rows) {
   }
 
   const vencido = rows.find((row) => row.status === 'Vencido');
-  const proximo = rows.find((row) => row.status === 'Próximo');
+  const proximo = rows.find((row) => row.status === 'PrÃ³ximo');
   const responsavel = frequency(rows.map((row) => row.responsavel)).at(0);
 
   return [
     {
-      label: 'Maior prioridade sanitária',
+      label: 'Maior prioridade sanitÃ¡ria',
       value: vencido ? `${vencido.descricao} - ${vencido.lote}` : 'Sem manejos vencidos',
-      detail: vencido ? vencido.proxima : 'Operação em dia',
+      detail: vencido ? vencido.proxima : 'OperaÃ§Ã£o em dia',
     },
     {
-      label: 'Próximo manejo',
-      value: proximo ? `${proximo.descricao} - ${proximo.lote}` : 'Sem protocolo próximo',
-      detail: proximo ? proximo.proxima : 'Sem agenda crítica',
+      label: 'PrÃ³ximo manejo',
+      value: proximo ? `${proximo.descricao} - ${proximo.lote}` : 'Sem protocolo prÃ³ximo',
+      detail: proximo ? proximo.proxima : 'Sem agenda crÃ­tica',
     },
     {
-      label: 'Responsável mais recorrente',
-      value: responsavel?.value || 'Sem responsável definido',
-      detail: responsavel ? `${responsavel.count} registros` : 'Sem concentração',
+      label: 'ResponsÃ¡vel mais recorrente',
+      value: responsavel?.value || 'Sem responsÃ¡vel definido',
+      detail: responsavel ? `${responsavel.count} registros` : 'Sem concentraÃ§Ã£o',
     },
   ];
 }
@@ -1501,15 +1263,15 @@ function buildStockHighlights(items, movements) {
     return [];
   }
 
-  const critico = items.find((item) => item.status === 'Crítico');
+  const critico = items.find((item) => item.status === 'CrÃ­tico');
   const maiorValor = items.slice().sort((a, b) => currencyToNumber(b.valor) - currencyToNumber(a.valor))[0];
   const ultimoMovimento = movements[0];
 
   return [
     {
-      label: 'Item mais sensível',
-      value: critico?.item || 'Sem itens críticos',
-      detail: critico?.saldo || 'Cobertura estável',
+      label: 'Item mais sensÃ­vel',
+      value: critico?.item || 'Sem itens crÃ­ticos',
+      detail: critico?.saldo || 'Cobertura estÃ¡vel',
     },
     {
       label: 'Maior valor parado em estoque',
@@ -1517,8 +1279,8 @@ function buildStockHighlights(items, movements) {
       detail: maiorValor.valor,
     },
     {
-      label: 'Última movimentação registrada',
-      value: ultimoMovimento ? `${ultimoMovimento.item} - ${ultimoMovimento.tipo}` : 'Sem movimentação no período',
+      label: 'Ãšltima movimentaÃ§Ã£o registrada',
+      value: ultimoMovimento ? `${ultimoMovimento.item} - ${ultimoMovimento.tipo}` : 'Sem movimentaÃ§Ã£o no perÃ­odo',
       detail: ultimoMovimento?.data || 'Sem data',
     },
   ];
@@ -1531,12 +1293,12 @@ function buildFinancialHighlights(rows, potentialRevenue, ledgerExpense) {
   return [
     {
       label: 'Principal categoria',
-      value: principalCategoria?.value || 'Sem lançamentos',
-      detail: principalCategoria ? `${principalCategoria.count} ocorrências` : 'Sem dados no período',
+      value: principalCategoria?.value || 'Sem lanÃ§amentos',
+      detail: principalCategoria ? `${principalCategoria.count} ocorrÃªncias` : 'Sem dados no perÃ­odo',
     },
     {
-      label: 'Maior lançamento individual',
-      value: maiorLinha?.categoria || 'Sem lançamento',
+      label: 'Maior lanÃ§amento individual',
+      value: maiorLinha?.categoria || 'Sem lanÃ§amento',
       detail: maiorLinha ? formatCurrency(maiorLinha.valor) : '--',
     },
     {
@@ -1563,7 +1325,7 @@ function buildPerformanceHighlights(rows) {
       detail: `${formatNumber(melhor.gmd, 3)} kg/dia`,
     },
     {
-      label: 'Ponto de atenção',
+      label: 'Ponto de atenÃ§Ã£o',
       value: pior.lote,
       detail: `${formatNumber(pior.gmd, 3)} kg/dia`,
     },
@@ -1684,7 +1446,7 @@ function resolveSanitaryStatus(item) {
     return 'Vencido';
   }
   if (diff <= Number(item?.alerta_dias_antes || 0)) {
-    return 'Próximo';
+    return 'PrÃ³ximo';
   }
   return 'Em dia';
 }
@@ -1710,10 +1472,10 @@ function describeScope(filters, count) {
 
 function describePeriod(start, end) {
   if (!start && !end) {
-    return 'Sem período definido';
+    return 'Sem perÃ­odo definido';
   }
 
-  return `${formatDate(start)} até ${formatDate(end)}`;
+  return `${formatDate(start)} atÃ© ${formatDate(end)}`;
 }
 
 function capitalize(value) {
@@ -1727,7 +1489,7 @@ function sanitizeBadge(status) {
   if (status === 'Vencido') {
     return 'danger';
   }
-  if (status === 'Próximo') {
+  if (status === 'PrÃ³ximo') {
     return 'warning';
   }
   if (status === 'Em dia') {
@@ -1737,7 +1499,7 @@ function sanitizeBadge(status) {
 }
 
 function stockBadge(status) {
-  if (status === 'Crítico') {
+  if (status === 'CrÃ­tico') {
     return 'danger';
   }
   if (status === 'Baixo') {
@@ -1750,7 +1512,7 @@ function priorityRank(status) {
   if (status === 'Vencido') {
     return 0;
   }
-  if (status === 'Próximo') {
+  if (status === 'PrÃ³ximo') {
     return 1;
   }
   if (status === 'Em dia') {
@@ -1794,7 +1556,7 @@ function parsePlanejamentoLote(obs) {
     produto: (text.match(/Dieta\/produto:\s*([^|]+)/i) || [])[1]?.trim(),
     consumoTipo: (text.match(/Modo de consumo:\s*([^|]+)/i) || [])[1]?.trim(),
     consumoInformado: (text.match(/Valor de consumo:\s*([^|]+)/i) || [])[1]?.trim(),
-    dataPrevistaSaida: (text.match(/Saída projetada \(informativa\):\s*([^|]+)/i) || [])[1]?.trim(),
+    dataPrevistaSaida: (text.match(/SaÃ­da projetada \(informativa\):\s*([^|]+)/i) || [])[1]?.trim(),
     consumoEstimado: (text.match(/Consumo estimado suplemento \(kg\):\s*([^|]+)/i) || [])[1]?.trim(),
     custoEstimado: (text.match(/Custo estimado suplemento \(R\$\):\s*([^|]+)/i) || [])[1]?.trim(),
   };
