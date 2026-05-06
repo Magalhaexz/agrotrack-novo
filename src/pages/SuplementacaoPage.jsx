@@ -175,6 +175,13 @@ export default function SuplementacaoPage({ db, setDb }) {
           <Button variant="outline" disabled={!hasPermission('estoque:editar')} onClick={() => setOpenConsumo(true)}>Registrar consumo diario</Button>
         </div>
       </header>
+      <Card title="Cadastro de nutrição" subtitle="Use este módulo para cadastrar dieta/suplemento e consumo padrão por lote.">
+        <div className="dashboard-list">
+          <div className="dashboard-list-item"><div className="dashboard-list-copy"><strong>Cadastrar dieta/suplemento</strong><p>Defina itens, unidade e consumo por cabeça/dia.</p></div></div>
+          <div className="dashboard-list-item"><div className="dashboard-list-copy"><strong>Registrar consumo</strong><p>Lança consumo diário e atualiza o saldo do estoque vinculado.</p></div></div>
+          <div className="dashboard-list-item"><div className="dashboard-list-copy"><strong>Observação</strong><p>Modelos de consumo em % do peso vivo não possuem schema dedicado neste fluxo atual.</p></div></div>
+        </div>
+      </Card>
 
       <Card className="suplementacao-card suplementacao-card--dietas" title="Dietas vinculadas por lote" subtitle="Compatibilidade preservada com os dados legados de suplementacao.">
         <div className="table-responsive">
