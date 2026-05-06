@@ -34,7 +34,6 @@ const inFlightSnapshots = new Map();
 const failedHydrationAt = new Map();
 const schemaWarningTables = new Set();
 const ownerScopeCapabilityByTable = new Map();
-let autoSyncDisabledLogged = false;
 
 function nowMs() {
   return typeof performance !== 'undefined' ? performance.now() : Date.now();
@@ -422,6 +421,7 @@ export function useOperationalData(initialDb, session, options = {}) {
     const userId = session?.user?.id || null;
     const syncDisabled = shouldDisableSupabaseSync();
     const manualSyncRequested = manualSyncNonce > 0;
+    const syncTrigger = manualSyncRequested ? 'manual_sync' : 'auto_sync';
 
     const shouldApply = () => {
       const isCurrentGeneration = hydrationGenerationRef.current === generationId;
@@ -467,32 +467,14 @@ export function useOperationalData(initialDb, session, options = {}) {
       };
     }
 
-    if (!manualSyncRequested) {
-      setDbState(fallbackDb);
-      setDataSource('local_offline');
-      setDataError(null);
-      setDataReady(true);
-      hydratingRef.current = false;
-      if (!autoSyncDisabledLogged && import.meta.env.DEV) {
-        autoSyncDisabledLogged = true;
-        console.debug('[HERDON_DATA_BOOT]', {
-          stage: 'auto_sync_disabled_by_default',
-          hasUserId: true,
-        });
-      }
-      return () => {
-        active = false;
-      };
-    }
-
     setDbState(fallbackDb);
       setDataSource('fallback');
       setDataError(null);
       setDataReady(true);
       setManualSyncInFlight(false);
       logSyncGuard({
-        stage: 'fallback_published',
-        action: manualSyncRequested ? 'manual_sync' : 'auto_sync',
+        stage: manualSyncRequested ? 'fallback_published' : 'auto_sync_bootstrap',
+        action: syncTrigger,
         status: 'fallback_ready',
         generationId,
         hasUserId: true,
@@ -515,7 +497,7 @@ export function useOperationalData(initialDb, session, options = {}) {
       setManualSyncInFlight(true);
       logSyncGuard({
         stage: 'sync_started',
-        action: manualSyncRequested ? 'manual_sync' : 'auto_sync',
+        action: syncTrigger,
         status: 'syncing',
         generationId,
         hasUserId: true,
@@ -541,7 +523,7 @@ export function useOperationalData(initialDb, session, options = {}) {
           setDataSource('fallback');
           logSyncGuard({
             stage: 'sync_skipped_local_mutation',
-            action: manualSyncRequested ? 'manual_sync' : 'auto_sync',
+            action: syncTrigger,
             status: 'local_mutation_detected',
             generationId,
             hasUserId: true,
@@ -556,7 +538,7 @@ export function useOperationalData(initialDb, session, options = {}) {
           setDataError(new Error('Sincronizacao com a nuvem instavel. O app continuara em modo local.'));
           logSyncGuard({
             stage: 'sync_finished_circuit_open',
-            action: manualSyncRequested ? 'manual_sync' : 'auto_sync',
+            action: syncTrigger,
             status: 'error',
             errorName: 'CIRCUIT_OPEN',
             errorMessage: 'Sincronizacao com a nuvem instavel. O app continuara em modo local.',
@@ -566,7 +548,7 @@ export function useOperationalData(initialDb, session, options = {}) {
           setDataError(new Error('A nuvem apresentou falhas nesta sincronizacao. O app segue em dados locais.'));
           logSyncGuard({
             stage: 'sync_finished_partial_failure',
-            action: manualSyncRequested ? 'manual_sync' : 'auto_sync',
+            action: syncTrigger,
             status: 'error',
             errorName: 'PARTIAL_SYNC_FAILURE',
             errorMessage: 'A nuvem apresentou falhas nesta sincronizacao. O app segue em dados locais.',
@@ -599,7 +581,7 @@ export function useOperationalData(initialDb, session, options = {}) {
           : 'Sincronizacao instavel. Seus dados locais continuam disponiveis.'));
         logSyncGuard({
           stage: 'sync_finished_exception',
-          action: manualSyncRequested ? 'manual_sync' : 'auto_sync',
+          action: syncTrigger,
           status: 'error',
           errorName,
           errorMessage: rawMessage || 'unknown_error',
@@ -621,7 +603,7 @@ export function useOperationalData(initialDb, session, options = {}) {
       setManualSyncInFlight(false);
       logSyncGuard({
         stage: 'sync_cancelled_cleanup',
-        action: manualSyncRequested ? 'manual_sync' : 'auto_sync',
+        action: syncTrigger,
         status: 'cancelled',
         generationId,
         hasUserId: Boolean(userId),

@@ -3,6 +3,8 @@ const NETWORK_CIRCUIT_OPEN_MS = 45000;
 const moduleNetworkCircuit = new Map();
 const OWNER_SCOPE_OPTIONAL_TABLES = new Set([]);
 const tableCapabilityCache = new Map();
+const PENDING_SYNC_QUEUE_KEY = 'herdon-pending-sync-queue';
+const AUTO_RETRY_EVENT = 'herdon-pending-sync-updated';
 
 function getSessionUserId(session) {
   return session?.user?.id || null;
@@ -254,6 +256,73 @@ function emitCloudSaveState({ table, action, syncStatus, code, message, session,
       userIdPresent: Boolean(getSessionUserId(session)),
     },
   }));
+}
+
+function readPendingSyncQueue() {
+  try {
+    const raw = localStorage.getItem(PENDING_SYNC_QUEUE_KEY);
+    if (!raw) return [];
+    const parsed = JSON.parse(raw);
+    return Array.isArray(parsed) ? parsed : [];
+  } catch {
+    return [];
+  }
+}
+
+function writePendingSyncQueue(queue) {
+  try {
+    localStorage.setItem(PENDING_SYNC_QUEUE_KEY, JSON.stringify(Array.isArray(queue) ? queue : []));
+  } catch {
+    // noop
+  }
+}
+
+function buildQueueFingerprint(item) {
+  const target = `${item?.table || ''}:${item?.action || ''}:${item?.cloudId || ''}:${item?.localId || ''}`;
+  return target.toLowerCase();
+}
+
+function emitPendingSyncState(queue = [], reason = 'updated') {
+  if (typeof window === 'undefined' || typeof window.dispatchEvent !== 'function') return;
+  window.dispatchEvent(new CustomEvent(AUTO_RETRY_EVENT, {
+    detail: {
+      pendingCount: Array.isArray(queue) ? queue.length : 0,
+      reason,
+      checkedAt: Date.now(),
+    },
+  }));
+}
+
+function enqueuePendingSync(item = {}) {
+  const current = readPendingSyncQueue();
+  const nextItem = {
+    id: `${Date.now()}-${Math.random().toString(16).slice(2)}`,
+    table: item.table || null,
+    action: item.action || null,
+    localId: item.localId ?? null,
+    cloudId: item.cloudId ?? null,
+    payload: isObject(item.payload) ? item.payload : {},
+    createdAt: item.createdAt || new Date().toISOString(),
+    lastAttemptAt: item.lastAttemptAt || null,
+    retryCount: Number(item.retryCount || 0),
+    code: item.code || 'unknown',
+    message: item.message || 'Registro salvo localmente. Sincronização pendente.',
+  };
+  const fingerprint = buildQueueFingerprint(nextItem);
+  const deduped = current.filter((queued) => buildQueueFingerprint(queued) !== fingerprint);
+  const queue = [...deduped, nextItem];
+  writePendingSyncQueue(queue);
+  emitPendingSyncState(queue, 'enqueue');
+  return nextItem;
+}
+
+export function getPendingSyncQueueSnapshot() {
+  const queue = readPendingSyncQueue();
+  return {
+    queue,
+    pendingCount: queue.length,
+    checkedAt: Date.now(),
+  };
 }
 
 export async function ensureSupabaseRequestReadiness(session, context = {}) {
@@ -789,7 +858,7 @@ function sanitizeAuditDetails(input) {
   }, {});
 }
 
-export async function createOperationalRecord(table, record, session) {
+export async function createOperationalRecord(table, record, session, options = {}) {
   const readiness = await ensureSupabaseRequestReadiness(session, { action: 'create', table });
   if (!readiness.ok) {
     const fallback = buildFallback(readiness.message, sanitizeRecord(record), readiness.code || 'CLOUD_NOT_READY');
@@ -802,6 +871,17 @@ export async function createOperationalRecord(table, record, session) {
       session,
       cloudConfigured: readiness.code !== 'SUPABASE_ENV_MISSING',
     });
+    if (!options?.skipQueueOnFailure) {
+      enqueuePendingSync({
+        table,
+        action: 'create',
+        localId: sanitizeRecord(record)?.id ?? null,
+        cloudId: sanitizeRecord(record)?.cloud_id ?? null,
+        payload: sanitizeRecord(record),
+        code: classifyCloudSaveCode(readiness.code),
+        message: fallback.error,
+      });
+    }
     return fallback;
   }
   const userId = getSessionUserId(session);
@@ -878,11 +958,22 @@ export async function createOperationalRecord(table, record, session) {
       session,
       cloudConfigured: true,
     });
+    if (!options?.skipQueueOnFailure) {
+      enqueuePendingSync({
+        table,
+        action: 'create',
+        localId: sanitizeRecord(record)?.id ?? null,
+        cloudId: sanitizeRecord(record)?.cloud_id ?? null,
+        payload: sanitizeRecord(record),
+        code: classifiedCode,
+        message: fallback.error,
+      });
+    }
     return fallback;
   }
 }
 
-export async function updateOperationalRecord(table, id, patch, session) {
+export async function updateOperationalRecord(table, id, patch, session, options = {}) {
   const readiness = await ensureSupabaseRequestReadiness(session, { action: 'update', table });
   if (!readiness.ok) {
     const fallback = buildFallback(readiness.message, sanitizeRecord(patch), readiness.code || 'CLOUD_NOT_READY');
@@ -895,6 +986,17 @@ export async function updateOperationalRecord(table, id, patch, session) {
       session,
       cloudConfigured: readiness.code !== 'SUPABASE_ENV_MISSING',
     });
+    if (!options?.skipQueueOnFailure) {
+      enqueuePendingSync({
+        table,
+        action: 'update',
+        localId: id ?? sanitizeRecord(patch)?.id ?? null,
+        cloudId: sanitizeRecord(patch)?.cloud_id ?? null,
+        payload: sanitizeRecord(patch),
+        code: classifyCloudSaveCode(readiness.code),
+        message: fallback.error,
+      });
+    }
     return fallback;
   }
   const userId = getSessionUserId(session);
@@ -966,11 +1068,22 @@ export async function updateOperationalRecord(table, id, patch, session) {
       session,
       cloudConfigured: true,
     });
+    if (!options?.skipQueueOnFailure) {
+      enqueuePendingSync({
+        table,
+        action: 'update',
+        localId: id ?? sanitizeRecord(patch)?.id ?? null,
+        cloudId: sanitizeRecord(patch)?.cloud_id ?? null,
+        payload: sanitizeRecord(patch),
+        code: classifiedCode,
+        message: fallback.error,
+      });
+    }
     return fallback;
   }
 }
 
-export async function deleteOperationalRecord(table, id, session) {
+export async function deleteOperationalRecord(table, id, session, options = {}) {
   const readiness = await ensureSupabaseRequestReadiness(session, { action: 'delete', table });
   if (!readiness.ok) {
     const fallback = buildFallback(readiness.message, null, readiness.code || 'CLOUD_NOT_READY');
@@ -983,6 +1096,16 @@ export async function deleteOperationalRecord(table, id, session) {
       session,
       cloudConfigured: readiness.code !== 'SUPABASE_ENV_MISSING',
     });
+    if (!options?.skipQueueOnFailure) {
+      enqueuePendingSync({
+        table,
+        action: 'delete',
+        localId: id ?? null,
+        payload: { id },
+        code: classifyCloudSaveCode(readiness.code),
+        message: fallback.error,
+      });
+    }
     return fallback;
   }
   const userId = getSessionUserId(session);
@@ -1053,8 +1176,70 @@ export async function deleteOperationalRecord(table, id, session) {
       session,
       cloudConfigured: true,
     });
+    if (!options?.skipQueueOnFailure) {
+      enqueuePendingSync({
+        table,
+        action: 'delete',
+        localId: id ?? null,
+        payload: { id },
+        code: classifiedCode,
+        message: fallback.error,
+      });
+    }
     return fallback;
   }
+}
+
+export async function processPendingSyncQueue(session, options = {}) {
+  const queue = readPendingSyncQueue();
+  if (!queue.length) {
+    emitPendingSyncState([], 'empty');
+    return { processed: 0, synced: 0, failed: 0, pendingCount: 0 };
+  }
+  const maxItems = Math.max(1, Number(options?.maxItems || 25));
+  const slice = queue.slice(0, maxItems);
+  const remaining = [...queue];
+  let synced = 0;
+  let failed = 0;
+
+  for (const item of slice) {
+    const fingerprint = buildQueueFingerprint(item);
+    const baseIndex = remaining.findIndex((queued) => buildQueueFingerprint(queued) === fingerprint);
+    if (baseIndex === -1) continue;
+    const current = remaining[baseIndex];
+    let result = null;
+    if (item.action === 'create') {
+      result = await createOperationalRecord(item.table, item.payload || {}, session, { skipQueueOnFailure: true });
+    } else if (item.action === 'update') {
+      result = await updateOperationalRecord(item.table, item.localId, item.payload || {}, session, { skipQueueOnFailure: true });
+    } else if (item.action === 'delete') {
+      result = await deleteOperationalRecord(item.table, item.localId, session, { skipQueueOnFailure: true });
+    }
+
+    if (result?.persisted) {
+      remaining.splice(baseIndex, 1);
+      synced += 1;
+      continue;
+    }
+
+    failed += 1;
+    remaining[baseIndex] = {
+      ...current,
+      lastAttemptAt: new Date().toISOString(),
+      retryCount: Number(current.retryCount || 0) + 1,
+      code: result?.code || current.code || 'unknown',
+      message: result?.error || current.message || 'Registro salvo localmente. Sincronização pendente.',
+    };
+  }
+
+  writePendingSyncQueue(remaining);
+  emitPendingSyncState(remaining, 'processed');
+  return {
+    processed: slice.length,
+    synced,
+    failed,
+    pendingCount: remaining.length,
+  };
 }
 
 export async function upsertOperationalRecord(table, record, session) {

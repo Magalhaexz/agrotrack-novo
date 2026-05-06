@@ -1,4 +1,4 @@
-import { Activity, AlertTriangle, Bell, ChevronDown, Loader2, LogOut, Menu, MoreHorizontal, Package, Settings, User } from 'lucide-react';
+﻿import { Activity, AlertTriangle, Bell, ChevronDown, Loader2, LogOut, Menu, MoreHorizontal, Package, Settings, User } from 'lucide-react';
 import { createPortal } from 'react-dom';
 import { useEffect, useRef, useState } from 'react';
 import { obterLabelPerfil } from '../auth/perfis';
@@ -56,6 +56,7 @@ function messageIsSessionError(message) {
 function getCloudState(syncStatus) {
   const source = syncStatus?.dataSource || 'signed_out';
   const message = syncStatus?.dataError?.message || '';
+  const pendingCount = Number(syncStatus?.pendingCount || 0);
 
 
   if (syncStatus?.cloudVerified) {
@@ -77,6 +78,17 @@ function getCloudState(syncStatus) {
       detail: syncStatus?.lastSyncAt ? `Ultima sync: ${formatSyncTime(syncStatus.lastSyncAt)}` : 'Nuvem nao verificada',
       title: 'Sincronizacao manual em andamento',
       disabled: true,
+    };
+  }
+
+  if (pendingCount > 0) {
+    return {
+      tone: 'warning',
+      icon: 'loading',
+      label: 'Sincronizacao pendente',
+      detail: pendingCount === 1 ? '1 pendencia de sync' : `${pendingCount} pendencias de sync`,
+      title: 'Pendencias serao sincronizadas automaticamente.',
+      disabled: false,
     };
   }
 
@@ -244,7 +256,7 @@ export default function AppHeader({
     return 'success';
   }
 
-  const nomeExibicao = usuarioLogado?.nome || 'Usuário';
+  const nomeExibicao = usuarioLogado?.nome || 'UsuÃ¡rio';
   const perfilExibicao = obterLabelPerfil(usuarioLogado?.perfilLabel || usuarioLogado?.perfil);
   const cloudState = getCloudState(syncStatus);
   const resolvedAlertKeys = alertDebugState?.resolvedAlertKeys || new Set();
@@ -591,7 +603,7 @@ export default function AppHeader({
               </button>
               <button type="button" className="user-dropdown-item" onClick={() => { onNavigateSettings?.(); setOpenUserMenu(false); }}>
                 <Settings size={15} />
-                                Configurações
+                                ConfiguraÃ§Ãµes
               </button>
               <div className="user-dropdown-divider" />
               <button type="button" className="user-dropdown-item logout" onClick={handleLogout}>
@@ -609,7 +621,7 @@ export default function AppHeader({
             <button
               type="button"
               className="notif-overlay"
-              aria-label="Fechar notificações"
+              aria-label="Fechar notificaÃ§Ãµes"
               onClick={() => setOpenNotif(false)}
             />
             <div
@@ -628,7 +640,7 @@ export default function AppHeader({
                 <div>
                   <span className="notif-panel-kicker">Central de alertas</span>
                   <strong>{notifications > 0 ? `${notifications} pendentes` : 'Tudo em dia'}</strong>
-                  <small>Alertas operacionais, sanitários, estoque e lembretes do HERDON.</small>
+                  <small>Alertas operacionais, sanitÃ¡rios, estoque e lembretes do HERDON.</small>
                 </div>
                 <span className="notif-panel-pill">{notifications}</span>
               </div>
@@ -660,12 +672,12 @@ export default function AppHeader({
                             <span className="notif-item-meta">{destino}</span>
                           </div>
                           <span className={`notif-item-tag notif-item-tag--${tone}`}>
-                            {tone === 'danger' ? 'Crítico' : tone === 'warning' ? 'Atenção' : tone === 'info' ? 'Monitorar' : 'Operacional'}
+                            {tone === 'danger' ? 'CrÃ­tico' : tone === 'warning' ? 'AtenÃ§Ã£o' : tone === 'info' ? 'Monitorar' : 'Operacional'}
                           </span>
                         </div>
                         <small>{alert.description || alert.mensagem}</small>
                         {import.meta.env.DEV ? (
-                          <small className="notif-debug-line">ackKey: {ackKey} | resolved: {isResolved ? 'sim' : 'não'} | adiado: {isSnoozed ? 'sim' : 'não'} | route found: {hasRoute ? 'sim' : 'não'}</small>
+                          <small className="notif-debug-line">ackKey: {ackKey} | resolved: {isResolved ? 'sim' : 'nÃ£o'} | adiado: {isSnoozed ? 'sim' : 'nÃ£o'} | route found: {hasRoute ? 'sim' : 'nÃ£o'}</small>
                         ) : null}
                         <div className="notif-actions">
                           <button
@@ -722,4 +734,3 @@ export default function AppHeader({
     </header>
   );
 }
-

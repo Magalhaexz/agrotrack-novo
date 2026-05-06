@@ -32,7 +32,11 @@ import {
   registrarSaidaAnimal,
   registrarSaidaEstoque,
 } from './services/movimentacoes';
-import { createOperationalRecord } from './services/operationalPersistence';
+import {
+  createOperationalRecord,
+  getPendingSyncQueueSnapshot,
+  processPendingSyncQueue,
+} from './services/operationalPersistence';
 import { buildAlerts } from './utils/alerts';
 import './styles/app.css';
 import './styles/ui.css';
@@ -180,6 +184,7 @@ export default function App() {
   const [forcarTelaLogin, setForcarTelaLogin] = useState(false);
   const [showBootRecovery, setShowBootRecovery] = useState(false);
   const [cloudDiagnosticState, setCloudDiagnosticState] = useState({ verified: false, checkedAt: null, message: '' });
+  const [pendingSyncState, setPendingSyncState] = useState(() => getPendingSyncQueueSnapshot());
   const [confirmState, setConfirmState] = useState({
     open: false,
     title: '',
@@ -270,6 +275,54 @@ export default function App() {
 
     return () => window.clearTimeout(timer);
   }, [forcarTelaLogin, user]);
+
+  useEffect(() => {
+    let retryTimer = null;
+
+    function refreshPendingState() {
+      setPendingSyncState(getPendingSyncQueueSnapshot());
+    }
+
+    async function runRetry() {
+      if (!session?.user?.id) return;
+      await processPendingSyncQueue(session, { maxItems: 20 });
+      refreshPendingState();
+    }
+
+    function scheduleRetry(delayMs = 1200) {
+      if (retryTimer) window.clearTimeout(retryTimer);
+      retryTimer = window.setTimeout(() => {
+        void runRetry();
+      }, delayMs);
+    }
+
+    function handlePendingUpdated() {
+      refreshPendingState();
+      scheduleRetry(900);
+    }
+
+    function handleOnline() {
+      scheduleRetry(500);
+    }
+
+    function handleDiagnostic(event) {
+      if (event?.detail?.verified) {
+        scheduleRetry(700);
+      }
+    }
+
+    refreshPendingState();
+    if (session?.user?.id) scheduleRetry(700);
+    window.addEventListener('herdon-pending-sync-updated', handlePendingUpdated);
+    window.addEventListener('online', handleOnline);
+    window.addEventListener('herdon-cloud-diagnostic-state', handleDiagnostic);
+    return () => {
+      if (retryTimer) window.clearTimeout(retryTimer);
+      window.removeEventListener('herdon-pending-sync-updated', handlePendingUpdated);
+      window.removeEventListener('online', handleOnline);
+      window.removeEventListener('herdon-cloud-diagnostic-state', handleDiagnostic);
+    };
+  }, [session?.user?.id]);
 
 
   useEffect(() => {
@@ -722,6 +775,7 @@ export default function App() {
             dataReady,
             isSyncing: isOperationalSyncing,
             lastSyncAt,
+            pendingCount: pendingSyncState?.pendingCount || 0,
             onSyncNow: cloudControls.sincronizarNuvem || syncNow,
             onTestCloud: cloudControls.testarConexaoNuvem,
             onReconnectCloud: cloudControls.reconectarNuvem,
