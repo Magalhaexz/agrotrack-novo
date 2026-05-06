@@ -28,7 +28,7 @@ const REPORT_TYPES = [
   {
     id: 'lote',
     group: 'Lotes',
-    title: 'RelatÃ³rios por lote',
+    title: 'Relatórios por lote',
     description: 'Indicadores produtivos, financeiros e operacionais por lote.',
     purpose: 'Ideal para fechar leitura de lote, conferir custo e acompanhar peso e margem.',
     output: 'Resumo executivo e tabela operacional por lote.',
@@ -37,17 +37,17 @@ const REPORT_TYPES = [
   {
     id: 'fazenda',
     group: 'Rebanho',
-    title: 'RelatÃ³rios por fazenda',
-    description: 'ConsolidaÃ§Ã£o dos resultados por fazenda e capacidade operacional.',
+    title: 'Relatórios por fazenda',
+    description: 'Consolidação dos resultados por fazenda e capacidade operacional.',
     purpose: 'Bom para comparar unidades, capacidade operacional e concentracao do rebanho.',
     output: 'Consolidado por fazenda com leitura de margem e receita.',
     icon: MapPin,
   },
   {
     id: 'sanitario',
-    group: 'SanitÃ¡rio',
-    title: 'RelatÃ³rios sanitÃ¡rios',
-    description: 'Protocolos aplicados, pendÃªncias, responsÃ¡veis e agenda de manejo.',
+    group: 'Sanitário',
+    title: 'Relatórios sanitários',
+    description: 'Protocolos aplicados, pendências, responsáveis e agenda de manejo.',
     purpose: 'Ajuda a priorizar vencimentos, proximos manejos e gargalos sanitarios.',
     output: 'Agenda sanitaria e base de protocolos filtrados.',
     icon: Pill,
@@ -55,8 +55,8 @@ const REPORT_TYPES = [
   {
     id: 'estoque',
     group: 'Operacional',
-    title: 'RelatÃ³rios de estoque',
-    description: 'Saldo, criticidade, movimentaÃ§Ãµes e cobertura operacional.',
+    title: 'Relatórios de estoque',
+    description: 'Saldo, criticidade, movimentações e cobertura operacional.',
     purpose: 'Serve para compras, reposicao, leitura de saldo e monitoramento de validade.',
     output: 'Saldo consolidado e movimentacoes do periodo.',
     icon: Package,
@@ -64,8 +64,8 @@ const REPORT_TYPES = [
   {
     id: 'financeiro',
     group: 'Financeiro',
-    title: 'RelatÃ³rios financeiros',
-    description: 'Despesas, receitas, categorias e visÃ£o pronta para DRE.',
+    title: 'Relatórios financeiros',
+    description: 'Despesas, receitas, categorias e visão pronta para DRE.',
     purpose: 'Apoia fechamento operacional, leitura de caixa e preparacao para DRE.',
     output: 'Lancamentos filtrados e resumo financeiro do escopo.',
     icon: DollarSign,
@@ -73,8 +73,8 @@ const REPORT_TYPES = [
   {
     id: 'desempenho',
     group: 'Pesagens',
-    title: 'RelatÃ³rios de desempenho',
-    description: 'Ranking zootÃ©cnico, metas de GMD e evoluÃ§Ã£o recente de peso.',
+    title: 'Relatórios de desempenho',
+    description: 'Ranking zootécnico, metas de GMD e evolução recente de peso.',
     purpose: 'Facilita priorizacao dos lotes acima ou abaixo da meta de desempenho.',
     output: 'Ranking zootecnico e destaques do periodo.',
     icon: TrendingUp,
@@ -145,14 +145,14 @@ export default function ResultadosPage({ db }) {
     () =>
       REPORT_TYPES.map((report) => ({
         id: report.id,
-        label: report.group === 'Financeiro' ? 'Financeiro' : report.title.replace('Relat??rios ', '').replace('Relat??rio ', ''),
+        label: report.group === 'Financeiro' ? 'Financeiro' : report.title.replace('Relatórios ', '').replace('Relatório ', ''),
       })),
     []
   );
 
   function applyFilters() {
     if (draftFilters.dataInicio && draftFilters.dataFim && draftFilters.dataInicio > draftFilters.dataFim) {
-      setValidationError('A data inicial precisa ser menor ou igual Ã  data final.');
+      setValidationError('A data inicial precisa ser menor ou igual à data final.');
       return;
     }
 
@@ -466,7 +466,7 @@ function buildReportBundle(db, filters) {
     const saldo = Number(item.quantidade_atual || 0);
     const minimo = Number(item.quantidade_minima || 0);
     const ratio = minimo > 0 ? saldo / minimo : saldo > 0 ? 2 : 0;
-    const status = ratio <= 1 ? 'CrÃ­tico' : ratio <= 1.4 ? 'Baixo' : 'SaudÃ¡vel';
+    const status = ratio <= 1 ? 'Crítico' : ratio <= 1.4 ? 'Baixo' : 'Saudável';
     const movimentosRelacionados = movimentacoesEstoque.filter((movimento) => Number(movimento.item_estoque_id) === Number(item.id));
     const consumos = movimentosRelacionados.filter((movimento) => ['saida', 'consumo', 'tratamento', 'perda'].includes(movimento.tipo));
     const consumoMedio = consumos.length
@@ -504,7 +504,7 @@ function buildReportBundle(db, filters) {
       data: formatDate(movimento.data),
       item: estoqueMap.get(Number(movimento.item_estoque_id))?.produto || '-',
       tipo: capitalize(movimento.tipo || '-'),
-      lote: loteMap.get(Number(movimento.lote_id))?.nome || 'OperaÃ§Ã£o geral',
+      lote: loteMap.get(Number(movimento.lote_id))?.nome || 'Operação geral',
       quantidade: formatNumber(movimento.quantidade, 1),
       valor: formatCurrency(movimento.valor_total || 0),
     }))
@@ -549,7 +549,7 @@ function buildReportBundle(db, filters) {
     }));
 
   const ledgerRows = [...financialRows, ...animalRevenueRows];
-  const pagamentosDiariosRows = ledgerRows.filter((row) => row.categoria === 'Pagamento DiÃ¡rio' || row.categoria === 'Pagamento Diario');
+  const pagamentosDiariosRows = ledgerRows.filter((row) => row.categoria === 'Pagamento Diário' || row.categoria === 'Pagamento Diario');
   const ledgerExpense = ledgerRows.filter((row) => row.tipo !== 'Receita').reduce((total, row) => total + row.valor, 0);
   const ledgerRevenue = ledgerRows.filter((row) => row.tipo === 'Receita').reduce((total, row) => total + row.valor, 0);
   const potentialRevenue = visibleLotes.reduce((total, item) => total + Number(item.indicadores.receitaTotal || 0), 0);
@@ -563,9 +563,9 @@ function buildReportBundle(db, filters) {
       produto: plano.produto || 'Sem dados suficientes',
       consumoTipo: plano.consumoTipo || 'Sem dados suficientes',
       consumoInformado: plano.consumoInformado || 'Sem dados suficientes',
-      dataPrevistaSaida: plano.dataPrevistaSaida || 'Estimativa indisponÃ­vel',
-      consumoEstimado: plano.consumoEstimado || 'Estimativa indisponÃ­vel',
-      custoEstimado: plano.custoEstimado || 'Estimativa indisponÃ­vel',
+      dataPrevistaSaida: plano.dataPrevistaSaida || 'Estimativa indisponível',
+      consumoEstimado: plano.consumoEstimado || 'Estimativa indisponível',
+      custoEstimado: plano.custoEstimado || 'Estimativa indisponível',
     };
   });
   const iatfRows = sanitaryRows.filter((row) => String(row.tipo || '').toUpperCase() === 'IATF' || String(row.descricao || '').toUpperCase().includes('IATF'));
@@ -635,7 +635,7 @@ function buildReportBundle(db, filters) {
     sanidadePendente: item.sanitarioPeriodo.filter((registro) => resolveSanitaryStatus(registro) !== 'Em dia').length,
   }));
 
-  const stockCriticalCount = stockItemRows.filter((item) => item.status === 'CrÃ­tico').length;
+  const stockCriticalCount = stockItemRows.filter((item) => item.status === 'Crítico').length;
   const lotMarginTotal = lotReportRows.reduce((total, item) => total + item.margem, 0);
   const totalAnimals = lotReportRows.reduce((total, item) => total + item.animais, 0);
   const performanceAboveMeta = performanceRows.filter((item) => item.gap >= 0).length;
@@ -645,8 +645,8 @@ function buildReportBundle(db, filters) {
 
   const reports = {
     lote: {
-      title: 'RelatÃ³rio por lote',
-      description: 'Panorama executivo de lote com foco em margem, evoluÃ§Ã£o e pressÃ£o sanitÃ¡ria.',
+      title: 'Relatório por lote',
+      description: 'Panorama executivo de lote com foco em margem, evolução e pressão sanitária.',
       scopeLabel: describeScope(filters, visibleLotes.length),
       periodLabel: describePeriod(filters.dataInicio, filters.dataFim),
       healthLabel: lotMarginTotal >= 0 ? 'Margem consolidada positiva' : 'Margem consolidada em alerta',
@@ -659,7 +659,7 @@ function buildReportBundle(db, filters) {
         createSummary('Lotes analisados', String(lotReportRows.length), 'Com filtros aplicados', 'info'),
         createSummary('Animais no escopo', formatNumber(totalAnimals, 0), 'Base atual consolidada', 'neutral'),
         createSummary(
-          'Custos no perÃ­odo',
+          'Custos no período',
           formatCurrency(lotReportRows.reduce((total, item) => total + item.custoPeriodo, 0)),
           'Somente despesas operacionais filtradas',
           'warning'
@@ -675,11 +675,11 @@ function buildReportBundle(db, filters) {
         {
           id: 'lotes',
           title: 'Panorama por lote',
-          description: 'Resumo produtivo, financeiro e sanitÃ¡rio em uma Ãºnica visÃ£o.',
+          description: 'Resumo produtivo, financeiro e sanitário em uma única visão.',
           badgeLabel: `${lotReportRows.length} registros`,
           badgeVariant: 'neutral',
           emptyTitle: 'Nenhum lote encontrado',
-          emptySubtitle: 'Amplie o perÃ­odo ou remova filtros especÃ­ficos para visualizar os lotes.',
+          emptySubtitle: 'Amplie o período ou remova filtros específicos para visualizar os lotes.',
           mobileTitleKey: 'lote',
           mobileSubtitleKey: 'fazenda',
           columns: [
@@ -687,7 +687,7 @@ function buildReportBundle(db, filters) {
             { key: 'fazenda', label: 'Fazenda' },
             { key: 'animais', label: 'Animais', render: (row) => formatNumber(row.animais, 0) },
             { key: 'gmd', label: 'GMD', render: (row) => `${formatNumber(row.gmd, 3)} kg/dia` },
-            { key: 'pesoAtual', label: 'Peso mÃ©dio', render: (row) => `${formatNumber(row.pesoAtual, 1)} kg` },
+            { key: 'pesoAtual', label: 'Peso médio', render: (row) => `${formatNumber(row.pesoAtual, 1)} kg` },
             { key: 'custoPeriodo', label: 'Custos', render: (row) => formatCurrency(row.custoPeriodo) },
             { key: 'margem', label: 'Margem', render: (row) => <span className={row.margem >= 0 ? 'text-success' : 'text-danger'}>{formatCurrency(row.margem)}</span> },
             { key: 'status', label: 'Status', render: (row) => <Badge variant={row.status === 'ativo' ? 'success' : 'neutral'}>{capitalize(row.status)}</Badge> },
@@ -697,19 +697,19 @@ function buildReportBundle(db, filters) {
       ],
     },
     fazenda: {
-      title: 'RelatÃ³rio por fazenda',
-      description: 'ConsolidaÃ§Ã£o dos lotes, estoque e pressÃ£o econÃ´mica por unidade produtiva.',
+      title: 'Relatório por fazenda',
+      description: 'Consolidação dos lotes, estoque e pressão econômica por unidade produtiva.',
       scopeLabel: describeScope(filters, farmRows.length),
       periodLabel: describePeriod(filters.dataInicio, filters.dataFim),
-      healthLabel: farmRows.length ? 'ConsolidaÃ§Ã£o disponÃ­vel' : 'Sem fazendas no escopo',
+      healthLabel: farmRows.length ? 'Consolidação disponível' : 'Sem fazendas no escopo',
       healthTone: farmRows.length ? 'success' : 'warning',
       catalogBadge: farmRows.length ? 'Consolidado' : 'Sem dados',
       catalogTone: farmRows.length ? 'success' : 'neutral',
       catalogMetric: `${farmRows.length} fazendas no recorte`,
       notes: [],
       summary: [
-        createSummary('Fazendas consolidadas', String(farmRows.length), 'Somente fazendas com lotes visÃ­veis', 'info'),
-        createSummary('Lotes distribuÃ­dos', formatNumber(visibleLotes.length, 0), 'OperaÃ§Ã£o acompanhada', 'neutral'),
+        createSummary('Fazendas consolidadas', String(farmRows.length), 'Somente fazendas com lotes visíveis', 'info'),
+        createSummary('Lotes distribuídos', formatNumber(visibleLotes.length, 0), 'Operação acompanhada', 'neutral'),
         createSummary(
           'Receita potencial',
           formatCurrency(farmRows.reduce((total, item) => total + item.receita, 0)),
@@ -731,12 +731,12 @@ function buildReportBundle(db, filters) {
       tables: [
         {
           id: 'fazendas',
-          title: 'ConsolidaÃ§Ã£o por fazenda',
+          title: 'Consolidação por fazenda',
           description: 'Capacidade, estoque e resultado potencial lado a lado.',
           badgeLabel: `${farmRows.length} fazendas`,
           badgeVariant: 'neutral',
           emptyTitle: 'Nenhuma fazenda encontrada',
-          emptySubtitle: 'Crie uma fazenda ou ajuste o escopo dos relatÃ³rios.',
+          emptySubtitle: 'Crie uma fazenda ou ajuste o escopo dos relatórios.',
           mobileTitleKey: 'fazenda',
           columns: [
             { key: 'fazenda', label: 'Fazenda' },
@@ -745,53 +745,53 @@ function buildReportBundle(db, filters) {
             { key: 'receita', label: 'Receita potencial', render: (row) => formatCurrency(row.receita) },
             { key: 'custoPeriodo', label: 'Custos', render: (row) => formatCurrency(row.custoPeriodo) },
             { key: 'margem', label: 'Margem', render: (row) => formatCurrency(row.margem) },
-            { key: 'consumoEstoque', label: 'Insumos no perÃ­odo', render: (row) => formatCurrency(row.consumoEstoque) },
-            { key: 'ocupacao', label: 'OcupaÃ§Ã£o' },
+            { key: 'consumoEstoque', label: 'Insumos no período', render: (row) => formatCurrency(row.consumoEstoque) },
+            { key: 'ocupacao', label: 'Ocupação' },
           ],
           rows: farmRows,
         },
       ],
     },
     sanitario: {
-      title: 'RelatÃ³rio sanitÃ¡rio',
-      description: 'PendÃªncias, agenda prÃ³xima, histÃ³rico do perÃ­odo e responsÃ¡veis por manejo.',
+      title: 'Relatório sanitário',
+      description: 'Pendências, agenda próxima, histórico do período e responsáveis por manejo.',
       scopeLabel: describeScope(filters, sanitaryRows.length),
       periodLabel: describePeriod(filters.dataInicio, filters.dataFim),
-      healthLabel: sanitaryRows.some((row) => row.status === 'Vencido') ? 'Existem protocolos vencidos' : 'CalendÃ¡rio estÃ¡ controlado',
+      healthLabel: sanitaryRows.some((row) => row.status === 'Vencido') ? 'Existem protocolos vencidos' : 'Calendário está controlado',
       healthTone: sanitaryRows.some((row) => row.status === 'Vencido') ? 'warning' : 'success',
-      catalogBadge: sanitaryRows.some((row) => row.status === 'Vencido') ? 'AtenÃ§Ã£o' : 'Em dia',
+      catalogBadge: sanitaryRows.some((row) => row.status === 'Vencido') ? 'Atenção' : 'Em dia',
       catalogTone: sanitaryRows.some((row) => row.status === 'Vencido') ? 'warning' : 'success',
-      catalogMetric: `${sanitaryRows.length} manejos no perÃ­odo`,
+      catalogMetric: `${sanitaryRows.length} manejos no período`,
       notes: sanitaryRows.length
         ? []
         : [
             {
-              title: 'Sem manejos no perÃ­odo',
-              text: 'O mÃ³dulo continua pronto; basta ampliar a janela de datas para recuperar o histÃ³rico.',
+              title: 'Sem manejos no período',
+              text: 'O módulo continua pronto; basta ampliar a janela de datas para recuperar o histórico.',
               variant: 'info',
             },
           ],
       summary: [
-        createSummary('Manejos no perÃ­odo', formatNumber(sanitaryRows.length, 0), 'Vacinas, vermÃ­fugos e tratamentos', 'info'),
+        createSummary('Manejos no período', formatNumber(sanitaryRows.length, 0), 'Vacinas, vermífugos e tratamentos', 'info'),
         createSummary(
-          'Protocolos concluÃ­dos',
+          'Protocolos concluídos',
           formatNumber(sanitaryRows.filter((row) => row.status === 'Em dia').length, 0),
-          'Sem pendÃªncias imediatas',
+          'Sem pendências imediatas',
           'success'
         ),
         createSummary(
-          'PrÃ³ximos ou vencidos',
+          'Próximos ou vencidos',
           formatNumber(sanitaryRows.filter((row) => row.status !== 'Em dia').length, 0),
           'Requer acompanhamento',
           'warning'
         ),
         createSummary(
-          'Lotes com pressÃ£o sanitÃ¡ria',
+          'Lotes com pressão sanitária',
           formatNumber(new Set(sanitaryRows.filter((row) => row.status !== 'Em dia').map((row) => row.lote)).size, 0),
           'Escopo com risco ativo',
           'danger'
         ),
-        createSummary('Protocolos IATF', formatNumber(iatfRows.length, 0), 'Registros reprodutivos dentro do contrato sanitÃ¡rio', iatfRows.length ? 'info' : 'neutral'),
+        createSummary('Protocolos IATF', formatNumber(iatfRows.length, 0), 'Registros reprodutivos dentro do contrato sanitário', iatfRows.length ? 'info' : 'neutral'),
       ],
       highlights: buildSanitaryHighlights(sanitaryRows),
       exportConfig: createExportConfig('relatorio-sanitario', filters, [
@@ -800,42 +800,42 @@ function buildReportBundle(db, filters) {
       tables: [
         {
           id: 'sanitario',
-          title: 'Agenda sanitÃ¡ria',
-          description: 'Lista ordenada por prioridade e pronta para conferÃªncia em campo.',
+          title: 'Agenda sanitária',
+          description: 'Lista ordenada por prioridade e pronta para conferência em campo.',
           badgeLabel: `${sanitaryRows.length} registros`,
           badgeVariant: 'neutral',
-          emptyTitle: 'Nenhum registro sanitÃ¡rio encontrado',
+          emptyTitle: 'Nenhum registro sanitário encontrado',
           emptySubtitle: 'Cadastre manejos ou revise o intervalo selecionado.',
           mobileTitleKey: 'descricao',
-          mobileSubtitleKey: (row) => `${row.lote} â€¢ ${row.status}`,
+          mobileSubtitleKey: (row) => `${row.lote} ⬢ ${row.status}`,
           columns: [
             { key: 'tipo', label: 'Tipo' },
-            { key: 'descricao', label: 'DescriÃ§Ã£o' },
+            { key: 'descricao', label: 'Descrição' },
             { key: 'lote', label: 'Lote' },
             { key: 'fazenda', label: 'Fazenda' },
-            { key: 'aplicacao', label: 'AplicaÃ§Ã£o' },
-            { key: 'proxima', label: 'PrÃ³xima' },
-            { key: 'responsavel', label: 'ResponsÃ¡vel' },
+            { key: 'aplicacao', label: 'Aplicação' },
+            { key: 'proxima', label: 'Próxima' },
+            { key: 'responsavel', label: 'Responsável' },
             { key: 'status', label: 'Status', render: (row) => <Badge variant={sanitizeBadge(row.status)}>{row.status}</Badge> },
           ],
           rows: sanitaryRows,
         },
         {
           id: 'iatf',
-          title: 'Agenda IATF / ReproduÃ§Ã£o',
-          description: 'Protocolos IATF registrados no sanitÃ¡rio para acompanhamento de agenda.',
+          title: 'Agenda IATF / Reprodução',
+          description: 'Protocolos IATF registrados no sanitário para acompanhamento de agenda.',
           badgeLabel: `${iatfRows.length} protocolos`,
           badgeVariant: 'neutral',
           emptyTitle: 'Nenhum registro encontrado',
-          emptySubtitle: 'Cadastre protocolos IATF no mÃ³dulo sanitÃ¡rio para visualizar este quadro.',
+          emptySubtitle: 'Cadastre protocolos IATF no módulo sanitário para visualizar este quadro.',
           mobileTitleKey: 'descricao',
-          mobileSubtitleKey: (row) => `${row.lote} â€¢ ${row.proxima}`,
+          mobileSubtitleKey: (row) => `${row.lote} ⬢ ${row.proxima}`,
           columns: [
             { key: 'descricao', label: 'Protocolo' },
             { key: 'lote', label: 'Lote' },
             { key: 'fazenda', label: 'Fazenda' },
-            { key: 'aplicacao', label: 'InÃ­cio' },
-            { key: 'proxima', label: 'PrÃ³xima aÃ§Ã£o' },
+            { key: 'aplicacao', label: 'Início' },
+            { key: 'proxima', label: 'Próxima ação' },
             { key: 'status', label: 'Status', render: (row) => <Badge variant={sanitizeBadge(row.status)}>{row.status}</Badge> },
           ],
           rows: iatfRows,
@@ -843,34 +843,34 @@ function buildReportBundle(db, filters) {
       ],
     },
     estoque: {
-      title: 'RelatÃ³rio de estoque',
-      description: 'Saldo atual, itens crÃ­ticos, validade e movimentaÃ§Ãµes com contexto operacional.',
+      title: 'Relatório de estoque',
+      description: 'Saldo atual, itens críticos, validade e movimentações com contexto operacional.',
       scopeLabel: describeScope(filters, stockItemRows.length),
       periodLabel: describePeriod(filters.dataInicio, filters.dataFim),
-      healthLabel: stockCriticalCount > 0 ? 'Existem itens crÃ­ticos' : 'Cobertura operacional estÃ¡ estÃ¡vel',
+      healthLabel: stockCriticalCount > 0 ? 'Existem itens críticos' : 'Cobertura operacional está estável',
       healthTone: stockCriticalCount > 0 ? 'warning' : 'success',
-      catalogBadge: stockCriticalCount > 0 ? 'CrÃ­ticos' : 'EstÃ¡vel',
+      catalogBadge: stockCriticalCount > 0 ? 'Críticos' : 'Estável',
       catalogTone: stockCriticalCount > 0 ? 'warning' : 'success',
       catalogMetric: `${stockItemRows.length} itens em estoque`,
       notes: stockMovementRows.length
         ? []
         : [
             {
-              title: 'Sem movimentaÃ§Ãµes no perÃ­odo',
-              text: 'Os saldos continuam visÃ­veis e a estrutura jÃ¡ estÃ¡ pronta para exportar entradas e saÃ­das futuramente.',
+              title: 'Sem movimentações no período',
+              text: 'Os saldos continuam visíveis e a estrutura já está pronta para exportar entradas e saídas futuramente.',
               variant: 'info',
             },
           ],
       summary: [
-        createSummary('Itens cadastrados', formatNumber(stockItemRows.length, 0), 'InventÃ¡rio atual', 'info'),
-        createSummary('Itens crÃ­ticos', formatNumber(stockCriticalCount, 0), 'Abaixo ou prÃ³ximos do mÃ­nimo', stockCriticalCount > 0 ? 'warning' : 'success'),
+        createSummary('Itens cadastrados', formatNumber(stockItemRows.length, 0), 'Inventário atual', 'info'),
+        createSummary('Itens críticos', formatNumber(stockCriticalCount, 0), 'Abaixo ou próximos do mínimo', stockCriticalCount > 0 ? 'warning' : 'success'),
         createSummary(
           'Valor em estoque',
           formatCurrency(stockItemRows.reduce((total, item) => total + currencyToNumber(item.valor), 0)),
-          'Saldo financeiro do inventÃ¡rio',
+          'Saldo financeiro do inventário',
           'neutral'
         ),
-        createSummary('MovimentaÃ§Ãµes no perÃ­odo', formatNumber(stockMovementRows.length, 0), 'Entradas, saÃ­das e consumos', 'info'),
+        createSummary('Movimentações no período', formatNumber(stockMovementRows.length, 0), 'Entradas, saídas e consumos', 'info'),
       ],
       highlights: buildStockHighlights(stockItemRows, stockMovementRows),
       exportConfig: createExportConfig('relatorio-estoque', filters, [
@@ -881,18 +881,18 @@ function buildReportBundle(db, filters) {
         {
           id: 'saldo',
           title: 'Saldo por item',
-          description: 'Leitura rÃ¡pida para operaÃ§Ã£o, compras e validade.',
-          badgeLabel: `${stockCriticalCount} crÃ­ticos`,
+          description: 'Leitura rápida para operação, compras e validade.',
+          badgeLabel: `${stockCriticalCount} críticos`,
           badgeVariant: stockCriticalCount > 0 ? 'warning' : 'success',
           emptyTitle: 'Nenhum item de estoque cadastrado',
-          emptySubtitle: 'Adicione itens para liberar o relatÃ³rio de estoque.',
+          emptySubtitle: 'Adicione itens para liberar o relatório de estoque.',
           mobileTitleKey: 'item',
           mobileSubtitleKey: 'categoria',
           columns: [
             { key: 'item', label: 'Item' },
             { key: 'categoria', label: 'Categoria' },
             { key: 'saldo', label: 'Saldo' },
-            { key: 'minimo', label: 'MÃ­nimo' },
+            { key: 'minimo', label: 'Mínimo' },
             { key: 'cobertura', label: 'Cobertura' },
             { key: 'valor', label: 'Valor' },
             { key: 'validade', label: 'Validade' },
@@ -902,14 +902,14 @@ function buildReportBundle(db, filters) {
         },
         {
           id: 'movimentacoes',
-          title: 'MovimentaÃ§Ãµes do perÃ­odo',
-          description: 'HistÃ³rico operacional filtrado por perÃ­odo, lote e fazenda.',
+          title: 'Movimentações do período',
+          description: 'Histórico operacional filtrado por período, lote e fazenda.',
           badgeLabel: `${stockMovementRows.length} movimentos`,
           badgeVariant: 'neutral',
-          emptyTitle: 'Nenhuma movimentaÃ§Ã£o encontrada',
-          emptySubtitle: 'O saldo continua monitorado, mas nÃ£o houve entradas ou saÃ­das no perÃ­odo selecionado.',
+          emptyTitle: 'Nenhuma movimentação encontrada',
+          emptySubtitle: 'O saldo continua monitorado, mas não houve entradas ou saídas no período selecionado.',
           mobileTitleKey: 'item',
-          mobileSubtitleKey: (row) => `${row.tipo} â€¢ ${row.data}`,
+          mobileSubtitleKey: (row) => `${row.tipo} ⬢ ${row.data}`,
           columns: [
             { key: 'data', label: 'Data' },
             { key: 'item', label: 'Item' },
@@ -923,11 +923,11 @@ function buildReportBundle(db, filters) {
       ],
     },
     financeiro: {
-      title: 'RelatÃ³rio financeiro',
-      description: 'VisÃ£o consolidada de despesas, receitas registradas e receita potencial da operaÃ§Ã£o.',
+      title: 'Relatório financeiro',
+      description: 'Visão consolidada de despesas, receitas registradas e receita potencial da operação.',
       scopeLabel: describeScope(filters, ledgerRows.length || visibleLotes.length),
       periodLabel: describePeriod(filters.dataInicio, filters.dataFim),
-      healthLabel: ledgerRevenue > 0 ? 'Fluxo realizado disponÃ­vel' : 'Receita realizada ainda nÃ£o lanÃ§ada',
+      healthLabel: ledgerRevenue > 0 ? 'Fluxo realizado disponível' : 'Receita realizada ainda não lançada',
       healthTone: ledgerRevenue > 0 ? 'success' : 'warning',
       catalogBadge: ledgerRows.length ? 'Fluxo' : 'Potencial',
       catalogTone: ledgerRows.length ? 'info' : 'warning',
@@ -936,22 +936,22 @@ function buildReportBundle(db, filters) {
         ? [
             {
               title: 'Receita realizada ainda zerada',
-              text: 'Enquanto os lanÃ§amentos ou vendas nÃ£o forem registrados, o relatÃ³rio usa a receita potencial dos lotes para apoiar a leitura executiva.',
+              text: 'Enquanto os lançamentos ou vendas não forem registrados, o relatório usa a receita potencial dos lotes para apoiar a leitura executiva.',
               variant: 'warning',
             },
           ]
         : [],
       summary: [
-        createSummary('Despesas do perÃ­odo', formatCurrency(ledgerExpense), 'Custos operacionais + despesas lanÃ§adas', 'danger'),
-        createSummary('Receita realizada', formatCurrency(ledgerRevenue), 'LanÃ§amentos financeiros e vendas registradas', 'success'),
+        createSummary('Despesas do período', formatCurrency(ledgerExpense), 'Custos operacionais + despesas lançadas', 'danger'),
+        createSummary('Receita realizada', formatCurrency(ledgerRevenue), 'Lançamentos financeiros e vendas registradas', 'success'),
         createSummary('Receita potencial', formatCurrency(potentialRevenue), 'Estimativa atual dos lotes filtrados', 'info'),
         createSummary(
-          'Resultado lÃ­quido',
+          'Resultado líquido',
           formatCurrency(ledgerRevenue - ledgerExpense),
-          'Somente o que jÃ¡ foi efetivamente lanÃ§ado',
+          'Somente o que já foi efetivamente lançado',
           ledgerRevenue - ledgerExpense >= 0 ? 'success' : 'danger'
         ),
-        createSummary('Pagamentos diÃ¡rios', formatNumber(pagamentosDiariosRows.length, 0), 'Lidos de movimentaÃ§Ãµes financeiras', 'info'),
+        createSummary('Pagamentos diários', formatNumber(pagamentosDiariosRows.length, 0), 'Lidos de movimentações financeiras', 'info'),
       ],
       highlights: buildFinancialHighlights(ledgerRows, potentialRevenue, ledgerExpense),
       exportConfig: createExportConfig('relatorio-financeiro', filters, [
@@ -961,14 +961,14 @@ function buildReportBundle(db, filters) {
       tables: [
         {
           id: 'financeiro-ledger',
-          title: 'LanÃ§amentos consolidados',
-          description: 'Base Ãºnica para futuro PDF, XLSX e integraÃ§Ãµes contÃ¡beis.',
+          title: 'Lançamentos consolidados',
+          description: 'Base única para futuro PDF, XLSX e integrações contábeis.',
           badgeLabel: `${ledgerRows.length} linhas`,
           badgeVariant: 'neutral',
-          emptyTitle: 'Sem lanÃ§amentos financeiros no perÃ­odo',
+          emptyTitle: 'Sem lançamentos financeiros no período',
           emptySubtitle: 'Cadastre receitas e despesas ou mantenha a leitura apenas pela receita potencial.',
           mobileTitleKey: 'categoria',
-          mobileSubtitleKey: (row) => `${row.tipo} â€¢ ${row.data}`,
+          mobileSubtitleKey: (row) => `${row.tipo} ⬢ ${row.data}`,
           columns: [
             { key: 'data', label: 'Data' },
             { key: 'tipo', label: 'Tipo', render: (row) => <Badge variant={row.tipo === 'Receita' ? 'success' : 'danger'}>{row.tipo}</Badge> },
@@ -982,14 +982,14 @@ function buildReportBundle(db, filters) {
         },
         {
           id: 'financeiro-pagamentos-diarios',
-          title: 'Pagamentos diÃ¡rios',
-          description: 'Pagamentos categorizados como Pagamento DiÃ¡rio no financeiro.',
+          title: 'Pagamentos diários',
+          description: 'Pagamentos categorizados como Pagamento Diário no financeiro.',
           badgeLabel: `${pagamentosDiariosRows.length} pagamentos`,
           badgeVariant: 'neutral',
           emptyTitle: 'Nenhum registro encontrado',
-          emptySubtitle: 'Sem pagamentos diÃ¡rios para os filtros selecionados.',
+          emptySubtitle: 'Sem pagamentos diários para os filtros selecionados.',
           mobileTitleKey: 'categoria',
-          mobileSubtitleKey: (row) => `${row.data} â€¢ ${formatCurrency(row.valor)}`,
+          mobileSubtitleKey: (row) => `${row.data} ⬢ ${formatCurrency(row.valor)}`,
           columns: [
             { key: 'data', label: 'Data' },
             { key: 'categoria', label: 'Categoria' },
@@ -1003,7 +1003,7 @@ function buildReportBundle(db, filters) {
         {
           id: 'financeiro-planejamento-lotes',
           title: 'Planejamento de lote e estimativas',
-          description: 'RepresentaÃ§Ã£o de GMD, dieta/consumo e estimativas persistidas em campos compatÃ­veis.',
+          description: 'Representação de GMD, dieta/consumo e estimativas persistidas em campos compatíveis.',
           badgeLabel: `${planejamentoLoteRows.length} lotes`,
           badgeVariant: 'neutral',
           emptyTitle: 'Nenhum lote encontrado',
@@ -1017,7 +1017,7 @@ function buildReportBundle(db, filters) {
             { key: 'produto', label: 'Dieta/produto' },
             { key: 'consumoTipo', label: 'Tipo de consumo' },
             { key: 'consumoInformado', label: 'Consumo informado' },
-            { key: 'dataPrevistaSaida', label: 'Data prevista (projeÃ§Ã£o)' },
+            { key: 'dataPrevistaSaida', label: 'Data prevista (projeção)' },
             { key: 'consumoEstimado', label: 'Consumo estimado' },
             { key: 'custoEstimado', label: 'Custo estimado' },
           ],
@@ -1026,8 +1026,8 @@ function buildReportBundle(db, filters) {
       ],
     },
     desempenho: {
-      title: 'RelatÃ³rio de desempenho',
-      description: 'Ranking zootÃ©cnico com foco em GMD, peso mÃ©dio, custo por cabeÃ§a e aderÃªncia Ã  meta.',
+      title: 'Relatório de desempenho',
+      description: 'Ranking zootécnico com foco em GMD, peso médio, custo por cabeça e aderência à meta.',
       scopeLabel: describeScope(filters, performanceRows.length),
       periodLabel: describePeriod(filters.dataInicio, filters.dataFim),
       healthLabel: performanceAboveMeta === performanceRows.length && performanceRows.length ? 'Metas sustentadas no recorte' : 'Existem lotes abaixo da meta',
@@ -1039,13 +1039,13 @@ function buildReportBundle(db, filters) {
         ? []
         : [
             {
-              title: 'Sem pesagens suficientes no perÃ­odo',
-              text: 'O ranking fica disponÃ­vel assim que houver pesagens ou lotes ativos dentro do escopo.',
+              title: 'Sem pesagens suficientes no período',
+              text: 'O ranking fica disponível assim que houver pesagens ou lotes ativos dentro do escopo.',
               variant: 'info',
             },
           ],
       summary: [
-        createSummary('GMD mÃ©dio', `${formatNumber(averageGmd, 3)} kg/dia`, 'MÃ©dia dos lotes filtrados', 'info'),
+        createSummary('GMD médio', `${formatNumber(averageGmd, 3)} kg/dia`, 'Média dos lotes filtrados', 'info'),
         createSummary(
           'Acima da meta',
           formatNumber(performanceAboveMeta, 0),
@@ -1053,11 +1053,11 @@ function buildReportBundle(db, filters) {
           performanceAboveMeta === performanceRows.length && performanceRows.length ? 'success' : 'warning'
         ),
         createSummary(
-          'Peso mÃ©dio atual',
+          'Peso médio atual',
           performanceRows.length
             ? `${formatNumber(performanceRows.reduce((total, item) => total + item.pesoAtual, 0) / performanceRows.length, 1)} kg`
             : '--',
-          'Base mais recente disponÃ­vel',
+          'Base mais recente disponível',
           'neutral'
         ),
         createSummary(
@@ -1075,11 +1075,11 @@ function buildReportBundle(db, filters) {
         {
           id: 'performance',
           title: 'Ranking de desempenho',
-          description: 'Ordenado por GMD para facilitar a tomada de decisÃ£o.',
+          description: 'Ordenado por GMD para facilitar a tomada de decisão.',
           badgeLabel: `${performanceAboveMeta}/${performanceRows.length} na meta`,
           badgeVariant: performanceAboveMeta === performanceRows.length && performanceRows.length ? 'success' : 'warning',
           emptyTitle: 'Nenhum lote com desempenho calculado',
-          emptySubtitle: 'Ã‰ preciso haver lotes ativos e pesagens para montar o ranking.',
+          emptySubtitle: '�0 preciso haver lotes ativos e pesagens para montar o ranking.',
           mobileTitleKey: 'lote',
           mobileSubtitleKey: 'fazenda',
           columns: [
@@ -1130,7 +1130,7 @@ function buildCsvFromSheets(sheets) {
     if (index > 0) lines.push('');
     lines.push(`Aba: ${sheet.name}`);
     if (!columns.length) {
-      lines.push('ObservaÃ§Ã£o;Nenhum registro encontrado');
+      lines.push('Observação;Nenhum registro encontrado');
       return;
     }
     lines.push(columns.map((col) => toCsvCell(formatCsvHeader(col))).join(';'));
@@ -1159,7 +1159,7 @@ function formatCsvHeader(key) {
     consumoInformado: 'Consumo informado',
     consumoEstimado: 'Consumo estimado',
     custoEstimado: 'Custo estimado',
-    dataPrevistaSaida: 'Data prevista de saÃ­da',
+    dataPrevistaSaida: 'Data prevista de saída',
   };
   if (map[key]) return map[key];
   return String(key)
@@ -1170,7 +1170,7 @@ function formatCsvHeader(key) {
 
 function toSafeExportValue(value) {
   if (value == null || value === '') return 'Sem dados suficientes';
-  if (typeof value === 'number' && Number.isNaN(value)) return 'Estimativa indisponÃ­vel';
+  if (typeof value === 'number' && Number.isNaN(value)) return 'Estimativa indisponível';
   return value;
 }
 
@@ -1190,12 +1190,12 @@ function buildLotHighlights(rows) {
       detail: formatCurrency(bestMargin.margem),
     },
     {
-      label: 'Melhor ganho mÃ©dio diÃ¡rio',
+      label: 'Melhor ganho médio diário',
       value: bestGmd.lote,
       detail: `${formatNumber(bestGmd.gmd, 3)} kg/dia`,
     },
     {
-      label: 'Maior custo no perÃ­odo',
+      label: 'Maior custo no período',
       value: highestCost.lote,
       detail: formatCurrency(highestCost.custoPeriodo),
     },
@@ -1223,9 +1223,9 @@ function buildFarmHighlights(rows) {
       detail: formatCurrency(maiorReceita.receita),
     },
     {
-      label: 'Maior concentraÃ§Ã£o animal',
+      label: 'Maior concentração animal',
       value: maiorRebanho.fazenda,
-      detail: `${formatNumber(maiorRebanho.animais, 0)} cabeÃ§as`,
+      detail: `${formatNumber(maiorRebanho.animais, 0)} cabeças`,
     },
   ];
 }
@@ -1236,24 +1236,24 @@ function buildSanitaryHighlights(rows) {
   }
 
   const vencido = rows.find((row) => row.status === 'Vencido');
-  const proximo = rows.find((row) => row.status === 'PrÃ³ximo');
+  const proximo = rows.find((row) => row.status === 'Próximo');
   const responsavel = frequency(rows.map((row) => row.responsavel)).at(0);
 
   return [
     {
-      label: 'Maior prioridade sanitÃ¡ria',
+      label: 'Maior prioridade sanitária',
       value: vencido ? `${vencido.descricao} - ${vencido.lote}` : 'Sem manejos vencidos',
-      detail: vencido ? vencido.proxima : 'OperaÃ§Ã£o em dia',
+      detail: vencido ? vencido.proxima : 'Operação em dia',
     },
     {
-      label: 'PrÃ³ximo manejo',
-      value: proximo ? `${proximo.descricao} - ${proximo.lote}` : 'Sem protocolo prÃ³ximo',
-      detail: proximo ? proximo.proxima : 'Sem agenda crÃ­tica',
+      label: 'Próximo manejo',
+      value: proximo ? `${proximo.descricao} - ${proximo.lote}` : 'Sem protocolo próximo',
+      detail: proximo ? proximo.proxima : 'Sem agenda crítica',
     },
     {
-      label: 'ResponsÃ¡vel mais recorrente',
-      value: responsavel?.value || 'Sem responsÃ¡vel definido',
-      detail: responsavel ? `${responsavel.count} registros` : 'Sem concentraÃ§Ã£o',
+      label: 'Responsável mais recorrente',
+      value: responsavel?.value || 'Sem responsável definido',
+      detail: responsavel ? `${responsavel.count} registros` : 'Sem concentração',
     },
   ];
 }
@@ -1263,15 +1263,15 @@ function buildStockHighlights(items, movements) {
     return [];
   }
 
-  const critico = items.find((item) => item.status === 'CrÃ­tico');
+  const critico = items.find((item) => item.status === 'Crítico');
   const maiorValor = items.slice().sort((a, b) => currencyToNumber(b.valor) - currencyToNumber(a.valor))[0];
   const ultimoMovimento = movements[0];
 
   return [
     {
-      label: 'Item mais sensÃ­vel',
-      value: critico?.item || 'Sem itens crÃ­ticos',
-      detail: critico?.saldo || 'Cobertura estÃ¡vel',
+      label: 'Item mais sensível',
+      value: critico?.item || 'Sem itens críticos',
+      detail: critico?.saldo || 'Cobertura estável',
     },
     {
       label: 'Maior valor parado em estoque',
@@ -1279,8 +1279,8 @@ function buildStockHighlights(items, movements) {
       detail: maiorValor.valor,
     },
     {
-      label: 'Ãšltima movimentaÃ§Ã£o registrada',
-      value: ultimoMovimento ? `${ultimoMovimento.item} - ${ultimoMovimento.tipo}` : 'Sem movimentaÃ§Ã£o no perÃ­odo',
+      label: '�altima movimentação registrada',
+      value: ultimoMovimento ? `${ultimoMovimento.item} - ${ultimoMovimento.tipo}` : 'Sem movimentação no período',
       detail: ultimoMovimento?.data || 'Sem data',
     },
   ];
@@ -1293,12 +1293,12 @@ function buildFinancialHighlights(rows, potentialRevenue, ledgerExpense) {
   return [
     {
       label: 'Principal categoria',
-      value: principalCategoria?.value || 'Sem lanÃ§amentos',
-      detail: principalCategoria ? `${principalCategoria.count} ocorrÃªncias` : 'Sem dados no perÃ­odo',
+      value: principalCategoria?.value || 'Sem lançamentos',
+      detail: principalCategoria ? `${principalCategoria.count} ocorrências` : 'Sem dados no período',
     },
     {
-      label: 'Maior lanÃ§amento individual',
-      value: maiorLinha?.categoria || 'Sem lanÃ§amento',
+      label: 'Maior lançamento individual',
+      value: maiorLinha?.categoria || 'Sem lançamento',
       detail: maiorLinha ? formatCurrency(maiorLinha.valor) : '--',
     },
     {
@@ -1325,7 +1325,7 @@ function buildPerformanceHighlights(rows) {
       detail: `${formatNumber(melhor.gmd, 3)} kg/dia`,
     },
     {
-      label: 'Ponto de atenÃ§Ã£o',
+      label: 'Ponto de atenção',
       value: pior.lote,
       detail: `${formatNumber(pior.gmd, 3)} kg/dia`,
     },
@@ -1446,7 +1446,7 @@ function resolveSanitaryStatus(item) {
     return 'Vencido';
   }
   if (diff <= Number(item?.alerta_dias_antes || 0)) {
-    return 'PrÃ³ximo';
+    return 'Próximo';
   }
   return 'Em dia';
 }
@@ -1472,10 +1472,10 @@ function describeScope(filters, count) {
 
 function describePeriod(start, end) {
   if (!start && !end) {
-    return 'Sem perÃ­odo definido';
+    return 'Sem período definido';
   }
 
-  return `${formatDate(start)} atÃ© ${formatDate(end)}`;
+  return `${formatDate(start)} até ${formatDate(end)}`;
 }
 
 function capitalize(value) {
@@ -1489,7 +1489,7 @@ function sanitizeBadge(status) {
   if (status === 'Vencido') {
     return 'danger';
   }
-  if (status === 'PrÃ³ximo') {
+  if (status === 'Próximo') {
     return 'warning';
   }
   if (status === 'Em dia') {
@@ -1499,7 +1499,7 @@ function sanitizeBadge(status) {
 }
 
 function stockBadge(status) {
-  if (status === 'CrÃ­tico') {
+  if (status === 'Crítico') {
     return 'danger';
   }
   if (status === 'Baixo') {
@@ -1512,7 +1512,7 @@ function priorityRank(status) {
   if (status === 'Vencido') {
     return 0;
   }
-  if (status === 'PrÃ³ximo') {
+  if (status === 'Próximo') {
     return 1;
   }
   if (status === 'Em dia') {
@@ -1556,7 +1556,7 @@ function parsePlanejamentoLote(obs) {
     produto: (text.match(/Dieta\/produto:\s*([^|]+)/i) || [])[1]?.trim(),
     consumoTipo: (text.match(/Modo de consumo:\s*([^|]+)/i) || [])[1]?.trim(),
     consumoInformado: (text.match(/Valor de consumo:\s*([^|]+)/i) || [])[1]?.trim(),
-    dataPrevistaSaida: (text.match(/SaÃ­da projetada \(informativa\):\s*([^|]+)/i) || [])[1]?.trim(),
+    dataPrevistaSaida: (text.match(/Saída projetada \(informativa\):\s*([^|]+)/i) || [])[1]?.trim(),
     consumoEstimado: (text.match(/Consumo estimado suplemento \(kg\):\s*([^|]+)/i) || [])[1]?.trim(),
     custoEstimado: (text.match(/Custo estimado suplemento \(R\$\):\s*([^|]+)/i) || [])[1]?.trim(),
   };
