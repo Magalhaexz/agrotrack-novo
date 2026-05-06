@@ -662,6 +662,14 @@ export default function App() {
                   alerts={alerts}
                   onNavigate={navigateWithPermission}
                   onResolveAlert={marcarAlertaComoFeito}
+                  onSnoozeAlert={adiarAlerta}
+                  onAlertNavigate={(alert) => {
+                    if (alert?.route) {
+                      navigateWithPermission(alert.route);
+                      return;
+                    }
+                    showToast({ type: 'info', message: 'Não há destino configurado para este alerta.' });
+                  }}
                   onRegistrarEntradaAnimal={handleRegistrarEntradaAnimal}
                   onRegistrarSaidaAnimal={handleRegistrarSaidaAnimal}
                   onRegistrarEntradaEstoque={handleRegistrarEntradaEstoque}

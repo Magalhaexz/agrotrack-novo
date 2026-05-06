@@ -575,6 +575,20 @@
   border-color: rgba(121, 255, 169, 0.24);
 }
 
+.dashboard-alert-actions {
+  display: inline-flex;
+  align-items: center;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+.dashboard-alert-actions .alert-action-btn {
+  min-height: 34px;
+  padding: 0 12px;
+  white-space: nowrap;
+}
+
 .empty-state-title {
   margin: 8px 0 0;
   color: #f5f8f6;
@@ -661,6 +675,11 @@
   .alert-item {
     grid-template-columns: 1fr;
     justify-items: start;
+  }
+
+  .dashboard-alert-actions {
+    width: 100%;
+    justify-content: flex-start;
   }
 }
 

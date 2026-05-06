@@ -37,6 +37,9 @@ export default function DashboardPage({
   setDb,
   alerts = [],
   onNavigate = null,
+  onResolveAlert = null,
+  onSnoozeAlert = null,
+  onAlertNavigate = null,
   tabAtiva = 'geral',
   setTabAtiva,
 }) {
@@ -485,13 +488,27 @@ export default function DashboardPage({
                     <p className="alert-item-title">{alerta.titulo}</p>
                     <p className="alert-item-desc">{alerta.descricao}</p>
                   </div>
-                  <button
-                    className="alert-action-btn"
-                    onClick={() => onNavigate?.(alerta.acao?.rota || 'dashboard')}
-                    type="button"
-                  >
-                    {alerta.acao?.label || 'Abrir'} →
-                  </button>
+                  <div className="dashboard-alert-actions">
+                    <button className="alert-action-btn" onClick={() => onResolveAlert?.(alerta)} type="button">Resolver</button>
+                    <button className="alert-action-btn" onClick={() => onSnoozeAlert?.(alerta, '1')} type="button">Adiar</button>
+                    <button
+                      className="alert-action-btn"
+                      onClick={() => {
+                        if (onAlertNavigate) {
+                          onAlertNavigate(alerta);
+                          return;
+                        }
+                        if (alerta?.acao?.rota) {
+                          onNavigate?.(alerta.acao.rota);
+                          return;
+                        }
+                        onNavigate?.('dashboard');
+                      }}
+                      type="button"
+                    >
+                      Abrir
+                    </button>
+                  </div>
                 </div>
               ))
             )}

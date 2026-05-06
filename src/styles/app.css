@@ -7618,3 +7618,111 @@ button:hover,
 .sidebar-group-description {
   line-height: 1.25;
 }
+
+/* Sprint 18K - Layout polish (visual-only, no business logic changes) */
+.page--estoque .rebanho-header {
+  gap: 16px;
+}
+
+.page--estoque .lote-actions {
+  gap: 10px;
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+.page--estoque .dashboard-grid--kpi-secondary {
+  gap: 12px;
+}
+
+.page--estoque .lote-cards-grid {
+  gap: 14px;
+}
+
+.page--estoque .estoque-card {
+  min-height: 0;
+  padding: 16px;
+}
+
+.page--estoque .estoque-card-actions {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.page--estoque .btn-entrada,
+.page--estoque .btn-saida {
+  min-height: 38px;
+}
+
+.financeiro-page .financeiro-header {
+  align-items: flex-end;
+  gap: 14px;
+  margin-bottom: 6px;
+}
+
+.financeiro-page .financeiro-subtitle {
+  max-width: 760px;
+}
+
+.financeiro-page .financeiro-tabs {
+  padding: 8px;
+  border-radius: 14px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: rgba(255, 255, 255, 0.03);
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.financeiro-page .financeiro-tab-btn {
+  min-height: 36px;
+  padding-inline: 14px;
+}
+
+.page--sanitario .form-grid.two {
+  gap: 10px;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.page--sanitario .sanitario-table-shell .table-responsive {
+  padding: 2px;
+}
+
+.page--sanitario .row-actions.row-actions--tight {
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.tarefas-page .kanban-board {
+  gap: 14px;
+}
+
+.tarefas-page .kanban-card {
+  gap: 10px;
+  padding: 12px;
+}
+
+.tarefas-page .kanban-card-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+@media (max-width: 1024px) {
+  .page--sanitario .form-grid.two {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 760px) {
+  .financeiro-page .financeiro-header {
+    align-items: flex-start;
+  }
+
+  .page--estoque .estoque-card-actions {
+    grid-template-columns: 1fr;
+  }
+
+  .page--sanitario .form-grid.two {
+    grid-template-columns: 1fr;
+  }
+}
