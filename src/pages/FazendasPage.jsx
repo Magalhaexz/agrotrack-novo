@@ -1,4 +1,4 @@
-import { useMemo, useRef, useState } from 'react';
+﻿import { useMemo, useRef, useState } from 'react';
 import Button from '../components/ui/Button';
 import PageHeader from '../components/PageHeader';
 import FazendaCard from '../components/fazendas/FazendaCard';
@@ -18,7 +18,7 @@ import { runMinimalCloudDiagnostic } from '../services/supabaseDiagnostics';
 export default function FazendasPage({ db, setDb, onConfirmAction }) {
   const { showToast, dismissToast } = useToast();
   const { hasPermission, session, user, forceLocalSignOut } = useAuth();
-  const mensagemSemPermissao = 'Você não tem permissão para executar esta ação.';
+  const mensagemSemPermissao = 'VocÃª nÃ£o tem permissÃ£o para executar esta aÃ§Ã£o.';
 
   const [openModal, setOpenModal] = useState(false);
   const [editando, setEditando] = useState(null);
@@ -64,7 +64,8 @@ export default function FazendasPage({ db, setDb, onConfirmAction }) {
           f.id === editando.id ? { ...f, ...(persisted.data || payload) } : f
         ),
       }));
-      if (!persisted.persisted) showToast({ type: 'warning', message: 'Alteração salva apenas localmente.' });
+      if (!persisted.persisted) showToast({ type: 'warning', message: 'AlteraÃ§Ã£o salva apenas localmente.' });
+      if (persisted.syncStatus === 'cloud_success') showToast({ type: 'success', message: 'Registro salvo na nuvem. (cloud_success)' });
     } else {
       const persisted = await createOperationalRecord('fazendas', payload, session);
       setDb((prev) => ({
@@ -72,6 +73,7 @@ export default function FazendasPage({ db, setDb, onConfirmAction }) {
         fazendas: [...prev.fazendas, persisted.data || { id: gerarNovoId(prev.fazendas), ...payload }],
       }));
       if (!persisted.persisted) showToast({ type: 'warning', message: 'Cadastro salvo apenas localmente.' });
+      if (persisted.syncStatus === 'cloud_success') showToast({ type: 'success', message: 'Registro salvo na nuvem. (cloud_success)' });
     }
     setOpenModal(false);
     setEditando(null);
@@ -85,7 +87,7 @@ export default function FazendasPage({ db, setDb, onConfirmAction }) {
     const fazenda = cards.find((f) => f.id === id);
     if (!fazenda) return;
     if (fazenda.lotesVinculados > 0) {
-      alert('Não é possível excluir uma fazenda com lotes vinculados.');
+      alert('NÃ£o Ã© possÃ­vel excluir uma fazenda com lotes vinculados.');
       return;
     }
     const confirmado = typeof onConfirmAction === 'function'
@@ -99,25 +101,26 @@ export default function FazendasPage({ db, setDb, onConfirmAction }) {
     if (!confirmado) return;
     const persisted = await deleteOperationalRecord('fazendas', id, session);
     setDb((prev) => ({ ...prev, fazendas: prev.fazendas.filter((f) => f.id !== id) }));
-    if (!persisted.persisted) showToast({ type: 'warning', message: 'Exclusão aplicada apenas localmente.' });
+    if (!persisted.persisted) showToast({ type: 'warning', message: 'ExclusÃ£o aplicada apenas localmente.' });
+      if (persisted.syncStatus === 'cloud_success') showToast({ type: 'success', message: 'Registro salvo na nuvem. (cloud_success)' });
   }
 
   function traduzirStatusEtapa(step) {
     if (step === 'env_check') return 'Ambiente';
-    if (step === 'rest_without_session') return 'REST sem sessão';
-    if (step === 'session_check') return 'Sessão';
-    if (step === 'rest_with_session') return 'REST com sessão';
+    if (step === 'rest_without_session') return 'REST sem sessÃ£o';
+    if (step === 'session_check') return 'SessÃ£o';
+    if (step === 'rest_with_session') return 'REST com sessÃ£o';
     if (step === 'fazendas_check') return 'Fazendas';
     if (step === 'lotes_check') return 'Lotes';
     if (step === 'client_select') return 'Supabase client';
-    return 'Diagnóstico';
+    return 'DiagnÃ³stico';
   }
 
   function traduzirSessaoStatus(status) {
     if (status === 'valid') return 'OK';
     if (status === 'expired') return 'Expirada';
-    if (status === 'invalid') return 'Inválida';
-    if (status === 'refresh_failed') return 'Inválida';
+    if (status === 'invalid') return 'InvÃ¡lida';
+    if (status === 'refresh_failed') return 'InvÃ¡lida';
     return 'Expirada';
   }
 
@@ -129,8 +132,8 @@ export default function FazendasPage({ db, setDb, onConfirmAction }) {
     if (code === '42501' || type === 'rls') return `${status || code || 'erro'} / RLS`;
     if (code === '42703' || code === 'PGRST204') return `${code} / Coluna ausente`;
     if (code === 'PGRST205' || code === '42P01' || type === 'schema') return `${code || status || '404'} / Tabela ausente`;
-    if (type === 'auth' || status === '401') return `${status || '401'} / Sessão inválida`;
-    if (type === 'payload' || status === '400') return `${code || status || '400'} / Estrutura incompatível`;
+    if (type === 'auth' || status === '401') return `${status || '401'} / SessÃ£o invÃ¡lida`;
+    if (type === 'payload' || status === '400') return `${code || status || '400'} / Estrutura incompatÃ­vel`;
     if (type === 'network_reset' || type === 'http2_protocol_error' || type === 'timeout') return 'Sem resposta / Rede';
     return `${code || status || 'erro'} / ${item?.safeMessage || 'Falha'}`;
   }
@@ -150,15 +153,15 @@ export default function FazendasPage({ db, setDb, onConfirmAction }) {
         if (item?.step === 'session_check') {
           showToast({
             type: item?.ok ? 'success' : 'warning',
-            message: `Sessão: ${item?.ok ? 'OK' : traduzirSessaoStatus(item?.status)}`,
+            message: `SessÃ£o: ${item?.ok ? 'OK' : traduzirSessaoStatus(item?.status)}`,
           });
           return;
         }
 
-        if (item?.safeMessage === 'Bloqueado por sessão inválida') {
+        if (item?.safeMessage === 'Bloqueado por sessÃ£o invÃ¡lida') {
           showToast({
             type: 'warning',
-            message: `${traduzirStatusEtapa(item?.step)}: Bloqueado por sessão inválida`,
+            message: `${traduzirStatusEtapa(item?.step)}: Bloqueado por sessÃ£o invÃ¡lida`,
           });
           return;
         }
@@ -166,7 +169,7 @@ export default function FazendasPage({ db, setDb, onConfirmAction }) {
         if (!item?.ok) {
           showToast({
             type: 'warning',
-            message: `${traduzirStatusEtapa(item?.step)}: Erro — ${resumirFalha(item)}`,
+            message: `${traduzirStatusEtapa(item?.step)}: Erro â€” ${resumirFalha(item)}`,
           });
           return;
         }
@@ -178,7 +181,7 @@ export default function FazendasPage({ db, setDb, onConfirmAction }) {
 
       showToast({
         type: result?.ok ? 'success' : 'warning',
-        message: result?.conclusionMessage || 'Falha ao executar diagnóstico da nuvem.',
+        message: result?.conclusionMessage || 'Falha ao executar diagnÃ³stico da nuvem.',
       });
 
       try {
@@ -196,7 +199,7 @@ export default function FazendasPage({ db, setDb, onConfirmAction }) {
       if (result?.conclusion === 'session_failure') {
         showToast({
           type: 'warning',
-          message: 'Sessão expirada. Use Reconectar à nuvem para entrar novamente.',
+          message: 'SessÃ£o expirada. Use Reconectar Ã  nuvem para entrar novamente.',
         });
       }
 
@@ -226,7 +229,7 @@ export default function FazendasPage({ db, setDb, onConfirmAction }) {
             tokenExpired: Boolean(result.authState.tokenExpired),
             refreshAttempted: Boolean(result.authState.refreshAttempted),
             refreshSucceeded: Boolean(result.authState.refreshSucceeded),
-            safeMessage: result?.conclusionMessage || 'Sessão expirada. Entre novamente para sincronizar com a nuvem.',
+            safeMessage: result?.conclusionMessage || 'SessÃ£o expirada. Entre novamente para sincronizar com a nuvem.',
           });
         }
         const authFailureSteps = steps.filter(
@@ -248,7 +251,7 @@ export default function FazendasPage({ db, setDb, onConfirmAction }) {
         console.groupEnd();
       }
     } catch (error) {
-      showToast({ type: 'warning', message: 'Não foi possível executar o diagnóstico da nuvem.' });
+      showToast({ type: 'warning', message: 'NÃ£o foi possÃ­vel executar o diagnÃ³stico da nuvem.' });
       if (import.meta.env.DEV) {
         console.warn('[HERDON_CLOUD_MINIMAL_DIAGNOSTIC]', {
           stage: 'diagnostic_exception',
@@ -276,7 +279,7 @@ export default function FazendasPage({ db, setDb, onConfirmAction }) {
           localCleanupStarted: true,
           localCleanupSucceeded: false,
           remoteSignOutSkipped: true,
-          safeMessage: 'Iniciando limpeza local da sessão Supabase.',
+          safeMessage: 'Iniciando limpeza local da sessÃ£o Supabase.',
         });
       }
 
@@ -289,13 +292,13 @@ export default function FazendasPage({ db, setDb, onConfirmAction }) {
           localCleanupStarted: true,
           localCleanupSucceeded: true,
           remoteSignOutSkipped: true,
-          safeMessage: 'Sessão local limpa com sucesso.',
+          safeMessage: 'SessÃ£o local limpa com sucesso.',
         });
       }
 
       showToast({
         type: 'info',
-        message: 'Sessão local limpa. Entre novamente para conectar à nuvem.',
+        message: 'SessÃ£o local limpa. Entre novamente para conectar Ã  nuvem.',
       });
     } catch {
       if (import.meta.env.DEV || isAdmin) {
@@ -304,13 +307,13 @@ export default function FazendasPage({ db, setDb, onConfirmAction }) {
           localCleanupStarted: true,
           localCleanupSucceeded: false,
           remoteSignOutSkipped: true,
-          safeMessage: 'Falha ao limpar sessão local. Tentando manter o app utilizável.',
+          safeMessage: 'Falha ao limpar sessÃ£o local. Tentando manter o app utilizÃ¡vel.',
         });
       }
       forceLocalSignOut?.();
       showToast({
         type: 'warning',
-        message: 'Sessão local limpa. Entre novamente para conectar à nuvem.',
+        message: 'SessÃ£o local limpa. Entre novamente para conectar Ã  nuvem.',
       });
     } finally {
       setReconectandoNuvem(false);
@@ -328,7 +331,7 @@ export default function FazendasPage({ db, setDb, onConfirmAction }) {
     manualSyncRef.current = { inFlight: true, lastStartAt: now };
 
     if (!session?.user?.id) {
-      showToast({ type: 'warning', message: 'Faça login para sincronizar com a nuvem.' });
+      showToast({ type: 'warning', message: 'FaÃ§a login para sincronizar com a nuvem.' });
       manualSyncRef.current.inFlight = false;
       return;
     }
@@ -337,7 +340,7 @@ export default function FazendasPage({ db, setDb, onConfirmAction }) {
     if (!sessionValidation?.ok) {
       showToast({
         type: 'warning',
-        message: 'Sessão expirada. Entre novamente para sincronizar com a nuvem.',
+        message: 'SessÃ£o expirada. Entre novamente para sincronizar com a nuvem.',
       });
       if (import.meta.env.DEV || isAdmin) {
         console.info('[HERDON_CLOUD_AUTH_DIAGNOSTIC]', {
@@ -347,7 +350,7 @@ export default function FazendasPage({ db, setDb, onConfirmAction }) {
           tokenExpired: Boolean(sessionValidation?.authState?.tokenExpired),
           refreshAttempted: Boolean(sessionValidation?.authState?.refreshAttempted),
           refreshSucceeded: Boolean(sessionValidation?.authState?.refreshSucceeded),
-          safeMessage: sessionValidation?.safeMessage || 'Sessão expirada. Entre novamente para sincronizar com a nuvem.',
+          safeMessage: sessionValidation?.safeMessage || 'SessÃ£o expirada. Entre novamente para sincronizar com a nuvem.',
         });
       }
       manualSyncRef.current.inFlight = false;
@@ -363,7 +366,7 @@ export default function FazendasPage({ db, setDb, onConfirmAction }) {
     });
 
     try {
-      showToast({ type: 'info', message: 'Sincronização iniciada. Aguarde...' });
+      showToast({ type: 'info', message: 'SincronizaÃ§Ã£o iniciada. Aguarde...' });
 
       let fazendasSync = null;
       let lotesSync = null;
@@ -376,11 +379,11 @@ export default function FazendasPage({ db, setDb, onConfirmAction }) {
         const tokenLength = typeof accessToken === 'string' ? accessToken.length : 0;
         if (import.meta.env.DEV || isAdmin) {
           console.groupCollapsed('[HERDON_SERVERLESS_AUTH_HEADER_DIAGNOSTIC]');
-          console.info({ endpoint: '/api/cloud-sync', status: null, hasAccessToken, tokenLooksJwt, tokenLength, failureType: hasAccessToken && tokenLooksJwt ? null : 'invalid_session', safeMessage: hasAccessToken && tokenLooksJwt ? 'Pré-validação do token concluída.' : 'Sessão inválida. Reconecte à nuvem.' });
+          console.info({ endpoint: '/api/cloud-sync', status: null, hasAccessToken, tokenLooksJwt, tokenLength, failureType: hasAccessToken && tokenLooksJwt ? null : 'invalid_session', safeMessage: hasAccessToken && tokenLooksJwt ? 'PrÃ©-validaÃ§Ã£o do token concluÃ­da.' : 'SessÃ£o invÃ¡lida. Reconecte Ã  nuvem.' });
           console.groupEnd();
         }
         if (!hasAccessToken || !tokenLooksJwt) {
-          showToast({ type: 'warning', message: 'Sessão inválida. Reconecte à nuvem.' });
+          showToast({ type: 'warning', message: 'SessÃ£o invÃ¡lida. Reconecte Ã  nuvem.' });
           return;
         }
         const response = await fetch('/api/cloud-sync', {
@@ -396,7 +399,7 @@ export default function FazendasPage({ db, setDb, onConfirmAction }) {
         });
         if (import.meta.env.DEV || isAdmin) {
           console.groupCollapsed('[HERDON_SERVERLESS_AUTH_HEADER_DIAGNOSTIC]');
-          console.info({ endpoint: '/api/cloud-sync', status: response.status, hasAccessToken: true, tokenLooksJwt: true, tokenLength: accessToken.length, failureType: response.ok ? null : 'server_http_error', safeMessage: response.ok ? 'Sync pelo servidor respondeu com sucesso.' : 'Falha na sincronização pelo servidor. O modo local continua ativo.' });
+          console.info({ endpoint: '/api/cloud-sync', status: response.status, hasAccessToken: true, tokenLooksJwt: true, tokenLength: accessToken.length, failureType: response.ok ? null : 'server_http_error', safeMessage: response.ok ? 'Sync pelo servidor respondeu com sucesso.' : 'Falha na sincronizaÃ§Ã£o pelo servidor. O modo local continua ativo.' });
           console.groupEnd();
         }
         const payload = await response.json().catch(() => null);
@@ -408,7 +411,7 @@ export default function FazendasPage({ db, setDb, onConfirmAction }) {
           status: payload?.fazendas?.status || 'error',
           message: payload?.fazendas?.status === 'success'
             ? 'Fazendas sincronizadas com a nuvem.'
-            : 'Não foi possível sincronizar pelo servidor. O modo local continua ativo.',
+            : 'NÃ£o foi possÃ­vel sincronizar pelo servidor. O modo local continua ativo.',
           data: Array.isArray(payload?.fazendas?.data) ? payload.fazendas.data : fazendas,
           httpStatus: response.status,
           code: payload?.fazendas?.status === 'success' ? null : 'SERVER_SYNC_FAILED',
@@ -418,7 +421,7 @@ export default function FazendasPage({ db, setDb, onConfirmAction }) {
           status: payload?.lotes?.status || 'error',
           message: payload?.lotes?.status === 'success'
             ? 'Lotes sincronizados com a nuvem.'
-            : 'Não foi possível sincronizar pelo servidor. O modo local continua ativo.',
+            : 'NÃ£o foi possÃ­vel sincronizar pelo servidor. O modo local continua ativo.',
           data: Array.isArray(payload?.lotes?.data) ? payload.lotes.data : lotes,
           httpStatus: response.status,
           code: payload?.lotes?.status === 'success' ? null : 'SERVER_SYNC_FAILED',
@@ -426,11 +429,11 @@ export default function FazendasPage({ db, setDb, onConfirmAction }) {
       } catch {
         if (import.meta.env.DEV || isAdmin) {
           console.groupCollapsed('[HERDON_SERVERLESS_AUTH_HEADER_DIAGNOSTIC]');
-          console.info({ endpoint: '/api/cloud-sync', status: 494, hasAccessToken: Boolean(session?.access_token || session?.session?.access_token), tokenLooksJwt: true, tokenLength: 0, failureType: 'server_network_error', safeMessage: 'Falha na sincronização pelo servidor. O modo local continua ativo.' });
+          console.info({ endpoint: '/api/cloud-sync', status: 494, hasAccessToken: Boolean(session?.access_token || session?.session?.access_token), tokenLooksJwt: true, tokenLength: 0, failureType: 'server_network_error', safeMessage: 'Falha na sincronizaÃ§Ã£o pelo servidor. O modo local continua ativo.' });
           console.groupEnd();
         }
-        fazendasSync = { module: 'fazendas', status: 'error', message: 'Não foi possível sincronizar pelo servidor. O modo local continua ativo.', data: fazendas, httpStatus: 494, code: 'SERVER_SYNC_FAILED' };
-        lotesSync = { module: 'lotes', status: 'error', message: 'Não foi possível sincronizar pelo servidor. O modo local continua ativo.', data: lotes, httpStatus: 494, code: 'SERVER_SYNC_FAILED' };
+        fazendasSync = { module: 'fazendas', status: 'error', message: 'NÃ£o foi possÃ­vel sincronizar pelo servidor. O modo local continua ativo.', data: fazendas, httpStatus: 494, code: 'SERVER_SYNC_FAILED' };
+        lotesSync = { module: 'lotes', status: 'error', message: 'NÃ£o foi possÃ­vel sincronizar pelo servidor. O modo local continua ativo.', data: lotes, httpStatus: 494, code: 'SERVER_SYNC_FAILED' };
       }
 
       if (Array.isArray(fazendasSync?.data) || Array.isArray(lotesSync?.data)) {
@@ -444,9 +447,9 @@ export default function FazendasPage({ db, setDb, onConfirmAction }) {
       if (fazendasSync?.status === 'success' && lotesSync?.status === 'success') {
         showToast({ type: 'success', message: 'Fazendas e lotes sincronizados com a nuvem.' });
       } else if (fazendasSync?.status === 'success' || lotesSync?.status === 'success') {
-        showToast({ type: 'warning', message: 'Sincronização parcial concluída. Parte dos dados permanece em modo local.' });
+        showToast({ type: 'warning', message: 'SincronizaÃ§Ã£o parcial concluÃ­da. Parte dos dados permanece em modo local.' });
       } else {
-        showToast({ type: 'warning', message: 'Falha na sincronização. O modo local continua ativo.' });
+        showToast({ type: 'warning', message: 'Falha na sincronizaÃ§Ã£o. O modo local continua ativo.' });
       }
 
       if (fazendasSync?.status !== 'success' || lotesSync?.status !== 'success') {
@@ -477,7 +480,7 @@ export default function FazendasPage({ db, setDb, onConfirmAction }) {
         console.groupEnd();
       }
     } catch {
-      showToast({ type: 'warning', message: 'Não foi possível sincronizar fazendas e lotes. Seus dados locais continuam disponíveis.' });
+      showToast({ type: 'warning', message: 'NÃ£o foi possÃ­vel sincronizar fazendas e lotes. Seus dados locais continuam disponÃ­veis.' });
     } finally {
       manualSyncRef.current.inFlight = false;
       if (loadingToastRef.current) {
@@ -492,7 +495,7 @@ export default function FazendasPage({ db, setDb, onConfirmAction }) {
     <div className="page">
       <PageHeader
         title="Fazendas"
-        subtitle="Gestão completa das propriedades e suas capacidades"
+        subtitle="GestÃ£o completa das propriedades e suas capacidades"
         actions={(
           <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
             <Button disabled={!hasPermission('fazendas:editar')} onClick={() => {
@@ -513,7 +516,7 @@ export default function FazendasPage({ db, setDb, onConfirmAction }) {
       {cards.length === 0 ? (
         <div className="ui-card empty-state">
           <strong>Nenhuma fazenda cadastrada.</strong>
-          <span>Use o botão "Nova Fazenda" para começar.</span>
+          <span>Use o botÃ£o "Nova Fazenda" para comeÃ§ar.</span>
         </div>
       ) : (
         <div className="grid-3">
@@ -538,3 +541,4 @@ export default function FazendasPage({ db, setDb, onConfirmAction }) {
     </div>
   );
 }
+

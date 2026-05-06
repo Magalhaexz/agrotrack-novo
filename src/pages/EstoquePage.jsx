@@ -332,6 +332,7 @@ function CadastroItemModal({ setDb, onClose, hasPermission, showToast, session }
 
     if (!persisted.persisted) {
       showToast({ type: 'warning', message: 'Cadastro salvo apenas localmente.' });
+    if (persisted.syncStatus === 'cloud_success') showToast({ type: 'success', message: 'Registro salvo na nuvem. (cloud_success)' });
     }
     showToast({ type: 'success', message: 'Item cadastrado com sucesso.' });
     onClose();
@@ -617,3 +618,4 @@ function SaidaModal({ db, setDb, selectedItem, onRegistrarSaidaEstoque, estoqueM
     </Modal>
   );
 }
+
