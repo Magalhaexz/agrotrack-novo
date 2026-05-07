@@ -118,19 +118,57 @@ function logSyncGuard(payload, level = 'debug') {
 function normalizeDb(baseDb) {
   const dedupeFazendas = (rows = []) => {
     const map = new Map();
-    rows.forEach((row) => {
-      const cloudKey = row?.cloud_id || row?.metadata?.cloud_id || row?.id || null;
-      const localKey = row?.metadata?.local_id ?? null;
+    const getIdentity = (row) => {
+      const cloudId = row?.id;
+      const externalCloudId = row?.cloud_id || row?.metadata?.cloud_id || null;
+      const localId = row?.metadata?.local_id ?? null;
       const fallbackKey = `${String(row?.nome || '').trim().toLowerCase()}|${String(row?.cidade || '').trim().toLowerCase()}|${String(row?.estado || '').trim().toLowerCase()}`;
-      const key = cloudKey ? `cloud:${cloudKey}` : (localKey ? `local:${localKey}` : `fallback:${fallbackKey}`);
+      if (cloudId !== undefined && cloudId !== null && cloudId !== '') return `id:${cloudId}`;
+      if (externalCloudId) return `cloud:${externalCloudId}`;
+      if (localId !== null && localId !== undefined && localId !== '') return `local:${localId}`;
+      return `fallback:${fallbackKey}`;
+    };
+    const scoreRow = (row) => {
+      const hasCloudIdentity = Boolean(
+        (row?.id !== undefined && row?.id !== null && row?.id !== '')
+        || row?.cloud_id
+        || row?.metadata?.cloud_id
+      );
+      const updatedAtScore = Date.parse(row?.updated_at || row?.created_at || 0) || 0;
+      return {
+        hasCloudIdentity,
+        updatedAtScore,
+        stableText: JSON.stringify({
+          id: row?.id ?? null,
+          cloud_id: row?.cloud_id ?? row?.metadata?.cloud_id ?? null,
+          local_id: row?.metadata?.local_id ?? null,
+          nome: String(row?.nome || ''),
+          cidade: String(row?.cidade || ''),
+          estado: String(row?.estado || ''),
+        }),
+      };
+    };
+
+    rows.forEach((row) => {
+      const key = getIdentity(row);
       if (!map.has(key)) {
         map.set(key, row);
         return;
       }
       const current = map.get(key);
-      const currentUpdated = Date.parse(current?.updated_at || current?.created_at || 0) || 0;
-      const nextUpdated = Date.parse(row?.updated_at || row?.created_at || 0) || 0;
-      if (nextUpdated >= currentUpdated) map.set(key, row);
+      const currentScore = scoreRow(current);
+      const nextScore = scoreRow(row);
+      if (nextScore.hasCloudIdentity && !currentScore.hasCloudIdentity) {
+        map.set(key, row);
+        return;
+      }
+      if (nextScore.updatedAtScore > currentScore.updatedAtScore) {
+        map.set(key, row);
+        return;
+      }
+      if (nextScore.updatedAtScore === currentScore.updatedAtScore && nextScore.stableText > currentScore.stableText) {
+        map.set(key, row);
+      }
     });
     return [...map.values()];
   };

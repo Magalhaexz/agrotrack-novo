@@ -36,6 +36,10 @@ function isUuid(value) {
   const text = String(value ?? '').trim();
   return /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(text);
 }
+function logFazendaDirectCreate(payload = {}) {
+  if (!import.meta.env.DEV) return;
+  console.info('[HERDON_FAZENDA_DIRECT_CREATE]', payload);
+}
 
 export default function FazendasPage({ db, setDb, onConfirmAction }) {
   const { showToast, dismissToast } = useToast();
@@ -81,6 +85,17 @@ export default function FazendasPage({ db, setDb, onConfirmAction }) {
     if (editando) {
       const localId = editando?.metadata?.local_id ?? editando?.id ?? null;
       const cloudId = editando?.cloud_id || editando?.metadata?.cloud_id || null;
+      const fallbackIdentity = {
+        nome: String(editando?.nome ?? '').trim(),
+        cidade: String(editando?.cidade ?? '').trim(),
+        estado: String(editando?.estado ?? '').trim(),
+      };
+      let selector = null;
+      if (isNumericId(editando?.id)) selector = { type: 'id', value: Number(editando.id), identity: fallbackIdentity };
+      else if (isUuid(editando?.cloud_id)) selector = { type: 'cloud_id', value: String(editando.cloud_id), identity: fallbackIdentity };
+      else if (isUuid(editando?.metadata?.cloud_id)) selector = { type: 'cloud_id', value: String(editando.metadata.cloud_id), identity: fallbackIdentity };
+      else if (editando?.metadata?.local_id !== undefined && editando?.metadata?.local_id !== null) selector = { type: 'metadata.local_id', value: String(editando.metadata.local_id), identity: fallbackIdentity };
+      else selector = { type: 'fallback_identity', identity: fallbackIdentity };
       const patch = {
         ...payload,
         metadata: {
@@ -92,7 +107,7 @@ export default function FazendasPage({ db, setDb, onConfirmAction }) {
         cloud_id: cloudId,
       };
       const targetId = cloudId || editando?.id || localId;
-      const persisted = await updateOperationalRecord('fazendas', targetId, patch, session);
+      const persisted = await updateOperationalRecord('fazendas', targetId, patch, session, { selector });
       const editIdentity = resolveFazendaIdentity(editando) || buildFazendaFallbackIdentity(editando);
       setDb((prev) => ({
         ...prev,
@@ -115,6 +130,12 @@ export default function FazendasPage({ db, setDb, onConfirmAction }) {
           local_id: localId,
         },
       };
+      logFazendaDirectCreate({
+        hasSession: Boolean(session),
+        hasUserId: Boolean(session?.user?.id),
+        attemptedCloud: Boolean(session?.user?.id),
+        payloadKeys: Object.keys(createPayload || {}),
+      });
       const persisted = await createOperationalRecord('fazendas', createPayload, session);
       const incoming = persisted.data || { id: localId, ...createPayload };
       setDb((prev) => {
@@ -123,9 +144,19 @@ export default function FazendasPage({ db, setDb, onConfirmAction }) {
         const existingIndex = next.findIndex((f) => (
           (resolveFazendaIdentity(f) || buildFazendaFallbackIdentity(f)) === incomingIdentity
         ));
-        if (existingIndex >= 0) next[existingIndex] = { ...next[existingIndex], ...incoming };
-        else next.push(incoming);
+        if (existingIndex >= 0) {
+          next[existingIndex] = { ...next[existingIndex], ...incoming };
+        } else next.push(incoming);
         return { ...prev, fazendas: next };
+      });
+      logFazendaDirectCreate({
+        hasSession: Boolean(session),
+        hasUserId: Boolean(session?.user?.id),
+        attemptedCloud: Boolean(session?.user?.id),
+        syncStatus: persisted.syncStatus || 'pending_sync',
+        code: persisted.code || null,
+        safeMessage: persisted.error || (persisted.syncStatus === 'cloud_success' ? 'Registro salvo na nuvem.' : 'Registro salvo localmente. Sincronização pendente.'),
+        payloadKeys: Object.keys(createPayload || {}),
       });
       if (persisted.syncStatus === 'cloud_success') showToast({ type: 'success', message: 'Registro salvo na nuvem.' });
       if (persisted.syncStatus === 'pending_sync' || persisted.syncStatus === 'local_only') {
@@ -196,7 +227,17 @@ export default function FazendasPage({ db, setDb, onConfirmAction }) {
     }
 
     const targetId = resolveFazendaIdentity(fazenda) || id;
-    const persisted = await deleteOperationalRecord('fazendas', targetId, session, { selector });
+    const persisted = await deleteOperationalRecord('fazendas', targetId, session, {
+      selector,
+      pendingPayload: {
+        id: targetId,
+        selector,
+        metadata: { local_id: fazenda?.metadata?.local_id ?? null },
+        nome: String(fazenda?.nome ?? ''),
+        cidade: String(fazenda?.cidade ?? ''),
+        estado: String(fazenda?.estado ?? ''),
+      },
+    });
     const deletedIdentity = buildFazendaFallbackIdentity(fazenda);
     setDb((prev) => ({
       ...prev,
