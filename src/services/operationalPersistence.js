@@ -591,9 +591,7 @@ function buildOperationalCreatePayload(table, record, userId) {
     } else {
       delete payload.metadata;
     }
-    if (tableSupportsOwnerScope('fazendas') && userId) {
-      payload.owner_user_id = userId;
-    }
+    payload.owner_user_id = userId || null;
     return payload;
   }
   if (normalizedTable === 'estoque') {
@@ -952,8 +950,12 @@ export async function createOperationalRecord(table, record, session, options = 
   };
   const readiness = await ensureSupabaseRequestReadiness(session, { action: 'create', table });
   if (!readiness.ok) {
+    const isFazendas = String(table || '').toLowerCase() === 'fazendas';
+    const fallbackMessage = (isFazendas && readiness.code === 'SESSION_MISSING')
+      ? 'Sessão da nuvem não encontrada. Faça login novamente para salvar na nuvem.'
+      : 'Registro salvo localmente. Sincronizacao pendente.';
     const fallback = buildFallback(
-      'Registro salvo localmente. Sincronizacao pendente.',
+      fallbackMessage,
       sanitizeRecord(record),
       readiness.code || 'CLOUD_NOT_READY',
       'pending_sync'
@@ -990,6 +992,44 @@ export async function createOperationalRecord(table, record, session, options = 
 
   try {
     const payload = buildOperationalCreatePayload(table, record, userId);
+    if (String(table || '').toLowerCase() === 'fazendas') {
+      const validation = validateFazendaCreatePayload(payload, session);
+      if (!validation.ok) {
+        const fallback = buildFallback(
+          validation.safeMessage || 'Registro salvo localmente. Sincronizacao pendente.',
+          sanitizeRecord(record),
+          validation.code || 'PAYLOAD_INVALID',
+          'pending_sync'
+        );
+        emitCloudSaveState({
+          table,
+          action: 'create',
+          syncStatus: fallback.syncStatus,
+          code: classifyCloudSaveCode(validation.code),
+          message: fallback.error,
+          session,
+          cloudConfigured: validation.code !== 'SESSION_MISSING',
+        });
+        if (!options?.skipQueueOnFailure) {
+          enqueuePendingSync({
+            table,
+            action: 'create',
+            localId: sanitizeRecord(record)?.id ?? null,
+            cloudId: sanitizeRecord(record)?.cloud_id ?? null,
+            payload: sanitizeRecord(record),
+            code: classifyCloudSaveCode(validation.code),
+            message: fallback.error,
+          });
+        }
+        logCloudRuntime({
+          ...runtimeContext,
+          cloudStatus: 'fallback',
+          syncStatus: fallback.syncStatus,
+          code: validation.code,
+        }, 'warn');
+        return fallback;
+      }
+    }
     if (!payload || typeof payload !== 'object') {
       const fallback = buildFallback(
         'Registro salvo localmente. Sincronização pendente.',
@@ -1122,6 +1162,48 @@ export async function createOperationalRecord(table, record, session, options = 
     }, 'warn');
     return fallback;
   }
+}
+
+function validateFazendaCreatePayload(payload = {}, session) {
+  const hasSession = Boolean(session);
+  const hasUserId = Boolean(getSessionUserId(session));
+  const hasOwnerUserId = Boolean(payload?.owner_user_id);
+  const hasNome = Boolean(String(payload?.nome ?? '').trim());
+  const payloadKeys = Object.keys(payload || {});
+  let code = null;
+  let safeMessage = null;
+
+  if (!hasUserId || !hasOwnerUserId) {
+    code = 'SESSION_MISSING';
+    safeMessage = 'Sessão da nuvem não encontrada. Faça login novamente para salvar na nuvem.';
+  } else if (!hasNome) {
+    code = 'NOME_REQUIRED';
+    safeMessage = 'Informe o nome da fazenda.';
+  } else if (Object.prototype.hasOwnProperty.call(payload, 'id')) {
+    code = 'INVALID_PAYLOAD_ID';
+    safeMessage = 'Falha de validação do cadastro da fazenda.';
+  } else if (payload?.cloud_id && !normalizeCloudUuid(payload.cloud_id)) {
+    code = 'INVALID_CLOUD_ID';
+    safeMessage = 'Falha de validação do cadastro da fazenda.';
+  } else if (!isObject(payload?.metadata)) {
+    code = 'INVALID_METADATA';
+    safeMessage = 'Falha de validação do cadastro da fazenda.';
+  }
+
+  if (import.meta.env.DEV) {
+    console.debug('[HERDON_FAZENDA_CREATE_PAYLOAD_CHECK]', {
+      hasSession,
+      hasUserId,
+      hasOwnerUserId,
+      hasNome,
+      payloadKeys,
+      syncStatus: code ? 'pending_sync' : 'cloud_ready',
+      code: code || null,
+      safeMessage: safeMessage || null,
+    });
+  }
+
+  return { ok: !code, code, safeMessage };
 }
 
 export async function updateOperationalRecord(table, id, patch, session, options = {}) {
