@@ -69,8 +69,10 @@ export function useCloudControls({ db, setDb, session, hasPermission, showToast,
         showToast({ type: 'success', message: 'Pendências sincronizadas com a nuvem.' });
       } else {
         const firstError = queueResult?.firstError;
-        const safeError = firstError ? ` | erro: ${firstError.code} - ${firstError.message}` : '';
-        showToast({ type: 'info', message: `Pendências: ${queueResult?.synced || 0} sincronizadas, ${queueResult?.pendingCount || 0} restantes${safeError}` });
+        const safeCode = firstError?.code ? String(firstError.code) : null;
+        const safeMessage = firstError?.message ? String(firstError.message) : null;
+        const safeError = safeCode || safeMessage ? ` | ${safeCode || 'erro'}: ${safeMessage || 'pendência restante'}` : '';
+        showToast({ type: 'info', message: `Sincronização manual concluída: ${queueResult?.synced || 0} sincronizadas, ${queueResult?.pendingCount || 0} pendentes${safeError}` });
       }
     } catch {
       showToast({ type: 'warning', message: 'NÃ£o foi possÃ­vel sincronizar fazendas e lotes. Seus dados locais continuam disponÃ­veis.' });

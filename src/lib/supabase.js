@@ -21,6 +21,16 @@ const supabaseUrl = normalizeEnvValue(runtimeEnv.VITE_SUPABASE_URL || processEnv
 const supabaseAnonKey = normalizeEnvValue(runtimeEnv.VITE_SUPABASE_ANON_KEY || processEnv.VITE_SUPABASE_ANON_KEY);
 const isTestEnvironment = processEnv.NODE_ENV === 'test';
 const supabaseEnvConfigured = Boolean(supabaseUrl && supabaseAnonKey);
+const publicAppUrl = normalizeEnvValue(runtimeEnv.VITE_PUBLIC_APP_URL || processEnv.VITE_PUBLIC_APP_URL);
+
+export function getSafeOAuthRedirectTo() {
+  const envUrl = normalizeEnvValue(publicAppUrl);
+  if (envUrl) return envUrl;
+  if (typeof window !== 'undefined' && window?.location?.origin) {
+    return window.location.origin;
+  }
+  return undefined;
+}
 
 export function getSupabaseEnvStatus() {
   return {

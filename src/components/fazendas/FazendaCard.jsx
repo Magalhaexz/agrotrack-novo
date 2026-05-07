@@ -1,4 +1,4 @@
-export default function FazendaCard({ fazenda, lotesVinculados = 0, onClick }) {
+export default function FazendaCard({ fazenda, lotesVinculados = 0, onClick, onDelete }) {
   if (!fazenda) return null;
 
   const area = fazenda.hectares ?? fazenda.area_total_ha ?? 0;
@@ -19,6 +19,18 @@ export default function FazendaCard({ fazenda, lotesVinculados = 0, onClick }) {
           <div className="fazenda-card-nome">{fazenda.nome}</div>
           <div className="fazenda-card-local">{localizacao}</div>
         </div>
+        <button
+          type="button"
+          className="fazenda-card-delete-btn"
+          onClick={(event) => {
+            event.preventDefault();
+            event.stopPropagation();
+            onDelete?.();
+          }}
+          aria-label={`Excluir fazenda ${fazenda.nome}`}
+        >
+          Excluir
+        </button>
       </div>
 
       <div className="fazenda-card-stats">
