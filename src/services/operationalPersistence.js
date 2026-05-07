@@ -259,6 +259,21 @@ function emitCloudSaveState({ table, action, syncStatus, code, message, session,
   }));
 }
 
+function logCloudRuntime(event = {}, level = 'debug') {
+  if (!import.meta.env.DEV) return;
+  const logger = level === 'warn' ? console.warn : console.debug;
+  logger('[HERDON_CLOUD_RUNTIME]', {
+    hasSession: Boolean(event.hasSession),
+    hasUserId: Boolean(event.hasUserId),
+    envReady: Boolean(event.envReady),
+    dataSource: event.dataSource || null,
+    cloudStatus: event.cloudStatus || null,
+    pendingCount: Number(event.pendingCount || 0),
+    syncStatus: event.syncStatus || null,
+    code: event.code || null,
+  });
+}
+
 function readPendingSyncQueue() {
   try {
     const raw = localStorage.getItem(PENDING_SYNC_QUEUE_KEY);
@@ -930,9 +945,19 @@ function sanitizeAuditDetails(input) {
 }
 
 export async function createOperationalRecord(table, record, session, options = {}) {
+  const runtimeContext = {
+    hasSession: Boolean(session),
+    hasUserId: Boolean(getSessionUserId(session)),
+    envReady: Boolean(getSupabaseEnvStatus()?.configured),
+  };
   const readiness = await ensureSupabaseRequestReadiness(session, { action: 'create', table });
   if (!readiness.ok) {
-    const fallback = buildFallback(readiness.message, sanitizeRecord(record), readiness.code || 'CLOUD_NOT_READY');
+    const fallback = buildFallback(
+      'Registro salvo localmente. Sincronizacao pendente.',
+      sanitizeRecord(record),
+      readiness.code || 'CLOUD_NOT_READY',
+      'pending_sync'
+    );
     emitCloudSaveState({
       table,
       action: 'create',
@@ -953,6 +978,12 @@ export async function createOperationalRecord(table, record, session, options = 
         message: fallback.error,
       });
     }
+    logCloudRuntime({
+      ...runtimeContext,
+      cloudStatus: 'fallback',
+      syncStatus: fallback.syncStatus,
+      code: readiness.code || 'CLOUD_NOT_READY',
+    }, 'warn');
     return fallback;
   }
   const userId = getSessionUserId(session);
@@ -966,7 +997,7 @@ export async function createOperationalRecord(table, record, session, options = 
         'PAYLOAD_INCOMPATIBLE',
         'pending_sync'
       );
-      emitCloudSaveState({
+        emitCloudSaveState({
         table,
         action: 'create',
         syncStatus: fallback.syncStatus,
@@ -974,9 +1005,26 @@ export async function createOperationalRecord(table, record, session, options = 
         message: fallback.error,
         session,
         cloudConfigured: true,
-      });
-      return fallback;
-    }
+        });
+        if (!options?.skipQueueOnFailure) {
+          enqueuePendingSync({
+            table,
+            action: 'create',
+            localId: sanitizeRecord(record)?.id ?? null,
+            cloudId: sanitizeRecord(record)?.cloud_id ?? null,
+            payload: sanitizeRecord(record),
+            code: 'schema_error',
+            message: fallback.error,
+          });
+        }
+        logCloudRuntime({
+          ...runtimeContext,
+          cloudStatus: 'fallback',
+          syncStatus: fallback.syncStatus,
+          code: 'PAYLOAD_INCOMPATIBLE',
+        }, 'warn');
+        return fallback;
+      }
     if (String(table || '').toLowerCase() === 'fazendas') {
       const existing = await findExistingFazendaRecord(payload, userId);
       if (existing?.error) throw existing.error;
@@ -1008,6 +1056,12 @@ export async function createOperationalRecord(table, record, session, options = 
       message: 'Registro salvo na nuvem.',
       session,
       cloudConfigured: true,
+    });
+    logCloudRuntime({
+      ...runtimeContext,
+      cloudStatus: 'active',
+      syncStatus: 'cloud_success',
+      code: null,
     });
     return { persisted: true, data, error: null, syncStatus: 'cloud_success', code: null };
   } catch (error) {
@@ -1060,14 +1114,30 @@ export async function createOperationalRecord(table, record, session, options = 
         message: fallback.error,
       });
     }
+    logCloudRuntime({
+      ...runtimeContext,
+      cloudStatus: 'fallback',
+      syncStatus: fallback.syncStatus,
+      code: classifiedCode,
+    }, 'warn');
     return fallback;
   }
 }
 
 export async function updateOperationalRecord(table, id, patch, session, options = {}) {
+  const runtimeContext = {
+    hasSession: Boolean(session),
+    hasUserId: Boolean(getSessionUserId(session)),
+    envReady: Boolean(getSupabaseEnvStatus()?.configured),
+  };
   const readiness = await ensureSupabaseRequestReadiness(session, { action: 'update', table });
   if (!readiness.ok) {
-    const fallback = buildFallback(readiness.message, sanitizeRecord(patch), readiness.code || 'CLOUD_NOT_READY');
+    const fallback = buildFallback(
+      'Registro salvo localmente. Sincronizacao pendente.',
+      sanitizeRecord(patch),
+      readiness.code || 'CLOUD_NOT_READY',
+      'pending_sync'
+    );
     emitCloudSaveState({
       table,
       action: 'update',
@@ -1089,6 +1159,12 @@ export async function updateOperationalRecord(table, id, patch, session, options
         message: fallback.error,
       });
     }
+    logCloudRuntime({
+      ...runtimeContext,
+      cloudStatus: 'fallback',
+      syncStatus: fallback.syncStatus,
+      code: readiness.code || 'CLOUD_NOT_READY',
+    }, 'warn');
     return fallback;
   }
   const userId = getSessionUserId(session);
@@ -1142,6 +1218,12 @@ export async function updateOperationalRecord(table, id, patch, session, options
       message: 'Registro salvo na nuvem.',
       session,
       cloudConfigured: true,
+    });
+    logCloudRuntime({
+      ...runtimeContext,
+      cloudStatus: 'active',
+      syncStatus: 'cloud_success',
+      code: null,
     });
     return { persisted: true, data, error: null, syncStatus: 'cloud_success', code: null };
   } catch (error) {
@@ -1198,14 +1280,30 @@ export async function updateOperationalRecord(table, id, patch, session, options
         message: fallback.error,
       });
     }
+    logCloudRuntime({
+      ...runtimeContext,
+      cloudStatus: 'fallback',
+      syncStatus: fallback.syncStatus,
+      code: classifiedCode,
+    }, 'warn');
     return fallback;
   }
 }
 
 export async function deleteOperationalRecord(table, id, session, options = {}) {
+  const runtimeContext = {
+    hasSession: Boolean(session),
+    hasUserId: Boolean(getSessionUserId(session)),
+    envReady: Boolean(getSupabaseEnvStatus()?.configured),
+  };
   const readiness = await ensureSupabaseRequestReadiness(session, { action: 'delete', table });
   if (!readiness.ok) {
-    const fallback = buildFallback(readiness.message, null, readiness.code || 'CLOUD_NOT_READY');
+    const fallback = buildFallback(
+      'Registro salvo localmente. Sincronizacao pendente.',
+      null,
+      readiness.code || 'CLOUD_NOT_READY',
+      'pending_sync'
+    );
     emitCloudSaveState({
       table,
       action: 'delete',
@@ -1229,6 +1327,12 @@ export async function deleteOperationalRecord(table, id, session, options = {}) 
         message: fallback.error,
       });
     }
+    logCloudRuntime({
+      ...runtimeContext,
+      cloudStatus: 'fallback',
+      syncStatus: fallback.syncStatus,
+      code: readiness.code || 'CLOUD_NOT_READY',
+    }, 'warn');
     return fallback;
   }
   const userId = getSessionUserId(session);
@@ -1293,6 +1397,12 @@ export async function deleteOperationalRecord(table, id, session, options = {}) 
       session,
       cloudConfigured: true,
     });
+    logCloudRuntime({
+      ...runtimeContext,
+      cloudStatus: 'active',
+      syncStatus: 'cloud_success',
+      code: null,
+    });
     return { persisted: true, data: null, error: null, syncStatus: 'cloud_success', code: null };
   } catch (error) {
     const status = getHttpStatus(error);
@@ -1350,6 +1460,12 @@ export async function deleteOperationalRecord(table, id, session, options = {}) 
         message: fallback.error,
       });
     }
+    logCloudRuntime({
+      ...runtimeContext,
+      cloudStatus: 'fallback',
+      syncStatus: fallback.syncStatus,
+      code: classifiedCode,
+    }, 'warn');
     return fallback;
   }
 }
