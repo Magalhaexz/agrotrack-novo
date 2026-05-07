@@ -278,6 +278,15 @@ function writePendingSyncQueue(queue) {
   }
 }
 
+function removePendingSyncItems(matcher) {
+  const queue = readPendingSyncQueue();
+  const next = queue.filter((item) => !matcher(item));
+  if (next.length !== queue.length) {
+    writePendingSyncQueue(next);
+    emitPendingSyncState(next, 'cleanup');
+  }
+}
+
 function buildQueueFingerprint(item) {
   const selectorType = item?.selector?.type || '';
   const selectorValue = item?.selector?.value || item?.selector?.identityKey || '';
@@ -982,6 +991,15 @@ export async function createOperationalRecord(table, record, session, options = 
       throw error;
     }
     notifyCloudHealthy('Registro salvo na nuvem.');
+    const metadataLocalId = sanitizeRecord(record)?.metadata?.local_id ?? null;
+    removePendingSyncItems((item) => (
+      String(item?.table || '') === String(table || '')
+      && String(item?.action || '') === 'create'
+      && (
+        (metadataLocalId && String(item?.payload?.metadata?.local_id || '') === String(metadataLocalId))
+        || (data?.id !== undefined && String(item?.payload?.id || '') === String(data.id))
+      )
+    ));
     emitCloudSaveState({
       table,
       action: 'create',
@@ -1089,6 +1107,14 @@ export async function updateOperationalRecord(table, id, patch, session, options
     }
     if (error) throw error;
     notifyCloudHealthy('Registro salvo na nuvem.');
+    removePendingSyncItems((item) => (
+      String(item?.table || '') === String(table || '')
+      && String(item?.action || '') === 'update'
+      && (
+        String(item?.localId || '') === String(id || '')
+        || String(item?.payload?.metadata?.local_id || '') === String(sanitizeRecord(patch)?.metadata?.local_id || '')
+      )
+    ));
     emitCloudSaveState({
       table,
       action: 'update',
@@ -1224,6 +1250,14 @@ export async function deleteOperationalRecord(table, id, session, options = {}) 
     }
     if (error) throw error;
     notifyCloudHealthy('Nuvem ativa com atualização confirmada.');
+    removePendingSyncItems((item) => (
+      String(item?.table || '') === String(table || '')
+      && String(item?.action || '') === 'delete'
+      && (
+        String(item?.localId || '') === String(id || '')
+        || String(item?.selector?.type || '') === String(options?.selector?.type || '')
+      )
+    ));
     emitCloudSaveState({
       table,
       action: 'delete',
@@ -1318,14 +1352,16 @@ export async function processPendingSyncQueue(session, options = {}) {
     }
     const localId = current?.localId ?? current?.payload?.metadata?.local_id ?? current?.payload?.id ?? current?.payload?.cloud_id ?? null;
     const selector = current?.selector || current?.payload?.selector || null;
-    const normalizedPayload = current?.action === 'update'
-      ? buildOperationalUpdatePayload(current.table, current.payload || {}, getSessionUserId(session))
-      : buildOperationalCreatePayload(current.table, current.payload || {}, getSessionUserId(session));
+    const normalizedPayload = current?.action === 'delete'
+      ? (current?.payload || {})
+      : current?.action === 'update'
+        ? buildOperationalUpdatePayload(current.table, current.payload || {}, getSessionUserId(session))
+        : buildOperationalCreatePayload(current.table, current.payload || {}, getSessionUserId(session));
     if (import.meta.env.DEV) {
       console.info('[HERDON_PENDING_SYNC_PROCESS]', { queueCount: remaining.length, table: current?.table || null, action: current?.action || null, retryCount, code: current?.code || null, message: current?.message || null });
       console.info('[HERDON_PENDING_SYNC_PAYLOAD]', { table: current?.table || null, action: current?.action || null, payloadKeys: Object.keys(current?.payload || {}), hasId: Object.hasOwn(current?.payload || {}, 'id'), hasMetadataLocalId: Boolean(current?.payload?.metadata?.local_id), normalizedPayloadKeys: Object.keys(normalizedPayload || {}) });
     }
-    if (!normalizedPayload || typeof normalizedPayload !== 'object') {
+    if (current?.action !== 'delete' && (!normalizedPayload || typeof normalizedPayload !== 'object')) {
       remaining[baseIndex] = {
         ...current,
         localId,
@@ -1765,7 +1801,6 @@ export async function syncLotesWithCloud({ lotes = [], session }) {
   closeNetworkCircuit('lotes');
   return buildModuleSyncResult({ module: 'lotes', status: 'success', message: 'Lotes sincronizados.', data: mergeLotesSafe(localRows, remoteList), syncedCount, failedCount, selectedCount: Array.isArray(remoteList) ? remoteList.length : 0 });
 }
-
 
 
 
