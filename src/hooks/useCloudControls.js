@@ -64,11 +64,13 @@ export function useCloudControls({ db, setDb, session, hasPermission, showToast,
       if (fazendasData || lotesData) setDb((prev) => ({ ...prev, fazendas: fazendasData || prev.fazendas, lotes: lotesData || prev.lotes }));
       if (payload?.fazendas?.status === 'success' && payload?.lotes?.status === 'success') showToast({ type: 'success', message: 'Fazendas e lotes sincronizados com a nuvem.' });
       else showToast({ type: 'warning', message: 'Falha na sincronizaÃ§Ã£o. O modo local continua ativo.' });
-      const queueResult = await processPendingSyncQueue(session, { maxItems: 40 });
-      if (queueResult?.synced > 0) {
+      const queueResult = await processPendingSyncQueue(session, { maxItems: 40, manual: true });
+      if ((queueResult?.pendingCount || 0) === 0) {
         showToast({ type: 'success', message: 'Pendências sincronizadas com a nuvem.' });
-      } else if (queueResult?.pendingCount > 0) {
-        showToast({ type: 'info', message: 'Sincronizando pendências...' });
+      } else {
+        const firstError = queueResult?.firstError;
+        const safeError = firstError ? ` | erro: ${firstError.code} - ${firstError.message}` : '';
+        showToast({ type: 'info', message: `Pendências: ${queueResult?.synced || 0} sincronizadas, ${queueResult?.pendingCount || 0} restantes${safeError}` });
       }
     } catch {
       showToast({ type: 'warning', message: 'NÃ£o foi possÃ­vel sincronizar fazendas e lotes. Seus dados locais continuam disponÃ­veis.' });
@@ -82,4 +84,3 @@ export function useCloudControls({ db, setDb, session, hasPermission, showToast,
 
   return { sincronizandoNuvem, diagnosticandoNuvem, reconectandoNuvem, sincronizarNuvem, testarConexaoNuvem, reconectarNuvem };
 }
-
