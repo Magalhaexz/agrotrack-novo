@@ -1249,7 +1249,26 @@ a:hover {
   display: flex;
   align-items: flex-start;
   justify-content: space-between;
+  gap: 10px;
   margin-bottom: 12px;
+}
+
+.fazenda-card-delete-btn {
+  border: 1px solid #7f1d1d;
+  color: #fca5a5;
+  background: rgba(127, 29, 29, 0.22);
+  border-radius: 10px;
+  padding: 6px 10px;
+  font-size: 0.8rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.15s ease, border-color 0.15s ease, color 0.15s ease;
+}
+
+.fazenda-card-delete-btn:hover {
+  background: rgba(127, 29, 29, 0.34);
+  border-color: #b91c1c;
+  color: #fecaca;
 }
 
 .fazenda-card-nome {
