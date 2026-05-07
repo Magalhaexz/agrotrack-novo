@@ -5,6 +5,7 @@ import { useAuth } from '../auth/useAuth';
 import {
   HERDON_LOGIN_ATTEMPT_KEY,
   HERDON_LOGIN_ACCEPTED_AT,
+  getSafeOAuthRedirectTo,
   limparMarcadoresFluxoAuth,
   limparPersistenciaSessao,
   marcarLogoutEmAndamento,
@@ -59,6 +60,16 @@ function isTransientLoginError(error) {
     'network error',
     'fetch failed',
   ].some((signature) => message.includes(signature));
+}
+
+function isGoogleProviderDisabledError(error) {
+  const code = String(error?.code || error?.error_code || '').toLowerCase();
+  const message = String(error?.message || error?.msg || '').toLowerCase();
+  return (
+    code === 'validation_failed'
+    || message.includes('unsupported provider')
+    || message.includes('provider is not enabled')
+  );
 }
 
 async function signInWithRetry({ email, password }) {
@@ -372,17 +383,21 @@ export default function LoginPage() {
     setCarregando(true);
 
     try {
+      const redirectTo = getSafeOAuthRedirectTo();
       const { error } = await supabase.auth.signInWithOAuth({
         provider: 'google',
         options: {
-          redirectTo: window.location.origin,
+          redirectTo,
         },
       });
 
       if (error) throw error;
     } catch (err) {
-      console.error('Erro ao entrar com Google:', err);
-      setErro(err?.message || 'Erro ao entrar com Google.');
+      if (isGoogleProviderDisabledError(err)) {
+        setErro('Login com Google ainda não está configurado. Ative o provedor Google no Supabase.');
+        return;
+      }
+      setErro('Não foi possível entrar com Google no momento. Tente novamente.');
     } finally {
       setCarregando(false);
     }
