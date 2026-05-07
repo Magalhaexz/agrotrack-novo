@@ -1211,11 +1211,14 @@ export async function deleteOperationalRecord(table, id, session, options = {}) 
       cloudConfigured: readiness.code !== 'SUPABASE_ENV_MISSING',
     });
     if (!options?.skipQueueOnFailure) {
+      const pendingPayload = isObject(options?.pendingPayload)
+        ? options.pendingPayload
+        : { id, selector: options?.selector || null };
       enqueuePendingSync({
         table,
         action: 'delete',
         localId: id ?? null,
-        payload: { id, selector: options?.selector || null },
+        payload: pendingPayload,
         selector: options?.selector || null,
         code: classifyCloudSaveCode(readiness.code),
         message: fallback.error,
@@ -1327,11 +1330,14 @@ export async function deleteOperationalRecord(table, id, session, options = {}) 
       cloudConfigured: true,
     });
     if (!options?.skipQueueOnFailure) {
+      const pendingPayload = isObject(options?.pendingPayload)
+        ? options.pendingPayload
+        : { id, selector: options?.selector || null };
       enqueuePendingSync({
         table,
         action: 'delete',
         localId: id ?? null,
-        payload: { id, selector: options?.selector || null },
+        payload: pendingPayload,
         selector: options?.selector || null,
         code: classifiedCode,
         message: fallback.error,
@@ -1819,5 +1825,4 @@ export async function syncLotesWithCloud({ lotes = [], session }) {
   closeNetworkCircuit('lotes');
   return buildModuleSyncResult({ module: 'lotes', status: 'success', message: 'Lotes sincronizados.', data: mergeLotesSafe(localRows, remoteList), syncedCount, failedCount, selectedCount: Array.isArray(remoteList) ? remoteList.length : 0 });
 }
-
 

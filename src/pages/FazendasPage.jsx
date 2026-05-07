@@ -227,7 +227,17 @@ export default function FazendasPage({ db, setDb, onConfirmAction }) {
     }
 
     const targetId = resolveFazendaIdentity(fazenda) || id;
-    const persisted = await deleteOperationalRecord('fazendas', targetId, session, { selector });
+    const persisted = await deleteOperationalRecord('fazendas', targetId, session, {
+      selector,
+      pendingPayload: {
+        id: targetId,
+        selector,
+        metadata: { local_id: fazenda?.metadata?.local_id ?? null },
+        nome: String(fazenda?.nome ?? ''),
+        cidade: String(fazenda?.cidade ?? ''),
+        estado: String(fazenda?.estado ?? ''),
+      },
+    });
     const deletedIdentity = buildFazendaFallbackIdentity(fazenda);
     setDb((prev) => ({
       ...prev,
