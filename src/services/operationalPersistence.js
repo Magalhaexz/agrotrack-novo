@@ -1028,6 +1028,9 @@ export async function createOperationalRecord(table, record, session, options = 
       errorCode: error?.code || null,
       httpStatus: status,
       syncStatus: 'pending_sync',
+      selectorType: null,
+      payloadKeys: Object.keys(sanitizeRecord(record) || {}),
+      safeMessage: safe.message || getErrorMessage(error),
       safeDetails: safe.details,
       safeHint: safe.hint,
     }, 'warn');
@@ -1163,6 +1166,8 @@ export async function updateOperationalRecord(table, id, patch, session, options
       errorCode: error?.code || null,
       httpStatus: status,
       syncStatus: 'pending_sync',
+      payloadKeys: Object.keys(sanitizeRecord(patch) || {}),
+      safeMessage: safe.message || getErrorMessage(error),
       safeDetails: safe.details,
       safeHint: safe.hint,
     }, 'warn');
@@ -1311,6 +1316,8 @@ export async function deleteOperationalRecord(table, id, session, options = {}) 
       errorCode: error?.code || null,
       httpStatus: status,
       syncStatus: 'pending_sync',
+      payloadKeys: Object.keys((isObject(options?.pendingPayload) ? options.pendingPayload : { id, selector: options?.selector || null }) || {}),
+      safeMessage: safe.message || getErrorMessage(error),
       safeDetails: safe.details,
       safeHint: safe.hint,
     }, 'warn');
@@ -1825,4 +1832,3 @@ export async function syncLotesWithCloud({ lotes = [], session }) {
   closeNetworkCircuit('lotes');
   return buildModuleSyncResult({ module: 'lotes', status: 'success', message: 'Lotes sincronizados.', data: mergeLotesSafe(localRows, remoteList), syncedCount, failedCount, selectedCount: Array.isArray(remoteList) ? remoteList.length : 0 });
 }
-
