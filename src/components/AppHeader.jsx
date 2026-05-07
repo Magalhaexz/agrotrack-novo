@@ -58,25 +58,13 @@ function getCloudState(syncStatus) {
   const message = syncStatus?.dataError?.message || '';
   const pendingCount = Number(syncStatus?.pendingCount || 0);
 
-
-  if (syncStatus?.cloudVerified) {
-    return {
-      tone: 'online',
-      icon: 'cloud',
-      label: 'Nuvem ativa',
-      detail: syncStatus?.lastSyncAt ? `Ultima sync: ${formatSyncTime(syncStatus.lastSyncAt)}` : 'Nuvem nao verificada',
-      title: syncStatus?.cloudVerifiedMessage || 'Nuvem conectada pelo servidor.',
-      disabled: false,
-    };
-  }
-
   if (syncStatus?.isSyncing || source === 'syncing') {
     return {
       tone: 'syncing',
       icon: 'loading',
       label: 'Sincronizando...',
-      detail: syncStatus?.lastSyncAt ? `Ultima sync: ${formatSyncTime(syncStatus.lastSyncAt)}` : 'Nuvem nao verificada',
-      title: 'Sincronizacao manual em andamento',
+      detail: syncStatus?.lastSyncAt ? `Ultima sync: ${formatSyncTime(syncStatus.lastSyncAt)}` : 'Sincronizacao em andamento',
+      title: 'Sincronizacao em andamento',
       disabled: true,
     };
   }
@@ -96,12 +84,23 @@ function getCloudState(syncStatus) {
     };
   }
 
+  if (syncStatus?.cloudVerified) {
+    return {
+      tone: 'online',
+      icon: 'cloud',
+      label: 'Nuvem ativa',
+      detail: syncStatus?.lastSyncAt ? `Ultima sync: ${formatSyncTime(syncStatus.lastSyncAt)}` : 'Conexao validada',
+      title: syncStatus?.cloudVerifiedMessage || 'Nuvem conectada pelo servidor.',
+      disabled: false,
+    };
+  }
+
   if (messageIsSessionError(message)) {
     return {
       tone: 'warning',
       icon: 'warning',
       label: 'Modo local',
-      detail: 'Nuvem nao verificada',
+      detail: 'Sessao expirada',
       title: 'Sessao expirada. Reconecte para voltar a sincronizar.',
       disabled: false,
     };
@@ -111,7 +110,7 @@ function getCloudState(syncStatus) {
     return {
       tone: 'online',
       icon: 'cloud',
-      label: 'Nuvem conectada',
+      label: 'Nuvem ativa',
       detail: formatSyncTime(syncStatus?.lastSyncAt),
       title: 'Dados sincronizados com o Supabase',
       disabled: false,

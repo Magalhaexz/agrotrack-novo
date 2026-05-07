@@ -218,6 +218,26 @@ export default function App() {
   const isOperationalSyncing = Boolean(session) && (dataSource === 'syncing' || manualSyncInFlight);
 
   useEffect(() => {
+    if (!import.meta.env.DEV) return;
+    const pendingCount = Number(pendingSyncState?.pendingCount || 0);
+    const cloudStatus = isOperationalSyncing
+      ? 'syncing'
+      : pendingCount > 0
+        ? 'pending'
+        : (dataSource === 'supabase' ? 'active' : 'local');
+    console.debug('[HERDON_CLOUD_RUNTIME]', {
+      hasSession: Boolean(session),
+      hasUserId: Boolean(session?.user?.id),
+      envReady: true,
+      dataSource: dataSource || null,
+      cloudStatus,
+      pendingCount,
+      syncStatus: cloudStatus === 'active' ? 'cloud_success' : (cloudStatus === 'pending' ? 'pending_sync' : 'local_only'),
+      code: dataError?.name || null,
+    });
+  }, [session, dataSource, dataError, pendingSyncState?.pendingCount, isOperationalSyncing]);
+
+  useEffect(() => {
     if (!isBootLoading) {
       return undefined;
     }
