@@ -28,6 +28,14 @@ function normalizeText(value) {
 function buildFazendaFallbackIdentity(row = {}) {
   return `${normalizeText(row?.nome)}|${normalizeText(row?.cidade)}|${normalizeText(row?.estado)}`;
 }
+function isNumericId(value) {
+  if (value === undefined || value === null || value === '') return false;
+  return Number.isFinite(Number(value));
+}
+function isUuid(value) {
+  const text = String(value ?? '').trim();
+  return /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(text);
+}
 
 export default function FazendasPage({ db, setDb, onConfirmAction }) {
   const { showToast, dismissToast } = useToast();
@@ -169,13 +177,36 @@ export default function FazendasPage({ db, setDb, onConfirmAction }) {
       : window.confirm('Esta ação remove a fazenda selecionada. Verifique se não há lotes, animais ou lançamentos vinculados antes de continuar.');
 
     if (!confirmado) return;
+    const fallbackIdentity = {
+      nome: String(fazenda?.nome ?? '').trim(),
+      cidade: String(fazenda?.cidade ?? '').trim(),
+      estado: String(fazenda?.estado ?? '').trim(),
+    };
+    let selector = null;
+    if (isNumericId(fazenda?.id)) {
+      selector = { type: 'id', value: Number(fazenda.id), identity: fallbackIdentity };
+    } else if (isUuid(fazenda?.cloud_id)) {
+      selector = { type: 'cloud_id', value: String(fazenda.cloud_id), identity: fallbackIdentity };
+    } else if (isUuid(fazenda?.metadata?.cloud_id)) {
+      selector = { type: 'cloud_id', value: String(fazenda.metadata.cloud_id), identity: fallbackIdentity };
+    } else if (fazenda?.metadata?.local_id !== undefined && fazenda?.metadata?.local_id !== null) {
+      selector = { type: 'metadata.local_id', value: String(fazenda.metadata.local_id), identity: fallbackIdentity };
+    } else {
+      selector = { type: 'fallback_identity', identity: fallbackIdentity };
+    }
+
     const targetId = resolveFazendaIdentity(fazenda) || id;
-    const persisted = await deleteOperationalRecord('fazendas', targetId, session);
+    const persisted = await deleteOperationalRecord('fazendas', targetId, session, { selector });
+    const deletedIdentity = buildFazendaFallbackIdentity(fazenda);
     setDb((prev) => ({
       ...prev,
-      fazendas: prev.fazendas.filter((f) => (resolveFazendaIdentity(f) || f.id) !== targetId),
+      fazendas: prev.fazendas.filter((f) => {
+        const sameIdentity = (resolveFazendaIdentity(f) || f.id) === targetId;
+        const sameFallback = buildFazendaFallbackIdentity(f) === deletedIdentity;
+        return !(sameIdentity || sameFallback);
+      }),
     }));
-    if (persisted.syncStatus === 'cloud_success') showToast({ type: 'success', message: 'Fazenda excluída.' });
+    if (persisted.syncStatus === 'cloud_success') showToast({ type: 'success', message: 'Fazenda excluída da nuvem.' });
     if (persisted.syncStatus === 'pending_sync' || persisted.syncStatus === 'local_only') {
       showToast({ type: 'warning', message: 'Exclusão registrada localmente. Sincronização pendente.' });
     }

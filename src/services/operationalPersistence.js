@@ -279,7 +279,9 @@ function writePendingSyncQueue(queue) {
 }
 
 function buildQueueFingerprint(item) {
-  const target = `${item?.table || ''}:${item?.action || ''}:${item?.cloudId || ''}:${item?.localId || ''}`;
+  const selectorType = item?.selector?.type || '';
+  const selectorValue = item?.selector?.value || item?.selector?.identityKey || '';
+  const target = `${item?.table || ''}:${item?.action || ''}:${item?.cloudId || ''}:${item?.localId || ''}:${selectorType}:${selectorValue}`;
   return target.toLowerCase();
 }
 
@@ -303,6 +305,7 @@ function enqueuePendingSync(item = {}) {
     localId: item.localId ?? null,
     cloudId: item.cloudId ?? null,
     payload: isObject(item.payload) ? item.payload : {},
+    selector: isObject(item.selector) ? item.selector : null,
     createdAt: item.createdAt || new Date().toISOString(),
     lastAttemptAt: item.lastAttemptAt || null,
     retryCount: Number(item.retryCount || 0),
@@ -1168,7 +1171,8 @@ export async function deleteOperationalRecord(table, id, session, options = {}) 
         table,
         action: 'delete',
         localId: id ?? null,
-        payload: { id },
+        payload: { id, selector: options?.selector || null },
+        selector: options?.selector || null,
         code: classifyCloudSaveCode(readiness.code),
         message: fallback.error,
       });
@@ -1179,11 +1183,37 @@ export async function deleteOperationalRecord(table, id, session, options = {}) 
 
   try {
     const withOwner = tableSupportsOwnerScope(table);
+    const selector = isObject(options?.selector) ? options.selector : null;
+    const isNumericId = Number.isFinite(Number(id)) && String(id).trim() !== '';
+    const normalizedIdentityKey = buildFazendaIdentityKey(selector?.identity || {});
     const runDelete = async (useOwnerScope) => {
-      let query = supabase
-        .from(table)
-        .delete()
-        .eq('id', id);
+      let query = supabase.from(table).delete();
+      if (String(table || '').toLowerCase() === 'fazendas' && selector?.type) {
+        if (selector.type === 'id' && Number.isFinite(Number(selector?.value))) {
+          query = query.eq('id', Number(selector.value));
+        } else if (selector.type === 'cloud_id' && selector?.value) {
+          query = query.eq('cloud_id', String(selector.value));
+        } else if (selector.type === 'metadata.local_id' && selector?.value) {
+          query = query.contains('metadata', { local_id: String(selector.value) });
+        } else if (selector.type === 'fallback_identity' && normalizedIdentityKey && normalizedIdentityKey !== '||') {
+          const [nome, cidade, estado] = normalizedIdentityKey.split('|');
+          query = query
+            .ilike('nome', nome || '')
+            .ilike('cidade', cidade || '')
+            .ilike('estado', estado || '');
+        } else if (isNumericId) {
+          query = query.eq('id', Number(id));
+        } else {
+          const invalid = new Error('invalid_delete_selector');
+          invalid.code = 'DELETE_SELECTOR_INVALID';
+          invalid.status = 400;
+          throw invalid;
+        }
+      } else if (isNumericId) {
+        query = query.eq('id', Number(id));
+      } else {
+        query = query.eq('id', id);
+      }
       if (useOwnerScope) query = query.eq('owner_user_id', userId);
       return query;
     };
@@ -1218,6 +1248,7 @@ export async function deleteOperationalRecord(table, id, session, options = {}) 
       requestStage: 'delete',
       action: 'delete',
       table,
+      selectorType: options?.selector?.type || null,
       hasSessionUser: Boolean(userId),
       hasAccessToken: true,
       envConfigured: true,
@@ -1248,7 +1279,8 @@ export async function deleteOperationalRecord(table, id, session, options = {}) 
         table,
         action: 'delete',
         localId: id ?? null,
-        payload: { id },
+        payload: { id, selector: options?.selector || null },
+        selector: options?.selector || null,
         code: classifiedCode,
         message: fallback.error,
       });
@@ -1285,6 +1317,7 @@ export async function processPendingSyncQueue(session, options = {}) {
       if (lastAttempt && (Date.now() - lastAttempt) < backoffMs) continue;
     }
     const localId = current?.localId ?? current?.payload?.metadata?.local_id ?? current?.payload?.id ?? current?.payload?.cloud_id ?? null;
+    const selector = current?.selector || current?.payload?.selector || null;
     const normalizedPayload = current?.action === 'update'
       ? buildOperationalUpdatePayload(current.table, current.payload || {}, getSessionUserId(session))
       : buildOperationalCreatePayload(current.table, current.payload || {}, getSessionUserId(session));
@@ -1308,7 +1341,7 @@ export async function processPendingSyncQueue(session, options = {}) {
     } else if (item.action === 'update') {
       result = await updateOperationalRecord(item.table, localId, normalizedPayload, session, { skipQueueOnFailure: true });
     } else if (item.action === 'delete') {
-      result = await deleteOperationalRecord(item.table, localId, session, { skipQueueOnFailure: true });
+      result = await deleteOperationalRecord(item.table, localId, session, { skipQueueOnFailure: true, selector });
     }
 
     if (result?.persisted) {
@@ -1732,7 +1765,6 @@ export async function syncLotesWithCloud({ lotes = [], session }) {
   closeNetworkCircuit('lotes');
   return buildModuleSyncResult({ module: 'lotes', status: 'success', message: 'Lotes sincronizados.', data: mergeLotesSafe(localRows, remoteList), syncedCount, failedCount, selectedCount: Array.isArray(remoteList) ? remoteList.length : 0 });
 }
-
 
 
 
