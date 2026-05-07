@@ -441,6 +441,12 @@ function sanitizeRecord(record = {}) {
   const { owner_user_id: _ignoredOwner, ...safeRecord } = record;
   return safeRecord;
 }
+function buildFazendaIdentityKey(record = {}) {
+  const nome = toNullableString(record?.nome)?.toLowerCase() || '';
+  const cidade = toNullableString(record?.cidade)?.toLowerCase() || '';
+  const estado = toNullableString(record?.estado)?.toLowerCase() || '';
+  return `${nome}|${cidade}|${estado}`;
+}
 
 function toIsoDate(value) {
   if (!value) return new Date().toISOString();
@@ -621,6 +627,25 @@ async function tryInsertPayloadVariants(table, payloadOrVariants) {
     }
   }
   return { data: null, error: lastError };
+}
+
+async function findExistingFazendaRecord(payload, userId) {
+  const cloudId = normalizeCloudUuid(payload?.cloud_id ?? payload?.metadata?.cloud_id);
+  const localId = payload?.metadata?.local_id ?? null;
+  const identityKey = buildFazendaIdentityKey(payload);
+  let query = supabase.from('fazendas').select('*').limit(50);
+  if (tableSupportsOwnerScope('fazendas') && userId) {
+    query = query.eq('owner_user_id', userId);
+  }
+  const { data, error } = await query;
+  if (error) return { data: null, error };
+  const rows = Array.isArray(data) ? data : [];
+  const match = rows.find((row) => {
+    if (cloudId && String(row?.id) === String(cloudId)) return true;
+    if (localId && String(row?.metadata?.local_id || '') === String(localId)) return true;
+    return buildFazendaIdentityKey(row) === identityKey && identityKey !== '||';
+  });
+  return { data: match || null, error: null };
 }
 
 function toNullableString(value) {
@@ -939,6 +964,14 @@ export async function createOperationalRecord(table, record, session, options = 
         cloudConfigured: true,
       });
       return fallback;
+    }
+    if (String(table || '').toLowerCase() === 'fazendas') {
+      const existing = await findExistingFazendaRecord(payload, userId);
+      if (existing?.error) throw existing.error;
+      if (existing?.data) {
+        notifyCloudHealthy('Registro já existente na nuvem.');
+        return { persisted: true, data: existing.data, error: null, syncStatus: 'cloud_success', code: null };
+      }
     }
     const { data, error } = await tryInsertPayloadVariants(table, payload);
 
@@ -1694,7 +1727,6 @@ export async function syncLotesWithCloud({ lotes = [], session }) {
   closeNetworkCircuit('lotes');
   return buildModuleSyncResult({ module: 'lotes', status: 'success', message: 'Lotes sincronizados.', data: mergeLotesSafe(localRows, remoteList), syncedCount, failedCount, selectedCount: Array.isArray(remoteList) ? remoteList.length : 0 });
 }
-
 
 
 

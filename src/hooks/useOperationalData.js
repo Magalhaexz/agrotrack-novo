@@ -116,6 +116,24 @@ function logSyncGuard(payload, level = 'debug') {
 }
 
 function normalizeDb(baseDb) {
+  const dedupeFazendas = (rows = []) => {
+    const map = new Map();
+    rows.forEach((row) => {
+      const cloudKey = row?.cloud_id || row?.metadata?.cloud_id || row?.id || null;
+      const localKey = row?.metadata?.local_id ?? null;
+      const fallbackKey = `${String(row?.nome || '').trim().toLowerCase()}|${String(row?.cidade || '').trim().toLowerCase()}|${String(row?.estado || '').trim().toLowerCase()}`;
+      const key = cloudKey ? `cloud:${cloudKey}` : (localKey ? `local:${localKey}` : `fallback:${fallbackKey}`);
+      if (!map.has(key)) {
+        map.set(key, row);
+        return;
+      }
+      const current = map.get(key);
+      const currentUpdated = Date.parse(current?.updated_at || current?.created_at || 0) || 0;
+      const nextUpdated = Date.parse(row?.updated_at || row?.created_at || 0) || 0;
+      if (nextUpdated >= currentUpdated) map.set(key, row);
+    });
+    return [...map.values()];
+  };
   return {
     ...baseDb,
     alertas_resolvidos: Array.isArray(baseDb?.alertas_resolvidos) ? baseDb.alertas_resolvidos : [],
@@ -129,7 +147,7 @@ function normalizeDb(baseDb) {
           data_venda: lote?.data_venda || null,
         }))
       : [],
-    fazendas: Array.isArray(baseDb?.fazendas) ? baseDb.fazendas : [],
+    fazendas: Array.isArray(baseDb?.fazendas) ? dedupeFazendas(baseDb.fazendas) : [],
     tarefas: Array.isArray(baseDb?.tarefas) ? baseDb.tarefas : [],
     configuracoes: baseDb?.configuracoes || {
       geral: {
