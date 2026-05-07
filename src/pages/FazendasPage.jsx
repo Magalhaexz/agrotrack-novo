@@ -14,6 +14,13 @@ import {
   updateOperationalRecord,
 } from '../services/operationalPersistence';
 import { runMinimalCloudDiagnostic } from '../services/supabaseDiagnostics';
+function ensureObject(value) {
+  return value && typeof value === 'object' && !Array.isArray(value) ? value : {};
+}
+
+function resolveFazendaIdentity(row = {}) {
+  return row?.cloud_id || row?.metadata?.cloud_id || row?.id || row?.metadata?.local_id || null;
+}
 
 export default function FazendasPage({ db, setDb, onConfirmAction }) {
   const { showToast, dismissToast } = useToast();
@@ -57,11 +64,22 @@ export default function FazendasPage({ db, setDb, onConfirmAction }) {
       return;
     }
     if (editando) {
-      const persisted = await updateOperationalRecord('fazendas', editando.id, payload, session);
+      const localId = editando?.metadata?.local_id ?? editando?.id ?? null;
+      const patch = {
+        ...payload,
+        metadata: {
+          ...ensureObject(editando?.metadata),
+          ...ensureObject(payload?.metadata),
+          local_id: localId,
+          cloud_id: editando?.cloud_id || editando?.metadata?.cloud_id || null,
+        },
+      };
+      const targetId = editando?.cloud_id || editando?.metadata?.cloud_id || editando?.id;
+      const persisted = await updateOperationalRecord('fazendas', targetId, patch, session);
       setDb((prev) => ({
         ...prev,
         fazendas: prev.fazendas.map((f) =>
-          f.id === editando.id ? { ...f, ...(persisted.data || payload) } : f
+          resolveFazendaIdentity(f) === resolveFazendaIdentity(editando) ? { ...f, ...(persisted.data || patch) } : f
         ),
       }));
       if (persisted.syncStatus === 'cloud_success') showToast({ type: 'success', message: 'Registro salvo na nuvem.' });
@@ -69,10 +87,18 @@ export default function FazendasPage({ db, setDb, onConfirmAction }) {
         showToast({ type: 'warning', message: `Registro salvo localmente. Sincronização pendente.${import.meta.env.DEV ? ` Motivo: ${persisted.error || persisted.code || 'unknown'}.` : ''}` });
       }
     } else {
-      const persisted = await createOperationalRecord('fazendas', payload, session);
+      const localId = gerarNovoId(fazendas);
+      const createPayload = {
+        ...payload,
+        metadata: {
+          ...ensureObject(payload?.metadata),
+          local_id: localId,
+        },
+      };
+      const persisted = await createOperationalRecord('fazendas', createPayload, session);
       setDb((prev) => ({
         ...prev,
-        fazendas: [...prev.fazendas, persisted.data || { id: gerarNovoId(prev.fazendas), ...payload }],
+        fazendas: [...prev.fazendas, persisted.data || { id: localId, ...createPayload }],
       }));
       if (persisted.syncStatus === 'cloud_success') showToast({ type: 'success', message: 'Registro salvo na nuvem.' });
       if (persisted.syncStatus === 'pending_sync' || persisted.syncStatus === 'local_only') {
@@ -545,4 +571,3 @@ export default function FazendasPage({ db, setDb, onConfirmAction }) {
     </div>
   );
 }
-

@@ -82,11 +82,15 @@ function getCloudState(syncStatus) {
   }
 
   if (pendingCount > 0) {
+    const schemaTables = Array.isArray(syncStatus?.schemaErrorTables) ? syncStatus.schemaErrorTables : [];
+    const devDetail = schemaTables.length ? `schema_error em ${schemaTables.join('/')}` : null;
     return {
       tone: 'warning',
       icon: 'loading',
       label: 'Sincronizacao pendente',
-      detail: pendingCount === 1 ? '1 pendencia de sync' : `${pendingCount} pendencias de sync`,
+      detail: import.meta.env.DEV && devDetail
+        ? devDetail
+        : (pendingCount === 1 ? '1 pendencia de sync' : `${pendingCount} pendencias de sync`),
       title: 'Pendencias serao sincronizadas automaticamente.',
       disabled: false,
     };

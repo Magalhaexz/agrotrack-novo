@@ -5,6 +5,7 @@ const OWNER_SCOPE_OPTIONAL_TABLES = new Set([]);
 const tableCapabilityCache = new Map();
 const PENDING_SYNC_QUEUE_KEY = 'herdon-pending-sync-queue';
 const AUTO_RETRY_EVENT = 'herdon-pending-sync-updated';
+const BLOCKED_SCHEMA_ERROR_CODE = 'blocked_schema_error';
 
 function getSessionUserId(session) {
   return session?.user?.id || null;
@@ -318,9 +319,16 @@ function enqueuePendingSync(item = {}) {
 
 export function getPendingSyncQueueSnapshot() {
   const queue = readPendingSyncQueue();
+  const schemaErrorTables = [...new Set(
+    queue
+      .filter((item) => String(item?.code || '').includes('schema_error'))
+      .map((item) => String(item?.table || '').trim())
+      .filter(Boolean)
+  )];
   return {
     queue,
     pendingCount: queue.length,
+    schemaErrorTables,
     checkedAt: Date.now(),
   };
 }
@@ -432,6 +440,12 @@ function sanitizeRecord(record = {}) {
   if (!record || typeof record !== 'object') return {};
   const { owner_user_id: _ignoredOwner, ...safeRecord } = record;
   return safeRecord;
+}
+function buildFazendaIdentityKey(record = {}) {
+  const nome = toNullableString(record?.nome)?.toLowerCase() || '';
+  const cidade = toNullableString(record?.cidade)?.toLowerCase() || '';
+  const estado = toNullableString(record?.estado)?.toLowerCase() || '';
+  return `${nome}|${cidade}|${estado}`;
 }
 
 function toIsoDate(value) {
@@ -555,6 +569,25 @@ function buildOperationalCreatePayload(table, record, userId) {
     }
     return payload;
   }
+  if (normalizedTable === 'estoque') {
+    const safe = sanitizeRecord(record);
+    const localId = safe?.id ?? safe?.metadata?.local_id ?? null;
+    const payload = {
+      nome: toNullableString(safe?.nome),
+      categoria: toNullableString(safe?.categoria),
+      unidade: toNullableString(safe?.unidade),
+      quantidade: toNullableNumber(safe?.quantidade),
+      quantidade_minima: toNullableNumber(safe?.quantidade_minima),
+      custo_unitario: toNullableNumber(safe?.custo_unitario),
+      valor_total: toNullableNumber(safe?.valor_total),
+      validade: toNullableDateString(safe?.validade),
+      fornecedor: toNullableString(safe?.fornecedor),
+      observacoes: toNullableString(safe?.observacoes),
+      metadata: isObject(safe?.metadata) ? { ...safe.metadata, local_id: localId } : { local_id: localId },
+    };
+    if (tableSupportsOwnerScope('estoque') && userId) payload.owner_user_id = userId;
+    return Object.fromEntries(Object.entries(payload).filter(([, value]) => value !== undefined));
+  }
   const safe = sanitizeRecord(record);
   if (tableSupportsOwnerScope(normalizedTable)) {
     return {
@@ -563,6 +596,13 @@ function buildOperationalCreatePayload(table, record, userId) {
     };
   }
   return safe;
+}
+
+function buildOperationalUpdatePayload(table, patch, userId) {
+  const safe = sanitizeRecord(patch);
+  const payload = buildOperationalCreatePayload(table, safe, userId);
+  if (!payload || typeof payload !== 'object') return payload;
+  return payload;
 }
 
 async function tryInsertPayloadVariants(table, payloadOrVariants) {
@@ -587,6 +627,25 @@ async function tryInsertPayloadVariants(table, payloadOrVariants) {
     }
   }
   return { data: null, error: lastError };
+}
+
+async function findExistingFazendaRecord(payload, userId) {
+  const cloudId = normalizeCloudUuid(payload?.cloud_id ?? payload?.metadata?.cloud_id);
+  const localId = payload?.metadata?.local_id ?? null;
+  const identityKey = buildFazendaIdentityKey(payload);
+  let query = supabase.from('fazendas').select('*').limit(50);
+  if (tableSupportsOwnerScope('fazendas') && userId) {
+    query = query.eq('owner_user_id', userId);
+  }
+  const { data, error } = await query;
+  if (error) return { data: null, error };
+  const rows = Array.isArray(data) ? data : [];
+  const match = rows.find((row) => {
+    if (cloudId && String(row?.id) === String(cloudId)) return true;
+    if (localId && String(row?.metadata?.local_id || '') === String(localId)) return true;
+    return buildFazendaIdentityKey(row) === identityKey && identityKey !== '||';
+  });
+  return { data: match || null, error: null };
 }
 
 function toNullableString(value) {
@@ -906,6 +965,14 @@ export async function createOperationalRecord(table, record, session, options = 
       });
       return fallback;
     }
+    if (String(table || '').toLowerCase() === 'fazendas') {
+      const existing = await findExistingFazendaRecord(payload, userId);
+      if (existing?.error) throw existing.error;
+      if (existing?.data) {
+        notifyCloudHealthy('Registro já existente na nuvem.');
+        return { persisted: true, data: existing.data, error: null, syncStatus: 'cloud_success', code: null };
+      }
+    }
     const { data, error } = await tryInsertPayloadVariants(table, payload);
 
     if (error) {
@@ -1191,10 +1258,11 @@ export async function deleteOperationalRecord(table, id, session, options = {}) 
 }
 
 export async function processPendingSyncQueue(session, options = {}) {
+  const isManual = Boolean(options?.manual);
   const queue = readPendingSyncQueue();
   if (!queue.length) {
     emitPendingSyncState([], 'empty');
-    return { processed: 0, synced: 0, failed: 0, pendingCount: 0 };
+    return { processed: 0, synced: 0, failed: 0, pendingCount: 0, firstError: null };
   }
   const maxItems = Math.max(1, Number(options?.maxItems || 25));
   const slice = queue.slice(0, maxItems);
@@ -1207,13 +1275,35 @@ export async function processPendingSyncQueue(session, options = {}) {
     const baseIndex = remaining.findIndex((queued) => buildQueueFingerprint(queued) === fingerprint);
     if (baseIndex === -1) continue;
     const current = remaining[baseIndex];
+    const retryCount = Number(current?.retryCount || 0);
+    if (!isManual && String(current?.code || '') === BLOCKED_SCHEMA_ERROR_CODE) {
+      continue;
+    }
+    if (!isManual && retryCount >= 3) {
+      const backoffMs = retryCount <= 5 ? 30000 : 120000;
+      const lastAttempt = current?.lastAttemptAt ? Date.parse(current.lastAttemptAt) : 0;
+      if (lastAttempt && (Date.now() - lastAttempt) < backoffMs) continue;
+    }
+    const localId = current?.localId ?? current?.payload?.metadata?.local_id ?? current?.payload?.id ?? current?.payload?.cloud_id ?? null;
+    const normalizedPayload = current?.action === 'update'
+      ? buildOperationalUpdatePayload(current.table, current.payload || {}, getSessionUserId(session))
+      : buildOperationalCreatePayload(current.table, current.payload || {}, getSessionUserId(session));
+    if (import.meta.env.DEV) {
+      console.info('[HERDON_PENDING_SYNC_PROCESS]', { queueCount: remaining.length, table: current?.table || null, action: current?.action || null, retryCount, code: current?.code || null, message: current?.message || null });
+      console.info('[HERDON_PENDING_SYNC_PAYLOAD]', { table: current?.table || null, action: current?.action || null, payloadKeys: Object.keys(current?.payload || {}), hasId: Object.hasOwn(current?.payload || {}, 'id'), hasMetadataLocalId: Boolean(current?.payload?.metadata?.local_id), normalizedPayloadKeys: Object.keys(normalizedPayload || {}) });
+    }
+    if (!normalizedPayload || typeof normalizedPayload !== 'object') {
+      remaining[baseIndex] = { ...current, localId, code: BLOCKED_SCHEMA_ERROR_CODE, message: 'Pendência precisa de revisão de compatibilidade antes de sincronizar.' };
+      failed += 1;
+      continue;
+    }
     let result = null;
     if (item.action === 'create') {
-      result = await createOperationalRecord(item.table, item.payload || {}, session, { skipQueueOnFailure: true });
+      result = await createOperationalRecord(item.table, normalizedPayload, session, { skipQueueOnFailure: true });
     } else if (item.action === 'update') {
-      result = await updateOperationalRecord(item.table, item.localId, item.payload || {}, session, { skipQueueOnFailure: true });
+      result = await updateOperationalRecord(item.table, localId, normalizedPayload, session, { skipQueueOnFailure: true });
     } else if (item.action === 'delete') {
-      result = await deleteOperationalRecord(item.table, item.localId, session, { skipQueueOnFailure: true });
+      result = await deleteOperationalRecord(item.table, localId, session, { skipQueueOnFailure: true });
     }
 
     if (result?.persisted) {
@@ -1223,22 +1313,37 @@ export async function processPendingSyncQueue(session, options = {}) {
     }
 
     failed += 1;
+    const nextRetryCount = retryCount + 1;
+    let nextCode = result?.code || current.code || 'unknown';
+    let nextMessage = result?.error || current.message || 'Registro salvo localmente. Sincronização pendente.';
+    if (nextRetryCount > 5 && String(nextCode) === 'schema_error') {
+      nextCode = BLOCKED_SCHEMA_ERROR_CODE;
+      nextMessage = 'Pendência precisa de revisão de compatibilidade antes de sincronizar.';
+    }
     remaining[baseIndex] = {
       ...current,
+      localId,
+      payload: normalizedPayload,
       lastAttemptAt: new Date().toISOString(),
-      retryCount: Number(current.retryCount || 0) + 1,
-      code: result?.code || current.code || 'unknown',
-      message: result?.error || current.message || 'Registro salvo localmente. Sincronização pendente.',
+      retryCount: nextRetryCount,
+      code: nextCode,
+      message: nextMessage,
     };
+    if (import.meta.env.DEV) {
+      const safe = getSafeErrorDetails(result);
+      console.info('[HERDON_PENDING_SYNC_RESULT]', { table: current?.table || null, action: current?.action || null, syncStatus: result?.syncStatus || 'pending_sync', code: nextCode, httpStatus: getHttpStatus(result), safeMessage: nextMessage, safeDetails: safe?.details || null, safeHint: safe?.hint || null });
+    }
   }
 
   writePendingSyncQueue(remaining);
   emitPendingSyncState(remaining, 'processed');
+  const firstError = remaining.find((item) => item?.code);
   return {
     processed: slice.length,
     synced,
     failed,
     pendingCount: remaining.length,
+    firstError: firstError ? { code: firstError.code, message: firstError.message } : null,
   };
 }
 
@@ -1622,8 +1727,6 @@ export async function syncLotesWithCloud({ lotes = [], session }) {
   closeNetworkCircuit('lotes');
   return buildModuleSyncResult({ module: 'lotes', status: 'success', message: 'Lotes sincronizados.', data: mergeLotesSafe(localRows, remoteList), syncedCount, failedCount, selectedCount: Array.isArray(remoteList) ? remoteList.length : 0 });
 }
-
-
 
 
 

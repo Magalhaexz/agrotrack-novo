@@ -289,7 +289,7 @@ export default function App() {
       refreshPendingState();
     }
 
-    function scheduleRetry(delayMs = 1200) {
+    function scheduleRetry(delayMs = 3000) {
       if (retryTimer) window.clearTimeout(retryTimer);
       retryTimer = window.setTimeout(() => {
         void runRetry();
@@ -298,21 +298,21 @@ export default function App() {
 
     function handlePendingUpdated() {
       refreshPendingState();
-      scheduleRetry(900);
+      scheduleRetry(5000);
     }
 
     function handleOnline() {
-      scheduleRetry(500);
+      scheduleRetry(3000);
     }
 
     function handleDiagnostic(event) {
       if (event?.detail?.verified) {
-        scheduleRetry(700);
+        scheduleRetry(3000);
       }
     }
 
     refreshPendingState();
-    if (session?.user?.id) scheduleRetry(700);
+    if (session?.user?.id) scheduleRetry(3000);
     window.addEventListener('herdon-pending-sync-updated', handlePendingUpdated);
     window.addEventListener('online', handleOnline);
     window.addEventListener('herdon-cloud-diagnostic-state', handleDiagnostic);
@@ -776,6 +776,7 @@ export default function App() {
             isSyncing: isOperationalSyncing,
             lastSyncAt,
             pendingCount: pendingSyncState?.pendingCount || 0,
+            schemaErrorTables: pendingSyncState?.schemaErrorTables || [],
             onSyncNow: cloudControls.sincronizarNuvem || syncNow,
             onTestCloud: cloudControls.testarConexaoNuvem,
             onReconnectCloud: cloudControls.reconectarNuvem,
@@ -941,5 +942,4 @@ function parseSnoozeDate(option) {
   data.setDate(data.getDate() + dias);
   return data.toISOString().slice(0, 10);
 }
-
 

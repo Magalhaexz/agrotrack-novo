@@ -34,16 +34,17 @@ function normalizarInitialData(data) {
 }
 
 function normalizarPayload(form, initialData) {
+  const text = (value) => String(value ?? '').trim();
   return {
-    nome: form.nome.trim(),
+    nome: text(form.nome),
     estado: form.estado,
-    cidade: form.cidade.trim(),
+    cidade: text(form.cidade),
     hectares: Number(form.hectares || 0),
     hectares_pastagem: Number(form.hectares_pastagem || 0),
     capacidade_lotacao: Number(form.capacidade_lotacao || 0),
-    responsavel: form.responsavel.trim(),
-    telefone: form.telefone.trim(),
-    observacoes: form.observacoes.trim(),
+    responsavel: text(form.responsavel),
+    telefone: text(form.telefone),
+    observacoes: text(form.observacoes),
     data_cadastro: initialData?.data_cadastro || new Date().toISOString().slice(0, 10),
   };
 }
@@ -72,7 +73,7 @@ export default function FazendaModal({ open, initialData, onSave, onCancel }) {
   function handleSubmit(e) {
     e.preventDefault();
 
-    if (!form.nome.trim()) {
+    if (!String(form.nome ?? '').trim()) {
       setErro('Nome da fazenda é obrigatório.');
       return;
     }
