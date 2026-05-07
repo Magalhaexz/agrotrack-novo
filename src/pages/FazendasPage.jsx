@@ -85,6 +85,17 @@ export default function FazendasPage({ db, setDb, onConfirmAction }) {
     if (editando) {
       const localId = editando?.metadata?.local_id ?? editando?.id ?? null;
       const cloudId = editando?.cloud_id || editando?.metadata?.cloud_id || null;
+      const fallbackIdentity = {
+        nome: String(editando?.nome ?? '').trim(),
+        cidade: String(editando?.cidade ?? '').trim(),
+        estado: String(editando?.estado ?? '').trim(),
+      };
+      let selector = null;
+      if (isNumericId(editando?.id)) selector = { type: 'id', value: Number(editando.id), identity: fallbackIdentity };
+      else if (isUuid(editando?.cloud_id)) selector = { type: 'cloud_id', value: String(editando.cloud_id), identity: fallbackIdentity };
+      else if (isUuid(editando?.metadata?.cloud_id)) selector = { type: 'cloud_id', value: String(editando.metadata.cloud_id), identity: fallbackIdentity };
+      else if (editando?.metadata?.local_id !== undefined && editando?.metadata?.local_id !== null) selector = { type: 'metadata.local_id', value: String(editando.metadata.local_id), identity: fallbackIdentity };
+      else selector = { type: 'fallback_identity', identity: fallbackIdentity };
       const patch = {
         ...payload,
         metadata: {
@@ -96,7 +107,7 @@ export default function FazendasPage({ db, setDb, onConfirmAction }) {
         cloud_id: cloudId,
       };
       const targetId = cloudId || editando?.id || localId;
-      const persisted = await updateOperationalRecord('fazendas', targetId, patch, session);
+      const persisted = await updateOperationalRecord('fazendas', targetId, patch, session, { selector });
       const editIdentity = resolveFazendaIdentity(editando) || buildFazendaFallbackIdentity(editando);
       setDb((prev) => ({
         ...prev,

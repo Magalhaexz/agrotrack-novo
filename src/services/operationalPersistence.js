@@ -1081,6 +1081,7 @@ export async function updateOperationalRecord(table, id, patch, session, options
         localId: id ?? sanitizeRecord(patch)?.id ?? null,
         cloudId: sanitizeRecord(patch)?.cloud_id ?? null,
         payload: sanitizeRecord(patch),
+        selector: options?.selector || null,
         code: classifyCloudSaveCode(readiness.code),
         message: fallback.error,
       });
@@ -1092,11 +1093,26 @@ export async function updateOperationalRecord(table, id, patch, session, options
   try {
     const payload = sanitizeRecord(patch);
     const withOwner = tableSupportsOwnerScope(table);
+    const selector = isObject(options?.selector) ? options.selector : null;
+    const normalizedIdentityKey = buildFazendaIdentityKey(selector?.identity || {});
     const runUpdate = async (useOwnerScope) => {
-      let query = supabase
-        .from(table)
-        .update(payload)
-        .eq('id', id);
+      let query = supabase.from(table).update(payload);
+      if (String(table || '').toLowerCase() === 'fazendas' && selector?.type) {
+        if (selector.type === 'id' && Number.isFinite(Number(selector?.value))) {
+          query = query.eq('id', Number(selector.value));
+        } else if (selector.type === 'cloud_id' && selector?.value) {
+          query = query.eq('cloud_id', String(selector.value));
+        } else if (selector.type === 'metadata.local_id' && selector?.value) {
+          query = query.contains('metadata', { local_id: String(selector.value) });
+        } else if (selector.type === 'fallback_identity' && normalizedIdentityKey && normalizedIdentityKey !== '||') {
+          const [nome, cidade, estado] = normalizedIdentityKey.split('|');
+          query = query.ilike('nome', nome || '').ilike('cidade', cidade || '').ilike('estado', estado || '');
+        } else {
+          query = query.eq('id', id);
+        }
+      } else {
+        query = query.eq('id', id);
+      }
       if (useOwnerScope) query = query.eq('owner_user_id', userId);
       return query.select('*').single();
     };
@@ -1139,6 +1155,7 @@ export async function updateOperationalRecord(table, id, patch, session, options
       requestStage: 'update',
       action: 'update',
       table,
+      selectorType: options?.selector?.type || null,
       hasSessionUser: Boolean(userId),
       hasAccessToken: true,
       envConfigured: true,
@@ -1171,6 +1188,7 @@ export async function updateOperationalRecord(table, id, patch, session, options
         localId: id ?? sanitizeRecord(patch)?.id ?? null,
         cloudId: sanitizeRecord(patch)?.cloud_id ?? null,
         payload: sanitizeRecord(patch),
+        selector: options?.selector || null,
         code: classifiedCode,
         message: fallback.error,
       });
@@ -1375,7 +1393,7 @@ export async function processPendingSyncQueue(session, options = {}) {
     if (item.action === 'create') {
       result = await createOperationalRecord(item.table, normalizedPayload, session, { skipQueueOnFailure: true });
     } else if (item.action === 'update') {
-      result = await updateOperationalRecord(item.table, localId, normalizedPayload, session, { skipQueueOnFailure: true });
+      result = await updateOperationalRecord(item.table, localId, normalizedPayload, session, { skipQueueOnFailure: true, selector });
     } else if (item.action === 'delete') {
       result = await deleteOperationalRecord(item.table, localId, session, { skipQueueOnFailure: true, selector });
     }
@@ -1801,6 +1819,5 @@ export async function syncLotesWithCloud({ lotes = [], session }) {
   closeNetworkCircuit('lotes');
   return buildModuleSyncResult({ module: 'lotes', status: 'success', message: 'Lotes sincronizados.', data: mergeLotesSafe(localRows, remoteList), syncedCount, failedCount, selectedCount: Array.isArray(remoteList) ? remoteList.length : 0 });
 }
-
 
 
