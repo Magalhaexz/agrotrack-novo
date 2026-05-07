@@ -41,9 +41,10 @@ function logFazendaDirectCreate(payload = {}) {
   console.info('[HERDON_FAZENDA_DIRECT_CREATE]', payload);
 }
 
-export default function FazendasPage({ db, setDb, onConfirmAction }) {
+export default function FazendasPage({ db, setDb, onConfirmAction, session: sessionProp }) {
   const { showToast, dismissToast } = useToast();
-  const { hasPermission, session, user, forceLocalSignOut } = useAuth();
+  const { hasPermission, session: authSession, user, forceLocalSignOut } = useAuth();
+  const session = sessionProp ?? authSession;
   const mensagemSemPermissao = 'VocÃª nÃ£o tem permissÃ£o para executar esta aÃ§Ã£o.';
 
   const [openModal, setOpenModal] = useState(false);
@@ -122,9 +123,18 @@ export default function FazendasPage({ db, setDb, onConfirmAction }) {
         showToast({ type: 'warning', message: `Fazenda atualizada localmente. Sincronização pendente.${import.meta.env.DEV ? ` Motivo: ${persisted.error || persisted.code || 'unknown'}.` : ''}` });
       }
     } else {
+      const nomeNormalizado = String(payload?.nome ?? '').trim();
+      if (!nomeNormalizado) {
+        showToast({ type: 'warning', message: 'Informe o nome da fazenda.' });
+        return;
+      }
+      if (!session?.user?.id) {
+        showToast({ type: 'warning', message: 'Sessão da nuvem não encontrada. Faça login novamente para salvar na nuvem.' });
+      }
       const localId = gerarNovoId(fazendas);
       const createPayload = {
         ...payload,
+        nome: nomeNormalizado,
         metadata: {
           ...ensureObject(payload?.metadata),
           local_id: localId,
