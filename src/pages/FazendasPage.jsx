@@ -21,6 +21,13 @@ function ensureObject(value) {
 function resolveFazendaIdentity(row = {}) {
   return row?.cloud_id || row?.metadata?.cloud_id || row?.id || row?.metadata?.local_id || null;
 }
+function normalizeText(value) {
+  return String(value ?? '').trim().toLowerCase();
+}
+
+function buildFazendaFallbackIdentity(row = {}) {
+  return `${normalizeText(row?.nome)}|${normalizeText(row?.cidade)}|${normalizeText(row?.estado)}`;
+}
 
 export default function FazendasPage({ db, setDb, onConfirmAction }) {
   const { showToast, dismissToast } = useToast();
@@ -65,26 +72,31 @@ export default function FazendasPage({ db, setDb, onConfirmAction }) {
     }
     if (editando) {
       const localId = editando?.metadata?.local_id ?? editando?.id ?? null;
+      const cloudId = editando?.cloud_id || editando?.metadata?.cloud_id || null;
       const patch = {
         ...payload,
         metadata: {
           ...ensureObject(editando?.metadata),
           ...ensureObject(payload?.metadata),
           local_id: localId,
-          cloud_id: editando?.cloud_id || editando?.metadata?.cloud_id || null,
+          cloud_id: cloudId,
         },
+        cloud_id: cloudId,
       };
-      const targetId = editando?.cloud_id || editando?.metadata?.cloud_id || editando?.id;
+      const targetId = cloudId || editando?.id || localId;
       const persisted = await updateOperationalRecord('fazendas', targetId, patch, session);
+      const editIdentity = resolveFazendaIdentity(editando) || buildFazendaFallbackIdentity(editando);
       setDb((prev) => ({
         ...prev,
         fazendas: prev.fazendas.map((f) =>
-          resolveFazendaIdentity(f) === resolveFazendaIdentity(editando) ? { ...f, ...(persisted.data || patch) } : f
+          (resolveFazendaIdentity(f) || buildFazendaFallbackIdentity(f)) === editIdentity
+            ? { ...f, ...(persisted.data || patch) }
+            : f
         ),
       }));
-      if (persisted.syncStatus === 'cloud_success') showToast({ type: 'success', message: 'Registro salvo na nuvem.' });
+      if (persisted.syncStatus === 'cloud_success') showToast({ type: 'success', message: 'Fazenda atualizada na nuvem.' });
       if (persisted.syncStatus === 'pending_sync' || persisted.syncStatus === 'local_only') {
-        showToast({ type: 'warning', message: `Registro salvo localmente. Sincronização pendente.${import.meta.env.DEV ? ` Motivo: ${persisted.error || persisted.code || 'unknown'}.` : ''}` });
+        showToast({ type: 'warning', message: `Fazenda atualizada localmente. Sincronização pendente.${import.meta.env.DEV ? ` Motivo: ${persisted.error || persisted.code || 'unknown'}.` : ''}` });
       }
     } else {
       const localId = gerarNovoId(fazendas);
@@ -96,10 +108,17 @@ export default function FazendasPage({ db, setDb, onConfirmAction }) {
         },
       };
       const persisted = await createOperationalRecord('fazendas', createPayload, session);
-      setDb((prev) => ({
-        ...prev,
-        fazendas: [...prev.fazendas, persisted.data || { id: localId, ...createPayload }],
-      }));
+      const incoming = persisted.data || { id: localId, ...createPayload };
+      setDb((prev) => {
+        const next = Array.isArray(prev?.fazendas) ? [...prev.fazendas] : [];
+        const incomingIdentity = resolveFazendaIdentity(incoming) || buildFazendaFallbackIdentity(incoming);
+        const existingIndex = next.findIndex((f) => (
+          (resolveFazendaIdentity(f) || buildFazendaFallbackIdentity(f)) === incomingIdentity
+        ));
+        if (existingIndex >= 0) next[existingIndex] = { ...next[existingIndex], ...incoming };
+        else next.push(incoming);
+        return { ...prev, fazendas: next };
+      });
       if (persisted.syncStatus === 'cloud_success') showToast({ type: 'success', message: 'Registro salvo na nuvem.' });
       if (persisted.syncStatus === 'pending_sync' || persisted.syncStatus === 'local_only') {
         showToast({ type: 'warning', message: `Registro salvo localmente. Sincronização pendente.${import.meta.env.DEV ? ` Motivo: ${persisted.error || persisted.code || 'unknown'}.` : ''}` });
@@ -114,25 +133,52 @@ export default function FazendasPage({ db, setDb, onConfirmAction }) {
       showToast({ type: 'error', message: mensagemSemPermissao });
       return;
     }
-    const fazenda = cards.find((f) => f.id === id);
+    const fazenda = cards.find((f) => resolveFazendaIdentity(f) === id || f.id === id);
     if (!fazenda) return;
-    if (fazenda.lotesVinculados > 0) {
-      alert('NÃ£o Ã© possÃ­vel excluir uma fazenda com lotes vinculados.');
+    const fazendaKeys = new Set([
+      String(fazenda?.id ?? ''),
+      String(resolveFazendaIdentity(fazenda) ?? ''),
+      String(fazenda?.metadata?.local_id ?? ''),
+      String(fazenda?.nome ?? ''),
+    ].filter(Boolean));
+    const hasLinkedRecords = (list = []) => list.some((item) => {
+      const refs = [
+        item?.fazenda_id, item?.fazendaId, item?.fazenda, item?.faz_id, item?.fazendaNome, item?.fazenda_nome,
+      ];
+      return refs.some((ref) => fazendaKeys.has(String(ref ?? '')));
+    });
+    if (
+      hasLinkedRecords(db?.lotes)
+      || hasLinkedRecords(db?.animais)
+      || hasLinkedRecords(db?.movimentacoes_financeiras)
+      || hasLinkedRecords(db?.estoque)
+      || hasLinkedRecords(db?.sanitario)
+    ) {
+      showToast({
+        type: 'warning',
+        message: 'Esta fazenda possui registros vinculados. Remova ou transfira os registros antes de excluir.',
+      });
       return;
     }
     const confirmado = typeof onConfirmAction === 'function'
       ? await onConfirmAction({
-        title: 'Excluir fazenda',
-        message: `Deseja realmente excluir a fazenda "${fazenda.nome}"?`,
+        title: 'Excluir fazenda?',
+        message: 'Esta ação remove a fazenda selecionada. Verifique se não há lotes, animais ou lançamentos vinculados antes de continuar.',
         tone: 'danger',
       })
-      : window.confirm(`Deseja realmente excluir a fazenda "${fazenda.nome}"?`);
+      : window.confirm('Esta ação remove a fazenda selecionada. Verifique se não há lotes, animais ou lançamentos vinculados antes de continuar.');
 
     if (!confirmado) return;
-    const persisted = await deleteOperationalRecord('fazendas', id, session);
-    setDb((prev) => ({ ...prev, fazendas: prev.fazendas.filter((f) => f.id !== id) }));
-    if (!persisted.persisted) showToast({ type: 'warning', message: 'ExclusÃ£o aplicada apenas localmente.' });
-      if (persisted.syncStatus === 'cloud_success') showToast({ type: 'success', message: 'Registro salvo na nuvem. (cloud_success)' });
+    const targetId = resolveFazendaIdentity(fazenda) || id;
+    const persisted = await deleteOperationalRecord('fazendas', targetId, session);
+    setDb((prev) => ({
+      ...prev,
+      fazendas: prev.fazendas.filter((f) => (resolveFazendaIdentity(f) || f.id) !== targetId),
+    }));
+    if (persisted.syncStatus === 'cloud_success') showToast({ type: 'success', message: 'Fazenda excluída.' });
+    if (persisted.syncStatus === 'pending_sync' || persisted.syncStatus === 'local_only') {
+      showToast({ type: 'warning', message: 'Exclusão registrada localmente. Sincronização pendente.' });
+    }
   }
 
   function traduzirStatusEtapa(step) {

@@ -1293,7 +1293,12 @@ export async function processPendingSyncQueue(session, options = {}) {
       console.info('[HERDON_PENDING_SYNC_PAYLOAD]', { table: current?.table || null, action: current?.action || null, payloadKeys: Object.keys(current?.payload || {}), hasId: Object.hasOwn(current?.payload || {}, 'id'), hasMetadataLocalId: Boolean(current?.payload?.metadata?.local_id), normalizedPayloadKeys: Object.keys(normalizedPayload || {}) });
     }
     if (!normalizedPayload || typeof normalizedPayload !== 'object') {
-      remaining[baseIndex] = { ...current, localId, code: BLOCKED_SCHEMA_ERROR_CODE, message: 'Pendência precisa de revisão de compatibilidade antes de sincronizar.' };
+      remaining[baseIndex] = {
+        ...current,
+        localId,
+        code: BLOCKED_SCHEMA_ERROR_CODE,
+        message: 'Pendência bloqueada por incompatibilidade de dados.',
+      };
       failed += 1;
       continue;
     }
@@ -1318,7 +1323,7 @@ export async function processPendingSyncQueue(session, options = {}) {
     let nextMessage = result?.error || current.message || 'Registro salvo localmente. Sincronização pendente.';
     if (nextRetryCount > 5 && String(nextCode) === 'schema_error') {
       nextCode = BLOCKED_SCHEMA_ERROR_CODE;
-      nextMessage = 'Pendência precisa de revisão de compatibilidade antes de sincronizar.';
+      nextMessage = 'Pendência bloqueada por incompatibilidade de dados.';
     }
     remaining[baseIndex] = {
       ...current,
@@ -1727,7 +1732,6 @@ export async function syncLotesWithCloud({ lotes = [], session }) {
   closeNetworkCircuit('lotes');
   return buildModuleSyncResult({ module: 'lotes', status: 'success', message: 'Lotes sincronizados.', data: mergeLotesSafe(localRows, remoteList), syncedCount, failedCount, selectedCount: Array.isArray(remoteList) ? remoteList.length : 0 });
 }
-
 
 
 
