@@ -36,13 +36,9 @@ function isUuid(value) {
   const text = String(value ?? '').trim();
   return /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(text);
 }
-function logFazendaCreateFlow(payload = {}) {
+function logFazendaDirectCreate(payload = {}) {
   if (!import.meta.env.DEV) return;
-  console.info('[HERDON_FAZENDA_CREATE_FLOW]', payload);
-}
-function logFazendaCreateResult(payload = {}) {
-  if (!import.meta.env.DEV) return;
-  console.info('[HERDON_FAZENDA_CREATE_RESULT]', payload);
+  console.info('[HERDON_FAZENDA_DIRECT_CREATE]', payload);
 }
 
 export default function FazendasPage({ db, setDb, onConfirmAction }) {
@@ -123,24 +119,14 @@ export default function FazendasPage({ db, setDb, onConfirmAction }) {
           local_id: localId,
         },
       };
-      logFazendaCreateFlow({
+      logFazendaDirectCreate({
         hasSession: Boolean(session),
         hasUserId: Boolean(session?.user?.id),
         attemptedCloud: Boolean(session?.user?.id),
+        payloadKeys: Object.keys(createPayload || {}),
       });
       const persisted = await createOperationalRecord('fazendas', createPayload, session);
       const incoming = persisted.data || { id: localId, ...createPayload };
-      if (persisted.syncStatus !== 'cloud_success') {
-        logFazendaCreateFlow({
-          hasSession: Boolean(session),
-          hasUserId: Boolean(session?.user?.id),
-          attemptedCloud: Boolean(session?.user?.id),
-          syncStatus: persisted.syncStatus || 'pending_sync',
-          code: persisted.code || 'unknown',
-          safeMessage: persisted.error || 'Registro salvo localmente. Sincronização pendente.',
-        });
-      }
-      let dedupedCount = 0;
       setDb((prev) => {
         const next = Array.isArray(prev?.fazendas) ? [...prev.fazendas] : [];
         const incomingIdentity = resolveFazendaIdentity(incoming) || buildFazendaFallbackIdentity(incoming);
@@ -149,15 +135,17 @@ export default function FazendasPage({ db, setDb, onConfirmAction }) {
         ));
         if (existingIndex >= 0) {
           next[existingIndex] = { ...next[existingIndex], ...incoming };
-          dedupedCount = 1;
         } else next.push(incoming);
         return { ...prev, fazendas: next };
       });
-      logFazendaCreateResult({
+      logFazendaDirectCreate({
+        hasSession: Boolean(session),
+        hasUserId: Boolean(session?.user?.id),
+        attemptedCloud: Boolean(session?.user?.id),
         syncStatus: persisted.syncStatus || 'pending_sync',
-        returnedCloudId: persisted?.data?.id ?? persisted?.data?.cloud_id ?? null,
-        localId,
-        dedupedCount,
+        code: persisted.code || null,
+        safeMessage: persisted.error || (persisted.syncStatus === 'cloud_success' ? 'Registro salvo na nuvem.' : 'Registro salvo localmente. Sincronização pendente.'),
+        payloadKeys: Object.keys(createPayload || {}),
       });
       if (persisted.syncStatus === 'cloud_success') showToast({ type: 'success', message: 'Registro salvo na nuvem.' });
       if (persisted.syncStatus === 'pending_sync' || persisted.syncStatus === 'local_only') {
