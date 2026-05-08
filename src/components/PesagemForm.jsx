@@ -6,7 +6,6 @@ import ArrobaPreview from './ArrobaPreview';
 const FORM_VAZIO = {
   tipo: 'lote',
   lote_id: '',
-  animal_id: '',
   data: '',
   peso_medio: '',
   observacao: '',
@@ -19,7 +18,6 @@ function normalizarInitialData(data) {
   return {
     tipo: data.tipo || data.origem || 'lote',
     lote_id: data.lote_id ?? '',
-    animal_id: data.animal_id ?? '',
     data: data.data || '',
     peso_medio: data.peso_medio ?? '',
     observacao: data.observacao || '',
@@ -30,10 +28,11 @@ function normalizarInitialData(data) {
 
 function validarForm(form) {
   if (form.tipo === 'lote' && !form.lote_id) return 'Selecione o lote.';
-  if (form.tipo === 'animal' && !form.animal_id) return 'Selecione o animal.';
   if (!form.data) return 'Informe a data da pesagem.';
-  if (!form.peso_medio) return 'Informe o peso medio.';
-  if (Number(form.peso_medio || 0) <= 0) return 'Peso medio deve ser maior que zero.';
+  if (form.tipo === 'lote') {
+    if (!form.peso_medio) return 'Informe o peso medio.';
+    if (Number(form.peso_medio || 0) <= 0) return 'Peso medio deve ser maior que zero.';
+  }
   if (Number(form.rendimento_carcaca || 0) <= 0) return 'Rendimento de carcaca deve ser maior que zero.';
   return null;
 }
@@ -47,11 +46,32 @@ export default function PesagemForm({
 }) {
   const [form, setForm] = useState(() => normalizarInitialData(initialData));
   const [erro, setErro] = useState('');
+  const [pesosAnimais, setPesosAnimais] = useState({});
+  const [observacoesAnimais, setObservacoesAnimais] = useState({});
+
+  const animaisDoLote = animais.filter(
+    (animal) => Number(animal?.lote_id) === Number(form.lote_id)
+  );
 
   /* eslint-disable react-hooks/set-state-in-effect */
   useEffect(() => {
     setForm(normalizarInitialData(initialData));
     setErro('');
+
+    if (initialData?.tipo === 'animal' || initialData?.origem === 'animal') {
+      const animalId = Number(initialData?.animal_id);
+      if (animalId > 0) {
+        setPesosAnimais({ [animalId]: String(initialData?.peso_medio ?? '') });
+        setObservacoesAnimais({ [animalId]: initialData?.observacao || '' });
+      } else {
+        setPesosAnimais({});
+        setObservacoesAnimais({});
+      }
+      return;
+    }
+
+    setPesosAnimais({});
+    setObservacoesAnimais({});
   }, [initialData]);
   /* eslint-enable react-hooks/set-state-in-effect */
 
@@ -62,16 +82,6 @@ export default function PesagemForm({
         return {
           ...prev,
           tipo: value,
-          animal_id: value === 'animal' ? prev.animal_id : '',
-        };
-      }
-
-      if (name === 'animal_id') {
-        const animalSelecionado = animais.find((item) => Number(item.id) === Number(value));
-        return {
-          ...prev,
-          animal_id: value,
-          lote_id: animalSelecionado?.lote_id ? String(animalSelecionado.lote_id) : prev.lote_id,
         };
       }
 
@@ -89,11 +99,46 @@ export default function PesagemForm({
     }
 
     setErro('');
+    if (form.tipo === 'animal') {
+      const registros = animaisDoLote
+        .map((animal) => {
+          const animalId = Number(animal.id);
+          const pesoBruto = String(pesosAnimais[animalId] ?? '').trim();
+          if (!pesoBruto) return null;
+          const peso = Number(pesoBruto.replace(',', '.'));
+          if (!Number.isFinite(peso) || peso <= 0) return null;
+
+          return {
+            tipo: 'animal',
+            origem: 'animal',
+            lote_id: form.lote_id ? Number(form.lote_id) : null,
+            animal_id: animalId,
+            data: form.data,
+            peso_medio: peso,
+            rendimento_carcaca: Number(form.rendimento_carcaca || 0),
+            preco_arroba: form.preco_arroba === '' ? null : Number(form.preco_arroba),
+            observacao: String(observacoesAnimais[animalId] ?? '').trim(),
+          };
+        })
+        .filter(Boolean);
+
+      if (!registros.length) {
+        setErro('Informe ao menos um peso valido para salvar.');
+        return;
+      }
+
+      onSave?.({
+        tipo: 'animal_batch',
+        registros,
+      });
+      return;
+    }
+
     onSave?.({
-      tipo: form.tipo === 'animal' ? 'animal' : 'lote',
-      origem: form.tipo === 'animal' ? 'animal' : 'lote',
+      tipo: 'lote',
+      origem: 'lote',
       lote_id: form.lote_id ? Number(form.lote_id) : null,
-      animal_id: form.tipo === 'animal' ? Number(form.animal_id) : null,
+      animal_id: null,
       data: form.data,
       peso_medio: Number(form.peso_medio),
       observacao: form.observacao.trim(),
@@ -136,17 +181,66 @@ export default function PesagemForm({
         </section>
 
         {form.tipo === 'animal' && (
-          <label className="pesagem-form-field">
-            Animal
-            <select className="ui-input" name="animal_id" value={form.animal_id} onChange={handleChange}>
-              <option value="">Selecione</option>
-              {animais.filter((animal) => !form.lote_id || Number(animal.lote_id) === Number(form.lote_id)).map((animal) => (
-                <option key={animal.id} value={animal.id}>
-                  {animal.identificacao || animal.nome || `Animal #${animal.id}`}
-                </option>
-              ))}
-            </select>
-          </label>
+          <section className="pesagem-form-section-block">
+            <div className="pesagem-form-section-head">Pesagem individual por lote</div>
+            {!form.lote_id ? (
+              <p style={{ margin: 0, fontSize: '0.9rem', color: 'var(--text-muted)' }}>
+                Selecione um lote para listar os animais.
+              </p>
+            ) : animaisDoLote.length === 0 ? (
+              <p style={{ margin: 0, fontSize: '0.9rem', color: 'var(--text-muted)' }}>
+                Nenhum animal individual encontrado para este lote.
+              </p>
+            ) : (
+              <div className="fazendas-table-wrap">
+                <table className="data-table herdon-table">
+                  <thead>
+                    <tr>
+                      <th>Animal</th>
+                      <th>Peso atual kg</th>
+                      <th>Observacao</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {animaisDoLote.map((animal) => {
+                      const animalId = Number(animal.id);
+                      const nomeAnimal = animal.identificacao || animal.nome || `Animal #${animalId}`;
+                      return (
+                        <tr key={animal.id}>
+                          <td>{nomeAnimal}</td>
+                          <td>
+                            <input
+                              className="ui-input"
+                              type="number"
+                              step="0.01"
+                              min={0}
+                              value={pesosAnimais[animalId] ?? ''}
+                              onChange={(event) => {
+                                const value = event.target.value;
+                                setPesosAnimais((prev) => ({ ...prev, [animalId]: value }));
+                              }}
+                              placeholder="Ex: 412"
+                            />
+                          </td>
+                          <td>
+                            <input
+                              className="ui-input"
+                              value={observacoesAnimais[animalId] ?? ''}
+                              onChange={(event) => {
+                                const value = event.target.value;
+                                setObservacoesAnimais((prev) => ({ ...prev, [animalId]: value }));
+                              }}
+                              placeholder="Observacao opcional"
+                            />
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </section>
         )}
 
         <section className="pesagem-form-section-block">
@@ -175,6 +269,7 @@ export default function PesagemForm({
               value={form.peso_medio}
               onChange={handleChange}
               placeholder="Ex: 412"
+              disabled={form.tipo === 'animal'}
             />
           </label>
         </div>

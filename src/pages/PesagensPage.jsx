@@ -248,6 +248,59 @@ export default function PesagensPage({ db, setDb, onConfirmAction, navigationInt
       return;
     }
 
+    if (dados?.tipo === 'animal_batch') {
+      const registros = Array.isArray(dados.registros) ? dados.registros : [];
+      if (!registros.length) {
+        showToast({ type: 'error', message: 'Nenhuma pesagem individual valida para salvar.' });
+        return;
+      }
+
+      const basePesagens = Array.isArray(pesagens) ? pesagens : [];
+      const nextPesagens = [...basePesagens];
+      const resultados = [];
+
+      for (const payload of registros) {
+        const loteId = Number(payload?.lote_id);
+        const animalId = Number(payload?.animal_id);
+        const data = payload?.data;
+        const existente = nextPesagens.find((item) => (
+          resolveTipoPesagem(item) === 'animal'
+          && Number(item?.lote_id) === loteId
+          && Number(item?.animal_id) === animalId
+          && String(item?.data || '') === String(data || '')
+        ));
+
+        if (existente) {
+          const persisted = await updateOperationalRecord('pesagens', existente.id, payload, session);
+          const atualizado = { ...existente, ...(persisted.data || payload) };
+          const idx = nextPesagens.findIndex((item) => item.id === existente.id);
+          if (idx >= 0) nextPesagens[idx] = atualizado;
+          resultados.push(persisted);
+        } else {
+          const persisted = await createOperationalRecord('pesagens', payload, session);
+          const novo = persisted.data || { id: gerarNovoId(nextPesagens), ...payload };
+          nextPesagens.push(novo);
+          resultados.push(persisted);
+        }
+      }
+
+      setDb((prev) => ({
+        ...prev,
+        pesagens: nextPesagens,
+      }));
+
+      const persistedBatch = await persistCollectionMutation(resultados.map((item) => Promise.resolve(item)));
+      if (!persistedBatch.persisted) {
+        showToast({ type: 'warning', message: 'Pesagem salva localmente. Sincronizacao pendente.' });
+      } else {
+        showToast({ type: 'success', message: 'Pesagem salva na nuvem.' });
+      }
+
+      setAbrirForm(false);
+      setPesagemEditando(null);
+      return;
+    }
+
     if (pesagemEditando) {
       const pesagemPersistida = await updateOperationalRecord('pesagens', pesagemEditando.id, dados, session);
       const registroAtualizado = { ...pesagemEditando, ...(pesagemPersistida.data || dados) };
