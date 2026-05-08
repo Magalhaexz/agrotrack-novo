@@ -624,17 +624,37 @@ function buildOperationalCreatePayload(table, record, userId) {
     }
     const payload = {
       owner_user_id: userId || null,
-      fazenda_id: toNullableNumber(safe?.fazenda_id),
       lote_id: toNullableNumber(safe?.lote_id),
       animal_id: toNullableNumber(safe?.animal_id),
       data: toNullableDateString(safe?.data ?? safe?.data_pesagem),
-      data_pesagem: toNullableDateString(safe?.data_pesagem ?? safe?.data),
-      peso: toNullableNumber(safe?.peso),
-      peso_kg: toNullableNumber(safe?.peso_kg),
       peso_medio: toNullableNumber(safe?.peso_medio ?? safe?.peso ?? safe?.peso_kg),
       tipo: toNullableString(safe?.tipo),
+      origem: toNullableString(safe?.origem),
+      rendimento_carcaca: toNullableNumber(safe?.rendimento_carcaca),
+      preco_arroba: toNullableNumber(safe?.preco_arroba),
       observacao: toNullableString(safe?.observacao),
-      observacoes: toNullableString(safe?.observacoes),
+      metadata,
+      cloud_id: cloudUuid || undefined,
+    };
+    delete payload.id;
+    return Object.fromEntries(Object.entries(payload).filter(([, value]) => value !== undefined));
+  }
+  if (normalizedTable === 'animais') {
+    const safe = sanitizeRecord(record);
+    const cloudUuid = normalizeCloudUuid(safe?.cloud_id ?? safe?.metadata?.cloud_id);
+    const metadata = isObject(safe?.metadata) ? { ...safe.metadata } : {};
+    if (!Object.prototype.hasOwnProperty.call(metadata, 'local_id')) {
+      metadata.local_id = safe?.id ?? null;
+    }
+    const payload = {
+      owner_user_id: userId || null,
+      lote_id: toNullableNumber(safe?.lote_id),
+      identificacao: toNullableString(safe?.identificacao ?? safe?.nome),
+      tipo_registro: toNullableString(safe?.tipo_registro),
+      qtd: toNullableNumber(safe?.qtd ?? safe?.quantidade),
+      status: toNullableString(safe?.status),
+      p_ini: toNullableNumber(safe?.p_ini),
+      p_at: toNullableNumber(safe?.p_at),
       metadata,
       cloud_id: cloudUuid || undefined,
     };

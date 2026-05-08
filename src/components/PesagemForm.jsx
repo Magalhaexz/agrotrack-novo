@@ -294,7 +294,6 @@ export default function PesagemForm({
       tipo: 'lote',
       origem: 'lote',
       lote_id: form.lote_id ? Number(form.lote_id) : null,
-      animal_id: null,
       data: form.data,
       peso_medio: Number(form.peso_medio),
       observacao: form.observacao.trim(),

@@ -16,6 +16,12 @@ function toFiniteNumber(value, fallback = 0) {
   return Number.isFinite(normalized) ? normalized : fallback;
 }
 
+function normalizeIdKey(value) {
+  if (value === undefined || value === null) return null;
+  const text = String(value).trim();
+  return text ? text : null;
+}
+
 function getAnimalIndex(animal, fallbackIndex = null) {
   const fromMetadata = Number(animal?.metadata?.index);
   if (Number.isFinite(fromMetadata) && fromMetadata > 0) return Math.floor(fromMetadata);
@@ -26,6 +32,73 @@ function getAnimalIndex(animal, fallbackIndex = null) {
     if (Number.isFinite(fromLabel) && fromLabel > 0) return Math.floor(fromLabel);
   }
   return Number.isFinite(Number(fallbackIndex)) ? Number(fallbackIndex) : null;
+}
+
+function isValidUuid(value) {
+  const text = String(value || '').trim();
+  if (!text) return false;
+  return /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(text);
+}
+
+function logBatchWeighingSave(event = {}) {
+  if (!import.meta.env.DEV) return;
+  console.info('[HERDON_BATCH_WEIGHING_SAVE]', {
+    stage: event.stage || null,
+    table: event.table || null,
+    action: event.action || null,
+    payloadKeys: Array.isArray(event.payloadKeys) ? event.payloadKeys : [],
+    loteIdPresent: Boolean(event.loteIdPresent),
+    animalIdPresent: Boolean(event.animalIdPresent),
+    virtualIndex: event.virtualIndex ?? null,
+    identification: event.identification || null,
+    syncStatus: event.syncStatus || null,
+    code: event.code || null,
+    safeMessage: event.safeMessage || null,
+  });
+}
+
+function buildSafeAnimalPayload(payload = {}, lote = null, virtualIndex = null) {
+  const loteId = Number(payload?.lote_id ?? lote?.id);
+  const identificacao = String(payload?.identificacao || `Animal #${virtualIndex || ''}`).trim();
+  const metadata = {
+    ...(typeof payload?.metadata === 'object' && payload?.metadata ? payload.metadata : {}),
+    generated_from_weighing: true,
+    index: Number(virtualIndex || payload?.metadata?.index || 0) || undefined,
+  };
+  return {
+    lote_id: Number.isFinite(loteId) && loteId > 0 ? loteId : null,
+    identificacao: identificacao || null,
+    tipo_registro: 'individual',
+    qtd: 1,
+    status: String(payload?.status || 'ativo'),
+    p_ini: Number.isFinite(Number(payload?.p_ini)) ? Number(payload?.p_ini) : (Number.isFinite(Number(lote?.p_ini)) ? Number(lote?.p_ini) : null),
+    p_at: Number.isFinite(Number(payload?.p_at)) ? Number(payload?.p_at) : (Number.isFinite(Number(lote?.p_at)) ? Number(lote?.p_at) : null),
+    metadata: Object.fromEntries(Object.entries(metadata).filter(([, value]) => value !== undefined)),
+  };
+}
+
+function buildSafePesagemPayload(payload = {}) {
+  const metadata = {
+    ...(typeof payload?.metadata === 'object' && payload?.metadata ? payload.metadata : {}),
+  };
+  if (payload?.virtual_animal?.index) metadata.virtualIndex = Number(payload.virtual_animal.index);
+  if (payload?.virtual_animal?.identificacao) metadata.animal_identificacao = String(payload.virtual_animal.identificacao);
+  if (payload?.animal_identificacao) metadata.animal_identificacao = String(payload.animal_identificacao);
+
+  const safe = {
+    lote_id: Number.isFinite(Number(payload?.lote_id)) ? Number(payload.lote_id) : null,
+    animal_id: Number.isFinite(Number(payload?.animal_id)) ? Number(payload.animal_id) : null,
+    data: payload?.data ? String(payload.data) : null,
+    tipo: 'animal',
+    peso_medio: Number.isFinite(Number(payload?.peso_medio)) ? Number(payload.peso_medio) : null,
+    observacao: payload?.observacao ? String(payload.observacao) : null,
+    metadata: Object.keys(metadata).length ? metadata : undefined,
+  };
+  if (Number.isFinite(Number(payload?.rendimento_carcaca))) safe.rendimento_carcaca = Number(payload.rendimento_carcaca);
+  if (payload?.preco_arroba !== null && payload?.preco_arroba !== undefined && payload?.preco_arroba !== '' && Number.isFinite(Number(payload.preco_arroba))) {
+    safe.preco_arroba = Number(payload.preco_arroba);
+  }
+  return Object.fromEntries(Object.entries(safe).filter(([, value]) => value !== undefined));
 }
 
 function resolveTipoPesagem(item) {
@@ -114,7 +187,14 @@ export default function PesagensPage({ db, setDb, onConfirmAction, navigationInt
 
   const animaisMap = useMemo(() => {
     const map = new Map();
-    (animais || []).forEach((animal) => map.set(Number(animal.id), animal));
+    (animais || []).forEach((animal) => {
+      const idKey = normalizeIdKey(animal?.id);
+      const cloudKey = normalizeIdKey(animal?.cloud_id);
+      const localKey = normalizeIdKey(animal?.metadata?.local_id);
+      if (idKey) map.set(`id:${idKey}`, animal);
+      if (cloudKey) map.set(`cloud:${cloudKey}`, animal);
+      if (localKey) map.set(`local:${localKey}`, animal);
+    });
     return map;
   }, [animais]);
 
@@ -141,12 +221,26 @@ export default function PesagensPage({ db, setDb, onConfirmAction, navigationInt
     return [...(pesagens || [])]
       .map((pesagem) => {
         const tipo = resolveTipoPesagem(pesagem);
-        const animal = animaisMap.get(Number(pesagem.animal_id));
+        const animalId = normalizeIdKey(pesagem?.animal_id);
+        const cloudAnimalId = normalizeIdKey(pesagem?.metadata?.animal_cloud_id);
+        const localAnimalId = normalizeIdKey(pesagem?.metadata?.animal_local_id);
+        const animal = (
+          (animalId ? animaisMap.get(`id:${animalId}`) : null)
+          || (cloudAnimalId ? animaisMap.get(`cloud:${cloudAnimalId}`) : null)
+          || (localAnimalId ? animaisMap.get(`local:${localAnimalId}`) : null)
+          || null
+        );
+        const fallbackAnimalName = (
+          pesagem?.metadata?.animal_identificacao
+          || (pesagem?.metadata?.virtualIndex ? `Animal #${pesagem.metadata.virtualIndex}` : null)
+          || (pesagem?.metadata?.index ? `Animal #${pesagem.metadata.index}` : null)
+          || null
+        );
         return {
           ...pesagem,
           tipo,
           loteNome: lotesMap.get(Number(pesagem.lote_id))?.nome || '—',
-          animalNome: animal?.identificacao || animal?.nome || null,
+          animalNome: animal?.identificacao || animal?.nome || fallbackAnimalName,
           variacao: tipo === 'lote' ? variacaoPorPesagem.get(pesagem.id) ?? null : null,
         };
       })
@@ -279,23 +373,39 @@ export default function PesagensPage({ db, setDb, onConfirmAction, navigationInt
       const existingIndexes = new Set(loteAnimais.map((item, idx) => getAnimalIndex(item, idx + 1)).filter(Boolean));
       const payloads = missingIndexes
         .filter((idx) => !existingIndexes.has(Number(idx)))
-        .map((idx) => ({
+        .map((idx) => buildSafeAnimalPayload({
           lote_id: loteId,
-          fazenda_id: lote?.fazenda_id ?? lote?.faz_id ?? null,
-          faz_id: lote?.faz_id ?? lote?.fazenda_id ?? null,
           identificacao: `Animal #${idx}`,
-          tipo_registro: 'individual',
-          qtd: 1,
-          status: 'ativo',
           p_ini: Number(lote?.p_ini || lote?.peso_inicial || lote?.peso_atual || lote?.p_at || 0) || null,
           p_at: Number(lote?.p_at || lote?.peso_atual || lote?.p_ini || lote?.peso_inicial || 0) || null,
           metadata: { generated_from_weighing: true, index: Number(idx) },
-        }));
+        }, lote, idx));
 
       const persisted = [];
       const criados = [];
       for (const payload of payloads) {
+        logBatchWeighingSave({
+          stage: 'before_create_missing',
+          table: 'animais',
+          action: 'create',
+          payloadKeys: Object.keys(payload),
+          loteIdPresent: payload?.lote_id != null,
+          animalIdPresent: false,
+          identification: payload?.identificacao,
+        });
         const result = await createOperationalRecord('animais', payload, session);
+        logBatchWeighingSave({
+          stage: 'after_create_missing',
+          table: 'animais',
+          action: 'create',
+          payloadKeys: Object.keys(payload),
+          loteIdPresent: payload?.lote_id != null,
+          animalIdPresent: Boolean(result?.data?.id),
+          identification: payload?.identificacao,
+          syncStatus: result?.syncStatus,
+          code: result?.code,
+          safeMessage: result?.error || null,
+        });
         persisted.push(result);
         criados.push(result.data || { id: gerarNovoId([...(animaisAtuais || []), ...criados]), ...payload });
       }
@@ -336,39 +446,92 @@ export default function PesagensPage({ db, setDb, onConfirmAction, navigationInt
       const createdAnimais = [];
       const createAnimalResults = [];
       const normalizedRegistros = [];
+      const indexToAnimal = new Map();
+      loteAnimais.forEach((animal, idx) => {
+        const index = getAnimalIndex(animal, idx + 1);
+        if (index && !indexToAnimal.has(index)) indexToAnimal.set(index, animal);
+      });
 
       for (const registro of registros) {
-        if (Number(registro?.animal_id) > 0) {
-          normalizedRegistros.push(registro);
+        const directAnimalId = Number(registro?.animal_id);
+        if (Number.isFinite(directAnimalId) && directAnimalId > 0) {
+          normalizedRegistros.push(buildSafePesagemPayload(registro));
           continue;
         }
         const virtualIndex = Number(registro?.virtual_animal?.index);
         if (!Number.isFinite(virtualIndex) || virtualIndex <= 0) continue;
 
-        let animalTarget = animalsByIndex.get(virtualIndex) || null;
+        let animalTarget = indexToAnimal.get(virtualIndex) || animalsByIndex.get(virtualIndex) || null;
         if (!animalTarget) {
-          const payloadAnimal = {
+          const payloadAnimal = buildSafeAnimalPayload({
             lote_id: loteId,
-            fazenda_id: lote?.fazenda_id ?? lote?.faz_id ?? null,
-            faz_id: lote?.faz_id ?? lote?.fazenda_id ?? null,
             identificacao: `Animal #${virtualIndex}`,
-            tipo_registro: 'individual',
-            qtd: 1,
-            status: 'ativo',
             p_ini: Number(lote?.p_ini || lote?.peso_inicial || lote?.peso_atual || lote?.p_at || 0) || null,
             p_at: Number(registro?.peso_medio || lote?.p_at || lote?.peso_atual || lote?.p_ini || lote?.peso_inicial || 0) || null,
             metadata: { generated_from_weighing: true, index: virtualIndex },
-          };
+          }, lote, virtualIndex);
+          logBatchWeighingSave({
+            stage: 'before_create_virtual',
+            table: 'animais',
+            action: 'create',
+            payloadKeys: Object.keys(payloadAnimal),
+            loteIdPresent: payloadAnimal?.lote_id != null,
+            animalIdPresent: false,
+            virtualIndex,
+            identification: payloadAnimal?.identificacao,
+          });
           const created = await createOperationalRecord('animais', payloadAnimal, session);
+          logBatchWeighingSave({
+            stage: 'after_create_virtual',
+            table: 'animais',
+            action: 'create',
+            payloadKeys: Object.keys(payloadAnimal),
+            loteIdPresent: payloadAnimal?.lote_id != null,
+            animalIdPresent: Boolean(created?.data?.id),
+            virtualIndex,
+            identification: payloadAnimal?.identificacao,
+            syncStatus: created?.syncStatus,
+            code: created?.code,
+            safeMessage: created?.error || null,
+          });
           createAnimalResults.push(created);
           animalTarget = created.data || { id: gerarNovoId([...(animaisAtuais || []), ...createdAnimais]), ...payloadAnimal };
           createdAnimais.push(animalTarget);
           animalsByIndex.set(virtualIndex, animalTarget);
+          indexToAnimal.set(virtualIndex, animalTarget);
         }
 
-        normalizedRegistros.push({
+        const resolvedAnimalId = Number(animalTarget?.id);
+        if (!Number.isFinite(resolvedAnimalId) || resolvedAnimalId <= 0) {
+          logBatchWeighingSave({
+            stage: 'skip_pesagem_missing_animal_id',
+            table: 'pesagens',
+            action: 'create',
+            payloadKeys: Object.keys(registro || {}),
+            loteIdPresent: Boolean(registro?.lote_id),
+            animalIdPresent: false,
+            virtualIndex,
+            identification: registro?.virtual_animal?.identificacao || `Animal #${virtualIndex}`,
+            syncStatus: 'skipped',
+            code: 'ANIMAL_ID_MISSING',
+            safeMessage: 'Animal não persistido para vincular pesagem.',
+          });
+          continue;
+        }
+
+        const safePesagem = buildSafePesagemPayload({
           ...registro,
-          animal_id: Number(animalTarget?.id),
+          animal_id: resolvedAnimalId,
+          metadata: {
+            ...(registro?.metadata || {}),
+            virtualIndex,
+            animal_identificacao: registro?.virtual_animal?.identificacao || `Animal #${virtualIndex}`,
+            animal_local_id: normalizeIdKey(animalTarget?.metadata?.local_id ?? animalTarget?.id),
+            animal_cloud_id: isValidUuid(animalTarget?.cloud_id) ? animalTarget.cloud_id : undefined,
+          },
+        });
+        normalizedRegistros.push({
+          ...safePesagem,
         });
       }
 
@@ -380,6 +543,7 @@ export default function PesagensPage({ db, setDb, onConfirmAction, navigationInt
         const loteId = Number(payload?.lote_id);
         const animalId = Number(payload?.animal_id);
         const data = payload?.data;
+        if (!Number.isFinite(animalId) || animalId <= 0) continue;
         const existente = nextPesagens.find((item) => (
           resolveTipoPesagem(item) === 'animal'
           && Number(item?.lote_id) === loteId
@@ -388,16 +552,62 @@ export default function PesagensPage({ db, setDb, onConfirmAction, navigationInt
         ));
 
         if (existente) {
+          logBatchWeighingSave({
+            stage: 'before_update_pesagem',
+            table: 'pesagens',
+            action: 'update',
+            payloadKeys: Object.keys(payload),
+            loteIdPresent: payload?.lote_id != null,
+            animalIdPresent: payload?.animal_id != null,
+            virtualIndex: payload?.metadata?.virtualIndex,
+            identification: payload?.metadata?.animal_identificacao,
+          });
           const persisted = await updateOperationalRecord('pesagens', existente.id, payload, session);
           const atualizado = { ...existente, ...(persisted.data || payload) };
           const idx = nextPesagens.findIndex((item) => item.id === existente.id);
           if (idx >= 0) nextPesagens[idx] = atualizado;
           resultados.push(persisted);
+          logBatchWeighingSave({
+            stage: 'after_update_pesagem',
+            table: 'pesagens',
+            action: 'update',
+            payloadKeys: Object.keys(payload),
+            loteIdPresent: payload?.lote_id != null,
+            animalIdPresent: payload?.animal_id != null,
+            virtualIndex: payload?.metadata?.virtualIndex,
+            identification: payload?.metadata?.animal_identificacao,
+            syncStatus: persisted?.syncStatus,
+            code: persisted?.code,
+            safeMessage: persisted?.error || null,
+          });
         } else {
+          logBatchWeighingSave({
+            stage: 'before_create_pesagem',
+            table: 'pesagens',
+            action: 'create',
+            payloadKeys: Object.keys(payload),
+            loteIdPresent: payload?.lote_id != null,
+            animalIdPresent: payload?.animal_id != null,
+            virtualIndex: payload?.metadata?.virtualIndex,
+            identification: payload?.metadata?.animal_identificacao,
+          });
           const persisted = await createOperationalRecord('pesagens', payload, session);
           const novo = persisted.data || { id: gerarNovoId(nextPesagens), ...payload };
           nextPesagens.push(novo);
           resultados.push(persisted);
+          logBatchWeighingSave({
+            stage: 'after_create_pesagem',
+            table: 'pesagens',
+            action: 'create',
+            payloadKeys: Object.keys(payload),
+            loteIdPresent: payload?.lote_id != null,
+            animalIdPresent: payload?.animal_id != null,
+            virtualIndex: payload?.metadata?.virtualIndex,
+            identification: payload?.metadata?.animal_identificacao,
+            syncStatus: persisted?.syncStatus,
+            code: persisted?.code,
+            safeMessage: persisted?.error || null,
+          });
         }
       }
 
@@ -588,7 +798,7 @@ export default function PesagensPage({ db, setDb, onConfirmAction, navigationInt
                         {item.tipo === 'animal' ? 'Animal' : 'Lote'}
                       </span>
                     </td>
-                    <td className="text-h">{item.tipo === 'animal' ? (item.animalNome || 'Animal sem identificacao') : item.loteNome}</td>
+                    <td className="text-h">{item.tipo === 'animal' ? (item.animalNome || 'Animal') : item.loteNome}</td>
                     <td>{item.loteNome}</td>
                     <td>{formatarData(item.data)}</td>
                     <td>{formatarNumero(item.peso_medio)} kg</td>
