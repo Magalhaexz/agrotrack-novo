@@ -74,6 +74,18 @@ export default function ConfiguracoesPage({ db, setDb, onConfirmAction }) {
     () => (db.usuarios || []).map((item) => ({ ...item, perfil: normalizarPerfil(item.perfil) })),
     [db.usuarios]
   );
+  const invitesPendentes = useMemo(
+    () => invitesRows.filter((invite) => ['pendente', 'enviado'].includes(String(invite?.status || '').toLowerCase())),
+    [invitesRows]
+  );
+  const invitesCanceladosExpirados = useMemo(
+    () => invitesRows.filter((invite) => ['cancelado', 'expirado'].includes(String(invite?.status || '').toLowerCase())),
+    [invitesRows]
+  );
+  const invitesAceitos = useMemo(
+    () => invitesRows.filter((invite) => String(invite?.status || '').toLowerCase() === 'aceito' || Boolean(invite?.used_at)),
+    [invitesRows]
+  );
 
   function validarPermissao(permissao) {
     if (hasPermission(permissao)) return true;
@@ -139,6 +151,42 @@ export default function ConfiguracoesPage({ db, setDb, onConfirmAction }) {
     setAccessModuleReady(true);
     setLoadingAccessData(false);
   }, [podeGerenciarAcessos, showToast]);
+
+  async function cancelarConvite(invite) {
+    if (!validarPermissao('acessos:gerenciar')) return;
+    const confirmar = onConfirmAction
+      ? await onConfirmAction({ title: 'Cancelar convite', message: `Deseja cancelar o convite de ${invite.email}?`, tone: 'danger' })
+      : window.confirm(`Deseja cancelar o convite de ${invite.email}?`);
+    if (!confirmar) return;
+    const { error } = await updateInvite(invite.id, { status: 'cancelado' });
+    if (error) {
+      showToast({ type: 'error', message: mensagemErroSegura(error, 'Nao foi possivel cancelar o convite.') });
+      return;
+    }
+    setInvitesRows((prev) => prev.map((item) => (item.id === invite.id ? { ...item, status: 'cancelado' } : item)));
+    showToast({ type: 'success', message: 'Convite cancelado com sucesso.' });
+    await carregarDadosDeAcesso();
+  }
+
+  async function removerConvitePendente(invite) {
+    if (!validarPermissao('acessos:gerenciar')) return;
+    if (String(invite.status || '').toLowerCase() === 'aceito' || invite.used_at) {
+      showToast({ type: 'warning', message: 'Este convite já foi aceito. Para remover acesso, altere o usuário.' });
+      return;
+    }
+    const confirmar = onConfirmAction
+      ? await onConfirmAction({ title: 'Remover convite pendente', message: `Remover convite pendente de ${invite.email}?`, tone: 'danger' })
+      : window.confirm(`Remover convite pendente de ${invite.email}?`);
+    if (!confirmar) return;
+    const { error } = await deleteInvite(invite.id);
+    if (error) {
+      showToast({ type: 'error', message: mensagemErroSegura(error, 'Nao foi possivel remover o convite.') });
+      return;
+    }
+    setInvitesRows((prev) => prev.filter((item) => item.id !== invite.id));
+    showToast({ type: 'success', message: 'Convite pendente removido com sucesso.' });
+    await carregarDadosDeAcesso();
+  }
 
   /* eslint-disable react-hooks/set-state-in-effect */
   useEffect(() => {
@@ -528,10 +576,10 @@ export default function ConfiguracoesPage({ db, setDb, onConfirmAction }) {
                 <table className="dashboard-table">
                   <thead><tr><th>Convite</th><th>Perfil automático</th><th>Status</th><th>Uso</th><th>Ações</th></tr></thead>
                   <tbody>
-                    {invitesRows.length === 0 ? (
+                    {invitesPendentes.length === 0 ? (
                       <tr><td colSpan="5">Nenhum convite configurado.</td></tr>
                     ) : (
-                      invitesRows.map((invite) => (
+                      invitesPendentes.map((invite) => (
                         <tr key={invite.id}>
                           <td>
                             <strong>{invite.nome || 'Convite sem nome'}</strong>
@@ -546,80 +594,47 @@ export default function ConfiguracoesPage({ db, setDb, onConfirmAction }) {
                                 <Button
                                   size="sm"
                                   variant="outline"
-                                  onClick={async () => {
-                                    if (!validarPermissao('acessos:gerenciar')) return;
-                                    const confirmarCancelamento = onConfirmAction
-                                      ? await onConfirmAction({
-                                          title: 'Cancelar convite',
-                                          message: `Deseja cancelar o convite de ${invite.email}?`,
-                                          tone: 'danger',
-                                        })
-                                      : window.confirm(`Deseja cancelar o convite de ${invite.email}?`);
-
-                                    if (!confirmarCancelamento) return;
-
-                                    const { error } = await updateInvite(invite.id, { status: 'cancelado' });
-                                    if (error) {
-                                      showToast({ type: 'error', message: mensagemErroSegura(error, 'Nao foi possivel cancelar o convite.') });
-                                      return;
-                                    }
-                                    registrarEventoAuditoria({
-                                      acao: 'convite_cancelado',
-                                      entidade: 'invites',
-                                      entidade_id: invite.id,
-                                      criticidade: 'alta',
-                                      detalhes: { email: invite.email },
-                                    });
-                                    showToast({ type: 'success', message: 'Convite cancelado com sucesso.' });
-                                    await carregarDadosDeAcesso();
-                                  }}
+                                  onClick={() => cancelarConvite(invite)}
                                 >
-                                  Cancelar
+                                  Cancelar convite
                                 </Button>
                               ) : null}
                               <Button
                                 size="sm"
                                 variant="danger"
-                                onClick={async () => {
-                                  if (!validarPermissao('acessos:gerenciar')) return;
-                                  const confirmarRemocao = onConfirmAction
-                                    ? await onConfirmAction({
-                                        title: 'Remover convite',
-                                        message: `Remover permanentemente o convite de ${invite.email}?`,
-                                        tone: 'danger',
-                                      })
-                                    : window.confirm(`Remover permanentemente o convite de ${invite.email}?`);
-
-                                  if (!confirmarRemocao) return;
-
-                                  if (String(invite.status || '').toLowerCase() === 'aceito') {
-                                    showToast({ type: 'warning', message: 'Convites aceitos não podem ser removidos por esta ação.' });
-                                    return;
-                                  }
-
-                                  const { error } = await deleteInvite(invite.id);
-                                  if (error) {
-                                    showToast({ type: 'error', message: mensagemErroSegura(error, 'Nao foi possivel remover o convite.') });
-                                    return;
-                                  }
-                                  registrarEventoAuditoria({
-                                    acao: 'convite_removido',
-                                    entidade: 'invites',
-                                    entidade_id: invite.id,
-                                    criticidade: 'alta',
-                                    detalhes: { email: invite.email },
-                                  });
-                                  showToast({ type: 'success', message: 'Convite removido com sucesso.' });
-                                  await carregarDadosDeAcesso();
-                                }}
+                                onClick={() => removerConvitePendente(invite)}
                               >
-                                Remover convite
+                                Remover convite pendente
                               </Button>
                             </div>
                           </td>
                         </tr>
                       ))
                     )}
+                  </tbody>
+                </table>
+              </div>
+
+              <div style={{ height: 20 }} />
+              <div className="table-responsive">
+                <table className="dashboard-table">
+                  <thead><tr><th colSpan="5">Convites aceitos</th></tr></thead>
+                  <tbody>
+                    {invitesAceitos.length === 0 ? <tr><td colSpan="5">Nenhum convite aceito.</td></tr> : invitesAceitos.map((invite) => (
+                      <tr key={invite.id}><td><strong>{invite.nome || 'Convite sem nome'}</strong><div>{invite.email}</div></td><td>{obterLabelPerfil(invite.perfil)}</td><td>{invite.status}</td><td>{invite.used_at ? new Date(invite.used_at).toLocaleString('pt-BR') : '-'}</td><td>Este convite já foi aceito. Para remover acesso, altere o usuário.</td></tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+
+              <div style={{ height: 20 }} />
+              <div className="table-responsive">
+                <table className="dashboard-table">
+                  <thead><tr><th colSpan="5">Convites cancelados/expirados</th></tr></thead>
+                  <tbody>
+                    {invitesCanceladosExpirados.length === 0 ? <tr><td colSpan="5">Nenhum convite cancelado ou expirado.</td></tr> : invitesCanceladosExpirados.map((invite) => (
+                      <tr key={invite.id}><td><strong>{invite.nome || 'Convite sem nome'}</strong><div>{invite.email}</div></td><td>{obterLabelPerfil(invite.perfil)}</td><td>{invite.status}</td><td>{invite.used_at ? new Date(invite.used_at).toLocaleString('pt-BR') : '-'}</td><td><Button size="sm" variant="danger" onClick={() => removerConvitePendente(invite)}>Remover convite pendente</Button></td></tr>
+                    ))}
                   </tbody>
                 </table>
               </div>
