@@ -65,6 +65,7 @@ const FORM_VAZIO = {
   observacao: '',
   rendimento_carcaca: 52,
   preco_arroba: '',
+  quantidade_pesada: '',
 };
 
 function normalizarInitialData(data) {
@@ -77,6 +78,7 @@ function normalizarInitialData(data) {
     observacao: data.observacao || '',
     rendimento_carcaca: data.rendimento_carcaca ?? 52,
     preco_arroba: data.preco_arroba ?? '',
+    quantidade_pesada: data.quantidade_pesada ?? '',
   };
 }
 
@@ -294,6 +296,7 @@ export default function PesagemForm({
       lote_id: form.lote_id ? Number(form.lote_id) : null,
       data: form.data,
       peso_medio: Number(form.peso_medio),
+      quantidade_pesada: form.quantidade_pesada === '' ? null : Number(form.quantidade_pesada),
       observacao: form.observacao.trim(),
     });
   }
@@ -362,7 +365,6 @@ export default function PesagemForm({
                         <tr key={key}>
                           <td>
                             {nomeAnimal}
-                            {animal.virtual ? <span className="badge badge-neutral" style={{ marginLeft: 8 }}>virtual</span> : null}
                           </td>
                           <td>
                             <input
@@ -415,19 +417,16 @@ export default function PesagemForm({
           </label>
 
           {form.tipo === 'lote' && (
-            <label className="pesagem-form-field">
-              Peso medio (kg)
-              <input
-                className="ui-input"
-                name="peso_medio"
-                type="number"
-                step="0.01"
-                min={0}
-                value={form.peso_medio}
-                onChange={handleChange}
-                placeholder="Ex: 412"
-              />
-            </label>
+            <>
+              <label className="pesagem-form-field">
+                Peso medio (kg)
+                <input className="ui-input" name="peso_medio" type="number" step="0.01" min={0} value={form.peso_medio} onChange={handleChange} placeholder="Ex: 412" />
+              </label>
+              <label className="pesagem-form-field">
+                Quantidade pesada (cabecas)
+                <input className="ui-input" name="quantidade_pesada" type="number" step="1" min={0} value={form.quantidade_pesada} onChange={handleChange} placeholder="Ex: 80" />
+              </label>
+            </>
           )}
         </div>
         </section>
