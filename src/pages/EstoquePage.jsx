@@ -6,6 +6,7 @@ import Button from '../components/ui/Button';
 import Modal from '../components/ui/Modal';
 import Input from '../components/ui/Input';
 import { formatCurrency, formatDate, formatNumber } from '../utils/calculations';
+import { exportarCsvCompatExcel, exportarExcelXmlCompat } from '../utils/exportadores';
 import { gerarNovoId } from '../utils/id';
 import { useToast } from '../hooks/useToast';
 import { useAuth } from '../auth/useAuth';
@@ -106,18 +107,26 @@ export default function EstoquePage({ db, setDb, onRegistrarSaidaEstoque }) {
   }).sort((a, b) => new Date(b.data) - new Date(a.data)), [db.movimentacoes_estoque, db.estoque, escopoEstoque, filters]);
 
   function exportCsv() {
-    const header = 'data,item,tipo,quantidade,lote,valor,obs';
-    const rows = movs.map((m) => {
-      const item = estoqueMap.get(m.item_estoque_id)?.produto || '';
-      const lote = lotesMap.get(m.lote_id)?.nome || '';
-      return [m.data, item, m.tipo, m.quantidade, lote, m.valor_total || 0, m.obs || ''].join(',');
-    });
-    const blob = new Blob([[header, ...rows].join('\n')], { type: 'text/csv' });
-    const a = document.createElement('a');
-    a.href = URL.createObjectURL(blob);
-    a.download = 'movimentacoes_estoque.csv';
-    a.click();
-    URL.revokeObjectURL(blob);
+    const rows = movs.map((m) => ({
+      data: m.data,
+      item: estoqueMap.get(m.item_estoque_id)?.produto || '',
+      tipo: m.tipo,
+      quantidade: m.quantidade,
+      lote: lotesMap.get(m.lote_id)?.nome || '',
+      valor: m.valor_total || 0,
+      observacao: m.obs || '',
+    }));
+    const columns = [
+      { key: 'data', header: 'Data', type: 'date' },
+      { key: 'item', header: 'Item' },
+      { key: 'tipo', header: 'Tipo' },
+      { key: 'quantidade', header: 'Quantidade', type: 'number' },
+      { key: 'lote', header: 'Lote' },
+      { key: 'valor', header: 'Valor', type: 'currency' },
+      { key: 'observacao', header: 'Observação' },
+    ];
+    exportarCsvCompatExcel({ filename: 'movimentacoes-estoque', rows, columns });
+    exportarExcelXmlCompat({ filename: 'movimentacoes-estoque', sheets: [{ name: 'Estoque', rows, columns }] });
   }
 
   return (
@@ -620,4 +629,3 @@ function SaidaModal({ db, setDb, selectedItem, onRegistrarSaidaEstoque, estoqueM
     </Modal>
   );
 }
-

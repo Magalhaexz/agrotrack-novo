@@ -8269,3 +8269,54 @@ body {
     display: none !important;
   }
 }
+
+@media print {
+  body { background: #fff !important; color: #111 !important; }
+  .sidebar, .app-header, .mobile-bottom-nav, .mobile-header-core, .mobile-fab,
+  .page-actions, .reports-page-actions, button, .action-btn, .no-print { display: none !important; }
+  .main, .page, .reports-page { padding: 0 !important; margin: 0 !important; background: #fff !important; }
+  .card, .reports-card, table { background: #fff !important; color: #111 !important; border-color: #d1d5db !important; }
+  .table-responsive { overflow: visible !important; }
+  tr, td, th, .card { page-break-inside: avoid; }
+  .reports-page::before { content: 'HERDON - Relatório\A Emissão: ' attr(data-print-date); white-space: pre; display: block; margin-bottom: 12px; font-weight: 700; color: #111; }
+}
+
+.config-actions-wrap .action-btn,
+.funcionario-row .action-btn,
+.funcionario-row .ui-input,
+.configuracoes-page .ui-input,
+.configuracoes-page button {
+  min-height: 44px;
+}
+
+.funcionario-row {
+  display: grid;
+  grid-template-columns: auto 1fr auto auto;
+  gap: 10px;
+  align-items: center;
+}
+
+@media (max-width: 900px) {
+  .table-responsive { overflow-x: auto; }
+  .dashboard-table { min-width: 680px; }
+  .funcionario-row {
+    grid-template-columns: auto 1fr;
+    align-items: start;
+  }
+  .funcionario-row .funcionario-phone,
+  .funcionario-row .funcionario-status,
+  .funcionario-row .row-actions {
+    grid-column: 2;
+  }
+  .funcionario-row .row-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin-top: 6px;
+  }
+  .config-actions-wrap {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+}

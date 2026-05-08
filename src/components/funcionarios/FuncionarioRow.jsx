@@ -8,11 +8,12 @@ function iniciais(nome) {
     .toUpperCase();
 }
 
-export default function FuncionarioRow({ funcionario, fazendaNome = '—', onEdit }) {
+export default function FuncionarioRow({ funcionario, fazendaNome = '—', onEdit, onDesativar, onReativar, onDesligar }) {
   if (!funcionario) return null;
 
   const status = funcionario.status || 'ativo';
   const ativo = status === 'ativo';
+  const desligado = status === 'desligado';
 
   return (
     <div
@@ -34,13 +35,13 @@ export default function FuncionarioRow({ funcionario, fazendaNome = '—', onEdi
         </div>
       </div>
 
-      <div className="funcionario-phone">
-        {funcionario.telefone || '—'}
-      </div>
+      <div className="funcionario-phone">{funcionario.telefone || funcionario.email || '—'}</div>
 
-      <span className={`funcionario-status ${ativo ? 'badge-ativo' : 'badge-inativo'}`}>
-        {ativo ? 'Ativo' : 'Inativo'}
-      </span>
+      <span className={`funcionario-status ${ativo ? 'badge-ativo' : desligado ? 'badge-r' : 'badge-inativo'}`}>{ativo ? 'Ativo' : desligado ? 'Desligado' : 'Inativo'}</span>
+      <div className="row-actions row-actions--tight" onClick={(e) => e.stopPropagation()}>
+        {ativo ? <button className="action-btn" onClick={onDesativar}>Desativar</button> : <button className="action-btn" onClick={onReativar}>Reativar</button>}
+        {!desligado ? <button className="action-btn action-btn-danger" onClick={onDesligar}>Marcar desligado</button> : null}
+      </div>
     </div>
   );
 }
