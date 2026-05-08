@@ -792,6 +792,7 @@ export default function App() {
           </div>
         ) : null}
         <AppHeader
+          currentPage={pageKey}
           farmName={fazendaSelecionada?.nome || db?.fazendas?.[0]?.nome || 'Fazenda Atual'}
           notifications={alerts.length}
           alerts={alerts}

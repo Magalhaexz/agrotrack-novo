@@ -7910,7 +7910,7 @@ body {
   .mobile-overlay {
     display: block;
     position: fixed;
-    inset: var(--herdon-mobile-topbar-height) 0 0 0;
+    inset: calc(var(--herdon-mobile-header-height) + env(safe-area-inset-top)) 0 0 0;
     z-index: 1540;
     background: rgba(5, 8, 7, 0.62);
     backdrop-filter: blur(2px);
@@ -7918,9 +7918,9 @@ body {
 
   .sidebar {
     position: fixed;
-    top: var(--herdon-mobile-topbar-height);
+    top: calc(var(--herdon-mobile-header-height) + env(safe-area-inset-top));
     left: 0;
-    height: calc(100dvh - var(--herdon-mobile-topbar-height));
+    height: calc(100dvh - var(--herdon-mobile-header-height) - env(safe-area-inset-top));
     width: min(88vw, 340px);
     transform: translateX(-100%);
     transition: transform 0.22s ease;
@@ -7935,13 +7935,7 @@ body {
 
   .header.top-header {
     left: 0;
-    top: var(--herdon-mobile-topbar-height);
     width: 100%;
-    min-height: var(--header-height);
-    height: auto;
-    padding: 8px 10px;
-    gap: 8px;
-    flex-wrap: wrap;
     z-index: 1500;
   }
 
@@ -8105,22 +8099,21 @@ body {
 
 @media (max-width: 900px) {
   :root {
-    --herdon-mobile-header-compact-height: 22px;
+    --herdon-mobile-header-height: 64px;
   }
 
   .mobile-topbar {
-    padding-top: env(safe-area-inset-top);
-    height: calc(var(--herdon-mobile-topbar-height) + env(safe-area-inset-top));
+    display: none !important;
   }
 
   .header.top-header {
-    top: calc(var(--herdon-mobile-topbar-height) + env(safe-area-inset-top));
-    min-height: 56px;
-    height: 56px;
+    top: env(safe-area-inset-top);
+    min-height: var(--herdon-mobile-header-height);
+    height: var(--herdon-mobile-header-height);
     padding: 6px 10px;
     display: flex;
     align-items: center;
-    justify-content: flex-end;
+    justify-content: space-between;
     flex-wrap: nowrap;
     gap: 8px;
   }
@@ -8152,6 +8145,49 @@ body {
     display: inline-flex;
   }
 
+  .mobile-header-core {
+    display: inline-flex;
+    align-items: center;
+    gap: 10px;
+    min-width: 0;
+  }
+
+  .mobile-header-menu-btn {
+    width: 40px;
+    height: 40px;
+    min-height: 40px;
+    border-radius: 10px;
+    border: 1px solid var(--color-border);
+    background: rgba(255, 255, 255, 0.03);
+    color: var(--color-text);
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .mobile-header-brand {
+    min-width: 0;
+    display: grid;
+    gap: 1px;
+  }
+
+  .mobile-header-brand strong {
+    color: #f2f7f4;
+    font-size: 0.82rem;
+    letter-spacing: 0.11em;
+    line-height: 1.1;
+  }
+
+  .mobile-header-brand span {
+    color: var(--color-text-secondary);
+    font-size: 0.74rem;
+    line-height: 1.2;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    max-width: 36vw;
+  }
+
   .mobile-header-panel-overlay {
     display: block;
     position: fixed;
@@ -8164,10 +8200,10 @@ body {
     display: grid;
     gap: 12px;
     position: fixed;
-    top: calc(var(--herdon-mobile-topbar-height) + env(safe-area-inset-top) + 56px + 8px);
+    top: calc(var(--herdon-mobile-header-height) + env(safe-area-inset-top) + 8px);
     right: 10px;
     width: min(360px, calc(100vw - 20px));
-    max-height: calc(100dvh - var(--herdon-mobile-topbar-height) - env(safe-area-inset-top) - 84px);
+    max-height: calc(100dvh - var(--herdon-mobile-header-height) - env(safe-area-inset-top) - 20px);
     overflow-y: auto;
     padding: 12px;
     border-radius: 14px;
@@ -8214,7 +8250,7 @@ body {
   }
 
   .main {
-    padding-top: calc(var(--herdon-mobile-topbar-height) + env(safe-area-inset-top) + 56px + 10px);
+    padding-top: calc(var(--herdon-mobile-header-height) + env(safe-area-inset-top) + 8px);
     padding-bottom: calc(var(--herdon-mobile-bottomnav-height) + env(safe-area-inset-bottom) + 14px);
   }
 
@@ -8225,5 +8261,11 @@ body {
 
   .mobile-fab {
     bottom: calc(var(--herdon-mobile-bottomnav-height) + env(safe-area-inset-bottom) + 16px);
+  }
+}
+
+@media (min-width: 901px) {
+  .mobile-header-core {
+    display: none !important;
   }
 }

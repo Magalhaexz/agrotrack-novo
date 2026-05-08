@@ -1,4 +1,4 @@
-import { Activity, AlertTriangle, Bell, ChevronDown, Loader2, LogOut, MoreHorizontal, Package, Settings, User } from 'lucide-react';
+import { Activity, AlertTriangle, Bell, ChevronDown, Loader2, LogOut, Menu, MoreHorizontal, Package, Settings, User } from 'lucide-react';
 import { createPortal } from 'react-dom';
 import { useEffect, useRef, useState } from 'react';
 import { obterLabelPerfil } from '../auth/perfis';
@@ -150,6 +150,7 @@ function getCloudState(syncStatus) {
 }
 
 export default function AppHeader({
+  currentPage = 'dashboard',
   farmName = 'Fazenda Santa Rita',
   usuarioLogado = null,
   notifications = 0,
@@ -158,6 +159,7 @@ export default function AppHeader({
   onSnoozeAlert,
   onAlertNavigate,
   onSignOut,
+  onOpenMenu,
   onNavigateProfile,
   onNavigateSettings,
   onConfirmAction,
@@ -261,6 +263,7 @@ export default function AppHeader({
 
   const nomeExibicao = usuarioLogado?.nome || 'Usuário';
   const perfilExibicao = obterLabelPerfil(usuarioLogado?.perfilLabel || usuarioLogado?.perfil);
+  const mobilePageTitle = getNavLabel(currentPage);
   const cloudState = getCloudState(syncStatus);
   const resolvedAlertKeys = alertDebugState?.resolvedAlertKeys || new Set();
   const snoozedAlerts = Array.isArray(alertDebugState?.snoozedAlerts) ? alertDebugState.snoozedAlerts : [];
@@ -422,6 +425,16 @@ export default function AppHeader({
 
   return (
     <header className="header top-header">
+      <div className="mobile-header-core sem-impressao">
+        <button type="button" className="mobile-header-menu-btn" onClick={onOpenMenu} aria-label="Abrir menu">
+          <Menu size={18} />
+        </button>
+        <div className="mobile-header-brand">
+          <strong>HERDON</strong>
+          <span>{mobilePageTitle}</span>
+        </div>
+      </div>
+
       <div className="farm-selector-wrap" ref={farmsRef}>
         <button
           type="button"
