@@ -175,7 +175,7 @@ export default function EstoquePage({ db, setDb, onRegistrarSaidaEstoque }) {
         </div>
       </div>
 
-      <Card title="Fluxo do estoque" subtitle="Cadastre o item e depois registre entradas e saídas." >
+      <Card title="Como funciona" subtitle="Cadastro, entrada e saída em poucos passos." >
         <div className="dashboard-list">
           <div className="dashboard-list-item"><div className="dashboard-list-copy"><strong>Cadastrar item</strong><p>Cria o item base do Estoque Geral.</p></div></div>
           <div className="dashboard-list-item"><div className="dashboard-list-copy"><strong>Registrar entrada</strong><p>Adiciona quantidade em item já cadastrado.</p></div></div>
@@ -193,8 +193,9 @@ export default function EstoquePage({ db, setDb, onRegistrarSaidaEstoque }) {
       <div className="lote-cards-grid">
         {itensView.length === 0 ? (
           <div className="empty-box">
-            <strong>{showOnlyCrit ? 'Nenhum item crítico.' : 'Nenhum item no estoque.'}</strong>
-            <span>{showOnlyCrit ? 'Todos os itens estão em nível normal.' : 'Cadastre um item para iniciar o Estoque Geral.'}</span>
+            <strong>{showOnlyCrit ? 'Nenhum item crítico.' : 'Nenhum item cadastrado.'}</strong>
+            <span>{showOnlyCrit ? 'Todos os itens estão em nível normal.' : 'Cadastre o primeiro item para controlar entradas e saídas.'}</span>
+            {!showOnlyCrit ? <Button onClick={() => setOpenCadastroItem(true)}>Cadastrar item</Button> : null}
           </div>
         ) : (
           itensView.map((item) => {
