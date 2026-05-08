@@ -1,4 +1,4 @@
-﻿import { Activity, AlertTriangle, Bell, ChevronDown, Loader2, LogOut, Menu, MoreHorizontal, Package, Settings, User } from 'lucide-react';
+import { Activity, AlertTriangle, Bell, ChevronDown, Loader2, LogOut, MoreHorizontal, Package, Settings, User } from 'lucide-react';
 import { createPortal } from 'react-dom';
 import { useEffect, useRef, useState } from 'react';
 import { obterLabelPerfil } from '../auth/perfis';
@@ -158,7 +158,6 @@ export default function AppHeader({
   onSnoozeAlert,
   onAlertNavigate,
   onSignOut,
-  onOpenMenu,
   onNavigateProfile,
   onNavigateSettings,
   onConfirmAction,
@@ -177,6 +176,7 @@ export default function AppHeader({
   const notifPanelRef = useRef(null);
   const [farmsRef, openFarms, setOpenFarms] = useDropdown(false);
   const [cloudMenuRef, openCloudMenu, setOpenCloudMenu] = useDropdown(false);
+  const [mobilePanelRef, openMobilePanel, setOpenMobilePanel] = useDropdown(false);
   const notifButtonRef = useRef(null);
   const [notifPosition, setNotifPosition] = useState({
     top: 0,
@@ -259,7 +259,7 @@ export default function AppHeader({
     return 'success';
   }
 
-  const nomeExibicao = usuarioLogado?.nome || 'UsuÃ¡rio';
+  const nomeExibicao = usuarioLogado?.nome || 'Usuário';
   const perfilExibicao = obterLabelPerfil(usuarioLogado?.perfilLabel || usuarioLogado?.perfil);
   const cloudState = getCloudState(syncStatus);
   const resolvedAlertKeys = alertDebugState?.resolvedAlertKeys || new Set();
@@ -422,10 +422,6 @@ export default function AppHeader({
 
   return (
     <header className="header top-header">
-      <button type="button" className="mobile-menu-inline sem-impressao" onClick={onOpenMenu} aria-label="Abrir menu">
-        <Menu size={18} />
-      </button>
-
       <div className="farm-selector-wrap" ref={farmsRef}>
         <button
           type="button"
@@ -570,6 +566,124 @@ export default function AppHeader({
           </button>
         </div>
 
+        <div className="user-menu-wrap mobile-utility-wrap" ref={mobilePanelRef}>
+          <button
+            type="button"
+            className="header-notification-btn mobile-utility-trigger"
+            onClick={() => setOpenMobilePanel((value) => !value)}
+            aria-expanded={openMobilePanel}
+            aria-controls="mobile-header-panel"
+            aria-label="Abrir controles do cabecalho"
+          >
+            <MoreHorizontal size={16} />
+          </button>
+
+          {openMobilePanel ? (
+            <>
+              <button
+                type="button"
+                className="mobile-header-panel-overlay"
+                aria-label="Fechar painel"
+                onClick={() => setOpenMobilePanel(false)}
+              />
+              <div id="mobile-header-panel" className="mobile-header-panel">
+                <section className="mobile-header-panel-section">
+                  <p className="mobile-header-panel-title">Fazenda ativa</p>
+                  <div className="mobile-header-panel-list">
+                    {fazendas.length === 0 ? (
+                      <div className="header-farm-item-empty">Nenhuma fazenda cadastrada.</div>
+                    ) : (
+                      fazendas.map((fazenda) => (
+                        <button
+                          key={`mobile-farm-${fazenda.id}`}
+                          type="button"
+                          className={`header-farm-item ${Number(fazendaSelecionada?.id) === Number(fazenda.id) ? 'active' : ''}`}
+                          onClick={() => {
+                            onSelectFazenda?.(fazenda);
+                            setOpenMobilePanel(false);
+                          }}
+                        >
+                          <span>{fazenda.nome}</span>
+                          <small>{fazenda.cidade} / {fazenda.estado}</small>
+                        </button>
+                      ))
+                    )}
+                  </div>
+                </section>
+
+                <section className="mobile-header-panel-section">
+                  <p className="mobile-header-panel-title">Visao</p>
+                  <div className="mobile-header-tabs">
+                    {['geral', 'estoque', 'alertas'].map((tab) => (
+                      <button
+                        key={`mobile-tab-${tab}`}
+                        type="button"
+                        className={`header-tab ${tabAtiva === tab ? 'active' : ''}`}
+                        onClick={() => {
+                          onTabChange?.(tab);
+                          setOpenMobilePanel(false);
+                        }}
+                      >
+                        {tab[0].toUpperCase() + tab.slice(1)}
+                      </button>
+                    ))}
+                  </div>
+                </section>
+
+                <section className="mobile-header-panel-section">
+                  <p className="mobile-header-panel-title">Nuvem</p>
+                  <div className={`header-sync-chip header-sync-chip--${cloudState.tone}`}>
+                    <span className="header-sync-icon" aria-hidden="true">
+                      {cloudState.icon === 'loading' ? (
+                        <Loader2 size={15} className="ui-spin" />
+                      ) : cloudState.icon === 'warning' ? (
+                        <AlertTriangle size={15} />
+                      ) : cloudState.icon === 'local' ? (
+                        <Package size={15} />
+                      ) : (
+                        <Activity size={15} />
+                      )}
+                    </span>
+                    <span className="header-sync-copy">
+                      <strong>{cloudState.label}</strong>
+                      <small>{cloudState.detail}</small>
+                    </span>
+                  </div>
+                  <div className="mobile-header-cloud-actions">
+                    <button type="button" className="header-sync-dropdown-item" onClick={() => syncStatus?.onTestCloud?.()}>
+                      Testar conexao
+                    </button>
+                    <button type="button" className="header-sync-dropdown-item" onClick={() => syncStatus?.onSyncNow?.()}>
+                      Sincronizar
+                    </button>
+                    <button type="button" className="header-sync-dropdown-item" onClick={() => syncStatus?.onReconnectCloud?.()}>
+                      Reconectar
+                    </button>
+                  </div>
+                </section>
+
+                <section className="mobile-header-panel-section">
+                  <p className="mobile-header-panel-title">Conta</p>
+                  <div className="mobile-header-account-actions">
+                    <button type="button" className="user-dropdown-item" onClick={() => { onNavigateProfile?.(); setOpenMobilePanel(false); }}>
+                      <User size={15} />
+                      Meu Perfil
+                    </button>
+                    <button type="button" className="user-dropdown-item" onClick={() => { onNavigateSettings?.(); setOpenMobilePanel(false); }}>
+                      <Settings size={15} />
+                      Configuracoes
+                    </button>
+                    <button type="button" className="user-dropdown-item logout" onClick={handleLogout}>
+                      <LogOut size={15} />
+                      Sair da conta
+                    </button>
+                  </div>
+                </section>
+              </div>
+            </>
+          ) : null}
+        </div>
+
         <div className="user-menu-wrap" ref={userMenuRef}>
           <button
             type="button"
@@ -606,7 +720,7 @@ export default function AppHeader({
               </button>
               <button type="button" className="user-dropdown-item" onClick={() => { onNavigateSettings?.(); setOpenUserMenu(false); }}>
                 <Settings size={15} />
-                                ConfiguraÃ§Ãµes
+                                Configurações
               </button>
               <div className="user-dropdown-divider" />
               <button type="button" className="user-dropdown-item logout" onClick={handleLogout}>
@@ -624,7 +738,7 @@ export default function AppHeader({
             <button
               type="button"
               className="notif-overlay"
-              aria-label="Fechar notificaÃ§Ãµes"
+              aria-label="Fechar notificações"
               onClick={() => setOpenNotif(false)}
             />
             <div
@@ -643,7 +757,7 @@ export default function AppHeader({
                 <div>
                   <span className="notif-panel-kicker">Central de alertas</span>
                   <strong>{notifications > 0 ? `${notifications} pendentes` : 'Tudo em dia'}</strong>
-                  <small>Alertas operacionais, sanitÃ¡rios, estoque e lembretes do HERDON.</small>
+                  <small>Alertas operacionais, sanitários, estoque e lembretes do HERDON.</small>
                 </div>
                 <span className="notif-panel-pill">{notifications}</span>
               </div>
@@ -675,12 +789,12 @@ export default function AppHeader({
                             <span className="notif-item-meta">{destino}</span>
                           </div>
                           <span className={`notif-item-tag notif-item-tag--${tone}`}>
-                            {tone === 'danger' ? 'CrÃ­tico' : tone === 'warning' ? 'AtenÃ§Ã£o' : tone === 'info' ? 'Monitorar' : 'Operacional'}
+                            {tone === 'danger' ? 'Crítico' : tone === 'warning' ? 'Atenção' : tone === 'info' ? 'Monitorar' : 'Operacional'}
                           </span>
                         </div>
                         <small>{alert.description || alert.mensagem}</small>
                         {import.meta.env.DEV ? (
-                          <small className="notif-debug-line">ackKey: {ackKey} | resolved: {isResolved ? 'sim' : 'nÃ£o'} | adiado: {isSnoozed ? 'sim' : 'nÃ£o'} | route found: {hasRoute ? 'sim' : 'nÃ£o'}</small>
+                          <small className="notif-debug-line">ackKey: {ackKey} | resolved: {isResolved ? 'sim' : 'não'} | adiado: {isSnoozed ? 'sim' : 'não'} | route found: {hasRoute ? 'sim' : 'não'}</small>
                         ) : null}
                         <div className="notif-actions">
                           <button
@@ -737,3 +851,5 @@ export default function AppHeader({
     </header>
   );
 }
+
+
