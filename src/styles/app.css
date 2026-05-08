@@ -8552,6 +8552,138 @@ body {
   }
 }
 
+/* SPRINT21D - Animais and Pesagens visual polish */
+.animais-page,
+.page--pesagens {
+  gap: 14px;
+}
+
+.animais-hero,
+.page--pesagens .animais-hero {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.animais-hero p,
+.page--pesagens .animais-hero p {
+  margin-top: 6px;
+  color: rgba(214, 223, 219, 0.72);
+  font-size: 0.9rem;
+}
+
+.animais-kpi-grid .ui-card,
+.page--pesagens .dashboard-grid--kpi-main .ui-card {
+  min-height: 112px;
+}
+
+.animais-kpi-value {
+  font-size: 1.9rem;
+  font-weight: 800;
+  color: #eff6f2;
+}
+
+.animais-page .segment,
+.page--pesagens .segment {
+  white-space: nowrap;
+}
+
+.animais-page .tab-bar,
+.page--pesagens .tab-bar {
+  margin-bottom: 8px;
+}
+
+.animais-empty-state,
+.page--pesagens .empty-box {
+  border-radius: 12px;
+  border: 1px dashed rgba(255, 255, 255, 0.12);
+  background: rgba(255, 255, 255, 0.02);
+  padding: 18px;
+}
+
+.animais-mode-actions {
+  display: grid;
+  gap: 6px;
+  padding: 10px 0;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.animais-mode-actions:last-child {
+  border-bottom: none;
+}
+
+.animal-form .section-card {
+  padding: 12px;
+}
+
+.animal-form-section-head h4 {
+  margin: 0;
+  font-size: 0.94rem;
+  color: #ecf3ef;
+}
+
+.animal-form-grid {
+  min-width: 0;
+}
+
+.animal-form-grid .full {
+  grid-column: 1 / -1;
+}
+
+.pesagem-form .section-card {
+  padding: 12px;
+}
+
+.pesagem-form-section-head {
+  margin-bottom: 8px;
+  font-weight: 700;
+  color: #eaf2ee;
+}
+
+.pesagem-preview-wrap {
+  margin-top: 2px;
+}
+
+.page--pesagens .fazendas-card,
+.page--pesagens .dashboard-grid--kpi-main .ui-card {
+  border-radius: 14px;
+}
+
+.page--pesagens .action-btn,
+.page--pesagens .primary-btn,
+.animais-page .action-btn {
+  min-height: 44px;
+}
+
+@media (max-width: 900px) {
+  .animais-hero,
+  .page--pesagens .animais-hero {
+    display: grid;
+    gap: 10px;
+  }
+
+  .animais-page .page-actions,
+  .page--pesagens .page-actions {
+    width: 100%;
+  }
+
+  .animais-page .page-actions > *,
+  .page--pesagens .page-actions > * {
+    width: 100%;
+  }
+
+  .animal-form-grid--2,
+  .pesagem-form .grid-2 {
+    grid-template-columns: 1fr;
+  }
+
+  .pesagem-form .responsive-table-wrap {
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+}
+
 /* SPRINT21C - Fazendas visual polish */
 .fazendas-grid {
   gap: 12px;
