@@ -388,17 +388,17 @@ export function registrarSaidaAnimal(
     lotes: lotesAtualizados,
     movimentacoes_financeiras: [
       ...movimentosFinanceiros,
-      // Adiciona movimentação financeira apenas se for uma venda
-      ...(tipoSaida === 'venda'
+      // Adiciona movimentação financeira para venda ou abate com valor
+      ...((tipoSaida === 'venda' || tipoSaida === 'abate') && valor > 0
         ? [
             {
               id: novoMovFinanceiroId,
               tipo: 'receita',
-              categoria: 'venda_animal',
+              categoria: tipoSaida === 'abate' ? 'abate_animal' : 'venda_animal',
               lote_id: Number(loteId),
               valor,
               data,
-              descricao: `Venda de ${quantidade} animal(is) do lote ${loteId}`,
+              descricao: `${tipoSaida === 'abate' ? 'Abate' : 'Venda'} de ${quantidade} animal(is) do lote ${loteId}`,
               origem_tipo: 'movimentacao_animal',
               origem_id: novoMovAnimalId,
             },
@@ -419,7 +419,7 @@ export function registrarSaidaAnimal(
       p_at: loteAtualizado?.p_at || 0,
     }, persistContext.session),
   ];
-  if (tipoSaida === 'venda') {
+  if ((tipoSaida === 'venda' || tipoSaida === 'abate') && valor > 0) {
     const movFinanceiraCriada = baseAtualizada.movimentacoes_financeiras[baseAtualizada.movimentacoes_financeiras.length - 1];
     if (movFinanceiraCriada?.tipo === 'receita') {
       mutations.push(createOperationalRecord('movimentacoes_financeiras', {
