@@ -615,6 +615,32 @@ function buildOperationalCreatePayload(table, record, userId) {
     if (tableSupportsOwnerScope('estoque') && userId) payload.owner_user_id = userId;
     return Object.fromEntries(Object.entries(payload).filter(([, value]) => value !== undefined));
   }
+  if (normalizedTable === 'pesagens') {
+    const safe = sanitizeRecord(record);
+    const cloudUuid = normalizeCloudUuid(safe?.cloud_id ?? safe?.metadata?.cloud_id);
+    const metadata = isObject(safe?.metadata) ? { ...safe.metadata } : {};
+    if (!Object.prototype.hasOwnProperty.call(metadata, 'local_id')) {
+      metadata.local_id = safe?.id ?? null;
+    }
+    const payload = {
+      owner_user_id: userId || null,
+      fazenda_id: toNullableNumber(safe?.fazenda_id),
+      lote_id: toNullableNumber(safe?.lote_id),
+      animal_id: toNullableNumber(safe?.animal_id),
+      data: toNullableDateString(safe?.data ?? safe?.data_pesagem),
+      data_pesagem: toNullableDateString(safe?.data_pesagem ?? safe?.data),
+      peso: toNullableNumber(safe?.peso),
+      peso_kg: toNullableNumber(safe?.peso_kg),
+      peso_medio: toNullableNumber(safe?.peso_medio ?? safe?.peso ?? safe?.peso_kg),
+      tipo: toNullableString(safe?.tipo),
+      observacao: toNullableString(safe?.observacao),
+      observacoes: toNullableString(safe?.observacoes),
+      metadata,
+      cloud_id: cloudUuid || undefined,
+    };
+    delete payload.id;
+    return Object.fromEntries(Object.entries(payload).filter(([, value]) => value !== undefined));
+  }
   const safe = sanitizeRecord(record);
   if (tableSupportsOwnerScope(normalizedTable)) {
     return {
@@ -1274,7 +1300,8 @@ export async function updateOperationalRecord(table, id, patch, session, options
     const normalizedIdentityKey = buildFazendaIdentityKey(selector?.identity || {});
     const runUpdate = async (useOwnerScope) => {
       let query = supabase.from(table).update(payload);
-      if (String(table || '').toLowerCase() === 'fazendas' && selector?.type) {
+      const normalizedTable = String(table || '').toLowerCase();
+      if (normalizedTable === 'fazendas' && selector?.type) {
         if (selector.type === 'id' && Number.isFinite(Number(selector?.value))) {
           query = query.eq('id', Number(selector.value));
         } else if (selector.type === 'cloud_id' && selector?.value) {
@@ -1284,6 +1311,29 @@ export async function updateOperationalRecord(table, id, patch, session, options
         } else if (selector.type === 'fallback_identity' && normalizedIdentityKey && normalizedIdentityKey !== '||') {
           const [nome, cidade, estado] = normalizedIdentityKey.split('|');
           query = query.ilike('nome', nome || '').ilike('cidade', cidade || '').ilike('estado', estado || '');
+        } else {
+          query = query.eq('id', id);
+        }
+      } else if (normalizedTable === 'pesagens' && selector?.type) {
+        if (selector.type === 'id' && Number.isFinite(Number(selector?.value))) {
+          query = query.eq('id', Number(selector.value));
+        } else if (selector.type === 'cloud_id' && selector?.value) {
+          query = query.eq('cloud_id', String(selector.value));
+        } else if (selector.type === 'metadata.local_id' && selector?.value) {
+          query = query.contains('metadata', { local_id: String(selector.value) });
+        } else if (selector.type === 'animal_date_tipo') {
+          query = query
+            .eq('animal_id', Number(selector?.animal_id))
+            .eq('lote_id', Number(selector?.lote_id))
+            .eq('tipo', String(selector?.tipo || 'animal'))
+            .eq('data', String(selector?.data || '').slice(0, 10));
+        } else if (selector.type === 'lote_date_tipo') {
+          query = query
+            .eq('lote_id', Number(selector?.lote_id))
+            .eq('tipo', String(selector?.tipo || 'lote'))
+            .eq('data', String(selector?.data || '').slice(0, 10));
+        } else if (Number.isFinite(Number(id))) {
+          query = query.eq('id', Number(id));
         } else {
           query = query.eq('id', id);
         }
