@@ -8865,3 +8865,86 @@ body {
     font-size: 0.7rem;
   }
 }
+/* SPRINT21E - Estoque and Nutrição/Suplementação visual polish */
+.page--estoque .page-header,
+.page--suplementacao .page-header {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.page--estoque .page-actions,
+.page--suplementacao .page-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.page--estoque .kpi-card,
+.page--suplementacao .kpi-card {
+  min-height: 106px;
+}
+
+.page--estoque .empty-box,
+.page--suplementacao .empty-state {
+  display: grid;
+  gap: 8px;
+  align-content: center;
+}
+
+.page--estoque .filters-wrap,
+.page--suplementacao .filters-wrap {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.page--suplementacao .tab-bar {
+  margin-bottom: 8px;
+}
+
+.page--suplementacao .segment {
+  white-space: nowrap;
+}
+
+.page--suplementacao .dashboard-table td,
+.page--suplementacao .dashboard-table th,
+.page--estoque .dashboard-table td,
+.page--estoque .dashboard-table th {
+  vertical-align: middle;
+}
+
+@media (max-width: 900px) {
+  .page--estoque .page-header,
+  .page--suplementacao .page-header {
+    display: grid;
+    align-items: stretch;
+  }
+
+  .page--estoque .page-actions,
+  .page--suplementacao .page-actions {
+    width: 100%;
+  }
+
+  .page--estoque .page-actions > *,
+  .page--suplementacao .page-actions > * {
+    width: 100%;
+    min-height: 44px;
+  }
+
+  .page--estoque .filters-wrap,
+  .page--suplementacao .filters-wrap {
+    grid-template-columns: 1fr;
+  }
+
+  .suplementacao-kpi-grid {
+    grid-template-columns: 1fr 1fr;
+  }
+}
+
+@media (max-width: 640px) {
+  .suplementacao-kpi-grid {
+    grid-template-columns: 1fr;
+  }
+}

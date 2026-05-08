@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+﻿import { useEffect, useMemo, useState } from 'react';
 import Modal from '../ui/Modal';
 import Button from '../ui/Button';
 
@@ -30,10 +30,11 @@ function validarForm(form) {
   if (form.modo === 'por_cabeca') {
     if (!Number(form.consumo_por_cabeca_dia || 0)) return 'Informe o consumo por cabeça/dia.';
     if (Number(form.consumo_por_cabeca_dia || 0) <= 0) return 'Consumo por cabeça/dia deve ser maior que zero.';
-  } else { // modo === 'total_lote'
+  } else {
     if (!Number(form.consumo_total_dia || 0)) return 'Informe o consumo total do lote/dia.';
     if (Number(form.consumo_total_dia || 0) <= 0) return 'Consumo total do lote/dia deve ser maior que zero.';
   }
+
   return null;
 }
 
@@ -41,13 +42,9 @@ export default function SuplementacaoForm({ lotes = [], estoque = [], onSave, on
   const [form, setForm] = useState(() => normalizarInitialData(initialData));
   const [erro, setErro] = useState('');
 
-  const itensDisponiveis = useMemo(() => {
-    return estoque.filter((item) =>
-      ['insumo', 'ração', 'mineral', 'outros'].includes(
-        String(item.categoria || '').toLowerCase()
-      )
-    );
-  }, [estoque]);
+  const itensDisponiveis = useMemo(() => (
+    estoque.filter((item) => ['insumo', 'ração', 'mineral', 'outros'].includes(String(item.categoria || '').toLowerCase()))
+  ), [estoque]);
 
   /* eslint-disable react-hooks/set-state-in-effect */
   useEffect(() => {
@@ -84,7 +81,7 @@ export default function SuplementacaoForm({ lotes = [], estoque = [], onSave, on
   const titulo = initialData ? 'Editar suplementação' : 'Nova suplementação';
 
   const footer = (
-    <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8 }}>
+    <div className="action-row" style={{ justifyContent: 'flex-end' }}>
       <Button variant="ghost" onClick={onCancel}>Cancelar</Button>
       <Button onClick={handleSubmit}>Salvar suplementação</Button>
     </div>
@@ -92,8 +89,7 @@ export default function SuplementacaoForm({ lotes = [], estoque = [], onSave, on
 
   return (
     <Modal open onClose={onCancel} title={titulo} footer={footer}>
-      <form onSubmit={handleSubmit} style={{ display: 'grid', gap: 14 }}>
-
+      <form onSubmit={handleSubmit} className="form-section" style={{ display: 'grid', gap: 14 }}>
         <div className="grid-2">
           <label className="ui-input-wrap">
             <span className="ui-input-label">Lote</span>
@@ -170,7 +166,6 @@ export default function SuplementacaoForm({ lotes = [], estoque = [], onSave, on
             {erro}
           </p>
         )}
-
       </form>
     </Modal>
   );
