@@ -86,6 +86,10 @@ export default function ConfiguracoesPage({ db, setDb, onConfirmAction }) {
     () => invitesRows.filter((invite) => String(invite?.status || '').toLowerCase() === 'aceito' || Boolean(invite?.used_at)),
     [invitesRows]
   );
+  const totalAdminsAtivosFallback = useMemo(
+    () => usuariosFallback.filter((item) => ['admin', 'proprietario'].includes(String(item?.perfil || '').toLowerCase()) && String(item?.status || 'ativo') === 'ativo').length,
+    [usuariosFallback]
+  );
 
   function validarPermissao(permissao) {
     if (hasPermission(permissao)) return true;
@@ -552,16 +556,17 @@ export default function ConfiguracoesPage({ db, setDb, onConfirmAction }) {
             <>
               <div className="table-responsive">
                 <table className="dashboard-table">
-                  <thead><tr><th>Nome</th><th>E-mail</th><th>Perfil</th><th>Atualizado em</th></tr></thead>
+                  <thead><tr><th>Nome</th><th>E-mail</th><th>Perfil atual</th><th>Origem</th><th>Atualizado em</th></tr></thead>
                   <tbody>
                     {profilesRows.length === 0 ? (
-                      <tr><td colSpan="4">Nenhum profile encontrado.</td></tr>
+                      <tr><td colSpan="5">Nenhum profile encontrado.</td></tr>
                     ) : (
                       profilesRows.map((item) => (
                         <tr key={item.id}>
                           <td>{item.nome || 'Sem nome'}</td>
                           <td>{item.email}</td>
-                          <td>{obterLabelPerfil(item.perfil)}</td>
+                          <td><span className="badge badge-info">{obterLabelPerfil(item.perfil)}</span></td>
+                          <td>profile</td>
                           <td>{item.updated_at ? new Date(item.updated_at).toLocaleString('pt-BR') : '-'}</td>
                         </tr>
                       ))
@@ -649,25 +654,38 @@ export default function ConfiguracoesPage({ db, setDb, onConfirmAction }) {
           {!accessModuleReady ? (
           <div className="table-responsive">
             <table className="dashboard-table">
-              <thead><tr><th>Nome</th><th>E-mail</th><th>Perfil</th><th>Status</th><th>Ações</th></tr></thead>
+              <thead><tr><th>Nome</th><th>E-mail</th><th>Perfil atual</th><th>Origem</th><th>Status</th><th>Ações</th></tr></thead>
               <tbody>
                 {usuariosFallback.map((item) => (
                   <tr key={item.id}>
-                    <td>{item.nome}</td>
+                    <td>{item.nome}<div style={{ fontSize: 12, opacity: 0.75 }}>Acesso especial de bootstrap.</div></td>
                     <td>{item.email}</td>
                     <td>
+                      <span className="badge badge-info" style={{ marginRight: 8 }}>{obterLabelPerfil(item.perfil)}</span>
                       <select
                         className="ui-input" // Adicionado classe ui-input
                         value={item.perfil}
-                        onChange={(e) => {
+                        onChange={async (e) => {
                           if (!validarPermissao('acessos:gerenciar')) return;
                           const novoPerfil = e.target.value;
                           const isSelf = String(item.id) === String(user?.id);
                           if (isSelf && novoPerfil !== 'admin') {
-                            showToast({ type: 'warning', message: 'Você não pode rebaixar seu próprio perfil por esta tela.' });
+                            showToast({ type: 'warning', message: 'Você não pode rebaixar seu próprio perfil administrativo.' });
                             return;
                           }
-                          void updateOperationalRecord('usuarios', item.id, { perfil: novoPerfil }, user ? { user } : null);
+                          const adminAtual = ['admin', 'proprietario'].includes(String(item.perfil || '').toLowerCase());
+                          const adminNovo = ['admin', 'proprietario'].includes(String(novoPerfil || '').toLowerCase());
+                          if (adminAtual && !adminNovo && totalAdminsAtivosFallback <= 1) {
+                            showToast({ type: 'warning', message: 'Não é possível remover ou rebaixar o último administrador.' });
+                            return;
+                          }
+                          const confirmarAlteracao = onConfirmAction
+                            ? await onConfirmAction({ title: 'Alterar perfil', message: 'Alterar o perfil deste usuário pode limitar o acesso dele ao sistema. Deseja continuar?', tone: 'warning' })
+                            : window.confirm('Alterar o perfil deste usuário pode limitar o acesso dele ao sistema. Deseja continuar?');
+                          if (!confirmarAlteracao) {
+                            return;
+                          }
+                          await updateOperationalRecord('usuarios', item.id, { perfil: novoPerfil }, user ? { user } : null);
                           registrarEventoAuditoria({
                             acao: 'usuario_fallback_perfil_atualizado',
                             entidade: 'usuarios',
@@ -687,6 +705,7 @@ export default function ConfiguracoesPage({ db, setDb, onConfirmAction }) {
                         <option value="visualizador">Visualizador</option>
                       </select>
                     </td>
+                    <td>fallback/bootstrap</td>
                     <td>
                       <select
                         className="ui-input" // Adicionado classe ui-input
@@ -694,6 +713,15 @@ export default function ConfiguracoesPage({ db, setDb, onConfirmAction }) {
                         onChange={(e) => {
                           if (!validarPermissao('acessos:gerenciar')) return;
                           const novoStatus = e.target.value;
+                          const isSelf = String(item.id) === String(user?.id);
+                          if (isSelf && novoStatus !== 'ativo') {
+                            showToast({ type: 'warning', message: 'Você não pode remover seu próprio acesso.' });
+                            return;
+                          }
+                          if (['admin', 'proprietario'].includes(String(item.perfil || '').toLowerCase()) && novoStatus !== 'ativo' && totalAdminsAtivosFallback <= 1) {
+                            showToast({ type: 'warning', message: 'Não é possível remover ou rebaixar o último administrador.' });
+                            return;
+                          }
                           void updateOperationalRecord('usuarios', item.id, { status: novoStatus }, user ? { user } : null);
                           registrarEventoAuditoria({
                             acao: 'usuario_fallback_status_atualizado',
@@ -718,6 +746,14 @@ export default function ConfiguracoesPage({ db, setDb, onConfirmAction }) {
                         variant="danger"
                         onClick={async () => {
                           if (!validarPermissao('acessos:gerenciar')) return;
+                          if (String(item.id) === String(user?.id)) {
+                            showToast({ type: 'warning', message: 'Você não pode remover seu próprio acesso.' });
+                            return;
+                          }
+                          if (['admin', 'proprietario'].includes(String(item.perfil || '').toLowerCase()) && totalAdminsAtivosFallback <= 1) {
+                            showToast({ type: 'warning', message: 'Não é possível remover ou rebaixar o último administrador.' });
+                            return;
+                          }
                           const confirmarRemocaoLocal = onConfirmAction
                             ? await onConfirmAction({
                                 title: 'Remover usuário',
