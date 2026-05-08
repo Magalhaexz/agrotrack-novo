@@ -104,7 +104,9 @@ export default function ConfiguracoesPage({ db, setDb, onConfirmAction }) {
       usuario_id: user?.id || null,
     }, session).then((result) => {
       if (!result?.persisted && import.meta.env.DEV) {
-        console.warn('[HERDON_AUDITORIA_FALLBACK]', result?.error || 'Falha ao persistir auditoria.');
+        if (import.meta.env.DEV) {
+          console.warn('[HERDON_AUDITORIA_FALLBACK]', result?.error || 'Falha ao persistir auditoria.');
+        }
       }
     });
   }
@@ -569,7 +571,7 @@ export default function ConfiguracoesPage({ db, setDb, onConfirmAction }) {
                                       detalhes: { email: invite.email },
                                     });
                                     showToast({ type: 'success', message: 'Convite cancelado com sucesso.' });
-                                    carregarDadosDeAcesso();
+                                    await carregarDadosDeAcesso();
                                   }}
                                 >
                                   Cancelar
@@ -590,6 +592,11 @@ export default function ConfiguracoesPage({ db, setDb, onConfirmAction }) {
 
                                   if (!confirmarRemocao) return;
 
+                                  if (String(invite.status || '').toLowerCase() === 'aceito') {
+                                    showToast({ type: 'warning', message: 'Convites aceitos não podem ser removidos por esta ação.' });
+                                    return;
+                                  }
+
                                   const { error } = await deleteInvite(invite.id);
                                   if (error) {
                                     showToast({ type: 'error', message: mensagemErroSegura(error, 'Nao foi possivel remover o convite.') });
@@ -603,10 +610,10 @@ export default function ConfiguracoesPage({ db, setDb, onConfirmAction }) {
                                     detalhes: { email: invite.email },
                                   });
                                   showToast({ type: 'success', message: 'Convite removido com sucesso.' });
-                                  carregarDadosDeAcesso();
+                                  await carregarDadosDeAcesso();
                                 }}
                               >
-                                Remover
+                                Remover convite
                               </Button>
                             </div>
                           </td>
@@ -640,6 +647,11 @@ export default function ConfiguracoesPage({ db, setDb, onConfirmAction }) {
                         onChange={(e) => {
                           if (!validarPermissao('acessos:gerenciar')) return;
                           const novoPerfil = e.target.value;
+                          const isSelf = String(item.id) === String(user?.id);
+                          if (isSelf && novoPerfil !== 'admin') {
+                            showToast({ type: 'warning', message: 'Você não pode rebaixar seu próprio perfil por esta tela.' });
+                            return;
+                          }
                           void updateOperationalRecord('usuarios', item.id, { perfil: novoPerfil }, user ? { user } : null);
                           registrarEventoAuditoria({
                             acao: 'usuario_fallback_perfil_atualizado',

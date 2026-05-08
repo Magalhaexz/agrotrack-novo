@@ -1,4 +1,4 @@
-import { getSupabaseEnvStatus, supabase, validateSupabaseSessionForCloud } from '../lib/supabase.js';
+﻿import { getSupabaseEnvStatus, supabase, validateSupabaseSessionForCloud } from '../lib/supabase.js';
 const NETWORK_CIRCUIT_OPEN_MS = 45000;
 const moduleNetworkCircuit = new Map();
 const OWNER_SCOPE_OPTIONAL_TABLES = new Set([]);
@@ -391,6 +391,38 @@ export function getPendingSyncQueueSnapshot() {
     checkedAt: Date.now(),
   };
 }
+
+const EXPECTED_SCHEMA_TABLES = Object.freeze([
+  'fazendas',
+  'lotes',
+  'animais',
+  'pesagens',
+  'movimentacoes_animais',
+  'movimentacoes_financeiras',
+  'estoque',
+  'sanitario',
+  'tarefas',
+  'funcionarios',
+  'profiles',
+  'invites',
+  'alertas_resolvidos',
+  'alertas_adiados',
+]);
+
+function registerSchemaDebugHelpers() {
+  if (!import.meta.env.DEV || typeof window === 'undefined') return;
+  if (window.HERDON_SCHEMA_DEBUG) return;
+  window.HERDON_SCHEMA_DEBUG = {
+    getPendingSchemaErrors() {
+      return getPendingSyncQueueSnapshot().schemaErrorTables;
+    },
+    getExpectedTables() {
+      return [...EXPECTED_SCHEMA_TABLES];
+    },
+  };
+}
+
+registerSchemaDebugHelpers();
 
 export async function ensureSupabaseRequestReadiness(session, context = {}) {
   const envStatus = getSupabaseEnvStatus();
