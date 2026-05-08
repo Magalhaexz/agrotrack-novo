@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState, useCallback } from 'react';
+﻿import { useEffect, useMemo, useState, useCallback } from 'react';
 import { AlertTriangle, ChevronRight, MoreHorizontal, Plus, Scale, Truck } from 'lucide-react';
 import { CartesianGrid, Line, LineChart, Pie, PieChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
 import Card from '../components/ui/Card';
@@ -33,7 +33,7 @@ export default function LotesPage({
 }) {
   const { hasPermission, session } = useAuth();
   const { showToast } = useToast(); // Usar o hook de toast
-  const mensagemSemPermissao = 'Você não tem permissão para executar esta ação.';
+  const mensagemSemPermissao = 'VocÃª nÃ£o tem permissÃ£o para executar esta aÃ§Ã£o.';
 
   const [filters, setFilters] = useState({ status: 'todos', fazenda: 'todas', periodo: 'todos' });
   const [activeLoteId, setActiveLoteId] = useState(null);
@@ -43,7 +43,7 @@ export default function LotesPage({
   const [openPesagemModal, setOpenPesagemModal] = useState(null);
   const [openFechamentoModal, setOpenFechamentoModal] = useState(null);
 
-  // Pré-indexar pesagens e lotes para otimização
+  // PrÃ©-indexar pesagens e lotes para otimizaÃ§Ã£o
   const pesagensByLoteId = useMemo(() => {
     const map = new Map();
     (db.pesagens || []).forEach(p => {
@@ -53,7 +53,7 @@ export default function LotesPage({
     return map;
   }, [db.pesagens]);
 
-  // Pré-calcular calcLote para todos os lotes
+  // PrÃ©-calcular calcLote para todos os lotes
   const allLoteIndicators = useMemo(() => {
     const indicatorsMap = new Map();
     (db.lotes || []).forEach(lote => {
@@ -103,7 +103,7 @@ export default function LotesPage({
     }
     if (!lote) return;
     if (lote.status === 'encerrado' || lote.status === 'vendido') {
-      showToast({ type: 'error', message: 'Este lote está encerrado e não aceita novas movimentações.' });
+      showToast({ type: 'error', message: 'Este lote estÃ¡ encerrado e nÃ£o aceita novas movimentaÃ§Ãµes.' });
       return;
     }
     setOpenMovModal(lote);
@@ -141,7 +141,7 @@ export default function LotesPage({
   return (
     <div className="page rebanho-page">
       <div className="rebanho-header">
-        <div><h1>Rebanho</h1><p>Gestão completa de lotes, movimentações e indicadores zootécnicos.</p></div>
+        <div><h1>Rebanho</h1><p>GestÃ£o completa de lotes, movimentaÃ§Ãµes e indicadores zootÃ©cnicos.</p></div>
         <Button icon={<Plus size={16} />} disabled={!hasPermission('lotes:editar')} onClick={() => {
           if (!hasPermission('lotes:editar')) {
             showToast({ type: 'error', message: mensagemSemPermissao });
@@ -166,9 +166,9 @@ export default function LotesPage({
             {(db.fazendas || []).map((f) => <option key={f.id} value={f.id}>{f.nome}</option>)}
           </select>
           <select className="ui-input" value={filters.periodo} onChange={(e) => setFilters((p) => ({ ...p, periodo: e.target.value }))}>
-            <option value="todos">Período</option>
-            <option value="30d">Últimos 30 dias</option>
-            <option value="90d">Últimos 90 dias</option>
+            <option value="todos">PerÃ­odo</option>
+            <option value="30d">Ãšltimos 30 dias</option>
+            <option value="90d">Ãšltimos 90 dias</option>
           </select>
         </div>
       </Card>
@@ -181,9 +181,9 @@ export default function LotesPage({
               <Badge variant={lote.status === 'ativo' ? 'success' : lote.status === 'vendido' ? 'info' : 'neutral'}>{lote.status}</Badge>
             </div>
             <div className="lote-metrics">
-              <p><strong>{lote.heads}</strong> cabeças</p>
-              <p className="lote-metric-peso">{formatNumber(lote.pesoAtual, 1)} kg · {formatNumber(lote.arrobaViva, 2)} @ {lote.diasSemPesar > 30 ? <AlertTriangle size={14} color="#dd6b20" /> : null}</p>
-              <p className="lote-metric-ultima-pesagem">{lote.ultimaPesagem ? `Última pesagem: ${formatDate(lote.ultimaPesagem)}` : 'Sem pesagens registradas'}</p>
+              <p><strong>{lote.heads}</strong> cabeÃ§as</p>
+              <p className="lote-metric-peso">{formatNumber(lote.pesoAtual, 1)} kg Â· {formatNumber(lote.arrobaViva, 2)} @ {lote.diasSemPesar > 30 ? <AlertTriangle size={14} color="#dd6b20" /> : null}</p>
+              <p className="lote-metric-ultima-pesagem">{lote.ultimaPesagem ? `Ãšltima pesagem: ${formatDate(lote.ultimaPesagem)}` : 'Sem pesagens registradas'}</p>
               <p>GMD 30d: {formatNumber(lote.gmd30, 3)} kg/dia</p>
               <p>Dias em trato: {daysFrom(lote.entrada)}</p>
               <p>Custo/cab/dia: {formatCurrency((lote.resumo.custoTotal || 0) / Math.max(lote.resumo.totalAnimais || 0,1) / Math.max(daysFrom(lote.entrada),1))}</p>
@@ -194,7 +194,7 @@ export default function LotesPage({
             <p className={lote.resumo.lucroTotal >= 0 ? 'text-success' : 'text-danger'}>Resultado parcial: {formatCurrency(lote.resumo.lucroTotal || 0)}</p>
             <div className="lote-actions">
               <Button size="sm" variant="outline" icon={<ChevronRight size={14} />} onClick={() => { setActiveTab('visao'); setActiveLoteId(lote.id); }}>Ver Detalhes</Button>
-              <Button size="sm" variant="ghost" icon={<Truck size={14} />} disabled={!hasPermission('animais:movimentar')} onClick={() => abrirMovimentacao(lote)}>Registrar Movimentação</Button>
+              <Button size="sm" variant="ghost" icon={<Truck size={14} />} disabled={!hasPermission('animais:movimentar')} onClick={() => abrirMovimentacao(lote)}>Registrar MovimentaÃ§Ã£o</Button>
               <Button size="sm" variant="ghost" icon={<Scale size={14} />} disabled={!hasPermission('pesagens:editar')} onClick={() => {
                 if (!hasPermission('pesagens:editar')) {
                   showToast({ type: 'error', message: mensagemSemPermissao });
@@ -224,25 +224,25 @@ export default function LotesPage({
           hasPermission={hasPermission}
         />
       )}
-      {openPesagemModal && <PesagemModal lote={openPesagemModal} db={db} setDb={setDb} onClose={() => setOpenPesagemModal(null)} showToast={showToast} hasPermission={hasPermission} />}
+      {openPesagemModal && <PesagemModal lote={openPesagemModal} db={db} setDb={setDb} onClose={() => setOpenPesagemModal(null)} showToast={showToast} hasPermission={hasPermission} session={session} />}
       {openFechamentoModal && <FechamentoLoteModal lote={openFechamentoModal} setDb={setDb} onClose={() => setOpenFechamentoModal(null)} showToast={showToast} hasPermission={hasPermission} session={session} />}
     </div>
   );
 }
 
 /**
- * Componente para exibir a visão detalhada de um lote.
+ * Componente para exibir a visÃ£o detalhada de um lote.
  * @param {object} props - As propriedades do componente.
  * @param {object} props.lote - O objeto do lote ativo.
- * @param {function} props.setDb - Função para atualizar o banco de dados.
+ * @param {function} props.setDb - FunÃ§Ã£o para atualizar o banco de dados.
  * @param {string} props.activeTab - A aba ativa.
- * @param {function} props.setActiveTab - Função para definir a aba ativa.
- * @param {function} props.onBack - Callback para voltar à lista de lotes.
- * @param {function} props.onOpenMov - Callback para abrir o modal de movimentação.
+ * @param {function} props.setActiveTab - FunÃ§Ã£o para definir a aba ativa.
+ * @param {function} props.onBack - Callback para voltar para a lista de lotes.
+ * @param {function} props.onOpenMov - Callback para abrir o modal de movimentaÃ§Ã£o.
  * @param {function} props.onOpenPesagem - Callback para abrir o modal de pesagem.
  * @param {function} props.onOpenFechamento - Callback para abrir o modal de fechamento de lote.
  * @param {Map<number, Array<object>>} props.pesagensByLoteId - Mapa de pesagens por ID de lote.
- * @param {Map<number, object>} props.allLoteIndicators - Mapa de indicadores pré-calculados para todos os lotes.
+ * @param {Map<number, object>} props.allLoteIndicators - Mapa de indicadores prÃ©-calculados para todos os lotes.
  */
 function LoteDetailView({ lote, db, activeTab, setActiveTab, onBack, onOpenMov, onOpenPesagem, onOpenFechamento, pesagensByLoteId }) {
   const resumoLote = useMemo(() => getResumoLote(db, lote.id), [db, lote.id]);
@@ -252,7 +252,7 @@ function LoteDetailView({ lote, db, activeTab, setActiveTab, onBack, onOpenMov, 
   const san = useMemo(() => (db.sanitario || []).filter((s) => s.lote_id === lote.id).sort((a, b) => new Date(b.data) - new Date(a.data)), [lote.id, db.sanitario]);
   const financeiro = useMemo(() => (db.movimentacoes_financeiras || []).filter((f) => Number(f.lote_id) === lote.id).sort((a, b) => new Date(b.data) - new Date(a.data)), [lote.id, db.movimentacoes_financeiras]);
 
-  // Use a versão memoizada de onOpenFechamento para evitar re-render desnecessário do useEffect
+  // Use a versÃ£o memoizada de onOpenFechamento para evitar re-render desnecessÃ¡rio do useEffect
   const memoizedOnOpenFechamento = useCallback(() => {
     if (lote.indicators.totalAnimais <= 0 && lote.status === 'ativo') {
       onOpenFechamento();
@@ -315,28 +315,28 @@ function LoteDetailView({ lote, db, activeTab, setActiveTab, onBack, onOpenMov, 
         id: `mov-${movimento.id}`,
         data: movimento.data,
         titulo: 'Movimentacao animal',
-        descricao: `${movimento.tipo || 'movimentacao'}${movimento.quantidade ? ` · ${movimento.quantidade} cabecas` : ''}`,
+        descricao: `${movimento.tipo || 'movimentacao'}${movimento.quantidade ? ` Â· ${movimento.quantidade} cabecas` : ''}`,
         meta: movimento.observacao || movimento.loteDestinoNome || movimento.lote_destino_nome || 'registro operacional',
       })),
       ...san.map((evento) => ({
         id: `san-${evento.id}`,
         data: evento.data || evento.proxima,
         titulo: 'Manejo sanitario',
-        descricao: `${evento.tipo || 'manejo'}${evento.produto ? ` · ${evento.produto}` : ''}`,
+        descricao: `${evento.tipo || 'manejo'}${evento.produto ? ` Â· ${evento.produto}` : ''}`,
         meta: evento.observacao || evento.dose || 'protocolo sanitario',
       })),
       ...custos.map((custo) => ({
         id: `custo-${custo.id}`,
         data: custo.data,
         titulo: 'Lancamento de custo',
-        descricao: `${custo.categoria || 'custo'} · ${formatCurrency(custo.valor || 0)}`,
+        descricao: `${custo.categoria || 'custo'} Â· ${formatCurrency(custo.valor || 0)}`,
         meta: custo.descricao || custo.observacao || 'financeiro do lote',
       })),
       ...financeiro.map((item) => ({
         id: `financeiro-${item.id}`,
         data: item.data,
         titulo: 'Movimentacao financeira',
-        descricao: `${item.tipo || 'movimentacao'} · ${formatCurrency(item.valor || 0)}`,
+        descricao: `${item.tipo || 'movimentacao'} Â· ${formatCurrency(item.valor || 0)}`,
         meta: item.descricao || item.categoria || 'fluxo financeiro',
       })),
     ];
@@ -350,11 +350,11 @@ function LoteDetailView({ lote, db, activeTab, setActiveTab, onBack, onOpenMov, 
     <div className="page rebanho-page">
       <div className="rebanho-header">
         <div>
-          <Button variant="ghost" onClick={onBack}>← Voltar para lotes</Button>
+          <Button variant="ghost" onClick={onBack}>â† Voltar para lotes</Button>
           <h1>{lote.nome}</h1>
         </div>
         <div className="page-topbar-actions">
-          <Button icon={<Plus size={14} />} onClick={onOpenMov}>Registrar Movimentação</Button>
+          <Button icon={<Plus size={14} />} onClick={onOpenMov}>Registrar MovimentaÃ§Ã£o</Button>
           <Button variant="outline" icon={<Scale size={14} />} onClick={onOpenPesagem}>Nova Pesagem</Button>
           {lote.status === 'ativo' && <Button variant="danger" onClick={onOpenFechamento}>Encerrar Lote</Button>}
         </div>
@@ -375,11 +375,11 @@ function LoteDetailView({ lote, db, activeTab, setActiveTab, onBack, onOpenMov, 
               <Card title="Custo total">{formatCurrency(resumoLote.custoTotal)}</Card>
               <Card title="Lucro total">{formatCurrency(resumoLote.lucroTotal)}</Card>
               <Card title="Margem %">{formatNumber(resumoLote.margemPct, 2)}%</Card>
-              <Card title="Lucro por cabeça">{formatCurrency(resumoLote.lucroPorCabeca)}</Card>
+              <Card title="Lucro por cabeÃ§a">{formatCurrency(resumoLote.lucroPorCabeca)}</Card>
               <Card title="Lucro por arroba">{formatCurrency(resumoLote.lucroPorArroba)}</Card>
-              <Card title="GMD médio">{formatNumber(resumoLote.gmdMedio, 3)} kg/dia</Card>
+              <Card title="GMD mÃ©dio">{formatNumber(resumoLote.gmdMedio, 3)} kg/dia</Card>
               <Card title="Arrobas produzidas">{formatNumber(resumoLote.arrobasProduzidas, 2)} @</Card>
-              <Card title="Classificação">
+              <Card title="ClassificaÃ§Ã£o">
                 <Badge
                   variant={
                     resumoLote.classificacao === 'lucro'
@@ -392,13 +392,13 @@ function LoteDetailView({ lote, db, activeTab, setActiveTab, onBack, onOpenMov, 
                   {resumoLote.classificacao === 'lucro'
                     ? 'Lucro'
                     : resumoLote.classificacao === 'prejuizo'
-                      ? 'Prejuízo'
+                      ? 'PrejuÃ­zo'
                       : 'Empate'}
                 </Badge>
               </Card>
             </div>
             <p className="text-secondary">
-              Resumo calculado com base nos lançamentos financeiros, animais, custos e pesagens disponíveis.
+              Resumo calculado com base nos lanÃ§amentos financeiros, animais, custos e pesagens disponÃ­veis.
             </p>
             <div style={{ marginTop: 12 }}>
               <h4>Insights do lote</h4>
@@ -414,8 +414,8 @@ function LoteDetailView({ lote, db, activeTab, setActiveTab, onBack, onOpenMov, 
             </div>
           </Card>
           <div className="dashboard-grid dashboard-grid--kpi-secondary">
-            <Card title="Cabeças">{lote.indicators.totalAnimais}</Card>
-            <Card title="Peso Médio">{formatNumber(lote.indicators.pesoAtualMedio, 1)} kg</Card>
+            <Card title="CabeÃ§as">{lote.indicators.totalAnimais}</Card>
+            <Card title="Peso MÃ©dio">{formatNumber(lote.indicators.pesoAtualMedio, 1)} kg</Card>
             <Card title="Resultado">{formatCurrency(lote.indicators.margem)}</Card>
           </div>
           <Card title="Painel de Indicadores (meta x realizado)">
@@ -444,15 +444,15 @@ function LoteDetailView({ lote, db, activeTab, setActiveTab, onBack, onOpenMov, 
           </Card>
 
           <section className="comparativo-grid-2">
-            <Card title="Evolução de Peso e GMD">
+            <Card title="EvoluÃ§Ã£o de Peso e GMD">
               <ResponsiveContainer width="100%" height={300}>
                 <LineChart data={chartData}>
                   <CartesianGrid strokeDasharray="3 3" />
                   <XAxis dataKey="data" />
                   <YAxis yAxisId="left" label={{ value: 'Peso (kg)', angle: -90, position: 'insideLeft' }} />
                   <YAxis yAxisId="right" orientation="right" label={{ value: 'GMD (kg/dia)', angle: 90, position: 'insideRight' }} />
-                  <Tooltip formatter={(value, name) => [`${formatNumber(value, name === 'peso' ? 1 : 3)} ${name === 'peso' ? 'kg' : 'kg/dia'}`, name === 'peso' ? 'Peso Médio' : 'GMD']} />
-                  <Line yAxisId="left" type="monotone" dataKey="peso" stroke="#8884d8" name="Peso Médio" />
+                  <Tooltip formatter={(value, name) => [`${formatNumber(value, name === 'peso' ? 1 : 3)} ${name === 'peso' ? 'kg' : 'kg/dia'}`, name === 'peso' ? 'Peso MÃ©dio' : 'GMD']} />
+                  <Line yAxisId="left" type="monotone" dataKey="peso" stroke="#8884d8" name="Peso MÃ©dio" />
                   <Line yAxisId="right" type="monotone" dataKey="gmd" stroke="#82ca9d" name="GMD" />
                 </LineChart>
               </ResponsiveContainer>
@@ -483,11 +483,11 @@ function LoteDetailView({ lote, db, activeTab, setActiveTab, onBack, onOpenMov, 
       )}
 
       {activeTab === 'mov' && (
-        <Card title="Histórico de Movimentações">
+        <Card title="HistÃ³rico de MovimentaÃ§Ãµes">
           {movimentacoes.length === 0 ? (
             <div className="empty-state">
-              <strong>Nenhuma movimentação registrada.</strong>
-              <span>Use o botão "Registrar Movimentação" para adicionar.</span>
+              <strong>Nenhuma movimentaÃ§Ã£o registrada.</strong>
+              <span>Use o botÃ£o "Registrar MovimentaÃ§Ã£o" para adicionar.</span>
             </div>
           ) : (
             <table className="data-table">
@@ -496,9 +496,9 @@ function LoteDetailView({ lote, db, activeTab, setActiveTab, onBack, onOpenMov, 
                   <th>Data</th>
                   <th>Tipo</th>
                   <th>Qtd</th>
-                  <th>Peso Médio</th>
+                  <th>Peso MÃ©dio</th>
                   <th>Valor</th>
-                  <th>Observação</th>
+                  <th>ObservaÃ§Ã£o</th>
                 </tr>
               </thead>
               <tbody>
@@ -508,8 +508,8 @@ function LoteDetailView({ lote, db, activeTab, setActiveTab, onBack, onOpenMov, 
                     <td>{mov.tipo}</td>
                     <td>{mov.qtd}</td>
                     <td>{formatNumber(mov.peso_medio, 1)} kg</td>
-                    <td>{mov.valor_total ? formatCurrency(mov.valor_total) : '—'}</td>
-                    <td>{mov.obs || '—'}</td>
+                    <td>{mov.valor_total ? formatCurrency(mov.valor_total) : 'â€”'}</td>
+                    <td>{mov.obs || 'â€”'}</td>
                   </tr>
                 ))}
               </tbody>
@@ -519,21 +519,21 @@ function LoteDetailView({ lote, db, activeTab, setActiveTab, onBack, onOpenMov, 
       )}
 
       {activeTab === 'pesagens' && (
-        <Card title="Histórico de Pesagens">
+        <Card title="HistÃ³rico de Pesagens">
           {lotePesagens.length === 0 ? (
             <div className="empty-state">
               <strong>Nenhuma pesagem registrada.</strong>
-              <span>Use o botão "Nova Pesagem" para adicionar.</span>
+              <span>Use o botÃ£o "Nova Pesagem" para adicionar.</span>
             </div>
           ) : (
             <table className="data-table">
               <thead>
                 <tr>
                   <th>Data</th>
-                  <th>Peso Médio</th>
+                  <th>Peso MÃ©dio</th>
                   <th>Qtd Pesada</th>
-                  <th>GMD (desde última)</th>
-                  <th>Observação</th>
+                  <th>GMD (desde Ãºltima)</th>
+                  <th>ObservaÃ§Ã£o</th>
                 </tr>
               </thead>
               <tbody>
@@ -546,7 +546,7 @@ function LoteDetailView({ lote, db, activeTab, setActiveTab, onBack, onOpenMov, 
                       <td>{formatNumber(p.peso_medio, 1)} kg</td>
                       <td>{p.qtd}</td>
                       <td>{formatNumber(gmd, 3)} kg/dia</td>
-                      <td>{p.observacao || '—'}</td>
+                      <td>{p.observacao || 'â€”'}</td>
                     </tr>
                   );
                 })}
@@ -557,11 +557,11 @@ function LoteDetailView({ lote, db, activeTab, setActiveTab, onBack, onOpenMov, 
       )}
 
       {activeTab === 'financeiro' && (
-        <Card title="Histórico Financeiro do Lote">
+        <Card title="HistÃ³rico Financeiro do Lote">
           {financeiro.length === 0 ? (
             <div className="empty-state">
-              <strong>Nenhum lançamento financeiro registrado.</strong>
-              <span>Lançamentos de custos e receitas vinculados a este lote aparecerão aqui.</span>
+              <strong>Nenhum lanÃ§amento financeiro registrado.</strong>
+              <span>LanÃ§amentos de custos e receitas vinculados a este lote aparecerÃ£o aqui.</span>
             </div>
           ) : (
             <table className="data-table">
@@ -571,7 +571,7 @@ function LoteDetailView({ lote, db, activeTab, setActiveTab, onBack, onOpenMov, 
                   <th>Tipo</th>
                   <th>Categoria</th>
                   <th>Valor</th>
-                  <th>Descrição</th>
+                  <th>DescriÃ§Ã£o</th>
                 </tr>
               </thead>
               <tbody>
@@ -581,7 +581,7 @@ function LoteDetailView({ lote, db, activeTab, setActiveTab, onBack, onOpenMov, 
                     <td>{item.tipo}</td>
                     <td>{item.categoria}</td>
                     <td>{formatCurrency(item.valor)}</td>
-                    <td>{item.descricao || item.observacao || '—'}</td>
+                    <td>{item.descricao || item.observacao || 'â€”'}</td>
                   </tr>
                 ))}
               </tbody>
@@ -591,11 +591,11 @@ function LoteDetailView({ lote, db, activeTab, setActiveTab, onBack, onOpenMov, 
       )}
 
       {activeTab === 'sanitario' && (
-        <Card title="Histórico Sanitário do Lote">
+        <Card title="HistÃ³rico SanitÃ¡rio do Lote">
           {san.length === 0 ? (
             <div className="empty-state">
-              <strong>Nenhum evento sanitário registrado.</strong>
-              <span>Eventos de vacinação, vermifugação, etc., aparecerão aqui.</span>
+              <strong>Nenhum evento sanitÃ¡rio registrado.</strong>
+              <span>Eventos de vacinaÃ§Ã£o, vermifugaÃ§Ã£o, etc., aparecerÃ£o aqui.</span>
             </div>
           ) : (
             <table className="data-table">
@@ -605,7 +605,7 @@ function LoteDetailView({ lote, db, activeTab, setActiveTab, onBack, onOpenMov, 
                   <th>Tipo</th>
                   <th>Produto</th>
                   <th>Dose</th>
-                  <th>Observação</th>
+                  <th>ObservaÃ§Ã£o</th>
                 </tr>
               </thead>
               <tbody>
@@ -615,7 +615,7 @@ function LoteDetailView({ lote, db, activeTab, setActiveTab, onBack, onOpenMov, 
                     <td>{item.tipo}</td>
                     <td>{item.produto}</td>
                     <td>{item.dose}</td>
-                    <td>{item.observacao || '—'}</td>
+                    <td>{item.observacao || 'â€”'}</td>
                   </tr>
                 ))}
               </tbody>
@@ -625,7 +625,7 @@ function LoteDetailView({ lote, db, activeTab, setActiveTab, onBack, onOpenMov, 
       )}
 
       {activeTab === 'historico' && (
-        <Card title="Histórico do Lote">
+        <Card title="HistÃ³rico do Lote">
           {historicoLote.length === 0 ? (
             <div className="empty-state">
               <strong>Nenhum evento registrado.</strong>
@@ -655,9 +655,9 @@ function LoteDetailView({ lote, db, activeTab, setActiveTab, onBack, onOpenMov, 
  * Modal para registrar o fechamento de um lote.
  * @param {object} props - As propriedades do componente.
  * @param {object} props.lote - O objeto do lote a ser fechado.
- * @param {function} props.setDb - Função para atualizar o banco de dados.
+ * @param {function} props.setDb - FunÃ§Ã£o para atualizar o banco de dados.
  * @param {function} props.onClose - Callback para fechar o modal.
- * @param {function} props.showToast - Função para exibir toasts.
+ * @param {function} props.showToast - FunÃ§Ã£o para exibir toasts.
  */
 function FechamentoLoteModal({ lote, setDb, onClose, showToast, hasPermission, session }) {
   const [form, setForm] = useState({
@@ -669,11 +669,11 @@ function FechamentoLoteModal({ lote, setDb, onClose, showToast, hasPermission, s
 
   async function submit() {
     if (!hasPermission('lotes:editar')) {
-      showToast({ type: 'error', message: 'Você não tem permissão para executar esta ação.' });
+      showToast({ type: 'error', message: 'VocÃª nÃ£o tem permissÃ£o para executar esta aÃ§Ã£o.' });
       return;
     }
     if (!form.data_saida) {
-      showToast({ type: 'error', message: 'A data de saída é obrigatória.' });
+      showToast({ type: 'error', message: 'A data de saÃ­da Ã© obrigatÃ³ria.' });
       return;
     }
     if (Number(form.mortalidade) < 0 || Number(form.mortalidade) > 100) {
@@ -712,7 +712,7 @@ function FechamentoLoteModal({ lote, setDb, onClose, showToast, hasPermission, s
   return (
     <Modal open onClose={onClose} title={`Encerrar Lote: ${lote.nome}`} footer={<Button onClick={submit}>Confirmar Fechamento</Button>}>
       <div className="form-grid two">
-        <Input label="Data de Saída" type="date" value={form.data_saida} onChange={(e) => setForm((p) => ({ ...p, data_saida: e.target.value }))} />
+        <Input label="Data de SaÃ­da" type="date" value={form.data_saida} onChange={(e) => setForm((p) => ({ ...p, data_saida: e.target.value }))} />
         <label className="ui-input-wrap">
           <span className="ui-input-label">Status Final</span>
           <select className="ui-input" value={form.status} onChange={(e) => setForm((p) => ({ ...p, status: e.target.value }))}>
@@ -721,22 +721,22 @@ function FechamentoLoteModal({ lote, setDb, onClose, showToast, hasPermission, s
           </select>
         </label>
         <Input label="Mortalidade (%)" type="number" value={form.mortalidade} onChange={(e) => setForm((p) => ({ ...p, mortalidade: e.target.value }))} />
-        <Input label="Motivo da Saída" value={form.motivo_saida} onChange={(e) => setForm((p) => ({ ...p, motivo_saida: e.target.value }))} />
+        <Input label="Motivo da SaÃ­da" value={form.motivo_saida} onChange={(e) => setForm((p) => ({ ...p, motivo_saida: e.target.value }))} />
       </div>
     </Modal>
   );
 }
 
 /**
- * Modal para registrar movimentações de animais (compra, venda, morte, etc.).
+ * Modal para registrar movimentaÃ§Ãµes de animais (compra, venda, morte, etc.).
  * @param {object} props - As propriedades do componente.
  * @param {object} props.lote - O objeto do lote.
  * @param {object} props.db - O objeto do banco de dados.
- * @param {function} props.setDb - Função para atualizar o banco de dados.
+ * @param {function} props.setDb - FunÃ§Ã£o para atualizar o banco de dados.
  * @param {function} props.onClose - Callback para fechar o modal.
  * @param {function} [props.onRegistrarEntradaAnimal] - Callback opcional para registrar entrada de animal.
- * @param {function} [props.onRegistrarSaidaAnimal] - Callback opcional para registrar saída de animal.
- * @param {function} props.showToast - Função para exibir toasts.
+ * @param {function} [props.onRegistrarSaidaAnimal] - Callback opcional para registrar saÃ­da de animal.
+ * @param {function} props.showToast - FunÃ§Ã£o para exibir toasts.
  */
 function MovimentacaoModal({ lote, db, setDb, onClose, onRegistrarEntradaAnimal, onRegistrarSaidaAnimal, showToast, hasPermission }) {
   const [form, setForm] = useState({
@@ -756,7 +756,7 @@ function MovimentacaoModal({ lote, db, setDb, onClose, onRegistrarEntradaAnimal,
     comissao: '',
     // Morte/Descarte
     motivo: '',
-    // Transferência
+    // TransferÃªncia
     lote_destino: '',
     obs: '',
   });
@@ -778,11 +778,11 @@ function MovimentacaoModal({ lote, db, setDb, onClose, onRegistrarEntradaAnimal,
 
   function submit() {
     if (!hasPermission('animais:movimentar')) {
-      showToast({ type: 'error', message: 'Você não tem permissão para executar esta ação.' });
+      showToast({ type: 'error', message: 'VocÃª nÃ£o tem permissÃ£o para executar esta aÃ§Ã£o.' });
       return;
     }
     if (!form.data || qtd <= 0 || peso <= 0) {
-      showToast({ type: 'error', message: 'Data, quantidade e peso médio são obrigatórios.' });
+      showToast({ type: 'error', message: 'Data, quantidade e peso mÃ©dio sÃ£o obrigatÃ³rios.' });
       return;
     }
 
@@ -794,7 +794,7 @@ function MovimentacaoModal({ lote, db, setDb, onClose, onRegistrarEntradaAnimal,
       qtd: qtd,
       peso_medio: peso,
       obs: form.obs,
-      // Campos específicos
+      // Campos especÃ­ficos
       fornecedor: form.fornecedor,
       custo_total: custoTotalCompra,
       frete: freteCompra,
@@ -815,22 +815,22 @@ function MovimentacaoModal({ lote, db, setDb, onClose, onRegistrarEntradaAnimal,
         showToast({ type: 'success', message: 'Entrada de animais registrada com sucesso!' });
         onClose();
       } catch (error) {
-        showToast({ type: 'error', message: error?.message || 'Não foi possível registrar a entrada de animais.' });
+        showToast({ type: 'error', message: error?.message || 'NÃ£o foi possÃ­vel registrar a entrada de animais.' });
       }
       return;
     }
     if (onRegistrarSaidaAnimal && ['venda', 'morte', 'descarte', 'transferencia_saida', 'abate'].includes(form.tipo)) {
       try {
         onRegistrarSaidaAnimal(mov);
-        showToast({ type: 'success', message: 'Saída de animais registrada com sucesso!' });
+        showToast({ type: 'success', message: 'SaÃ­da de animais registrada com sucesso!' });
         onClose();
       } catch (error) {
-        showToast({ type: 'error', message: error?.message || 'Não foi possível registrar a saída de animais.' });
+        showToast({ type: 'error', message: error?.message || 'NÃ£o foi possÃ­vel registrar a saÃ­da de animais.' });
       }
       return;
     }
 
-    // Lógica padrão de atualização do DB
+    // LÃ³gica padrÃ£o de atualizaÃ§Ã£o do DB
     setDb((prev) => {
       let newLotes = prev.lotes;
       let newAnimais = prev.animais;
@@ -848,15 +848,15 @@ function MovimentacaoModal({ lote, db, setDb, onClose, onRegistrarEntradaAnimal,
             pesoAtualMedio = ((pesoAtualMedio * lote.indicators.totalAnimais) + (peso * qtd)) / totalAnimais;
           } else if (['venda', 'morte', 'descarte', 'transferencia_saida', 'abate'].includes(form.tipo)) {
             totalAnimais -= qtd;
-            // Recalcular peso médio de forma mais robusta, ou assumir que o peso médio do lote não muda drasticamente
-            // Por simplicidade, vamos apenas ajustar a quantidade. O peso médio será recalculado por calcLote.
+            // Recalcular peso mÃ©dio de forma mais robusta, ou assumir que o peso mÃ©dio do lote nÃ£o muda drasticamente
+            // Por simplicidade, vamos apenas ajustar a quantidade. O peso mÃ©dio serÃ¡ recalculado por calcLote.
           }
-          return { ...l, totalAnimais, p_at: pesoAtualMedio }; // p_at é o peso atual do lote
+          return { ...l, totalAnimais, p_at: pesoAtualMedio }; // p_at Ã© o peso atual do lote
         }
         return l;
       });
 
-      // Atualizar lote de destino (para transferências)
+      // Atualizar lote de destino (para transferÃªncias)
       if ((form.tipo === 'transferencia_saida' || form.tipo === 'transferencia_entrada') && form.lote_destino) {
         newLotes = newLotes.map((l) => {
           if (l.id === Number(form.lote_destino)) {
@@ -872,12 +872,12 @@ function MovimentacaoModal({ lote, db, setDb, onClose, onRegistrarEntradaAnimal,
       }
 
 
-      // Adicionar custo de aquisição
+      // Adicionar custo de aquisiÃ§Ã£o
       if (form.tipo === 'compra') {
         newCustos = [...(prev.custos || []), {
           id: gerarNovoId(prev.custos),
           lote_id: lote.id,
-          cat: 'aquisição',
+          cat: 'aquisiÃ§Ã£o',
           desc: `Compra de ${qtd} animais para o lote ${lote.nome}`,
           data: form.data,
           val: custoTotalCompra + freteCompra,
@@ -901,18 +901,18 @@ function MovimentacaoModal({ lote, db, setDb, onClose, onRegistrarEntradaAnimal,
       return {
         ...prev,
         lotes: newLotes,
-        animais: newAnimais, // Animais individuais não são atualizados aqui, apenas o resumo do lote
+        animais: newAnimais, // Animais individuais nÃ£o sÃ£o atualizados aqui, apenas o resumo do lote
         movimentacoes_animais: [...(prev.movimentacoes_animais || []), mov],
         custos: newCustos,
         movimentacoes_financeiras: newMovFinanceiras,
       };
     });
-    showToast({ type: 'success', message: 'Movimentação registrada com sucesso!' });
+    showToast({ type: 'success', message: 'MovimentaÃ§Ã£o registrada com sucesso!' });
     onClose();
   }
 
   return (
-    <Modal open onClose={onClose} title="Nova movimentação" size="lg" footer={<Button onClick={submit}>Salvar Movimentação</Button>}>
+    <Modal open onClose={onClose} title="Nova movimentaÃ§Ã£o" size="lg" footer={<Button onClick={submit}>Salvar MovimentaÃ§Ã£o</Button>}>
       <div className="form-grid two"> {/* Alterado para grid de 2 colunas */}
         <label className="ui-input-wrap">
           <span className="ui-input-label">Tipo</span>
@@ -921,8 +921,8 @@ function MovimentacaoModal({ lote, db, setDb, onClose, onRegistrarEntradaAnimal,
           </select>
         </label>
         <Input label="Data" type="date" value={form.data} onChange={(e) => setForm((p) => ({ ...p, data: e.target.value }))} />
-        <Input label="Quantidade de cabeças" type="number" value={form.qtd} onChange={(e) => setForm((p) => ({ ...p, qtd: e.target.value }))} />
-        <Input label="Peso médio" type="number" value={form.peso_medio} onChange={(e) => setForm((p) => ({ ...p, peso_medio: e.target.value }))} />
+        <Input label="Quantidade de cabeÃ§as" type="number" value={form.qtd} onChange={(e) => setForm((p) => ({ ...p, qtd: e.target.value }))} />
+        <Input label="Peso mÃ©dio" type="number" value={form.peso_medio} onChange={(e) => setForm((p) => ({ ...p, peso_medio: e.target.value }))} />
 
         {form.tipo === 'compra' && (
           <>
@@ -930,25 +930,25 @@ function MovimentacaoModal({ lote, db, setDb, onClose, onRegistrarEntradaAnimal,
             <Input label="Custo total" type="number" value={form.custo_total} onChange={(e) => setForm((p) => ({ ...p, custo_total: e.target.value }))} />
             <Input label="Frete" type="number" value={form.frete} onChange={(e) => setForm((p) => ({ ...p, frete: e.target.value }))} />
             <Input label="Origem" value={form.origem} onChange={(e) => setForm((p) => ({ ...p, origem: e.target.value }))} />
-            <p className="form-info full">R$/cabeça: {formatCurrency(custoCab)} · @ viva: {formatNumber(arrobaViva, 2)}</p>
+            <p className="form-info full">R$/cabeÃ§a: {formatCurrency(custoCab)} Â· @ viva: {formatNumber(arrobaViva, 2)}</p>
           </>
         )}
 
         {form.tipo === 'venda' && (
           <>
             <Input label="Comprador" value={form.comprador} onChange={(e) => setForm((p) => ({ ...p, comprador: e.target.value }))} />
-            <Input label="Preço/@" type="number" value={form.preco_arroba} onChange={(e) => setForm((p) => ({ ...p, preco_arroba: e.target.value }))} />
+            <Input label="PreÃ§o/@" type="number" value={form.preco_arroba} onChange={(e) => setForm((p) => ({ ...p, preco_arroba: e.target.value }))} />
             <Input label="Rendimento (%)" type="number" value={form.rendimento} onChange={(e) => setForm((p) => ({ ...p, rendimento: e.target.value }))} />
             <Input label="Frete" type="number" value={form.frete} onChange={(e) => setForm((p) => ({ ...p, frete: e.target.value }))} />
-            <Input label="Comissão" type="number" value={form.comissao} onChange={(e) => setForm((p) => ({ ...p, comissao: e.target.value }))} />
-            <p className="form-info full">@ viva: {formatNumber(arrobaViva, 2)} · @ carcaça: {formatNumber(arrobaCarc, 2)} · Total: {formatCurrency(valorTotal)} · Líquido: {formatCurrency(liquido)}</p>
+            <Input label="ComissÃ£o" type="number" value={form.comissao} onChange={(e) => setForm((p) => ({ ...p, comissao: e.target.value }))} />
+            <p className="form-info full">@ viva: {formatNumber(arrobaViva, 2)} Â· @ carcaÃ§a: {formatNumber(arrobaCarc, 2)} Â· Total: {formatCurrency(valorTotal)} Â· LÃ­quido: {formatCurrency(liquido)}</p>
           </>
         )}
 
         {(form.tipo === 'morte' || form.tipo === 'descarte') && (
           <>
             <Input label="Motivo" value={form.motivo} onChange={(e) => setForm((p) => ({ ...p, motivo: e.target.value }))} />
-            <p className="form-info full">Impacto estimado no peso médio: -{formatNumber((qtd * peso) / Math.max(lote.indicators.totalAnimais, 1), 1)} kg</p>
+            <p className="form-info full">Impacto estimado no peso mÃ©dio: -{formatNumber((qtd * peso) / Math.max(lote.indicators.totalAnimais, 1), 1)} kg</p>
           </>
         )}
 
@@ -962,7 +962,7 @@ function MovimentacaoModal({ lote, db, setDb, onClose, onRegistrarEntradaAnimal,
           </label>
         )}
         <label className="ui-input-wrap full">
-          <span className="ui-input-label">Observações</span>
+          <span className="ui-input-label">ObservaÃ§Ãµes</span>
           <textarea className="ui-input" value={form.obs} onChange={(e) => setForm((p) => ({ ...p, obs: e.target.value }))} />
         </label>
       </div>
@@ -975,13 +975,81 @@ function MovimentacaoModal({ lote, db, setDb, onClose, onRegistrarEntradaAnimal,
  * @param {object} props - As propriedades do componente.
  * @param {object} props.lote - O objeto do lote.
  * @param {object} props.db - O objeto do banco de dados.
- * @param {function} props.setDb - Função para atualizar o banco de dados.
+ * @param {function} props.setDb - FunÃ§Ã£o para atualizar o banco de dados.
  * @param {function} props.onClose - Callback para fechar o modal.
- * @param {function} props.showToast - Função para exibir toasts.
+ * @param {function} props.showToast - FunÃ§Ã£o para exibir toasts.
  */
-function PesagemModal({ lote, db, setDb, onClose, showToast, hasPermission }) {
-  const ultima = useMemo(() => (db.pesagens || []).filter((p) => p.lote_id === lote.id).sort((a, b) => new Date(b.data) - new Date(a.data))[0], [db.pesagens, lote.id]);
-  const [form, setForm] = useState({ data: getTodayIso(), peso_medio: '', qtd: lote.indicators.totalAnimais, obs: '' });
+function PesagemModal({ lote, db, setDb, onClose, showToast, hasPermission, session }) {
+  const animais = Array.isArray(db?.animais) ? db.animais : [];
+  const pesagens = Array.isArray(db?.pesagens) ? db.pesagens : [];
+  const ultima = useMemo(
+    () => pesagens.filter((p) => Number(p?.lote_id) === Number(lote.id)).sort((a, b) => new Date(b.data) - new Date(a.data))[0],
+    [pesagens, lote.id]
+  );
+  const [form, setForm] = useState({
+    tipo: 'lote',
+    data: getTodayIso(),
+    peso_medio: '',
+    qtd: lote?.indicators?.totalAnimais || 0,
+    obs: '',
+  });
+  const [pesosAnimais, setPesosAnimais] = useState({});
+  const [obsAnimais, setObsAnimais] = useState({});
+
+  const animaisLote = useMemo(
+    () => animais.filter((item) => Number(item?.lote_id) === Number(lote.id)),
+    [animais, lote.id]
+  );
+
+  const animaisIndividuais = useMemo(() => {
+    return animaisLote.filter((item) => {
+      const tipo = String(item?.tipo_registro || '').toLowerCase();
+      if (tipo === 'individual') return true;
+      return Number(item?.qtd || 0) === 1 && Boolean(String(item?.identificacao || '').trim());
+    });
+  }, [animaisLote]);
+
+  const lotHeadCount = useMemo(() => {
+    const candidates = [
+      lote?.qtd,
+      lote?.quantidade,
+      lote?.quantidade_animais,
+      lote?.qtd_inicial,
+      lote?.cabecas,
+      lote?.total_cabecas,
+      lote?.indicators?.totalAnimais,
+      lote?.heads,
+    ];
+    for (const candidate of candidates) {
+      const n = Number(candidate);
+      if (Number.isFinite(n) && n > 0) return Math.floor(n);
+    }
+    return animaisLote.reduce((sum, item) => sum + Math.max(1, Number(item?.qtd || 1)), 0);
+  }, [animaisLote, lote]);
+
+  const existingPesagensAnimalData = useMemo(() => {
+    const dataIso = String(form.data || '').slice(0, 10);
+    const map = new Map();
+    pesagens
+      .filter((item) => Number(item?.lote_id) === Number(lote.id))
+      .filter((item) => String(item?.tipo || '') === 'animal')
+      .filter((item) => String(item?.data || '').slice(0, 10) === dataIso)
+      .forEach((item) => map.set(String(item?.animal_id), item));
+    return map;
+  }, [form.data, lote.id, pesagens]);
+
+  const animaisPesagemView = useMemo(() => {
+    return animaisIndividuais.map((animal) => {
+      const key = String(animal.id);
+      const existing = existingPesagensAnimalData.get(key) || null;
+      return {
+        ...animal,
+        pesoDraft: pesosAnimais[key] ?? (existing ? String(existing?.peso_medio ?? '') : ''),
+        obsDraft: obsAnimais[key] ?? (existing?.observacao || ''),
+        existingPesagem: existing,
+      };
+    });
+  }, [animaisIndividuais, existingPesagensAnimalData, pesosAnimais, obsAnimais]);
 
   const diasDesdeUltima = ultima ? daysBetween(ultima.data, form.data) : 0;
   const gmd = ultima && form.peso_medio && diasDesdeUltima > 0 ? (Number(form.peso_medio) - Number(ultima.peso_medio)) / diasDesdeUltima : 0;
@@ -989,11 +1057,91 @@ function PesagemModal({ lote, db, setDb, onClose, showToast, hasPermission }) {
   const precoArrobaPadrao = db.configuracoes?.geral?.preco_arroba_padrao || 290;
   const valorEst = Number(form.qtd || 0) * arroba * precoArrobaPadrao;
 
-  function submit() {
-    if (!hasPermission('pesagens:editar')) {
+  function toDataIso(value) {
+    return String(value || '').slice(0, 10);
+  }
+
+  function buildPesagemSelector(existing, payload) {
+    if (existing?.id && Number.isFinite(Number(existing.id))) return { type: 'id', value: Number(existing.id) };
+    if (existing?.cloud_id) return { type: 'cloud_id', value: String(existing.cloud_id) };
+    if (existing?.metadata?.local_id !== undefined && existing?.metadata?.local_id !== null) {
+      return { type: 'metadata.local_id', value: String(existing.metadata.local_id) };
+    }
+    if (String(payload?.tipo || '') === 'animal') {
+      return {
+        type: 'animal_date_tipo',
+        animal_id: Number(payload?.animal_id),
+        lote_id: Number(payload?.lote_id),
+        tipo: 'animal',
+        data: toDataIso(payload?.data),
+      };
+    }
+    return {
+      type: 'lote_date_tipo',
+      lote_id: Number(payload?.lote_id),
+      tipo: 'lote',
+      data: toDataIso(payload?.data),
+    };
+  }
+
+  async function gerarAnimaisFaltantes() {
+    if (!hasPermission('animais:editar')) {
       showToast({ type: 'error', message: 'Você não tem permissão para executar esta ação.' });
       return;
     }
+    if (lotHeadCount <= 0) {
+      showToast({ type: 'warning', message: 'Lote sem quantidade de cabeças válida para geração.' });
+      return;
+    }
+    const indexes = new Set(
+      animaisIndividuais
+        .map((item) => {
+          const match = String(item?.identificacao || '').match(/animal\s*#\s*(\d+)/i);
+          return match ? Number(match[1]) : null;
+        })
+        .filter((value) => Number.isFinite(value))
+    );
+    const payloads = [];
+    for (let i = 1; i <= lotHeadCount; i += 1) {
+      if (indexes.has(i)) continue;
+      payloads.push({
+        lote_id: Number(lote.id),
+        fazenda_id: lote?.faz_id ? Number(lote.faz_id) : null,
+        identificacao: `Animal #${i}`,
+        tipo_registro: 'individual',
+        qtd: 1,
+        status: 'ativo',
+        p_ini: Number(lote?.p_ini ?? lote?.peso_inicial ?? 0),
+        p_at: Number(lote?.p_at ?? lote?.peso_atual ?? lote?.peso_inicial ?? 0),
+      });
+    }
+
+    if (!payloads.length) {
+      showToast({ type: 'info', message: 'Todos os animais individuais esperados já existem no lote.' });
+      return;
+    }
+
+    const results = await Promise.all(payloads.map((payload) => createOperationalRecord('animais', payload, session)));
+    let fallbackId = gerarNovoId(animais);
+    const novosAnimais = results.map((result, index) => result?.data || { id: fallbackId + index, ...payloads[index] });
+    setDb((prev) => ({
+      ...prev,
+      animais: [...(Array.isArray(prev?.animais) ? prev.animais : []), ...novosAnimais],
+    }));
+    const hasFailure = results.some((item) => !item?.persisted);
+    if (hasFailure) showToast({ type: 'warning', message: 'Animais gerados localmente. Sincronização pendente.' });
+    else showToast({ type: 'success', message: 'Animais do lote gerados na nuvem.' });
+  }
+
+  function onChangePeso(animalId, value) {
+    setPesosAnimais((prev) => ({ ...prev, [String(animalId)]: String(value ?? '').replace(',', '.') }));
+  }
+
+  function onChangeObs(animalId, value) {
+    setObsAnimais((prev) => ({ ...prev, [String(animalId)]: String(value ?? '') }));
+  }
+
+  async function submitLote() {
     if (!form.data || Number(form.peso_medio) <= 0) {
       showToast({ type: 'error', message: 'Data e peso médio são obrigatórios.' });
       return;
@@ -1003,47 +1151,241 @@ function PesagemModal({ lote, db, setDb, onClose, showToast, hasPermission }) {
       return;
     }
 
+    const payload = {
+      lote_id: Number(lote.id),
+      fazenda_id: lote?.faz_id ? Number(lote.faz_id) : null,
+      data: toDataIso(form.data),
+      tipo: 'lote',
+      peso_medio: Number(form.peso_medio),
+      observacao: String(form.obs || '').trim() || null,
+      qtd: Number(form.qtd || 0),
+      quantidade: Number(form.qtd || 0),
+    };
+    const existing = pesagens
+      .filter((item) => Number(item?.lote_id) === Number(lote.id))
+      .find((item) => String(item?.tipo || '') === 'lote' && toDataIso(item?.data) === toDataIso(form.data)) || null;
+    const persisted = existing
+      ? await updateOperationalRecord('pesagens', existing.id || lote.id, payload, session, { selector: buildPesagemSelector(existing, payload) })
+      : await createOperationalRecord('pesagens', payload, session);
+
     setDb((prev) => ({
       ...prev,
-      pesagens: [...(prev.pesagens || []), {
-        id: gerarNovoId(prev.pesagens),
-        lote_id: lote.id,
-        data: form.data,
-        peso_medio: Number(form.peso_medio),
-        observacao: form.obs,
-        qtd: Number(form.qtd || 0),
-      }],
+      pesagens: existing
+        ? (prev.pesagens || []).map((item) => (Number(item.id) === Number(existing.id) ? { ...item, ...(persisted.data || payload) } : item))
+        : [...(prev.pesagens || []), persisted.data || { id: gerarNovoId(prev.pesagens || []), ...payload }],
       lotes: (prev.lotes || []).map((item) =>
         Number(item.id) === Number(lote.id)
-          ? { ...item, p_at: Number(form.peso_medio || 0), ultima_pesagem: form.data }
+          ? {
+              ...item,
+              p_at: Number(form.peso_medio || 0),
+              peso_atual: Number(form.peso_medio || 0),
+              peso_medio_atual: Number(form.peso_medio || 0),
+              ultima_pesagem: toDataIso(form.data),
+              data_ultima_pesagem: toDataIso(form.data),
+            }
           : item
       ),
     }));
-    showToast({ type: 'success', message: 'Pesagem registrada com sucesso!' });
+    if (!persisted.persisted) showToast({ type: 'warning', message: 'Pesagem salva localmente. Sincronização pendente.' });
+    else showToast({ type: 'success', message: 'Pesagem salva na nuvem.' });
     onClose();
   }
 
+  async function submitAnimal() {
+    const dataIso = toDataIso(form.data);
+    const entries = animaisPesagemView
+      .map((animal) => {
+        const raw = String(animal?.pesoDraft ?? '').trim();
+        const peso = Number(raw);
+        if (!raw || !Number.isFinite(peso) || peso <= 0) return null;
+        return {
+          animal,
+          payload: {
+            lote_id: Number(lote.id),
+            fazenda_id: lote?.faz_id ? Number(lote.faz_id) : null,
+            animal_id: Number(animal.id),
+            data: dataIso,
+            tipo: 'animal',
+            peso_medio: peso,
+            observacao: String(animal?.obsDraft || '').trim() || null,
+          },
+        };
+      })
+      .filter(Boolean);
+
+    if (!entries.length) {
+      showToast({ type: 'warning', message: 'Preencha pelo menos um peso válido para salvar.' });
+      return;
+    }
+
+    const results = await Promise.all(entries.map(({ animal, payload }) => {
+      const existing = animal?.existingPesagem || null;
+      if (existing) {
+        return updateOperationalRecord('pesagens', existing.id || payload.animal_id, payload, session, {
+          selector: buildPesagemSelector(existing, payload),
+        });
+      }
+      return createOperationalRecord('pesagens', payload, session);
+    }));
+
+    let fallbackId = gerarNovoId(pesagens);
+    const persistedRows = results.map((result, index) => result?.data || { id: fallbackId + index, ...entries[index].payload });
+
+    const updatedAnimaisMap = new Map(animais.map((item) => [Number(item.id), item]));
+    persistedRows.forEach((row) => {
+      const current = updatedAnimaisMap.get(Number(row?.animal_id));
+      if (!current) return;
+      updatedAnimaisMap.set(Number(row?.animal_id), { ...current, p_at: Number(row?.peso_medio || current?.p_at || 0) });
+    });
+    const nextAnimais = Array.from(updatedAnimaisMap.values());
+    const media = persistedRows.reduce((sum, item) => sum + Number(item?.peso_medio || 0), 0) / Math.max(persistedRows.length, 1);
+    const lotePatch = {
+      p_at: media,
+      peso_atual: media,
+      peso_medio_atual: media,
+      ultima_pesagem: dataIso,
+      data_ultima_pesagem: dataIso,
+    };
+    const lotePersist = await updateOperationalRecord('lotes', lote.id, lotePatch, session);
+
+    const loteResumoPayload = {
+      lote_id: Number(lote.id),
+      fazenda_id: lote?.faz_id ? Number(lote.faz_id) : null,
+      data: dataIso,
+      tipo: 'lote',
+      peso_medio: media,
+      observacao: 'Resumo automático da pesagem por animal',
+      quantidade: persistedRows.length,
+    };
+    const existingResumo = pesagens.find((item) => Number(item?.lote_id) === Number(lote.id) && String(item?.tipo || '') === 'lote' && toDataIso(item?.data) === dataIso) || null;
+    const resumoPersist = existingResumo
+      ? await updateOperationalRecord('pesagens', existingResumo.id || lote.id, loteResumoPayload, session, { selector: buildPesagemSelector(existingResumo, loteResumoPayload) })
+      : await createOperationalRecord('pesagens', loteResumoPayload, session);
+
+    setDb((prev) => {
+      const basePesagens = Array.isArray(prev?.pesagens) ? prev.pesagens : [];
+      const map = new Map();
+      basePesagens.forEach((item) => {
+        if (String(item?.tipo || '') === 'animal') map.set(`animal-${item?.animal_id}-${toDataIso(item?.data)}`, item);
+        else map.set(`lote-${item?.lote_id}-${toDataIso(item?.data)}`, item);
+      });
+      persistedRows.forEach((item) => map.set(`animal-${item?.animal_id}-${toDataIso(item?.data)}`, item));
+      if (resumoPersist?.data) {
+        map.set(`lote-${resumoPersist.data?.lote_id}-${toDataIso(resumoPersist.data?.data)}`, resumoPersist.data);
+      } else if (existingResumo) {
+        map.set(`lote-${existingResumo?.lote_id}-${toDataIso(existingResumo?.data)}`, { ...existingResumo, ...loteResumoPayload });
+      } else {
+        map.set(`lote-${lote.id}-${dataIso}`, { id: gerarNovoId(basePesagens), ...loteResumoPayload });
+      }
+      return {
+        ...prev,
+        animais: nextAnimais,
+        pesagens: Array.from(map.values()),
+        lotes: (prev.lotes || []).map((item) => (
+          Number(item.id) === Number(lote.id)
+            ? { ...item, ...(lotePersist.data || lotePatch) }
+            : item
+        )),
+      };
+    });
+
+    const hasFailure = results.some((item) => !item?.persisted) || !lotePersist?.persisted || !resumoPersist?.persisted;
+    if (hasFailure) showToast({ type: 'warning', message: 'Pesagem salva localmente. Sincronização pendente.' });
+    else showToast({ type: 'success', message: 'Pesagem salva na nuvem.' });
+    onClose();
+  }
+
+  async function submit() {
+    if (!hasPermission('pesagens:editar')) {
+      showToast({ type: 'error', message: 'Você não tem permissão para executar esta ação.' });
+      return;
+    }
+    if (!form.data) {
+      showToast({ type: 'error', message: 'Data da pesagem é obrigatória.' });
+      return;
+    }
+    if (form.tipo === 'lote') {
+      await submitLote();
+      return;
+    }
+    await submitAnimal();
+  }
+
   return (
-    <Modal open onClose={onClose} title="Nova Pesagem" size="md" footer={<Button onClick={submit}>Salvar Pesagem</Button>}>
+    <Modal open onClose={onClose} title="Nova Pesagem" size="lg" footer={<Button onClick={submit}>Salvar Pesagens</Button>}>
       <div className="form-grid two">
-        <Input label="Data" type="date" value={form.data} onChange={(e) => setForm((p) => ({ ...p, data: e.target.value }))} />
-        <Input label="Peso médio" type="number" value={form.peso_medio} onChange={(e) => setForm((p) => ({ ...p, peso_medio: e.target.value }))} />
-        <Input label="Quantidade pesada" type="number" value={form.qtd} onChange={(e) => setForm((p) => ({ ...p, qtd: e.target.value }))} />
-        <Input label="Observações" value={form.obs} onChange={(e) => setForm((p) => ({ ...p, obs: e.target.value }))} />
-        <p className="form-info full">GMD desde última: {formatNumber(gmd, 3)} kg/dia · @ viva: {formatNumber(arroba, 2)} · Valor estimado: {formatCurrency(valorEst)}</p>
+        <label className="ui-input-wrap">
+          <span className="ui-input-label">Tipo e referência</span>
+          <select className="ui-input" value={form.tipo} onChange={(e) => setForm((p) => ({ ...p, tipo: e.target.value }))}>
+            <option value="lote">Por lote</option>
+            <option value="animal">Por animal</option>
+          </select>
+        </label>
+        <Input label="Lote" value={lote?.nome || '-'} readOnly />
+        <Input label="Data da pesagem" type="date" value={form.data} onChange={(e) => setForm((p) => ({ ...p, data: e.target.value }))} />
+        <Input label="Quantidade esperada do lote" type="number" value={String(lotHeadCount || 0)} readOnly />
+
+        {form.tipo === 'lote' ? (
+          <>
+            <Input label="Peso médio" type="number" value={form.peso_medio} onChange={(e) => setForm((p) => ({ ...p, peso_medio: e.target.value }))} />
+            <Input label="Quantidade pesada" type="number" value={form.qtd} onChange={(e) => setForm((p) => ({ ...p, qtd: e.target.value }))} />
+            <Input label="Observações" value={form.obs} onChange={(e) => setForm((p) => ({ ...p, obs: e.target.value }))} />
+            <p className="form-info full">GMD desde última: {formatNumber(gmd, 3)} kg/dia · @ viva: {formatNumber(arroba, 2)} · Valor estimado: {formatCurrency(valorEst)}</p>
+          </>
+        ) : (
+          <>
+            {animaisIndividuais.length < lotHeadCount ? (
+              <div className="full">
+                <button type="button" className="ui-button ui-button--outline" onClick={gerarAnimaisFaltantes}>
+                  Gerar animais individuais faltantes
+                </button>
+              </div>
+            ) : null}
+            <div className="full table-responsive">
+              <table className="data-table">
+                <thead>
+                  <tr>
+                    <th>Animal</th>
+                    <th>Peso atual kg</th>
+                    <th>Observação opcional</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {animaisPesagemView.map((animal) => (
+                    <tr key={animal.id}>
+                      <td className="text-h">{animal.identificacao || `Animal #${animal.id}`}</td>
+                      <td>
+                        <input
+                          className="ui-input"
+                          type="number"
+                          min="0"
+                          step="0.01"
+                          value={animal.pesoDraft}
+                          onChange={(e) => onChangePeso(animal.id, e.target.value)}
+                          placeholder="kg"
+                        />
+                      </td>
+                      <td>
+                        <input
+                          className="ui-input"
+                          type="text"
+                          value={animal.obsDraft}
+                          onChange={(e) => onChangeObs(animal.id, e.target.value)}
+                          placeholder="Observação"
+                        />
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+            <p className="form-info full">Salvar pesagens cria/atualiza um registro por animal na data selecionada.</p>
+          </>
+        )}
       </div>
     </Modal>
   );
 }
-
-/**
- * Modal para criar um novo lote.
- * @param {object} props - As propriedades do componente.
- * @param {object} props.db - O objeto do banco de dados.
- * @param {function} props.setDb - Função para atualizar o banco de dados.
- * @param {function} props.onClose - Callback para fechar o modal.
- * @param {function} props.showToast - Função para exibir toasts.
- */
 function NovoLoteModal({ db, setDb, onClose, showToast, hasPermission, session }) {
   const configGeral = db.configuracoes?.geral || {};
   const [form, setForm] = useState({
@@ -1116,12 +1458,12 @@ function NovoLoteModal({ db, setDb, onClose, showToast, hasPermission, session }
 
   function validate() {
     const e = {};
-    if (!form.nome.trim()) e.nome = 'Nome é obrigatório';
-    if (!form.faz_id) e.faz_id = 'Fazenda é obrigatória';
-    if (!form.entrada) e.entrada = 'Informe a data de entrada para projetar a saída.';
+    if (!form.nome.trim()) e.nome = 'Nome Ã© obrigatÃ³rio';
+    if (!form.faz_id) e.faz_id = 'Fazenda Ã© obrigatÃ³ria';
+    if (!form.entrada) e.entrada = 'Informe a data de entrada para projetar a saÃ­da.';
     if (Number(form.qtd_inicial || 0) <= 0) e.qtd_inicial = 'Quantidade inicial deve ser maior que zero';
     if (Number(form.peso_inicial || 0) <= 0) e.peso_inicial = 'Peso inicial deve ser maior que zero';
-    if (Number(form.gmd_esperado || 0) <= 0) e.gmd_esperado = 'Informe um GMD esperado válido.';
+    if (Number(form.gmd_esperado || 0) <= 0) e.gmd_esperado = 'Informe um GMD esperado vÃ¡lido.';
     if (Number(form.peso_alvo || 0) <= Number(form.peso_inicial || 0)) e.peso_alvo = 'O peso alvo deve ser maior que o peso inicial.';
     if (Number(form.consumo_valor || 0) <= 0) e.consumo_valor = 'Informe a regra de consumo deste produto.';
     setErrors(e);
@@ -1130,11 +1472,11 @@ function NovoLoteModal({ db, setDb, onClose, showToast, hasPermission, session }
 
   async function submit() {
     if (!hasPermission('lotes:editar')) {
-      showToast({ type: 'error', message: 'Você não tem permissão para executar esta ação.' });
+      showToast({ type: 'error', message: 'VocÃª nÃ£o tem permissÃ£o para executar esta aÃ§Ã£o.' });
       return;
     }
     if (!validate()) {
-      showToast({ type: 'error', message: 'Por favor, corrija os erros no formulário.' });
+      showToast({ type: 'error', message: 'Por favor, corrija os erros no formulÃ¡rio.' });
       return;
     }
 
@@ -1143,12 +1485,12 @@ function NovoLoteModal({ db, setDb, onClose, showToast, hasPermission, session }
     const planejamentoLote = [
       '[Planejamento lote]',
       `GMD esperado: ${Number(form.gmd_esperado || 0)}`,
-      `Dieta/produto: ${form.produto_vinculado || 'Não informado'}`,
-      `Modo de consumo: ${form.consumo_tipo || 'Não informado'}`,
+      `Dieta/produto: ${form.produto_vinculado || 'NÃ£o informado'}`,
+      `Modo de consumo: ${form.consumo_tipo || 'NÃ£o informado'}`,
       `Valor de consumo: ${Number(form.consumo_valor || 0)}`,
-      `Saída projetada (informativa): ${dataPrevistaSaida || 'Não calculada'}`,
-      `Consumo estimado suplemento (kg): ${consumoTotalLote !== null ? consumoTotalLote.toFixed(2) : 'Não calculado'}`,
-      `Custo estimado suplemento (R$): ${custoTotalLote !== null ? custoTotalLote.toFixed(2) : 'Não calculado'}`,
+      `SaÃ­da projetada (informativa): ${dataPrevistaSaida || 'NÃ£o calculada'}`,
+      `Consumo estimado suplemento (kg): ${consumoTotalLote !== null ? consumoTotalLote.toFixed(2) : 'NÃ£o calculado'}`,
+      `Custo estimado suplemento (R$): ${custoTotalLote !== null ? custoTotalLote.toFixed(2) : 'NÃ£o calculado'}`,
     ].join(' | ');
 
     const lotePayload = {
@@ -1188,8 +1530,8 @@ function NovoLoteModal({ db, setDb, onClose, showToast, hasPermission, session }
     if (custoAquisicao > 0) {
       custoPersist = await createOperationalRecord('custos', {
         lote_id: loteIdFinal,
-        cat: 'aquisição',
-        desc: `Custo de aquisição do lote ${form.nome}`,
+        cat: 'aquisiÃ§Ã£o',
+        desc: `Custo de aquisiÃ§Ã£o do lote ${form.nome}`,
         data: form.entrada,
         val: custoAquisicao,
       }, session);
@@ -1218,15 +1560,15 @@ function NovoLoteModal({ db, setDb, onClose, showToast, hasPermission, session }
           consumo: 0,
         },
       ],
-      // Adicionar custo de aquisição como um custo financeiro
+      // Adicionar custo de aquisiÃ§Ã£o como um custo financeiro
       custos: custoAquisicao > 0 ? [
         ...(Array.isArray(prev?.custos) ? prev.custos : []),
         {
           ...(custoPersist.data || {
             id: gerarNovoId(prev.custos || []),
             lote_id: loteIdFinal,
-            cat: 'aquisição',
-            desc: `Custo de aquisição do lote ${form.nome}`,
+            cat: 'aquisiÃ§Ã£o',
+            desc: `Custo de aquisiÃ§Ã£o do lote ${form.nome}`,
             data: form.entrada,
             val: custoAquisicao,
           }),
@@ -1245,11 +1587,11 @@ function NovoLoteModal({ db, setDb, onClose, showToast, hasPermission, session }
     const custoPersistido = Boolean(custoPersist?.persisted);
 
     if (lotePersistido && (animaisPersistidos || custoPersistido)) {
-      showToast({ type: 'warning', message: 'Cadastro concluído com sincronização parcial. Parte dos dados permanece em modo local.' });
+      showToast({ type: 'warning', message: 'Cadastro concluÃ­do com sincronizaÃ§Ã£o parcial. Parte dos dados permanece em modo local.' });
     } else if (lotePersistido || animaisPersistidos || custoPersistido) {
-      showToast({ type: 'warning', message: 'Cadastro concluído parcialmente no modo local. Reconecte para sincronizar o restante.' });
+      showToast({ type: 'warning', message: 'Cadastro concluÃ­do parcialmente no modo local. Reconecte para sincronizar o restante.' });
     } else {
-      showToast({ type: 'warning', message: 'Cadastro salvo apenas no modo local. A sincronização com a nuvem não foi concluída.' });
+      showToast({ type: 'warning', message: 'Cadastro salvo apenas no modo local. A sincronizaÃ§Ã£o com a nuvem nÃ£o foi concluÃ­da.' });
     }
 
     onClose();
@@ -1267,12 +1609,12 @@ function NovoLoteModal({ db, setDb, onClose, showToast, hasPermission, session }
           </select>
           {errors.faz_id && <small className="input-error">{errors.faz_id}</small>}
         </label>
-        <Input label="Raça / grupo genético" value={form.raca} onChange={(e) => setForm((p) => ({ ...p, raca: e.target.value }))} />
+        <Input label="RaÃ§a / grupo genÃ©tico" value={form.raca} onChange={(e) => setForm((p) => ({ ...p, raca: e.target.value }))} />
         <label className="ui-input-wrap">
           <span className="ui-input-label">Sexo</span>
           <select className="ui-input" value={form.sexo} onChange={(e) => setForm((p) => ({ ...p, sexo: e.target.value }))}>
             <option>Macho</option>
-            <option>Fêmea</option>
+            <option>FÃªmea</option>
             <option>Misto</option>
           </select>
         </label>
@@ -1289,20 +1631,20 @@ function NovoLoteModal({ db, setDb, onClose, showToast, hasPermission, session }
         </label>
         <Input label="Data de entrada" type="date" error={errors.entrada} value={form.entrada} onChange={(e) => setForm((p) => ({ ...p, entrada: e.target.value }))} />
         <Input label="Fornecedor" value={form.fornecedor} onChange={(e) => setForm((p) => ({ ...p, fornecedor: e.target.value }))} />
-        <Input label="Peso médio inicial" type="number" error={errors.peso_inicial} value={form.peso_inicial} onChange={(e) => setForm((p) => ({ ...p, peso_inicial: e.target.value }))} />
+        <Input label="Peso mÃ©dio inicial" type="number" error={errors.peso_inicial} value={form.peso_inicial} onChange={(e) => setForm((p) => ({ ...p, peso_inicial: e.target.value }))} />
         <Input label="Quantidade inicial" type="number" error={errors.qtd_inicial} value={form.qtd_inicial} onChange={(e) => setForm((p) => ({ ...p, qtd_inicial: e.target.value }))} />
-        <Input label="Custo de aquisição" prefix="R$" type="number" value={form.custo_aquisicao} onChange={(e) => setForm((p) => ({ ...p, custo_aquisicao: e.target.value }))} />
+        <Input label="Custo de aquisiÃ§Ã£o" prefix="R$" type="number" value={form.custo_aquisicao} onChange={(e) => setForm((p) => ({ ...p, custo_aquisicao: e.target.value }))} />
         <Input label="Peso alvo" suffix="kg" type="number" error={errors.peso_alvo} value={form.peso_alvo} onChange={(e) => setForm((p) => ({ ...p, peso_alvo: e.target.value }))} />
 
         <Input label="GMD esperado" suffix="kg/dia" type="number" error={errors.gmd_esperado} value={form.gmd_esperado} onChange={(e) => setForm((p) => ({ ...p, gmd_esperado: e.target.value }))} />
         <label className="ui-input-wrap">
-          <span className="ui-input-label">Qual dieta este lote receberá?</span>
-          <input className="ui-input" value={form.dieta_nome} onChange={(e) => setForm((p) => ({ ...p, dieta_nome: e.target.value }))} placeholder="Ex.: Dieta de terminação" />
+          <span className="ui-input-label">Qual dieta este lote receberÃ¡?</span>
+          <input className="ui-input" value={form.dieta_nome} onChange={(e) => setForm((p) => ({ ...p, dieta_nome: e.target.value }))} placeholder="Ex.: Dieta de terminaÃ§Ã£o" />
         </label>
         <label className="ui-input-wrap">
           <span className="ui-input-label">Produto/suplemento vinculado ao estoque</span>
           <select className="ui-input" value={form.produto_vinculado} onChange={(e) => { const v=e.target.value; const sp=produtosEstoque.find((item)=>item.nome===v); setForm((p)=>({ ...p, produto_vinculado:v, consumo_tipo: sp?.tipoPadrao || p.consumo_tipo, consumo_valor: sp?.valorPadrao ? String(sp.valorPadrao) : p.consumo_valor })); }}>
-            <option value="">Produto não vinculado ao estoque</option>
+            <option value="">Produto nÃ£o vinculado ao estoque</option>
             {produtosEstoque.map((item) => <option key={item.id} value={item.nome}>{item.nome}</option>)}
           </select>
         </label>
@@ -1310,33 +1652,33 @@ function NovoLoteModal({ db, setDb, onClose, showToast, hasPermission, session }
           <span className="ui-input-label">Tipo de consumo</span>
           <select className="ui-input" value={form.consumo_tipo} onChange={(e) => setForm((p) => ({ ...p, consumo_tipo: e.target.value }))}>
             <option value="%_peso_vivo">% do peso vivo</option>
-            <option value="kg_cab_dia">kg/cabeça/dia</option>
+            <option value="kg_cab_dia">kg/cabeÃ§a/dia</option>
           </select>
         </label>
-        <Input label="Consumo informado" suffix={form.consumo_tipo === '%_peso_vivo' ? '% do peso vivo' : 'kg/cabeça/dia'} type="number" error={errors.consumo_valor} value={form.consumo_valor} onChange={(e) => setForm((p) => ({ ...p, consumo_valor: e.target.value }))} />
-        <Input label="Data prevista de saída" type="text" value={dataPrevistaSaida ? formatDate(dataPrevistaSaida) : 'Informe dados válidos para projetar a saída'} readOnly />
+        <Input label="Consumo informado" suffix={form.consumo_tipo === '%_peso_vivo' ? '% do peso vivo' : 'kg/cabeÃ§a/dia'} type="number" error={errors.consumo_valor} value={form.consumo_valor} onChange={(e) => setForm((p) => ({ ...p, consumo_valor: e.target.value }))} />
+        <Input label="Data prevista de saÃ­da" type="text" value={dataPrevistaSaida ? formatDate(dataPrevistaSaida) : 'Informe dados vÃ¡lidos para projetar a saÃ­da'} readOnly />
 
         <div className="ui-card full" style={{ padding: 12, borderStyle: 'dashed' }}>
           <strong>Estimativas do lote</strong>
-          <p>Dias estimados na fazenda: {diasEstimados !== null ? `${formatNumber(diasEstimados, 0)} dias` : 'Informe um GMD esperado válido.'}</p>
-          <p>Data prevista de saída: {dataPrevistaSaida ? formatDate(dataPrevistaSaida) : 'Informe dados válidos para calcular.'}</p>
-          <p>Consumo diário por animal: {consumoDiarioPorAnimal !== null ? `${formatNumber(consumoDiarioPorAnimal, 3)} kg/dia` : 'Informe a regra de consumo deste produto.'}</p>
-          <p>Consumo por animal no período: {consumoPeriodoPorAnimal !== null ? `${formatNumber(consumoPeriodoPorAnimal, 2)} kg` : 'Informe dados válidos para calcular.'}</p>
-          <p>Consumo total estimado do lote: {consumoTotalLote !== null ? `${formatNumber(consumoTotalLote, 2)} kg` : 'Informe quantidade de cabeças para calcular.'}</p>
-          <p>Custo diário por animal: {custoDiarioPorAnimal !== null ? formatCurrency(custoDiarioPorAnimal) : 'Custo estimado indisponível: informe o custo do produto no estoque.'}</p>
-          <p>Custo estimado por animal no período: {custoPeriodoPorAnimal !== null ? formatCurrency(custoPeriodoPorAnimal) : 'Custo estimado indisponível: informe o custo do produto no estoque.'}</p>
-          <p>Custo estimado total do lote: {custoTotalLote !== null ? formatCurrency(custoTotalLote) : 'Custo estimado indisponível: informe o custo do produto no estoque.'}</p>
-          <p>Custo diário por animal: {custoDiarioPorAnimal !== null ? formatCurrency(custoDiarioPorAnimal) : 'Custo estimado indisponível: informe o custo do produto no estoque.'}</p>
-          <p>Custo estimado por animal no período: {custoPeriodoPorAnimal !== null ? formatCurrency(custoPeriodoPorAnimal) : 'Custo estimado indisponível: informe o custo do produto no estoque.'}</p>
-          <p>Custo estimado total do lote: {custoTotalLote !== null ? formatCurrency(custoTotalLote) : 'Custo estimado indisponível: informe o custo do produto no estoque.'}</p>
-          <p>Produto/suplemento: {form.produto_vinculado || 'Produto não vinculado ao estoque'}</p>
-          <p>Tipo de consumo: {form.consumo_tipo === '%_peso_vivo' ? '% do peso vivo' : 'kg/cabeça/dia'}</p>
-          <p>Consumo informado: {form.consumo_valor ? `${form.consumo_valor} ${form.consumo_tipo === '%_peso_vivo' ? '%' : 'kg/cabeça/dia'}` : 'Informe a regra de consumo deste produto.'}</p>
-          <p>Dieta escolhida: {form.dieta_nome || 'Não informada'}</p>
+          <p>Dias estimados na fazenda: {diasEstimados !== null ? `${formatNumber(diasEstimados, 0)} dias` : 'Informe um GMD esperado vÃ¡lido.'}</p>
+          <p>Data prevista de saÃ­da: {dataPrevistaSaida ? formatDate(dataPrevistaSaida) : 'Informe dados vÃ¡lidos para calcular.'}</p>
+          <p>Consumo diÃ¡rio por animal: {consumoDiarioPorAnimal !== null ? `${formatNumber(consumoDiarioPorAnimal, 3)} kg/dia` : 'Informe a regra de consumo deste produto.'}</p>
+          <p>Consumo por animal no perÃ­odo: {consumoPeriodoPorAnimal !== null ? `${formatNumber(consumoPeriodoPorAnimal, 2)} kg` : 'Informe dados vÃ¡lidos para calcular.'}</p>
+          <p>Consumo total estimado do lote: {consumoTotalLote !== null ? `${formatNumber(consumoTotalLote, 2)} kg` : 'Informe quantidade de cabeÃ§as para calcular.'}</p>
+          <p>Custo diÃ¡rio por animal: {custoDiarioPorAnimal !== null ? formatCurrency(custoDiarioPorAnimal) : 'Custo estimado indisponÃ­vel: informe o custo do produto no estoque.'}</p>
+          <p>Custo estimado por animal no perÃ­odo: {custoPeriodoPorAnimal !== null ? formatCurrency(custoPeriodoPorAnimal) : 'Custo estimado indisponÃ­vel: informe o custo do produto no estoque.'}</p>
+          <p>Custo estimado total do lote: {custoTotalLote !== null ? formatCurrency(custoTotalLote) : 'Custo estimado indisponÃ­vel: informe o custo do produto no estoque.'}</p>
+          <p>Custo diÃ¡rio por animal: {custoDiarioPorAnimal !== null ? formatCurrency(custoDiarioPorAnimal) : 'Custo estimado indisponÃ­vel: informe o custo do produto no estoque.'}</p>
+          <p>Custo estimado por animal no perÃ­odo: {custoPeriodoPorAnimal !== null ? formatCurrency(custoPeriodoPorAnimal) : 'Custo estimado indisponÃ­vel: informe o custo do produto no estoque.'}</p>
+          <p>Custo estimado total do lote: {custoTotalLote !== null ? formatCurrency(custoTotalLote) : 'Custo estimado indisponÃ­vel: informe o custo do produto no estoque.'}</p>
+          <p>Produto/suplemento: {form.produto_vinculado || 'Produto nÃ£o vinculado ao estoque'}</p>
+          <p>Tipo de consumo: {form.consumo_tipo === '%_peso_vivo' ? '% do peso vivo' : 'kg/cabeÃ§a/dia'}</p>
+          <p>Consumo informado: {form.consumo_valor ? `${form.consumo_valor} ${form.consumo_tipo === '%_peso_vivo' ? '%' : 'kg/cabeÃ§a/dia'}` : 'Informe a regra de consumo deste produto.'}</p>
+          <p>Dieta escolhida: {form.dieta_nome || 'NÃ£o informada'}</p>
         </div>
 
         <label className="ui-input-wrap full">
-          <span className="ui-input-label">Observações</span>
+          <span className="ui-input-label">ObservaÃ§Ãµes</span>
           <textarea className="ui-input" value={form.obs} onChange={(e) => setForm((p) => ({ ...p, obs: e.target.value }))} />
         </label>
       </div>
@@ -1345,9 +1687,9 @@ function NovoLoteModal({ db, setDb, onClose, showToast, hasPermission, session }
 }
 
 /**
- * Calcula o número de dias de uma data até hoje.
+ * Calcula o nÃºmero de dias de uma data atÃ© hoje.
  * @param {string} dateStr - A string da data.
- * @returns {number} O número de dias.
+ * @returns {number} O nÃºmero de dias.
  */
 function daysFrom(dateStr) {
   if (!dateStr) return 0;
@@ -1359,10 +1701,10 @@ function daysFrom(dateStr) {
 }
 
 /**
- * Calcula o número de dias entre duas datas.
+ * Calcula o nÃºmero de dias entre duas datas.
  * @param {string} a - Primeira data.
  * @param {string} b - Segunda data.
- * @returns {number} O número de dias.
+ * @returns {number} O nÃºmero de dias.
  */
 function daysBetween(a, b) {
   if (!a || !b) return 0;
@@ -1374,7 +1716,7 @@ function daysBetween(a, b) {
 }
 
 /**
- * Calcula o GMD dos últimos 30 dias (ou entre as duas últimas pesagens se o período for menor).
+ * Calcula o GMD dos Ãºltimos 30 dias (ou entre as duas Ãºltimas pesagens se o perÃ­odo for menor).
  * @param {Array<object>} pesagens - Array de objetos de pesagem.
  * @param {number} loteId - ID do lote.
  * @returns {number} O GMD calculado.
@@ -1386,25 +1728,25 @@ function calcGmd30(pesagens, loteId) {
   const last = data[data.length - 1];
   let prev = null;
 
-  // Encontrar a pesagem mais antiga que está dentro dos últimos 30 dias
+  // Encontrar a pesagem mais antiga que estÃ¡ dentro dos Ãºltimos 30 dias
   for (let i = data.length - 2; i >= 0; i--) {
     const currentPesagem = data[i];
     const daysDiff = daysBetween(currentPesagem.data, last.data);
-    if (daysDiff <= 30 && daysDiff > 0) { // Considerar apenas pesagens dentro do período e com diferença de dias
+    if (daysDiff <= 30 && daysDiff > 0) { // Considerar apenas pesagens dentro do perÃ­odo e com diferenÃ§a de dias
       prev = currentPesagem;
       break;
     }
   }
 
-  // Se não encontrou uma pesagem nos últimos 30 dias, usa a penúltima pesagem disponível
+  // Se nÃ£o encontrou uma pesagem nos Ãºltimos 30 dias, usa a penÃºltima pesagem disponÃ­vel
   if (!prev && data.length >= 2) {
     prev = data[data.length - 2];
   }
 
-  if (!prev) return 0; // Não há pesagem anterior válida
+  if (!prev) return 0; // NÃ£o hÃ¡ pesagem anterior vÃ¡lida
 
   const daysDiff = daysBetween(prev.data, last.data);
-  if (daysDiff <= 0) return 0; // Evitar divisão por zero ou GMD inválido
+  if (daysDiff <= 0) return 0; // Evitar divisÃ£o por zero ou GMD invÃ¡lido
 
   return (Number(last.peso_medio) - Number(prev.peso_medio)) / daysDiff;
 }
@@ -1442,7 +1784,7 @@ function groupCustos(custos) {
 }
 
 /**
- * Constrói a linha do tempo financeira acumulada para um lote específico.
+ * ConstrÃ³i a linha do tempo financeira acumulada para um lote especÃ­fico.
  * @param {object} db - O objeto do banco de dados.
  * @param {number} loteId - O ID do lote.
  * @returns {Array<object>} A linha do tempo financeira.
@@ -1466,3 +1808,5 @@ function buildFinanceTimeline(db, loteId) {
   });
   return timelineData;
 }
+
+
