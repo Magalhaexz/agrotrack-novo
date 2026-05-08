@@ -1375,6 +1375,193 @@ a:hover {
   }
 }
 
+/* SPRINT20I - mobile layout hardening for shell, dashboard, calendar and estoque */
+@media (max-width: 900px) {
+  .header.top-header {
+    height: auto;
+    min-height: 58px;
+    padding: 6px 10px;
+    align-items: center;
+    overflow: hidden;
+  }
+
+  .mobile-header-core {
+    flex: 1;
+    min-width: 0;
+  }
+
+  .mobile-header-brand {
+    min-width: 0;
+    max-width: calc(100vw - 132px);
+  }
+
+  .mobile-header-menu-btn,
+  .mobile-utility-trigger,
+  .header-notification-btn {
+    width: 44px;
+    height: 44px;
+    min-height: 44px;
+  }
+
+  .main,
+  .main-content {
+    padding-bottom: calc(var(--herdon-mobile-bottomnav-height) + env(safe-area-inset-bottom) + 28px);
+  }
+
+  .page,
+  .page-container,
+  .dashboard-page,
+  .calendario-page,
+  .page--estoque {
+    padding-bottom: calc(var(--herdon-mobile-bottomnav-height) + env(safe-area-inset-bottom) + 18px);
+  }
+
+  .mobile-fab {
+    bottom: calc(var(--herdon-mobile-bottomnav-height) + env(safe-area-inset-bottom) + 16px);
+  }
+
+  .dashboard-toolbar {
+    display: grid;
+    gap: 12px;
+    align-items: start;
+  }
+
+  .dashboard-toolbar-copy h1 {
+    font-size: clamp(1.45rem, 7vw, 1.95rem);
+    line-height: 1.1;
+  }
+
+  .dashboard-toolbar-copy p {
+    font-size: 0.88rem;
+    line-height: 1.45;
+    margin-top: 6px;
+  }
+
+  .dashboard-toolbar-actions {
+    width: 100%;
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 8px;
+  }
+
+  .dashboard-toolbar-actions > * {
+    width: 100%;
+    min-height: 44px;
+  }
+
+  .dashboard-grid--kpi-main {
+    grid-template-columns: 1fr;
+    gap: 10px;
+  }
+
+  .kpi-panel,
+  .kpi-panel--compact {
+    min-height: 118px;
+    padding: 16px;
+  }
+
+  .calendar-shell {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 12px;
+  }
+
+  .calendar-toolbar {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 8px;
+  }
+
+  .calendar-month-grid {
+    gap: 4px;
+  }
+
+  .calendar-day-cell {
+    min-height: 54px;
+    padding: 4px;
+    overflow: hidden;
+  }
+
+  .calendar-day-events,
+  .calendar-day-event,
+  .calendar-day-event-title {
+    display: none;
+  }
+
+  .calendar-day-head {
+    font-size: 0.72rem;
+    line-height: 1.1;
+  }
+
+  .calendar-day-dot {
+    width: 8px;
+    height: 8px;
+    margin-top: 4px;
+  }
+
+  .calendar-event-card,
+  .calendar-upcoming-item {
+    overflow: hidden;
+  }
+
+  .calendar-event-content,
+  .calendar-event-title,
+  .calendar-event-meta {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .page--estoque .rebanho-header,
+  .page--estoque .lote-actions,
+  .page--estoque .dashboard-grid--kpi-secondary {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 10px;
+  }
+
+  .page--estoque .empty-state,
+  .page--estoque .empty-box,
+  .page--estoque .calendar-empty-state {
+    text-align: left;
+    padding: 16px;
+    border-radius: 12px;
+  }
+
+  .page--estoque .filters-wrap,
+  .page--estoque .filters-bar {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 8px;
+  }
+
+  .page--estoque .filters-wrap > *,
+  .page--estoque .filters-bar > * {
+    width: 100%;
+    min-height: 44px;
+  }
+}
+
+@media (max-width: 640px) {
+  .dashboard-toolbar-actions {
+    grid-template-columns: 1fr;
+  }
+
+  .calendar-month-grid {
+    gap: 3px;
+  }
+
+  .calendar-day-cell {
+    min-height: 48px;
+    padding: 3px;
+  }
+
+  .calendar-weekdays span {
+    font-size: 0.62rem;
+  }
+}
+
 @media (max-width: 600px) {
   .page-header h1 {
     font-size: 1.5rem;
