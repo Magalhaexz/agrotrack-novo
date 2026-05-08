@@ -1375,6 +1375,193 @@ a:hover {
   }
 }
 
+/* SPRINT20I - mobile layout hardening for shell, dashboard, calendar and estoque */
+@media (max-width: 900px) {
+  .header.top-header {
+    height: auto;
+    min-height: 58px;
+    padding: 6px 10px;
+    align-items: center;
+    overflow: hidden;
+  }
+
+  .mobile-header-core {
+    flex: 1;
+    min-width: 0;
+  }
+
+  .mobile-header-brand {
+    min-width: 0;
+    max-width: calc(100vw - 132px);
+  }
+
+  .mobile-header-menu-btn,
+  .mobile-utility-trigger,
+  .header-notification-btn {
+    width: 44px;
+    height: 44px;
+    min-height: 44px;
+  }
+
+  .main,
+  .main-content {
+    padding-bottom: calc(var(--herdon-mobile-bottomnav-height) + env(safe-area-inset-bottom) + 28px);
+  }
+
+  .page,
+  .page-container,
+  .dashboard-page,
+  .calendario-page,
+  .page--estoque {
+    padding-bottom: calc(var(--herdon-mobile-bottomnav-height) + env(safe-area-inset-bottom) + 18px);
+  }
+
+  .mobile-fab {
+    bottom: calc(var(--herdon-mobile-bottomnav-height) + env(safe-area-inset-bottom) + 16px);
+  }
+
+  .dashboard-toolbar {
+    display: grid;
+    gap: 12px;
+    align-items: start;
+  }
+
+  .dashboard-toolbar-copy h1 {
+    font-size: clamp(1.45rem, 7vw, 1.95rem);
+    line-height: 1.1;
+  }
+
+  .dashboard-toolbar-copy p {
+    font-size: 0.88rem;
+    line-height: 1.45;
+    margin-top: 6px;
+  }
+
+  .dashboard-toolbar-actions {
+    width: 100%;
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 8px;
+  }
+
+  .dashboard-toolbar-actions > * {
+    width: 100%;
+    min-height: 44px;
+  }
+
+  .dashboard-grid--kpi-main {
+    grid-template-columns: 1fr;
+    gap: 10px;
+  }
+
+  .kpi-panel,
+  .kpi-panel--compact {
+    min-height: 118px;
+    padding: 16px;
+  }
+
+  .calendar-shell {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 12px;
+  }
+
+  .calendar-toolbar {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 8px;
+  }
+
+  .calendar-month-grid {
+    gap: 4px;
+  }
+
+  .calendar-day-cell {
+    min-height: 54px;
+    padding: 4px;
+    overflow: hidden;
+  }
+
+  .calendar-day-events,
+  .calendar-day-event,
+  .calendar-day-event-title {
+    display: none;
+  }
+
+  .calendar-day-head {
+    font-size: 0.72rem;
+    line-height: 1.1;
+  }
+
+  .calendar-day-dot {
+    width: 8px;
+    height: 8px;
+    margin-top: 4px;
+  }
+
+  .calendar-event-card,
+  .calendar-upcoming-item {
+    overflow: hidden;
+  }
+
+  .calendar-event-content,
+  .calendar-event-title,
+  .calendar-event-meta {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .page--estoque .rebanho-header,
+  .page--estoque .lote-actions,
+  .page--estoque .dashboard-grid--kpi-secondary {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 10px;
+  }
+
+  .page--estoque .empty-state,
+  .page--estoque .empty-box,
+  .page--estoque .calendar-empty-state {
+    text-align: left;
+    padding: 16px;
+    border-radius: 12px;
+  }
+
+  .page--estoque .filters-wrap,
+  .page--estoque .filters-bar {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 8px;
+  }
+
+  .page--estoque .filters-wrap > *,
+  .page--estoque .filters-bar > * {
+    width: 100%;
+    min-height: 44px;
+  }
+}
+
+@media (max-width: 640px) {
+  .dashboard-toolbar-actions {
+    grid-template-columns: 1fr;
+  }
+
+  .calendar-month-grid {
+    gap: 3px;
+  }
+
+  .calendar-day-cell {
+    min-height: 48px;
+    padding: 3px;
+  }
+
+  .calendar-weekdays span {
+    font-size: 0.62rem;
+  }
+}
+
 @media (max-width: 600px) {
   .page-header h1 {
     font-size: 1.5rem;
@@ -8267,5 +8454,100 @@ body {
 @media (min-width: 901px) {
   .mobile-header-core {
     display: none !important;
+  }
+}
+
+@media print {
+  body { background: #fff !important; color: #111 !important; }
+  .sidebar, .app-header, .mobile-bottom-nav, .mobile-header-core, .mobile-fab,
+  .page-actions, .reports-page-actions, button, .action-btn, .no-print { display: none !important; }
+  .main, .page, .reports-page { padding: 0 !important; margin: 0 !important; background: #fff !important; }
+  .card, .reports-card, table { background: #fff !important; color: #111 !important; border-color: #d1d5db !important; }
+  .table-responsive { overflow: visible !important; }
+  tr, td, th, .card { page-break-inside: avoid; }
+  .reports-page::before { content: 'HERDON - Relatório\A Emissão: ' attr(data-print-date); white-space: pre; display: block; margin-bottom: 12px; font-weight: 700; color: #111; }
+}
+
+.config-actions-wrap .action-btn,
+.funcionario-row .action-btn,
+.funcionario-row .ui-input,
+.configuracoes-page .ui-input,
+.configuracoes-page button {
+  min-height: 44px;
+}
+
+.funcionario-row {
+  display: grid;
+  grid-template-columns: auto 1fr auto auto;
+  gap: 10px;
+  align-items: center;
+}
+
+@media (max-width: 900px) {
+  .table-responsive { overflow-x: auto; }
+  .dashboard-table { min-width: 680px; }
+  .funcionario-row {
+    grid-template-columns: auto 1fr;
+    align-items: start;
+  }
+  .funcionario-row .funcionario-phone,
+  .funcionario-row .funcionario-status,
+  .funcionario-row .row-actions {
+    grid-column: 2;
+  }
+  .funcionario-row .row-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin-top: 6px;
+  }
+  .config-actions-wrap {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+}
+
+.tab-bar {
+  display: flex;
+  gap: 8px;
+  flex-wrap: nowrap;
+  overflow-x: auto;
+  padding-bottom: 4px;
+}
+
+.animais-empty-state,
+.empty-box,
+.empty-state-td {
+  min-height: 120px;
+}
+
+.dashboard-grid--kpi-main .card,
+.kpi-card--compact {
+  min-height: 96px;
+}
+
+.page-actions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+@media (max-width: 900px) {
+  .animais-hero,
+  .rebanho-header,
+  .page-header {
+    display: grid;
+    gap: 10px;
+  }
+  .page-actions,
+  .lote-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+  .dashboard-grid--kpi-main {
+    grid-template-columns: 1fr 1fr;
   }
 }
