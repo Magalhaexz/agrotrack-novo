@@ -41,9 +41,41 @@ function getPostgrestCode(error) {
 }
 
 function getSafeErrorDetails(error) {
+  const safeMessage = getErrorMessage(error) ? String(getErrorMessage(error)) : null;
   const details = error?.details ? String(error.details) : null;
   const hint = error?.hint ? String(error.hint) : null;
-  return { details, hint };
+  return { safeMessage, details, hint };
+}
+
+function isSchemaCompatibilityError(error) {
+  const status = getHttpStatus(error);
+  const code = String(error?.code || '').toUpperCase();
+  const message = String(getErrorMessage(error) || '').toLowerCase();
+  const details = String(error?.details || '').toLowerCase();
+  return (
+    status === 400
+    || code === 'PGRST204'
+    || code === '42703'
+    || message.includes('column')
+    || message.includes('schema cache')
+    || details.includes('column')
+    || details.includes('schema cache')
+  );
+}
+
+function logSupabase400Diagnostic(event = {}) {
+  if (!import.meta.env.DEV) return;
+  console.warn('[HERDON_SUPABASE_400_DIAGNOSTIC]', {
+    table: event.table || null,
+    action: event.action || null,
+    status: event.status || null,
+    postgrestCode: event.postgrestCode || null,
+    safeMessage: event.safeMessage || null,
+    details: event.details || null,
+    hint: event.hint || null,
+    payloadKeys: Array.isArray(event.payloadKeys) ? event.payloadKeys : [],
+    removedKeys: Array.isArray(event.removedKeys) ? event.removedKeys : [],
+  });
 }
 
 function getTableCapability(table) {
@@ -334,7 +366,7 @@ function enqueuePendingSync(item = {}) {
     lastAttemptAt: item.lastAttemptAt || null,
     retryCount: Number(item.retryCount || 0),
     code: item.code || 'unknown',
-    message: item.message || 'Registro salvo localmente. Sincronização pendente.',
+    message: item.message || 'Registro salvo localmente. SincronizaÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â§ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â£o pendente.',
   };
   const fingerprint = buildQueueFingerprint(nextItem);
   const deduped = current.filter((queued) => buildQueueFingerprint(queued) !== fingerprint);
@@ -371,7 +403,7 @@ export async function ensureSupabaseRequestReadiness(session, context = {}) {
     return {
       ok: false,
       code: 'SUPABASE_ENV_MISSING',
-      message: envStatus.message || 'Configuração da nuvem ausente neste ambiente.',
+      message: envStatus.message || 'ConfiguraÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â§ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â£o da nuvem ausente neste ambiente.',
     };
   }
 
@@ -386,7 +418,7 @@ export async function ensureSupabaseRequestReadiness(session, context = {}) {
     return {
       ok: false,
       code: 'SESSION_MISSING',
-      message: 'Sessão expirada. Entre novamente para sincronizar com a nuvem.',
+      message: 'SessÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â£o expirada. Entre novamente para sincronizar com a nuvem.',
     };
   }
 
@@ -404,7 +436,7 @@ export async function ensureSupabaseRequestReadiness(session, context = {}) {
           tokenExpired: Boolean(validated?.authState?.tokenExpired),
           refreshAttempted: Boolean(validated?.authState?.refreshAttempted),
           refreshSucceeded: Boolean(validated?.authState?.refreshSucceeded),
-          safeMessage: validated?.safeMessage || 'Sessão expirada. Entre novamente para sincronizar com a nuvem.',
+          safeMessage: validated?.safeMessage || 'SessÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â£o expirada. Entre novamente para sincronizar com a nuvem.',
         });
       }
       logOperationalSync({
@@ -417,7 +449,7 @@ export async function ensureSupabaseRequestReadiness(session, context = {}) {
       return {
         ok: false,
         code: validated?.code || 'SESSION_STALE',
-        message: validated?.safeMessage || 'Sessão expirada. Entre novamente para sincronizar com a nuvem.',
+        message: validated?.safeMessage || 'SessÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â£o expirada. Entre novamente para sincronizar com a nuvem.',
       };
     }
     return {
@@ -437,7 +469,7 @@ export async function ensureSupabaseRequestReadiness(session, context = {}) {
     return {
       ok: false,
       code: 'SESSION_READ_ERROR',
-      message: classifyOperationalError(error, 'Falha ao validar sessão com a nuvem. Seus dados locais continuam disponíveis.', context?.table || null),
+      message: classifyOperationalError(error, 'Falha ao validar sessÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â£o com a nuvem. Seus dados locais continuam disponÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â­veis.', context?.table || null),
     };
   }
 }
@@ -700,6 +732,86 @@ async function tryInsertPayloadVariants(table, payloadOrVariants) {
     }
   }
   return { data: null, error: lastError };
+}
+
+function pruneKeys(payload, keys = []) {
+  const next = { ...(payload || {}) };
+  keys.forEach((key) => {
+    if (Object.prototype.hasOwnProperty.call(next, key)) delete next[key];
+  });
+  return next;
+}
+
+function buildAdaptiveVariants(table, payload = {}) {
+  const normalizedTable = String(table || '').toLowerCase();
+  const variants = [];
+  const pushVariant = (nextPayload, removedKeys = []) => {
+    variants.push({
+      payload: Object.fromEntries(Object.entries(nextPayload || {}).filter(([, value]) => value !== undefined)),
+      removedKeys,
+    });
+  };
+
+  pushVariant(payload, []);
+  if (normalizedTable === 'animais') {
+    const v1 = pruneKeys(payload, ['owner_user_id']);
+    pushVariant(v1, ['owner_user_id']);
+    const v2 = pruneKeys(v1, ['cloud_id']);
+    pushVariant(v2, ['owner_user_id', 'cloud_id']);
+    const v3 = pruneKeys(v2, ['metadata']);
+    pushVariant(v3, ['owner_user_id', 'cloud_id', 'metadata']);
+    const v4 = {
+      lote_id: v3.lote_id,
+      identificacao: v3.identificacao,
+      tipo_registro: v3.tipo_registro,
+      qtd: v3.qtd,
+      status: v3.status,
+      p_ini: v3.p_ini,
+      p_at: v3.p_at,
+    };
+    pushVariant(v4, ['owner_user_id', 'cloud_id', 'metadata', 'minimal']);
+  } else if (normalizedTable === 'pesagens') {
+    const v1 = pruneKeys(payload, ['owner_user_id']);
+    pushVariant(v1, ['owner_user_id']);
+    const v2 = pruneKeys(v1, ['cloud_id']);
+    pushVariant(v2, ['owner_user_id', 'cloud_id']);
+    const v3 = pruneKeys(v2, ['metadata']);
+    pushVariant(v3, ['owner_user_id', 'cloud_id', 'metadata']);
+    const v4 = pruneKeys(v3, ['origem']);
+    pushVariant(v4, ['owner_user_id', 'cloud_id', 'metadata', 'origem']);
+    const v5 = pruneKeys(v4, ['rendimento_carcaca']);
+    pushVariant(v5, ['owner_user_id', 'cloud_id', 'metadata', 'origem', 'rendimento_carcaca']);
+    const v6 = pruneKeys(v5, ['preco_arroba']);
+    pushVariant(v6, ['owner_user_id', 'cloud_id', 'metadata', 'origem', 'rendimento_carcaca', 'preco_arroba']);
+    const v7 = {
+      lote_id: v6.lote_id,
+      animal_id: v6.animal_id,
+      data: v6.data,
+      tipo: v6.tipo,
+      peso_medio: v6.peso_medio,
+      observacao: v6.observacao,
+    };
+    pushVariant(v7, ['owner_user_id', 'cloud_id', 'metadata', 'origem', 'rendimento_carcaca', 'preco_arroba', 'minimal']);
+  } else if (normalizedTable === 'alertas_resolvidos') {
+    const v1 = pruneKeys(payload, ['owner_user_id']);
+    pushVariant(v1, ['owner_user_id']);
+    const v2 = pruneKeys(v1, ['metadata']);
+    pushVariant(v2, ['owner_user_id', 'metadata']);
+    const v3 = pruneKeys(v2, ['ack_key']);
+    pushVariant(v3, ['owner_user_id', 'metadata', 'ack_key']);
+    const v4 = pruneKeys(v3, ['origem']);
+    pushVariant(v4, ['owner_user_id', 'metadata', 'ack_key', 'origem']);
+    const v5 = { chave: v4.chave, resolved_at: v4.resolved_at };
+    pushVariant(v5, ['owner_user_id', 'metadata', 'ack_key', 'origem', 'minimal']);
+  }
+
+  const seen = new Set();
+  return variants.filter((variant) => {
+    const key = JSON.stringify(Object.keys(variant.payload || {}).sort());
+    if (seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
 }
 
 async function findExistingFazendaRecord(payload, userId) {
@@ -1000,7 +1112,7 @@ export async function createOperationalRecord(table, record, session, options = 
   if (!readiness.ok) {
     const isFazendas = String(table || '').toLowerCase() === 'fazendas';
     const fallbackMessage = (isFazendas && readiness.code === 'SESSION_MISSING')
-      ? 'Sessão da nuvem não encontrada. Faça login novamente para salvar na nuvem.'
+      ? 'SessÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â£o da nuvem nÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â£o encontrada. FaÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â§a login novamente para salvar na nuvem.'
       : 'Registro salvo localmente. Sincronizacao pendente.';
     const fallback = buildFallback(
       fallbackMessage,
@@ -1080,7 +1192,7 @@ export async function createOperationalRecord(table, record, session, options = 
     }
     if (!payload || typeof payload !== 'object') {
       const fallback = buildFallback(
-        'Registro salvo localmente. Sincronização pendente.',
+        'Registro salvo localmente. SincronizaÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â§ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â£o pendente.',
         sanitizeRecord(record),
         'PAYLOAD_INCOMPATIBLE',
         'pending_sync'
@@ -1117,15 +1229,37 @@ export async function createOperationalRecord(table, record, session, options = 
       const existing = await findExistingFazendaRecord(payload, userId);
       if (existing?.error) throw existing.error;
       if (existing?.data) {
-        notifyCloudHealthy('Registro já existente na nuvem.');
+        notifyCloudHealthy('Registro jÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¡ existente na nuvem.');
         return { persisted: true, data: existing.data, error: null, syncStatus: 'cloud_success', code: null };
       }
     }
-    const { data, error } = await tryInsertPayloadVariants(table, payload);
-
-    if (error) {
-      throw error;
+    let data = null;
+    let error = null;
+    const adaptiveVariants = buildAdaptiveVariants(table, payload);
+    for (const variant of (adaptiveVariants.length ? adaptiveVariants : [{ payload, removedKeys: [] }])) {
+      const result = await tryInsertPayloadVariants(table, variant.payload);
+      data = result?.data || null;
+      error = result?.error || null;
+      if (!error) break;
+      if (isSchemaCompatibilityError(error)) {
+        const safe = getSafeErrorDetails(error);
+        logSupabase400Diagnostic({
+          table,
+          action: 'create',
+          status: getHttpStatus(error),
+          postgrestCode: getPostgrestCode(error),
+          safeMessage: safe.safeMessage,
+          details: safe.details,
+          hint: safe.hint,
+          payloadKeys: Object.keys(variant.payload || {}),
+          removedKeys: variant.removedKeys || [],
+        });
+      } else {
+        break;
+      }
     }
+
+    if (error) throw error;
     notifyCloudHealthy('Registro salvo na nuvem.');
     const metadataLocalId = sanitizeRecord(record)?.metadata?.local_id ?? null;
     removePendingSyncItems((item) => (
@@ -1155,8 +1289,9 @@ export async function createOperationalRecord(table, record, session, options = 
   } catch (error) {
     const status = getHttpStatus(error);
     const safe = getSafeErrorDetails(error);
-    const classifiedCode = status === 400
-      ? 'schema_error'
+    const schemaIncompatible = isSchemaCompatibilityError(error);
+    const classifiedCode = schemaIncompatible
+      ? BLOCKED_SCHEMA_ERROR_CODE
       : classifyCloudSaveCode(error?.code, error, status);
     logOperationalSync({
       stage: 'create_error',
@@ -1172,12 +1307,27 @@ export async function createOperationalRecord(table, record, session, options = 
       syncStatus: 'pending_sync',
       selectorType: null,
       payloadKeys: Object.keys(sanitizeRecord(record) || {}),
-      safeMessage: safe.message || getErrorMessage(error),
+      safeMessage: safe.safeMessage || getErrorMessage(error),
       safeDetails: safe.details,
       safeHint: safe.hint,
     }, 'warn');
+    if (schemaIncompatible) {
+      logSupabase400Diagnostic({
+        table,
+        action: 'create',
+        status,
+        postgrestCode: getPostgrestCode(error),
+        safeMessage: safe.safeMessage || getErrorMessage(error),
+        details: safe.details,
+        hint: safe.hint,
+        payloadKeys: Object.keys(sanitizeRecord(record) || {}),
+        removedKeys: [],
+      });
+    }
     const fallback = buildFallback(
-      'Registro salvo localmente. Sincronização pendente.',
+      schemaIncompatible
+        ? 'Estrutura da nuvem incompatÃƒÆ’Ã‚Â­vel com este registro. Registro mantido localmente.'
+        : 'Registro salvo localmente. SincronizaÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â§ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â£o pendente.',
       sanitizeRecord(record),
       classifiedCode,
       'pending_sync'
@@ -1226,19 +1376,19 @@ function validateFazendaCreatePayload(payload = {}, session) {
 
   if (!hasUserId || !hasOwnerUserId) {
     code = 'SESSION_MISSING';
-    safeMessage = 'Sessão da nuvem não encontrada. Faça login novamente para salvar na nuvem.';
+    safeMessage = 'SessÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â£o da nuvem nÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â£o encontrada. FaÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â§a login novamente para salvar na nuvem.';
   } else if (!hasNome) {
     code = 'NOME_REQUIRED';
     safeMessage = 'Informe o nome da fazenda.';
   } else if (Object.prototype.hasOwnProperty.call(payload, 'id')) {
     code = 'INVALID_PAYLOAD_ID';
-    safeMessage = 'Falha de validação do cadastro da fazenda.';
+    safeMessage = 'Falha de validaÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â§ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â£o do cadastro da fazenda.';
   } else if (hasCloudIdKey && !normalizeCloudUuid(payload?.cloud_id)) {
     code = 'INVALID_CLOUD_ID';
-    safeMessage = 'Falha de validação do cadastro da fazenda.';
+    safeMessage = 'Falha de validaÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â§ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â£o do cadastro da fazenda.';
   } else if (!isObject(payload?.metadata)) {
     code = 'INVALID_METADATA';
-    safeMessage = 'Falha de validação do cadastro da fazenda.';
+    safeMessage = 'Falha de validaÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â§ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â£o do cadastro da fazenda.';
   }
 
   if (import.meta.env.DEV) {
@@ -1314,11 +1464,11 @@ export async function updateOperationalRecord(table, id, patch, session, options
   const userId = getSessionUserId(session);
 
   try {
-    const payload = sanitizeRecord(patch);
+    const basePayload = buildOperationalUpdatePayload(table, patch, userId) || sanitizeRecord(patch);
     const withOwner = tableSupportsOwnerScope(table);
     const selector = isObject(options?.selector) ? options.selector : null;
     const normalizedIdentityKey = buildFazendaIdentityKey(selector?.identity || {});
-    const runUpdate = async (useOwnerScope) => {
+    const runUpdate = async (useOwnerScope, payload) => {
       let query = supabase.from(table).update(payload);
       const normalizedTable = String(table || '').toLowerCase();
       if (normalizedTable === 'fazendas' && selector?.type) {
@@ -1363,10 +1513,32 @@ export async function updateOperationalRecord(table, id, patch, session, options
       if (useOwnerScope) query = query.eq('owner_user_id', userId);
       return query.select('*').single();
     };
-    let { data, error } = await runUpdate(withOwner);
-    if (error && withOwner && isOwnerColumnSchemaError(error)) {
-      updateTableCapability(table, { ownerScope: false });
-      ({ data, error } = await runUpdate(false));
+    let data = null;
+    let error = null;
+    const adaptiveVariants = buildAdaptiveVariants(table, basePayload);
+    for (const variant of (adaptiveVariants.length ? adaptiveVariants : [{ payload: basePayload, removedKeys: [] }])) {
+      ({ data, error } = await runUpdate(withOwner, variant.payload));
+      if (error && withOwner && isOwnerColumnSchemaError(error)) {
+        updateTableCapability(table, { ownerScope: false });
+        ({ data, error } = await runUpdate(false, variant.payload));
+      }
+      if (!error) break;
+      if (isSchemaCompatibilityError(error)) {
+        const safe = getSafeErrorDetails(error);
+        logSupabase400Diagnostic({
+          table,
+          action: 'update',
+          status: getHttpStatus(error),
+          postgrestCode: getPostgrestCode(error),
+          safeMessage: safe.safeMessage || getErrorMessage(error),
+          details: safe.details,
+          hint: safe.hint,
+          payloadKeys: Object.keys(variant.payload || {}),
+          removedKeys: variant.removedKeys || [],
+        });
+      } else {
+        break;
+      }
     }
     if (error) throw error;
     notifyCloudHealthy('Registro salvo na nuvem.');
@@ -1400,8 +1572,9 @@ export async function updateOperationalRecord(table, id, patch, session, options
     if (isOwnerColumnSchemaError(error)) {
       updateTableCapability(table, { ownerScope: false });
     }
-    const classifiedCode = status === 400
-      ? 'schema_error'
+    const schemaIncompatible = isSchemaCompatibilityError(error);
+    const classifiedCode = schemaIncompatible
+      ? BLOCKED_SCHEMA_ERROR_CODE
       : classifyCloudSaveCode(error?.code, error, status);
     logOperationalSync({
       stage: 'update_error',
@@ -1417,12 +1590,27 @@ export async function updateOperationalRecord(table, id, patch, session, options
       httpStatus: status,
       syncStatus: 'pending_sync',
       payloadKeys: Object.keys(sanitizeRecord(patch) || {}),
-      safeMessage: safe.message || getErrorMessage(error),
+      safeMessage: safe.safeMessage || getErrorMessage(error),
       safeDetails: safe.details,
       safeHint: safe.hint,
     }, 'warn');
+    if (schemaIncompatible) {
+      logSupabase400Diagnostic({
+        table,
+        action: 'update',
+        status,
+        postgrestCode: getPostgrestCode(error),
+        safeMessage: safe.safeMessage || getErrorMessage(error),
+        details: safe.details,
+        hint: safe.hint,
+        payloadKeys: Object.keys(sanitizeRecord(patch) || {}),
+        removedKeys: [],
+      });
+    }
     const fallback = buildFallback(
-      'Registro salvo localmente. Sincronização pendente.',
+      schemaIncompatible
+        ? 'Estrutura da nuvem incompatÃ­vel com este registro. Registro mantido localmente.'
+        : 'Registro salvo localmente. SincronizaÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â§ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â£o pendente.',
       sanitizeRecord(patch),
       classifiedCode,
       'pending_sync'
@@ -1547,7 +1735,7 @@ export async function deleteOperationalRecord(table, id, session, options = {}) 
       ({ error } = await runDelete(false));
     }
     if (error) throw error;
-    notifyCloudHealthy('Nuvem ativa com atualização confirmada.');
+    notifyCloudHealthy('Nuvem ativa com atualizaÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â§ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â£o confirmada.');
     removePendingSyncItems((item) => (
       String(item?.table || '') === String(table || '')
       && String(item?.action || '') === 'delete'
@@ -1600,7 +1788,7 @@ export async function deleteOperationalRecord(table, id, session, options = {}) 
       safeHint: safe.hint,
     }, 'warn');
     const fallback = buildFallback(
-      'Registro salvo localmente. Sincronização pendente.',
+      'Registro salvo localmente. SincronizaÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â§ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â£o pendente.',
       null,
       classifiedCode,
       'pending_sync'
@@ -1657,7 +1845,7 @@ export async function processPendingSyncQueue(session, options = {}) {
     if (baseIndex === -1) continue;
     const current = remaining[baseIndex];
     const retryCount = Number(current?.retryCount || 0);
-    if (!isManual && String(current?.code || '') === BLOCKED_SCHEMA_ERROR_CODE) {
+    if (!isManual && [BLOCKED_SCHEMA_ERROR_CODE, 'schema_error'].includes(String(current?.code || ''))) {
       continue;
     }
     if (!isManual && retryCount >= 3) {
@@ -1681,7 +1869,7 @@ export async function processPendingSyncQueue(session, options = {}) {
         ...current,
         localId,
         code: BLOCKED_SCHEMA_ERROR_CODE,
-        message: 'Pendência bloqueada por incompatibilidade de dados.',
+        message: 'PendÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Âªncia bloqueada por incompatibilidade de dados.',
       };
       failed += 1;
       continue;
@@ -1704,10 +1892,10 @@ export async function processPendingSyncQueue(session, options = {}) {
     failed += 1;
     const nextRetryCount = retryCount + 1;
     let nextCode = result?.code || current.code || 'unknown';
-    let nextMessage = result?.error || current.message || 'Registro salvo localmente. Sincronização pendente.';
+    let nextMessage = result?.error || current.message || 'Registro salvo localmente. SincronizaÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â§ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â£o pendente.';
     if (nextRetryCount > 5 && String(nextCode) === 'schema_error') {
       nextCode = BLOCKED_SCHEMA_ERROR_CODE;
-      nextMessage = 'Pendência bloqueada por incompatibilidade de dados.';
+      nextMessage = 'PendÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Âªncia bloqueada por incompatibilidade de dados.';
     }
     remaining[baseIndex] = {
       ...current,
@@ -1755,7 +1943,7 @@ export async function persistCollectionMutation(mutations = []) {
 export async function createAuditEvent(event = {}, session) {
   const userId = getSessionUserId(session);
   if (!userId) {
-    return buildFallback('Sessão indisponível para registrar auditoria.');
+    return buildFallback('SessÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â£o indisponÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â­vel para registrar auditoria.');
   }
 
   const payload = {
@@ -1774,7 +1962,7 @@ export async function createAuditEvent(event = {}, session) {
 export async function deleteOwnerScopedCollection(table, session, extraFilters = []) {
   const userId = getSessionUserId(session);
   if (!userId) {
-    return buildFallback('Sessão indisponível para limpeza da coleção.');
+    return buildFallback('SessÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â£o indisponÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â­vel para limpeza da coleÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â§ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â£o.');
   }
 
   try {
@@ -1785,11 +1973,11 @@ export async function deleteOwnerScopedCollection(table, session, extraFilters =
     });
     const { error } = await query;
     if (error) {
-      throw new Error(error.message || 'Falha ao limpar coleção.');
+      throw new Error(error.message || 'Falha ao limpar coleÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â§ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â£o.');
     }
     return { persisted: true, data: null, error: null };
   } catch (error) {
-    return buildFallback(error?.message || 'Falha ao persistir limpeza da coleção.');
+    return buildFallback(error?.message || 'Falha ao persistir limpeza da coleÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â§ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â£o.');
   }
 }
 
@@ -1810,18 +1998,18 @@ function classifyFazendasSyncError(error) {
   const details = String(error?.details || '').toLowerCase();
 
   if (code === '42501' || message.includes('permission denied') || message.includes('row-level security') || details.includes('row-level security')) {
-    return 'Sem permissão para acessar estes dados na nuvem.';
+    return 'Sem permissÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â£o para acessar estes dados na nuvem.';
   }
 
   if (code === '42703' || code === 'PGRST204' || message.includes('column') || message.includes('schema') || details.includes('column') || details.includes('schema')) {
-    return 'Tabela de fazendas não encontrada na nuvem. Verifique a estrutura do Supabase.';
+    return 'Tabela de fazendas nÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â£o encontrada na nuvem. Verifique a estrutura do Supabase.';
   }
 
   if (isNetworkError(error)) {
-    return 'Falha de conexão do navegador com o Supabase. O modo local continua ativo.';
+    return 'Falha de conexÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â£o do navegador com o Supabase. O modo local continua ativo.';
   }
 
-  return 'Não foi possível sincronizar fazendas. Seus dados locais continuam disponíveis.';
+  return 'NÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â£o foi possÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â­vel sincronizar fazendas. Seus dados locais continuam disponÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â­veis.';
 }
 
 function classifyLotesSyncError(error) {
@@ -1831,7 +2019,7 @@ function classifyLotesSyncError(error) {
   const status = getHttpStatus(error);
 
   if (status === 401) {
-    return 'Sessão expirada. Entre novamente para sincronizar com a nuvem.';
+    return 'SessÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â£o expirada. Entre novamente para sincronizar com a nuvem.';
   }
 
   if (code === '42501' || status === 403 || message.includes('permission denied') || message.includes('row-level security') || details.includes('row-level security')) {
@@ -1843,7 +2031,7 @@ function classifyLotesSyncError(error) {
   }
 
   if (status === 400 || code === '42703' || code === 'PGRST204' || message.includes('column') || message.includes('schema') || message.includes('relation') || details.includes('column') || details.includes('schema') || details.includes('relation')) {
-    return 'Estrutura da nuvem incompatível com o app. Verifique as colunas no Supabase.';
+    return 'Estrutura da nuvem incompatÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â­vel com o app. Verifique as colunas no Supabase.';
   }
 
   if (code === 'CONFIG_ERROR' || message.includes('missing_rest_config_or_token')) {
@@ -1851,7 +2039,7 @@ function classifyLotesSyncError(error) {
   }
 
   if (isNetworkError(error)) {
-    return 'Falha de conexão do navegador com o Supabase. O modo local continua ativo.';
+    return 'Falha de conexÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â£o do navegador com o Supabase. O modo local continua ativo.';
   }
 
   if (code === '57014' || message.includes('timeout')) {
@@ -1859,7 +2047,7 @@ function classifyLotesSyncError(error) {
   }
 
   if (code === '22P02' || message.includes('invalid input syntax') || message.includes('violates')) {
-    return 'Estrutura da nuvem incompatível com o app. Verifique as colunas no Supabase.';
+    return 'Estrutura da nuvem incompatÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â­vel com o app. Verifique as colunas no Supabase.';
   }
 
   return 'N\u00E3o foi poss\u00EDvel sincronizar lotes. Seus dados locais continuam dispon\u00EDveis.';
@@ -1885,7 +2073,7 @@ export async function checkSupabaseCloudConnection({ session } = {}) {
     };
   }
   if (!sessionUserId) {
-    const message = 'Sessão expirada. Entre novamente para sincronizar com a nuvem.';
+    const message = 'SessÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â£o expirada. Entre novamente para sincronizar com a nuvem.';
     if (isAuthDebugEnabled()) {
       console.info('[HERDON_CLOUD_HEALTH]', {
         stage: 'auth_session_missing',
@@ -1929,12 +2117,12 @@ export async function checkSupabaseCloudConnection({ session } = {}) {
     const code = String(error?.code || '').toUpperCase() || null;
     const lower = String(error?.message || '').toLowerCase();
     let stage = 'unknown_error';
-    let message = 'Não foi possível sincronizar fazendas. Seus dados locais continuam disponíveis.';
-    if (status === 401) { stage = 'auth_session_missing'; message = 'Sessão expirada. Entre novamente para sincronizar com a nuvem.'; }
-    else if (status === 403 || code === '42501') { stage = 'permission_denied'; message = 'Sem permissão para acessar estes dados na nuvem.'; }
-    else if (status === 404 || code === 'PGRST205' || code === 'PGRST204' || code === '42703' || lower.includes('schema') || lower.includes('column')) { stage = 'schema_mismatch'; message = 'Tabela de fazendas não encontrada na nuvem. Verifique a estrutura do Supabase.'; }
-    else if (code === 'CONFIG_ERROR' || lower.includes('missing_rest_config_or_token')) { stage = 'config_missing'; message = 'Configuração da nuvem ausente. Verifique as variáveis do Supabase.'; }
-    else if (isNetworkError(error) || (error?.name === 'TypeError' && lower.includes('failed to fetch'))) { stage = 'network_error'; message = 'Falha de conexão do navegador com o Supabase. O modo local continua ativo.'; }
+    let message = 'NÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â£o foi possÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â­vel sincronizar fazendas. Seus dados locais continuam disponÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â­veis.';
+    if (status === 401) { stage = 'auth_session_missing'; message = 'SessÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â£o expirada. Entre novamente para sincronizar com a nuvem.'; }
+    else if (status === 403 || code === '42501') { stage = 'permission_denied'; message = 'Sem permissÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â£o para acessar estes dados na nuvem.'; }
+    else if (status === 404 || code === 'PGRST205' || code === 'PGRST204' || code === '42703' || lower.includes('schema') || lower.includes('column')) { stage = 'schema_mismatch'; message = 'Tabela de fazendas nÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â£o encontrada na nuvem. Verifique a estrutura do Supabase.'; }
+    else if (code === 'CONFIG_ERROR' || lower.includes('missing_rest_config_or_token')) { stage = 'config_missing'; message = 'ConfiguraÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â§ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â£o da nuvem ausente. Verifique as variÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â¡veis do Supabase.'; }
+    else if (isNetworkError(error) || (error?.name === 'TypeError' && lower.includes('failed to fetch'))) { stage = 'network_error'; message = 'Falha de conexÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â£o do navegador com o Supabase. O modo local continua ativo.'; }
 
     if (isAuthDebugEnabled()) {
       console.info('[HERDON_CLOUD_HEALTH]', {
@@ -1973,7 +2161,7 @@ export async function syncFazendasWithCloud({ fazendas = [], session }) {
     return buildModuleSyncResult({
       module: 'fazendas',
       status: 'error',
-      message: readiness.message || 'Sincronização indisponível no momento.',
+      message: readiness.message || 'SincronizaÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â§ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â£o indisponÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â­vel no momento.',
       code: readiness.code || 'SYNC_NOT_READY',
       data: Array.isArray(fazendas) ? fazendas : [],
     });
@@ -2000,10 +2188,10 @@ export async function syncFazendasWithCloud({ fazendas = [], session }) {
       const status = getHttpStatus(error);
       const code = getPostgrestCode(error) || 'SYNC_FAILED';
       const lower = String(error?.message || '').toLowerCase();
-      let message = 'Não foi possível sincronizar fazendas. Seus dados locais continuam disponíveis.';
-      if (status === 401) message = 'Sessão expirada. Entre novamente para sincronizar com a nuvem.';
-      else if (status === 403 || code === '42501') message = 'Sem permissão para acessar estes dados na nuvem.';
-      else if (status === 404 || code === 'PGRST205' || code === 'PGRST204' || code === '42703' || lower.includes('schema') || lower.includes('column')) message = 'Tabela de fazendas não encontrada na nuvem. Verifique a estrutura do Supabase.';
+      let message = 'NÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â£o foi possÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â­vel sincronizar fazendas. Seus dados locais continuam disponÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â­veis.';
+      if (status === 401) message = 'SessÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â£o expirada. Entre novamente para sincronizar com a nuvem.';
+      else if (status === 403 || code === '42501') message = 'Sem permissÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â£o para acessar estes dados na nuvem.';
+      else if (status === 404 || code === 'PGRST205' || code === 'PGRST204' || code === '42703' || lower.includes('schema') || lower.includes('column')) message = 'Tabela de fazendas nÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â£o encontrada na nuvem. Verifique a estrutura do Supabase.';
       else if (code === 'CONFIG_ERROR' || lower.includes('missing_rest_config_or_token')) message = 'Configura\u00E7\u00E3o da nuvem incompleta. Verifique as vari\u00E1veis do Supabase.';
       else if (isNetworkError(error)) message = 'N\u00E3o foi poss\u00EDvel conectar ao Supabase. Verifique sua conex\u00E3o, DNS ou vari\u00E1veis da nuvem.';
       if (shouldOpenNetworkCircuit(error)) openNetworkCircuit('fazendas');
@@ -2043,7 +2231,7 @@ export async function syncLotesWithCloud({ lotes = [], session }) {
     return buildModuleSyncResult({
       module: 'lotes',
       status: 'error',
-      message: readiness.message || 'Sincronização indisponível no momento.',
+      message: readiness.message || 'SincronizaÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â§ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â£o indisponÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â­vel no momento.',
       code: readiness.code || 'SYNC_NOT_READY',
       data: Array.isArray(lotes) ? lotes : [],
     });
@@ -2115,4 +2303,23 @@ export async function syncLotesWithCloud({ lotes = [], session }) {
 
   closeNetworkCircuit('lotes');
   return buildModuleSyncResult({ module: 'lotes', status: 'success', message: 'Lotes sincronizados.', data: mergeLotesSafe(localRows, remoteList), syncedCount, failedCount, selectedCount: Array.isArray(remoteList) ? remoteList.length : 0 });
+}
+
+if (import.meta.env.DEV && typeof window !== 'undefined') {
+  window.HERDON_SYNC_DEBUG = {
+    clearPendingQueue() {
+      writePendingSyncQueue([]);
+      emitPendingSyncState([], 'dev_clear');
+      return { ok: true, pendingCount: 0 };
+    },
+    getPendingQueue() {
+      return readPendingSyncQueue();
+    },
+    getBlockedSchemaErrors() {
+      return readPendingSyncQueue().filter((item) => (
+        String(item?.code || '') === BLOCKED_SCHEMA_ERROR_CODE
+        || String(item?.code || '') === 'schema_error'
+      ));
+    },
+  };
 }
