@@ -3,8 +3,15 @@ import Modal from './ui/Modal';
 import Button from './ui/Button';
 import ArrobaPreview from './ArrobaPreview';
 
-function getExpectedHeadCount(lote) {
-  if (!lote) return 0;
+function isIndividualAnimal(animal) {
+  if (!animal) return false;
+  const tipoRegistro = String(animal?.tipo_registro || '').toLowerCase();
+  if (tipoRegistro === 'individual') return true;
+  const qtd = Number(animal?.qtd);
+  return Number.isFinite(qtd) && qtd === 1;
+}
+
+function getExpectedHeadCount(lote, animaisDoLote = []) {
   const candidates = [
     lote.qtd,
     lote.quantidade,
@@ -12,13 +19,26 @@ function getExpectedHeadCount(lote) {
     lote.qtd_inicial,
     lote.cabecas,
     lote.total_cabecas,
-    lote?.indicators?.totalAnimais,
     lote.heads,
+    lote?.indicators?.totalAnimais,
+    lote?.resumo?.totalAnimais,
   ];
   for (const value of candidates) {
     const parsed = Number(value);
     if (Number.isFinite(parsed) && parsed > 0) return Math.floor(parsed);
   }
+
+  const computed = (Array.isArray(animaisDoLote) ? animaisDoLote : []).reduce((sum, animal) => {
+    if (String(animal?.tipo_registro || '').toLowerCase() === 'individual') return sum + 1;
+    const qtyCandidates = [animal?.qtd, animal?.quantidade, animal?.quantidade_animais, animal?.cabecas];
+    for (const value of qtyCandidates) {
+      const parsed = Number(value);
+      if (Number.isFinite(parsed) && parsed > 0) return sum + Math.floor(parsed);
+    }
+    return sum + 1;
+  }, 0);
+  if (computed > 0) return computed;
+
   return 0;
 }
 
@@ -86,11 +106,12 @@ export default function PesagemForm({
   const animaisDoLote = animais.filter(
     (animal) => Number(animal?.lote_id) === Number(form.lote_id)
   );
+  const animaisIndividuais = animaisDoLote.filter((animal) => isIndividualAnimal(animal));
   const loteSelecionado = lotes.find((lote) => Number(lote?.id) === Number(form.lote_id)) || null;
-  const expectedHeadCount = getExpectedHeadCount(loteSelecionado);
+  const expectedHeadCount = getExpectedHeadCount(loteSelecionado, animaisDoLote);
 
   const animalsByIndex = new Map();
-  animaisDoLote.forEach((animal, idx) => {
+  animaisIndividuais.forEach((animal, idx) => {
     const index = getAnimalIndex(animal, idx + 1);
     if (!index || animalsByIndex.has(index)) return;
     animalsByIndex.set(index, animal);
@@ -311,7 +332,7 @@ export default function PesagemForm({
             <div className="pesagem-form-section-head">Pesagem individual por lote</div>
             {form.lote_id ? (
               <p style={{ margin: 0, fontSize: '0.9rem', color: 'var(--text-muted)' }}>
-                Este lote possui {expectedHeadCount || 0} cabeças e {animaisDoLote.length} animais individuais cadastrados.
+                Este lote possui {expectedHeadCount || 0} cabeças e {animaisIndividuais.length} animais individuais cadastrados.
               </p>
             ) : null}
             {!form.lote_id ? (
@@ -392,7 +413,7 @@ export default function PesagemForm({
         )}
 
         <section className="pesagem-form-section-block">
-          <div className="pesagem-form-section-head">Medicao</div>
+          <div className="pesagem-form-section-head">{form.tipo === 'animal' ? 'Data da pesagem' : 'Medicao'}</div>
         <div className="grid-2 pesagem-form-grid">
           <label className="pesagem-form-field">
             Data
@@ -406,20 +427,21 @@ export default function PesagemForm({
             />
           </label>
 
-          <label className="pesagem-form-field">
-            Peso medio (kg)
-            <input
-              className="ui-input"
-              name="peso_medio"
-              type="number"
-              step="0.01"
-              min={0}
-              value={form.peso_medio}
-              onChange={handleChange}
-              placeholder="Ex: 412"
-              disabled={form.tipo === 'animal'}
-            />
-          </label>
+          {form.tipo === 'lote' && (
+            <label className="pesagem-form-field">
+              Peso medio (kg)
+              <input
+                className="ui-input"
+                name="peso_medio"
+                type="number"
+                step="0.01"
+                min={0}
+                value={form.peso_medio}
+                onChange={handleChange}
+                placeholder="Ex: 412"
+              />
+            </label>
+          )}
         </div>
         </section>
 
