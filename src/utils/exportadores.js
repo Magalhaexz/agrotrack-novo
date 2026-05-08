@@ -19,7 +19,7 @@ export function exportarCsvCompatExcel({ filename, rows = [], columns = [], loca
 
 function escapeXml(value){return String(value??'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');}
 function sheetName(name){return String(name||'Planilha').slice(0,31).replace(/[\\/:*?[\]]/g,'-');}
-export function exportarXlsx({ filename, sheets = [] }) {
+export function exportarExcelXmlCompat({ filename, sheets = [] }) {
   const workbookName = filename || `relatorio-herdon-${hojeIso()}`;
   const xmlSheets = sheets.map((sheet) => {
     const cols = sheet.columns || [];
@@ -35,5 +35,7 @@ export function exportarXlsx({ filename, sheets = [] }) {
   }).join('');
   const xml = `<?xml version="1.0"?><ss:Workbook xmlns:ss="urn:schemas-microsoft-com:office:spreadsheet">${xmlSheets}</ss:Workbook>`;
   const blob = new Blob([xml], { type: 'application/vnd.ms-excel' });
-  const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = `${workbookName}.xlsx`; a.click(); URL.revokeObjectURL(a.href);
+  const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = `${workbookName}.xls`; a.click(); URL.revokeObjectURL(a.href);
 }
+
+export const exportarXlsx = exportarExcelXmlCompat;

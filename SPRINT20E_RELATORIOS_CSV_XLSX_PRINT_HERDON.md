@@ -14,7 +14,7 @@
   - escape de aspas, `;` e quebra de linha
   - formatação de data `DD/MM/AAAA`
   - formatação numérica decimal com vírgula
-- Criado `exportarXlsx` (compatível Excel via workbook XML com extensão `.xlsx`) com suporte a múltiplas abas e largura básica de colunas.
+- Criado `exportarExcelXmlCompat` (compatível Excel via workbook XML com extensão `.xls`) com suporte a múltiplas abas e largura básica de colunas.
 - `exportarParaExcel` agora delega para o exportador central compatível com Excel.
 
 ## Módulos contemplados
@@ -35,9 +35,10 @@
 - npm run build
 
 ## Pendências conhecidas
-- Sem biblioteca `xlsx` oficial por restrição de instalação no ambiente; foi usado formato XML compatível com Excel salvo com extensão `.xlsx`.
+- XLSX oficial ficou pendente por bloqueio `403` no registry durante tentativa de instalação da dependência.
+- A entrega atual usa Excel XML compatível com extensão `.xls` para reduzir risco de aviso de incompatibilidade.
 - Exportação CSV/XLSX por módulo ainda não foi aplicada em todos os módulos (Financeiro, Animais, Pesagens, Lotes) neste sprint.
 
 ## Riscos
-- Alguns Excels podem exibir aviso de formato/assinatura para o arquivo `.xlsx` gerado via XML legado.
+- Pode existir variação de abertura entre versões do Excel para XML legado, mas o uso de `.xls` reduz risco de alerta de extensão incorreta.
 - Diferenças regionais de Excel podem impactar interpretação automática de números dependendo da configuração local da máquina.

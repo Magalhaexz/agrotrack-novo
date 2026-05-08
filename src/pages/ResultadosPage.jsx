@@ -22,7 +22,7 @@ import Input from '../components/ui/Input';
 import Table from '../components/ui/Table';
 import { calcLote, formatCurrency, formatDate, formatNumber } from '../utils/calculations';
 import { getResumoLote } from '../domain/resumoLote';
-import { exportarCsvCompatExcel, exportarXlsx } from '../utils/exportadores';
+import { exportarCsvCompatExcel, exportarExcelXmlCompat } from '../utils/exportadores';
 import '../styles/relatorios.css';
 
 const REPORT_TYPES = [
@@ -205,7 +205,7 @@ export default function ResultadosPage({ db }) {
       setValidationError('Nenhum registro encontrado');
       return;
     }
-    exportarXlsx({
+    exportarExcelXmlCompat({
       filename: activeReport.exportConfig.filename,
       sheets: sheets.map((sheet) => ({
         name: sheet.name,

@@ -6,7 +6,7 @@ import Button from '../components/ui/Button';
 import Modal from '../components/ui/Modal';
 import Input from '../components/ui/Input';
 import { formatCurrency, formatDate, formatNumber } from '../utils/calculations';
-import { exportarCsvCompatExcel, exportarXlsx } from '../utils/exportadores';
+import { exportarCsvCompatExcel, exportarExcelXmlCompat } from '../utils/exportadores';
 import { gerarNovoId } from '../utils/id';
 import { useToast } from '../hooks/useToast';
 import { useAuth } from '../auth/useAuth';
@@ -126,7 +126,7 @@ export default function EstoquePage({ db, setDb, onRegistrarSaidaEstoque }) {
       { key: 'observacao', header: 'Observação' },
     ];
     exportarCsvCompatExcel({ filename: 'movimentacoes-estoque', rows, columns });
-    exportarXlsx({ filename: 'movimentacoes-estoque', sheets: [{ name: 'Estoque', rows, columns }] });
+    exportarExcelXmlCompat({ filename: 'movimentacoes-estoque', sheets: [{ name: 'Estoque', rows, columns }] });
   }
 
   return (
