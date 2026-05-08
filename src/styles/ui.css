@@ -833,3 +833,75 @@ textarea.ui-input:focus {
     padding-bottom: 22px;
   }
 }
+
+/* SPRINT18W6 - modal and touch target safety */
+.ui-modal-overlay {
+  padding: 12px;
+}
+
+.ui-modal {
+  width: min(100%, 980px);
+  max-width: calc(100vw - 24px);
+  max-height: calc(100dvh - 24px);
+}
+
+.ui-modal-body {
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+}
+
+.ui-modal-foot {
+  gap: 10px;
+}
+
+.ui-modal-foot .ui-button,
+.ui-modal-foot button {
+  min-height: 44px;
+}
+
+.ui-button,
+.btn,
+button[type='button'],
+button[type='submit'],
+button[type='reset'] {
+  min-height: 44px;
+}
+
+@media (max-width: 900px) {
+  .ui-modal {
+    max-width: calc(100vw - 24px);
+    max-height: calc(100dvh - 24px);
+    border-radius: 20px;
+  }
+
+  .ui-modal-head,
+  .ui-modal-body,
+  .ui-modal-foot {
+    padding-left: 14px;
+    padding-right: 14px;
+  }
+}
+
+@media (max-width: 640px) {
+  .ui-modal-overlay {
+    align-items: flex-end;
+    padding: 8px;
+  }
+
+  .ui-modal {
+    width: calc(100vw - 16px);
+    max-width: calc(100vw - 16px);
+    max-height: calc(100dvh - 16px);
+    border-radius: 18px;
+  }
+
+  .ui-modal-foot {
+    position: sticky;
+    bottom: 0;
+  }
+
+  .ui-modal-foot .ui-button,
+  .ui-modal-foot button {
+    width: 100%;
+  }
+}
