@@ -33,8 +33,11 @@ export default function FinanceiroPage({ db, setDb }) {
   const [filters, setFilters] = useState({ tipo: 'todos', cat: 'todas', lote: 'todos' });
   const [novoPagamento, setNovoPagamento] = useState({ descricao: '', valor: '', data_vencimento: getTodayIso(), metodo: 'Pix', pago: false, observacao: '' });
 
-  const lotes = Array.isArray(db?.lotes) ? db.lotes : [];
-  const movimentacoes = Array.isArray(db?.movimentacoes_financeiras) ? db.movimentacoes_financeiras : [];
+  const lotes = useMemo(() => (Array.isArray(db?.lotes) ? db.lotes : []), [db]);
+  const movimentacoes = useMemo(
+    () => (Array.isArray(db?.movimentacoes_financeiras) ? db.movimentacoes_financeiras : []),
+    [db]
+  );
   const podeEditarFinanceiroUi = hasPermission('financeiro:editar');
 
   function podeEditarFinanceiro() {

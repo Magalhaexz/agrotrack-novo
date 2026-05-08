@@ -3,6 +3,8 @@ import { calcLote, formatNumber } from '../utils/calculations'; // Assuming calc
 import { getResumoLote } from '../domain/resumoLote';
 import '../styles/rebanho.css'; // Assuming this CSS file exists
 
+const cols = ['gmd', 'custoArroba', 'lucroCab', 'margem', 'dias', 'mortalidade'];
+
 // Helper para obter opções únicas para filtros
 function getUniqueOptions(data, key) {
   const options = new Set(data.map(item => item[key]).filter(Boolean)); // Filter out null/undefined
@@ -75,8 +77,6 @@ export default function ComparativoLotesPage({ db }) {
   }, [calculatedLoteData, filtro, sortBy]); // Recalcula quando dados pré-calculados, filtros ou ordenação mudam
 
   // Define as colunas a serem exibidas e usadas para ordenação
-  const cols = ['gmd', 'custoArroba', 'lucroCab', 'margem', 'dias', 'mortalidade'];
-
   // Calcula os valores extremos (min/max) para cada coluna para destaque visual
   const extrema = useMemo(() => {
     const result = {};
@@ -88,7 +88,7 @@ export default function ComparativoLotesPage({ db }) {
       };
     });
     return result;
-  }, [rows, cols]); // Recalcula quando as linhas ou colunas mudam
+  }, [rows]); // Recalcula quando as linhas mudam
 
   // Opções para os filtros (assumindo que raca, categoria, sexo, periodo existem nos lotes)
   const racaOptions = useMemo(() => getUniqueOptions(calculatedLoteData, 'raca'), [calculatedLoteData]);

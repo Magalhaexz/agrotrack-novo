@@ -64,8 +64,8 @@ export default function CustosPage({ db, setDb, onConfirmAction }) {
   const [custoEditando, setCustoEditando] = useState(null);
   const mensagemSemPermissao = 'Você não tem permissão para executar esta ação.';
 
-  const lotes = db?.lotes || [];
-  const custos = db?.custos || [];
+  const lotes = useMemo(() => (Array.isArray(db?.lotes) ? db.lotes : []), [db]);
+  const custos = useMemo(() => (Array.isArray(db?.custos) ? db.custos : []), [db]);
 
   // Otimização: Criar um mapa de lotes para busca eficiente (O(1))
   const lotesMap = useMemo(() => {

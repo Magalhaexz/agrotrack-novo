@@ -40,7 +40,7 @@ export default function TarefasPage({ db, setDb, onConfirmAction }) {
   const { showToast } = useToast();
   const { hasPermission, session } = useAuth();
   const mensagemSemPermissao = 'Você não tem permissão para executar esta ação.';
-  const tarefas = Array.isArray(db?.tarefas) ? db.tarefas : [];
+  const tarefas = useMemo(() => (Array.isArray(db?.tarefas) ? db.tarefas : []), [db.tarefas]);
   const [openModal, setOpenModal] = useState(false);
   const [editingTask, setEditingTask] = useState(null);
   const [filters, setFilters] = useState({

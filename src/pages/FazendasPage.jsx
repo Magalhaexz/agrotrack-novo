@@ -57,8 +57,8 @@ export default function FazendasPage({ db, setDb, onConfirmAction, session: sess
   const isAdmin = String(user?.perfil || '').toLowerCase() === 'admin' || hasPermission('configuracoes:editar');
   const podeVerDiagnostico = Boolean(import.meta.env.DEV || isAdmin);
 
-  const fazendas = Array.isArray(db?.fazendas) ? db.fazendas : [];
-  const lotes = Array.isArray(db?.lotes) ? db.lotes : [];
+  const fazendas = useMemo(() => (Array.isArray(db?.fazendas) ? db.fazendas : []), [db?.fazendas]);
+  const lotes = useMemo(() => (Array.isArray(db?.lotes) ? db.lotes : []), [db?.lotes]);
 
   const lotesByFazendaMap = useMemo(() => {
     const map = new Map();

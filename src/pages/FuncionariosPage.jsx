@@ -29,8 +29,8 @@ export default function FuncionariosPage({ db, setDb, onConfirmAction }) {
   const [busca, setBusca] = useState('');
   const [status, setStatus] = useState('todos');
 
-  const funcionarios = Array.isArray(db?.funcionarios) ? db.funcionarios : [];
-  const fazendas = Array.isArray(db?.fazendas) ? db.fazendas : [];
+  const funcionarios = useMemo(() => (Array.isArray(db?.funcionarios) ? db.funcionarios : []), [db]);
+  const fazendas = useMemo(() => (Array.isArray(db?.fazendas) ? db.fazendas : []), [db]);
 
   // Pré-indexar fazendas para busca eficiente de nomes
   const fazendasMap = useMemo(() => {

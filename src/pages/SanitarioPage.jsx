@@ -35,7 +35,7 @@ export default function SanitarioPage({ db, setDb, onConfirmAction }) {
     return map;
   }, [db?.funcionarios]);
 
-  const sanitario = db?.sanitario || [];
+  const sanitario = useMemo(() => (Array.isArray(db?.sanitario) ? db.sanitario : []), [db]);
 
   const dadosTabela = useMemo(() => {
     return [...sanitario]

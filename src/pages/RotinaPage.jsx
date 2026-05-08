@@ -34,7 +34,7 @@ export default function RotinaPage({ db, setDb, onConfirmAction }) {
     return map;
   }, [db?.lotes]);
 
-  const rotinas = db?.rotinas || [];
+  const rotinas = useMemo(() => (Array.isArray(db?.rotinas) ? db.rotinas : []), [db]);
 
   const hoje = useMemo(() => zerarHora(new Date()), []);
   const hojeStr = useMemo(() => formatarDataISO(hoje), [hoje]);

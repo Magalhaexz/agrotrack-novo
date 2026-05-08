@@ -342,7 +342,7 @@ export default function App() {
       window.removeEventListener('online', handleOnline);
       window.removeEventListener('herdon-cloud-diagnostic-state', handleDiagnostic);
     };
-  }, [session?.user?.id]);
+  }, [session?.user?.id, session]);
 
 
   useEffect(() => {
@@ -459,8 +459,14 @@ export default function App() {
     window.location.replace('/');
   }
 
-  const alertasResolvidos = Array.isArray(db?.alertas_resolvidos) ? db.alertas_resolvidos : [];
-  const alertasAdiados = Array.isArray(db?.alertas_adiados) ? db.alertas_adiados : [];
+  const alertasResolvidos = useMemo(
+    () => (Array.isArray(db?.alertas_resolvidos) ? db.alertas_resolvidos : []),
+    [db]
+  );
+  const alertasAdiados = useMemo(
+    () => (Array.isArray(db?.alertas_adiados) ? db.alertas_adiados : []),
+    [db]
+  );
 
   const resolvedAlertKeys = useMemo(() => {
     const storageKeys = normalizeResolvedAlertEntries(readJsonStorage(ALERTAS_RESOLVIDOS_STORAGE_KEY, []));

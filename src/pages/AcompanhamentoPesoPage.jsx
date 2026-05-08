@@ -99,10 +99,10 @@ export default function AcompanhamentoPesoPage({ db, setDb }) {
   const [resumoFinal, setResumoFinal] = useState(null);
   const [saving, setSaving] = useState(false);
 
-  const fazendas = Array.isArray(db?.fazendas) ? db.fazendas : [];
-  const lotes = Array.isArray(db?.lotes) ? db.lotes : [];
-  const animais = Array.isArray(db?.animais) ? db.animais : [];
-  const pesagens = Array.isArray(db?.pesagens) ? db.pesagens : [];
+  const fazendas = useMemo(() => (Array.isArray(db?.fazendas) ? db.fazendas : []), [db]);
+  const lotes = useMemo(() => (Array.isArray(db?.lotes) ? db.lotes : []), [db]);
+  const animais = useMemo(() => (Array.isArray(db?.animais) ? db.animais : []), [db]);
+  const pesagens = useMemo(() => (Array.isArray(db?.pesagens) ? db.pesagens : []), [db]);
 
   const lotesFiltrados = useMemo(() => {
     if (!fazendaSelecionada) return lotes;

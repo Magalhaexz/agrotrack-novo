@@ -22,9 +22,12 @@ export default function AnimaisPage({ db, setDb, onConfirmAction }) {
   const [animalEditando, setAnimalEditando] = useState(null);
   const mensagemSemPermissao = 'Você não tem permissão para executar esta ação.';
 
-  const lotes = Array.isArray(db?.lotes) ? db.lotes : [];
-  const animais = Array.isArray(db?.animais) ? db.animais : [];
-  const movimentacoesAnimais = Array.isArray(db?.movimentacoes_animais) ? db.movimentacoes_animais : [];
+  const lotes = useMemo(() => (Array.isArray(db?.lotes) ? db.lotes : []), [db]);
+  const animais = useMemo(() => (Array.isArray(db?.animais) ? db.animais : []), [db]);
+  const movimentacoesAnimais = useMemo(
+    () => (Array.isArray(db?.movimentacoes_animais) ? db.movimentacoes_animais : []),
+    [db]
+  );
 
   const lotesMap = useMemo(() => new Map(lotes.map((lote) => [Number(lote.id), lote])), [lotes]);
 

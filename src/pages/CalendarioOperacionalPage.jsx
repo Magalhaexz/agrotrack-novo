@@ -42,8 +42,8 @@ export default function CalendarioOperacionalPage({ db, setDb }) {
   const [cursorDate, setCursorDate] = useState(() => new Date(`${hoje}T00:00:00`));
   const [openModal, setOpenModal] = useState(false);
 
-  const lotes = Array.isArray(db?.lotes) ? db.lotes : [];
-  const funcionarios = Array.isArray(db?.funcionarios) ? db.funcionarios : [];
+  const lotes = useMemo(() => (Array.isArray(db?.lotes) ? db.lotes : []), [db]);
+  const funcionarios = useMemo(() => (Array.isArray(db?.funcionarios) ? db.funcionarios : []), [db]);
   const lotesMap = useMemo(() => new Map(lotes.map((lote) => [Number(lote.id), lote])), [lotes]);
   const funcionariosMap = useMemo(() => new Map(funcionarios.map((funcionario) => [Number(funcionario.id), funcionario])), [funcionarios]);
 

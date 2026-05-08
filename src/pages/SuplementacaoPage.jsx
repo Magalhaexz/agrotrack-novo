@@ -522,7 +522,7 @@ function ConsumoModal({ db, setDb, onClose, showToast }) {
     () => (selectedLote ? dietasMap.get(Number(selectedLote.id)) || null : null),
     [dietasMap, selectedLote]
   );
-  const itensDieta = Array.isArray(dieta?.itens) ? dieta.itens : [];
+  const itensDieta = useMemo(() => (Array.isArray(dieta?.itens) ? dieta.itens : []), [dieta]);
   const cabecas = useMemo(
     () => (animaisMap.get(Number(selectedLote?.id)) || []).reduce((total, animal) => total + Number(animal.qtd || 0), 0),
     [animaisMap, selectedLote]

@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import Modal from './ui/Modal';
 import Button from './ui/Button';
 import ArrobaPreview from './ArrobaPreview';
@@ -141,8 +141,9 @@ export default function PesagemForm({
     };
   });
 
-  const pesagensDoDiaPorAnimalId = new Map();
-  if (form.tipo === 'animal' && form.data) {
+  const pesagensDoDiaPorAnimalId = useMemo(() => {
+    const map = new Map();
+    if (form.tipo !== 'animal' || !form.data) return map;
     pesagens
       .filter((item) => (
         String(item?.data || '') === String(form.data)
@@ -151,11 +152,12 @@ export default function PesagemForm({
       ))
       .forEach((item) => {
         const animalId = Number(item?.animal_id);
-        if (animalId > 0 && !pesagensDoDiaPorAnimalId.has(animalId)) {
-          pesagensDoDiaPorAnimalId.set(animalId, item);
+        if (animalId > 0 && !map.has(animalId)) {
+          map.set(animalId, item);
         }
       });
-  }
+    return map;
+  }, [form.tipo, form.data, form.lote_id, pesagens]);
 
   /* eslint-disable react-hooks/set-state-in-effect */
   useEffect(() => {

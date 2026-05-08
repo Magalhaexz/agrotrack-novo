@@ -980,8 +980,8 @@ function MovimentacaoModal({ lote, db, setDb, onClose, onRegistrarEntradaAnimal,
  * @param {function} props.showToast - Função para exibir toasts.
  */
 function PesagemModal({ lote, db, setDb, onClose, showToast, hasPermission, session }) {
-  const animais = Array.isArray(db?.animais) ? db.animais : [];
-  const pesagens = Array.isArray(db?.pesagens) ? db.pesagens : [];
+  const animais = useMemo(() => (Array.isArray(db?.animais) ? db.animais : []), [db.animais]);
+  const pesagens = useMemo(() => (Array.isArray(db?.pesagens) ? db.pesagens : []), [db.pesagens]);
   const ultima = useMemo(
     () => pesagens.filter((p) => Number(p?.lote_id) === Number(lote.id)).sort((a, b) => new Date(b.data) - new Date(a.data))[0],
     [pesagens, lote.id]
