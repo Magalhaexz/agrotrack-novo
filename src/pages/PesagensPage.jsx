@@ -1,5 +1,7 @@
 import { useMemo, useState } from 'react';
 import PesagemForm from '../components/PesagemForm';
+import Card from '../components/ui/Card';
+import Button from '../components/ui/Button';
 import { formatarNumero, formatarData } from '../utils/formatters';
 import { gerarNovoId } from '../utils/id';
 import { useToast } from '../hooks/useToast';
