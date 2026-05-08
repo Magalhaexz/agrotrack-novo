@@ -2,14 +2,16 @@
 
 export default function LotesPageHeader({ onNovoLote, canEdit }) {
   return (
-    <div className="rebanho-header">
+    <div className="rebanho-header page-header">
       <div>
-        <h1>Rebanho</h1>
-        <p>Gestão central de lotes, pesagens, retiradas e resultado financeiro.</p>
+        <h1>Lotes / Rebanho</h1>
+        <p>Acompanhe lotes, desempenho, retiradas e status operacional em um só painel.</p>
       </div>
-      <Button onClick={onNovoLote} disabled={!canEdit}>
-        Novo lote
-      </Button>
+      <div className="page-actions action-row">
+        <Button onClick={onNovoLote} disabled={!canEdit}>
+          Novo lote
+        </Button>
+      </div>
     </div>
   );
 }

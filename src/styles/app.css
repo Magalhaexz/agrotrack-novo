@@ -8552,6 +8552,78 @@ body {
   }
 }
 
+/* SPRINT21C - Fazendas visual polish */
+.fazendas-grid {
+  gap: 12px;
+}
+
+.fazenda-card {
+  border-radius: 16px;
+  padding: 14px;
+  gap: 12px;
+}
+
+.fazenda-card-nome {
+  font-size: 1.02rem;
+}
+
+.fazenda-card-local {
+  font-size: 0.82rem;
+  color: rgba(214, 223, 219, 0.68);
+}
+
+.fazenda-card-stats {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.fazenda-stat-label {
+  font-size: 0.72rem;
+  color: rgba(214, 223, 219, 0.62);
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+
+.fazenda-stat-value {
+  margin-top: 2px;
+  font-size: 0.9rem;
+  color: #edf4f1;
+}
+
+.fazenda-card-actions .ui-button {
+  min-height: 40px;
+}
+
+.fazenda-form-shell {
+  gap: 10px;
+}
+
+.fazenda-form-section {
+  padding: 12px;
+}
+
+.fazenda-form-section h4 {
+  margin: 0;
+  color: #e9f1ed;
+  font-size: 0.94rem;
+}
+
+@media (max-width: 900px) {
+  .fazendas-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .fazenda-card-stats {
+    grid-template-columns: 1fr;
+  }
+
+  .fazenda-card-actions .ui-button {
+    width: 100%;
+    min-height: 44px;
+  }
+}
+
 /* SPRINT21B - App shell polish (header/sidebar/bottom nav) */
 .header.top-header {
   backdrop-filter: blur(10px);

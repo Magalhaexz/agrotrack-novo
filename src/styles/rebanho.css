@@ -375,3 +375,121 @@ label textarea {
     grid-template-columns: 1fr;
   }
 }
+
+/* SPRINT21C - Lotes/Rebanho visual polish */
+.rebanho-page {
+  gap: 14px;
+}
+
+.rebanho-header p {
+  margin-top: 6px;
+  color: rgba(214, 223, 219, 0.72);
+  font-size: 0.9rem;
+}
+
+.rebanho-filters-shell {
+  padding: 14px;
+}
+
+.rebanho-filters-shell .section-header {
+  margin-bottom: 10px;
+}
+
+.rebanho-filters-shell .section-header h3 {
+  margin: 0;
+  color: #ecf3ef;
+  font-size: 1rem;
+}
+
+.rebanho-filters-shell .section-header p {
+  margin-top: 4px;
+  color: rgba(214, 223, 219, 0.72);
+  font-size: 0.82rem;
+}
+
+.lote-cards-grid {
+  gap: 10px;
+}
+
+.lote-card-modern {
+  border-radius: 16px;
+  padding: 14px;
+}
+
+.lote-card-title {
+  align-items: flex-start;
+  gap: 10px;
+}
+
+.lote-card-title h3 {
+  margin: 0;
+  color: #eef5f1;
+}
+
+.lote-card-subtitle {
+  margin-top: 4px;
+  color: rgba(214, 223, 219, 0.66);
+  font-size: 0.8rem;
+}
+
+.lote-card-statuses {
+  justify-content: flex-end;
+}
+
+.lote-metrics-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.lote-metrics-grid p {
+  margin: 0;
+  display: grid;
+  gap: 2px;
+}
+
+.lote-metrics-grid p strong {
+  color: #eef5f1;
+  font-size: 0.95rem;
+}
+
+.lote-metrics-grid p span {
+  color: rgba(214, 223, 219, 0.66);
+  font-size: 0.74rem;
+}
+
+.lote-card-last {
+  margin: 0;
+  color: rgba(214, 223, 219, 0.72);
+  font-size: 0.82rem;
+}
+
+.tabs-row {
+  flex-wrap: nowrap;
+  overflow-x: auto;
+}
+
+.tabs-row button {
+  white-space: nowrap;
+}
+
+@media (max-width: 1024px) {
+  .lote-cards-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 768px) {
+  .lote-cards-grid,
+  .lote-metrics-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .rebanho-filters {
+    grid-template-columns: 1fr;
+  }
+
+  .lote-actions .ui-button {
+    min-height: 44px;
+  }
+}
