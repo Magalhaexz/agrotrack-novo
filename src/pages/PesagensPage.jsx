@@ -16,6 +16,18 @@ function toFiniteNumber(value, fallback = 0) {
   return Number.isFinite(normalized) ? normalized : fallback;
 }
 
+function getAnimalIndex(animal, fallbackIndex = null) {
+  const fromMetadata = Number(animal?.metadata?.index);
+  if (Number.isFinite(fromMetadata) && fromMetadata > 0) return Math.floor(fromMetadata);
+  const identificacao = String(animal?.identificacao || animal?.nome || '');
+  const match = identificacao.match(/#\s*(\d+)/i);
+  if (match) {
+    const fromLabel = Number(match[1]);
+    if (Number.isFinite(fromLabel) && fromLabel > 0) return Math.floor(fromLabel);
+  }
+  return Number.isFinite(Number(fallbackIndex)) ? Number(fallbackIndex) : null;
+}
+
 function resolveTipoPesagem(item) {
   if (item?.tipo === 'animal' || item?.origem === 'animal') return 'animal';
   return 'lote';
@@ -248,6 +260,62 @@ export default function PesagensPage({ db, setDb, onConfirmAction, navigationInt
       return;
     }
 
+    if (dados?.tipo === 'animal_generate_missing') {
+      const loteId = Number(dados?.lote_id);
+      const lote = (lotes || []).find((item) => Number(item?.id) === loteId);
+      if (!loteId || !lote) {
+        showToast({ type: 'error', message: 'Selecione um lote valido para gerar os animais.' });
+        return;
+      }
+
+      const missingIndexes = Array.isArray(dados?.missingIndexes) ? dados.missingIndexes : [];
+      if (!missingIndexes.length) {
+        showToast({ type: 'info', message: 'Todos os animais individuais esperados ja existem no lote.' });
+        return;
+      }
+
+      const animaisAtuais = Array.isArray(animais) ? animais : [];
+      const loteAnimais = animaisAtuais.filter((item) => Number(item?.lote_id) === loteId);
+      const existingIndexes = new Set(loteAnimais.map((item, idx) => getAnimalIndex(item, idx + 1)).filter(Boolean));
+      const payloads = missingIndexes
+        .filter((idx) => !existingIndexes.has(Number(idx)))
+        .map((idx) => ({
+          lote_id: loteId,
+          fazenda_id: lote?.fazenda_id ?? lote?.faz_id ?? null,
+          faz_id: lote?.faz_id ?? lote?.fazenda_id ?? null,
+          identificacao: `Animal #${idx}`,
+          tipo_registro: 'individual',
+          qtd: 1,
+          status: 'ativo',
+          p_ini: Number(lote?.p_ini || lote?.peso_inicial || lote?.peso_atual || lote?.p_at || 0) || null,
+          p_at: Number(lote?.p_at || lote?.peso_atual || lote?.p_ini || lote?.peso_inicial || 0) || null,
+          metadata: { generated_from_weighing: true, index: Number(idx) },
+        }));
+
+      const persisted = [];
+      const criados = [];
+      for (const payload of payloads) {
+        const result = await createOperationalRecord('animais', payload, session);
+        persisted.push(result);
+        criados.push(result.data || { id: gerarNovoId([...(animaisAtuais || []), ...criados]), ...payload });
+      }
+
+      if (criados.length) {
+        setDb((prev) => ({
+          ...prev,
+          animais: [...(Array.isArray(prev?.animais) ? prev.animais : []), ...criados],
+        }));
+      }
+
+      const batch = await persistCollectionMutation(persisted.map((item) => Promise.resolve(item)));
+      if (!batch.persisted) {
+        showToast({ type: 'warning', message: 'Animais gerados localmente. Sincronizacao pendente.' });
+      } else {
+        showToast({ type: 'success', message: 'Animais do lote gerados na nuvem.' });
+      }
+      return;
+    }
+
     if (dados?.tipo === 'animal_batch') {
       const registros = Array.isArray(dados.registros) ? dados.registros : [];
       if (!registros.length) {
@@ -255,11 +323,60 @@ export default function PesagensPage({ db, setDb, onConfirmAction, navigationInt
         return;
       }
 
+      const loteId = Number(dados?.lote_id);
+      const lote = (lotes || []).find((item) => Number(item?.id) === loteId);
+      const animaisAtuais = Array.isArray(animais) ? animais : [];
+      const loteAnimais = animaisAtuais.filter((item) => Number(item?.lote_id) === loteId);
+      const animalsByIndex = new Map();
+      loteAnimais.forEach((animal, idx) => {
+        const index = getAnimalIndex(animal, idx + 1);
+        if (index && !animalsByIndex.has(index)) animalsByIndex.set(index, animal);
+      });
+
+      const createdAnimais = [];
+      const createAnimalResults = [];
+      const normalizedRegistros = [];
+
+      for (const registro of registros) {
+        if (Number(registro?.animal_id) > 0) {
+          normalizedRegistros.push(registro);
+          continue;
+        }
+        const virtualIndex = Number(registro?.virtual_animal?.index);
+        if (!Number.isFinite(virtualIndex) || virtualIndex <= 0) continue;
+
+        let animalTarget = animalsByIndex.get(virtualIndex) || null;
+        if (!animalTarget) {
+          const payloadAnimal = {
+            lote_id: loteId,
+            fazenda_id: lote?.fazenda_id ?? lote?.faz_id ?? null,
+            faz_id: lote?.faz_id ?? lote?.fazenda_id ?? null,
+            identificacao: `Animal #${virtualIndex}`,
+            tipo_registro: 'individual',
+            qtd: 1,
+            status: 'ativo',
+            p_ini: Number(lote?.p_ini || lote?.peso_inicial || lote?.peso_atual || lote?.p_at || 0) || null,
+            p_at: Number(registro?.peso_medio || lote?.p_at || lote?.peso_atual || lote?.p_ini || lote?.peso_inicial || 0) || null,
+            metadata: { generated_from_weighing: true, index: virtualIndex },
+          };
+          const created = await createOperationalRecord('animais', payloadAnimal, session);
+          createAnimalResults.push(created);
+          animalTarget = created.data || { id: gerarNovoId([...(animaisAtuais || []), ...createdAnimais]), ...payloadAnimal };
+          createdAnimais.push(animalTarget);
+          animalsByIndex.set(virtualIndex, animalTarget);
+        }
+
+        normalizedRegistros.push({
+          ...registro,
+          animal_id: Number(animalTarget?.id),
+        });
+      }
+
       const basePesagens = Array.isArray(pesagens) ? pesagens : [];
       const nextPesagens = [...basePesagens];
-      const resultados = [];
+      const resultados = [...createAnimalResults];
 
-      for (const payload of registros) {
+      for (const payload of normalizedRegistros) {
         const loteId = Number(payload?.lote_id);
         const animalId = Number(payload?.animal_id);
         const data = payload?.data;
@@ -286,6 +403,10 @@ export default function PesagensPage({ db, setDb, onConfirmAction, navigationInt
 
       setDb((prev) => ({
         ...prev,
+        animais: [
+          ...(Array.isArray(prev?.animais) ? prev.animais : []),
+          ...createdAnimais,
+        ],
         pesagens: nextPesagens,
       }));
 
@@ -496,6 +617,7 @@ export default function PesagensPage({ db, setDb, onConfirmAction, navigationInt
           initialData={pesagemEditando}
           lotes={lotes || []}
           animais={animais || []}
+          pesagens={pesagens || []}
           onSave={salvarPesagem}
           onCancel={() => {
             setAbrirForm(false);

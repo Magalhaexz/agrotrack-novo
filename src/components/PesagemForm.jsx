@@ -3,6 +3,39 @@ import Modal from './ui/Modal';
 import Button from './ui/Button';
 import ArrobaPreview from './ArrobaPreview';
 
+function getExpectedHeadCount(lote) {
+  if (!lote) return 0;
+  const candidates = [
+    lote.qtd,
+    lote.quantidade,
+    lote.quantidade_animais,
+    lote.qtd_inicial,
+    lote.cabecas,
+    lote.total_cabecas,
+    lote?.indicators?.totalAnimais,
+    lote.heads,
+  ];
+  for (const value of candidates) {
+    const parsed = Number(value);
+    if (Number.isFinite(parsed) && parsed > 0) return Math.floor(parsed);
+  }
+  return 0;
+}
+
+function getAnimalIndex(animal, fallbackIndex = null) {
+  const fromMetadata = Number(animal?.metadata?.index);
+  if (Number.isFinite(fromMetadata) && fromMetadata > 0) return Math.floor(fromMetadata);
+
+  const identificacao = String(animal?.identificacao || animal?.nome || '');
+  const match = identificacao.match(/#\s*(\d+)/i);
+  if (match) {
+    const fromLabel = Number(match[1]);
+    if (Number.isFinite(fromLabel) && fromLabel > 0) return Math.floor(fromLabel);
+  }
+
+  return Number.isFinite(Number(fallbackIndex)) ? Number(fallbackIndex) : null;
+}
+
 const FORM_VAZIO = {
   tipo: 'lote',
   lote_id: '',
@@ -41,6 +74,7 @@ export default function PesagemForm({
   initialData,
   lotes = [],
   animais = [],
+  pesagens = [],
   onSave,
   onCancel,
 }) {
@@ -52,6 +86,55 @@ export default function PesagemForm({
   const animaisDoLote = animais.filter(
     (animal) => Number(animal?.lote_id) === Number(form.lote_id)
   );
+  const loteSelecionado = lotes.find((lote) => Number(lote?.id) === Number(form.lote_id)) || null;
+  const expectedHeadCount = getExpectedHeadCount(loteSelecionado);
+
+  const animalsByIndex = new Map();
+  animaisDoLote.forEach((animal, idx) => {
+    const index = getAnimalIndex(animal, idx + 1);
+    if (!index || animalsByIndex.has(index)) return;
+    animalsByIndex.set(index, animal);
+  });
+
+  const rowCount = Math.max(expectedHeadCount, animalsByIndex.size);
+  const linhasAnimais = Array.from({ length: rowCount }, (_, idx) => {
+    const index = idx + 1;
+    const existing = animalsByIndex.get(index) || null;
+    if (existing) {
+      return {
+        ...existing,
+        virtual: false,
+        rowIndex: index,
+      };
+    }
+    return {
+      virtual: true,
+      virtualIndex: index,
+      rowIndex: index,
+      identificacao: `Animal #${index}`,
+      lote_id: form.lote_id ? Number(form.lote_id) : null,
+    };
+  });
+
+  const pesagensDoDiaPorAnimalId = new Map();
+  if (form.tipo === 'animal' && form.data) {
+    pesagens
+      .filter((item) => (
+        String(item?.data || '') === String(form.data)
+        && Number(item?.lote_id) === Number(form.lote_id)
+        && (item?.tipo === 'animal' || item?.origem === 'animal')
+      ))
+      .forEach((item) => {
+        const animalId = Number(item?.animal_id);
+        if (animalId > 0 && !pesagensDoDiaPorAnimalId.has(animalId)) {
+          pesagensDoDiaPorAnimalId.set(animalId, item);
+        }
+      });
+  }
+
+  const missingIndexes = linhasAnimais
+    .filter((item) => item.virtual)
+    .map((item) => item.virtualIndex);
 
   /* eslint-disable react-hooks/set-state-in-effect */
   useEffect(() => {
@@ -73,6 +156,43 @@ export default function PesagemForm({
     setPesosAnimais({});
     setObservacoesAnimais({});
   }, [initialData]);
+
+  useEffect(() => {
+    if (form.tipo !== 'animal') return;
+    if (!form.data) return;
+
+    setPesosAnimais((prev) => {
+      let changed = false;
+      const next = { ...prev };
+      linhasAnimais.forEach((animal) => {
+        if (animal.virtual) return;
+        const animalId = Number(animal.id);
+        if (!animalId || next[animalId]) return;
+        const existingPesagem = pesagensDoDiaPorAnimalId.get(animalId);
+        if (existingPesagem?.peso_medio !== undefined && existingPesagem?.peso_medio !== null) {
+          next[animalId] = String(existingPesagem.peso_medio);
+          changed = true;
+        }
+      });
+      return changed ? next : prev;
+    });
+
+    setObservacoesAnimais((prev) => {
+      let changed = false;
+      const next = { ...prev };
+      linhasAnimais.forEach((animal) => {
+        if (animal.virtual) return;
+        const animalId = Number(animal.id);
+        if (!animalId || next[animalId]) return;
+        const existingPesagem = pesagensDoDiaPorAnimalId.get(animalId);
+        if (existingPesagem?.observacao) {
+          next[animalId] = String(existingPesagem.observacao);
+          changed = true;
+        }
+      });
+      return changed ? next : prev;
+    });
+  }, [form.tipo, form.data, linhasAnimais, pesagensDoDiaPorAnimalId]);
   /* eslint-enable react-hooks/set-state-in-effect */
 
   function handleChange(e) {
@@ -100,10 +220,10 @@ export default function PesagemForm({
 
     setErro('');
     if (form.tipo === 'animal') {
-      const registros = animaisDoLote
+      const registros = linhasAnimais
         .map((animal) => {
-          const animalId = Number(animal.id);
-          const pesoBruto = String(pesosAnimais[animalId] ?? '').trim();
+          const key = animal.virtual ? `virtual-${animal.virtualIndex}` : String(Number(animal.id));
+          const pesoBruto = String(pesosAnimais[key] ?? '').trim();
           if (!pesoBruto) return null;
           const peso = Number(pesoBruto.replace(',', '.'));
           if (!Number.isFinite(peso) || peso <= 0) return null;
@@ -112,12 +232,16 @@ export default function PesagemForm({
             tipo: 'animal',
             origem: 'animal',
             lote_id: form.lote_id ? Number(form.lote_id) : null,
-            animal_id: animalId,
+            animal_id: animal.virtual ? null : Number(animal.id),
+            virtual_animal: animal.virtual ? {
+              identificacao: animal.identificacao,
+              index: animal.virtualIndex,
+            } : null,
             data: form.data,
             peso_medio: peso,
             rendimento_carcaca: Number(form.rendimento_carcaca || 0),
             preco_arroba: form.preco_arroba === '' ? null : Number(form.preco_arroba),
-            observacao: String(observacoesAnimais[animalId] ?? '').trim(),
+            observacao: String(observacoesAnimais[key] ?? '').trim(),
           };
         })
         .filter(Boolean);
@@ -129,6 +253,8 @@ export default function PesagemForm({
 
       onSave?.({
         tipo: 'animal_batch',
+        lote_id: form.lote_id ? Number(form.lote_id) : null,
+        expectedHeadCount,
         registros,
       });
       return;
@@ -183,16 +309,35 @@ export default function PesagemForm({
         {form.tipo === 'animal' && (
           <section className="pesagem-form-section-block">
             <div className="pesagem-form-section-head">Pesagem individual por lote</div>
+            {form.lote_id ? (
+              <p style={{ margin: 0, fontSize: '0.9rem', color: 'var(--text-muted)' }}>
+                Este lote possui {expectedHeadCount || 0} cabeças e {animaisDoLote.length} animais individuais cadastrados.
+              </p>
+            ) : null}
             {!form.lote_id ? (
               <p style={{ margin: 0, fontSize: '0.9rem', color: 'var(--text-muted)' }}>
                 Selecione um lote para listar os animais.
               </p>
-            ) : animaisDoLote.length === 0 ? (
+            ) : linhasAnimais.length === 0 ? (
               <p style={{ margin: 0, fontSize: '0.9rem', color: 'var(--text-muted)' }}>
                 Nenhum animal individual encontrado para este lote.
               </p>
             ) : (
-              <div className="fazendas-table-wrap">
+              <div className="fazendas-table-wrap" style={{ display: 'grid', gap: 10 }}>
+                <div>
+                  <Button
+                    variant="outline"
+                    onClick={() => onSave?.({
+                      tipo: 'animal_generate_missing',
+                      lote_id: form.lote_id ? Number(form.lote_id) : null,
+                      expectedHeadCount,
+                      missingIndexes,
+                    })}
+                    disabled={!missingIndexes.length}
+                  >
+                    Gerar animais individuais faltantes
+                  </Button>
+                </div>
                 <table className="data-table herdon-table">
                   <thead>
                     <tr>
@@ -202,22 +347,25 @@ export default function PesagemForm({
                     </tr>
                   </thead>
                   <tbody>
-                    {animaisDoLote.map((animal) => {
-                      const animalId = Number(animal.id);
-                      const nomeAnimal = animal.identificacao || animal.nome || `Animal #${animalId}`;
+                    {linhasAnimais.map((animal) => {
+                      const key = animal.virtual ? `virtual-${animal.virtualIndex}` : String(Number(animal.id));
+                      const nomeAnimal = animal.identificacao || animal.nome || `Animal #${animal.rowIndex}`;
                       return (
-                        <tr key={animal.id}>
-                          <td>{nomeAnimal}</td>
+                        <tr key={key}>
+                          <td>
+                            {nomeAnimal}
+                            {animal.virtual ? <span className="badge badge-neutral" style={{ marginLeft: 8 }}>virtual</span> : null}
+                          </td>
                           <td>
                             <input
                               className="ui-input"
                               type="number"
                               step="0.01"
                               min={0}
-                              value={pesosAnimais[animalId] ?? ''}
+                              value={pesosAnimais[key] ?? ''}
                               onChange={(event) => {
                                 const value = event.target.value;
-                                setPesosAnimais((prev) => ({ ...prev, [animalId]: value }));
+                                setPesosAnimais((prev) => ({ ...prev, [key]: value }));
                               }}
                               placeholder="Ex: 412"
                             />
@@ -225,10 +373,10 @@ export default function PesagemForm({
                           <td>
                             <input
                               className="ui-input"
-                              value={observacoesAnimais[animalId] ?? ''}
+                              value={observacoesAnimais[key] ?? ''}
                               onChange={(event) => {
                                 const value = event.target.value;
-                                setObservacoesAnimais((prev) => ({ ...prev, [animalId]: value }));
+                                setObservacoesAnimais((prev) => ({ ...prev, [key]: value }));
                               }}
                               placeholder="Observacao opcional"
                             />
@@ -275,16 +423,18 @@ export default function PesagemForm({
         </div>
         </section>
 
-        <label className="pesagem-form-field">
-          Observacao
-          <input
-            className="ui-input"
-            name="observacao"
-            value={form.observacao}
-            onChange={handleChange}
-            placeholder="Ex: ganho acima do esperado"
-          />
-        </label>
+        {form.tipo === 'lote' && (
+          <label className="pesagem-form-field">
+            Observacao
+            <input
+              className="ui-input"
+              name="observacao"
+              value={form.observacao}
+              onChange={handleChange}
+              placeholder="Ex: ganho acima do esperado"
+            />
+          </label>
+        )}
 
         <section className="pesagem-form-section-block">
           <div className="pesagem-form-section-head">Indicadores de valor</div>
@@ -320,7 +470,18 @@ export default function PesagemForm({
 
         <div className="pesagem-preview-wrap">
           <ArrobaPreview
-            peso={form.peso_medio}
+            peso={form.tipo === 'animal'
+              ? (
+                (() => {
+                  const values = Object.values(pesosAnimais)
+                    .map((value) => Number(String(value).replace(',', '.')))
+                    .filter((value) => Number.isFinite(value) && value > 0);
+                  if (!values.length) return 0;
+                  const total = values.reduce((sum, value) => sum + value, 0);
+                  return total / values.length;
+                })()
+              )
+              : form.peso_medio}
             rendimento={form.rendimento_carcaca}
             precoPorArroba={form.preco_arroba}
           />
