@@ -134,7 +134,7 @@ export default function FuncionariosPage({ db, setDb, onConfirmAction }) {
       <div className="ui-card no-padding funcionarios-list-shell"> {/* Adicionada classe no-padding para remover padding padrão */}
         {lista.length === 0 ? (
           <div className="empty-state padded"> {/* Adicionada classe padded para padding interno */}
-            <p>Nenhum funcionário encontrado.</p>
+            <p>{status === 'ativos' ? 'Nenhum funcionário ativo.' : status === 'inativos_desligados' ? 'Nenhum funcionário inativo/desligado.' : 'Nenhum funcionário encontrado.'}</p>
             <span>Ajuste os filtros ou adicione um novo funcionário.</span>
           </div>
         ) : (

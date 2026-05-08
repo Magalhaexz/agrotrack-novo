@@ -551,6 +551,9 @@ export default function ConfiguracoesPage({ db, setDb, onConfirmAction }) {
               Atualizar lista
             </Button>
           </div>
+          <p style={{ marginTop: 0, marginBottom: 12, color: 'var(--text-muted)' }}>
+            Usuário = acesso ao sistema HERDON. Funcionário = pessoa da operação da fazenda.
+          </p>
 
           {accessModuleReady ? (
             <>
@@ -559,13 +562,13 @@ export default function ConfiguracoesPage({ db, setDb, onConfirmAction }) {
                   <thead><tr><th>Nome</th><th>E-mail</th><th>Perfil atual</th><th>Origem</th><th>Atualizado em</th></tr></thead>
                   <tbody>
                     {profilesRows.length === 0 ? (
-                      <tr><td colSpan="5">Nenhum profile encontrado.</td></tr>
+                      <tr><td colSpan="5">Nenhum usuário ativo encontrado.</td></tr>
                     ) : (
                       profilesRows.map((item) => (
                         <tr key={item.id}>
                           <td>{item.nome || 'Sem nome'}</td>
                           <td>{item.email}</td>
-                          <td><span className="badge badge-info">{obterLabelPerfil(item.perfil)}</span></td>
+                          <td><span className={badgeStatusClass(item.perfil)}>{obterLabelPerfil(item.perfil)}</span></td>
                           <td>profile</td>
                           <td>{item.updated_at ? new Date(item.updated_at).toLocaleString('pt-BR') : '-'}</td>
                         </tr>
@@ -582,7 +585,7 @@ export default function ConfiguracoesPage({ db, setDb, onConfirmAction }) {
                   <thead><tr><th>Convite</th><th>Perfil automático</th><th>Status</th><th>Uso</th><th>Ações</th></tr></thead>
                   <tbody>
                     {invitesPendentes.length === 0 ? (
-                      <tr><td colSpan="5">Nenhum convite configurado.</td></tr>
+                      <tr><td colSpan="5">Nenhum convite pendente.</td></tr>
                     ) : (
                       invitesPendentes.map((invite) => (
                         <tr key={invite.id}>
@@ -590,8 +593,8 @@ export default function ConfiguracoesPage({ db, setDb, onConfirmAction }) {
                             <strong>{invite.nome || 'Convite sem nome'}</strong>
                             <div>{invite.email}</div>
                           </td>
-                          <td>{obterLabelPerfil(invite.perfil)}</td>
-                          <td>{invite.status}</td>
+                          <td><span className={badgeStatusClass(invite.perfil)}>{obterLabelPerfil(invite.perfil)}</span></td>
+                          <td><span className={badgeStatusClass(invite.status)}>{invite.status}</span></td>
                           <td>{invite.used_at ? new Date(invite.used_at).toLocaleString('pt-BR') : '-'}</td>
                           <td>
                             <div className="config-actions-wrap">
@@ -626,7 +629,7 @@ export default function ConfiguracoesPage({ db, setDb, onConfirmAction }) {
                   <thead><tr><th colSpan="5">Convites aceitos</th></tr></thead>
                   <tbody>
                     {invitesAceitos.length === 0 ? <tr><td colSpan="5">Nenhum convite aceito.</td></tr> : invitesAceitos.map((invite) => (
-                      <tr key={invite.id}><td><strong>{invite.nome || 'Convite sem nome'}</strong><div>{invite.email}</div></td><td>{obterLabelPerfil(invite.perfil)}</td><td>{invite.status}</td><td>{invite.used_at ? new Date(invite.used_at).toLocaleString('pt-BR') : '-'}</td><td>Este convite já foi aceito. Para remover acesso, altere o usuário.</td></tr>
+                      <tr key={invite.id}><td><strong>{invite.nome || 'Convite sem nome'}</strong><div>{invite.email}</div></td><td><span className={badgeStatusClass(invite.perfil)}>{obterLabelPerfil(invite.perfil)}</span></td><td><span className={badgeStatusClass(invite.status)}>{invite.status}</span></td><td>{invite.used_at ? new Date(invite.used_at).toLocaleString('pt-BR') : '-'}</td><td>Este convite já foi aceito. Para remover acesso, altere o usuário.</td></tr>
                     ))}
                   </tbody>
                 </table>
@@ -637,8 +640,8 @@ export default function ConfiguracoesPage({ db, setDb, onConfirmAction }) {
                 <table className="dashboard-table">
                   <thead><tr><th colSpan="5">Convites cancelados/expirados</th></tr></thead>
                   <tbody>
-                    {invitesCanceladosExpirados.length === 0 ? <tr><td colSpan="5">Nenhum convite cancelado ou expirado.</td></tr> : invitesCanceladosExpirados.map((invite) => (
-                      <tr key={invite.id}><td><strong>{invite.nome || 'Convite sem nome'}</strong><div>{invite.email}</div></td><td>{obterLabelPerfil(invite.perfil)}</td><td>{invite.status}</td><td>{invite.used_at ? new Date(invite.used_at).toLocaleString('pt-BR') : '-'}</td><td><Button size="sm" variant="danger" onClick={() => removerConvitePendente(invite)}>Remover convite pendente</Button></td></tr>
+                    {invitesCanceladosExpirados.length === 0 ? <tr><td colSpan="5">Nenhum convite cancelado.</td></tr> : invitesCanceladosExpirados.map((invite) => (
+                      <tr key={invite.id}><td><strong>{invite.nome || 'Convite sem nome'}</strong><div>{invite.email}</div></td><td><span className={badgeStatusClass(invite.perfil)}>{obterLabelPerfil(invite.perfil)}</span></td><td><span className={badgeStatusClass(invite.status)}>{invite.status}</span></td><td>{invite.used_at ? new Date(invite.used_at).toLocaleString('pt-BR') : '-'}</td><td><Button size="sm" variant="danger" onClick={() => removerConvitePendente(invite)}>Remover convite pendente</Button></td></tr>
                     ))}
                   </tbody>
                 </table>
@@ -883,6 +886,14 @@ export default function ConfiguracoesPage({ db, setDb, onConfirmAction }) {
  * @param {function} props.onInvite - Callback para quando o usuário é convidado.
  * @param {function} props.onClose - Callback para fechar o formulário.
  */
+function badgeStatusClass(status = '') {
+  const s = String(status).toLowerCase();
+  if (['ativo', 'aceito'].includes(s)) return 'badge badge-g';
+  if (['inativo', 'pendente', 'enviado'].includes(s)) return 'badge badge-a';
+  if (['desligado', 'cancelado', 'expirado'].includes(s)) return 'badge badge-r';
+  return 'badge badge-info';
+}
+
 function InviteForm({ onInvite, onClose }) {
   const { showToast } = useToast(); // Hook para exibir toasts
   const [form, setForm] = useState({ nome: '', email: '', perfil: 'visualizador', status: 'ativo', notes: '' });
