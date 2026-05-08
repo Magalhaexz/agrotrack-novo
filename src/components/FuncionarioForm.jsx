@@ -183,6 +183,7 @@ export default function FuncionarioForm({ open, onCancel, onSave, initialData, f
           <select className="ui-input" name="status" value={form.status} onChange={handleChange}>
             <option value="ativo">Ativo</option>
             <option value="inativo">Inativo</option>
+            <option value="desligado">Desligado</option>
           </select>
         </div>
 
