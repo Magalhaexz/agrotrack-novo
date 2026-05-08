@@ -8551,3 +8551,113 @@ body {
     grid-template-columns: 1fr 1fr;
   }
 }
+
+/* SPRINT21B - App shell polish (header/sidebar/bottom nav) */
+.header.top-header {
+  backdrop-filter: blur(10px);
+  background: linear-gradient(180deg, rgba(9, 13, 11, 0.96), rgba(9, 13, 11, 0.92));
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.header.top-header .top-header-actions {
+  gap: 10px;
+}
+
+.header-farm-selector,
+.header-user-btn,
+.header-notification-btn,
+.mobile-utility-trigger {
+  min-height: 44px;
+}
+
+.header-farm-selector,
+.header-user-btn {
+  border-color: rgba(255, 255, 255, 0.12);
+}
+
+.sidebar {
+  border-right-color: rgba(255, 255, 255, 0.08);
+}
+
+.sidebar-content {
+  padding-top: 12px;
+}
+
+.sidebar-item {
+  min-height: 42px;
+  border-radius: 12px;
+}
+
+.sidebar-item.active {
+  border-color: rgba(47, 181, 107, 0.4);
+  box-shadow: inset 0 0 0 1px rgba(47, 181, 107, 0.12);
+}
+
+.mobile-bottom-nav {
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
+  background: linear-gradient(180deg, rgba(11, 15, 13, 0.96), rgba(9, 13, 11, 0.98));
+}
+
+.mobile-bottom-nav-item {
+  min-height: 56px;
+  color: rgba(214, 223, 219, 0.72);
+}
+
+.mobile-bottom-nav-item.active {
+  color: #9ef4ba;
+}
+
+.mobile-bottom-nav-item.active svg {
+  filter: drop-shadow(0 0 6px rgba(47, 181, 107, 0.35));
+}
+
+.mobile-fab {
+  bottom: calc(var(--mobile-bottom-nav-height) + env(safe-area-inset-bottom) + 16px);
+}
+
+.main {
+  padding-bottom: calc(var(--herdon-mobile-bottomnav-height) + env(safe-area-inset-bottom) + 20px);
+}
+
+@media (max-width: 900px) {
+  .header.top-header {
+    min-height: var(--herdon-mobile-header-height);
+    height: var(--herdon-mobile-header-height);
+    padding-inline: 10px;
+  }
+
+  .mobile-header-brand span {
+    max-width: 44vw;
+  }
+
+  .mobile-header-menu-btn,
+  .header-notification-btn,
+  .mobile-utility-trigger {
+    min-width: 44px;
+    min-height: 44px;
+  }
+
+  .sidebar {
+    width: min(86vw, 332px);
+  }
+
+  .main {
+    padding-top: calc(var(--herdon-mobile-header-height) + env(safe-area-inset-top) + 10px);
+    padding-bottom: calc(var(--herdon-mobile-bottomnav-height) + env(safe-area-inset-bottom) + 18px);
+  }
+}
+
+@media (max-width: 640px) {
+  .mobile-header-brand strong {
+    font-size: 0.78rem;
+  }
+
+  .mobile-header-brand span {
+    font-size: 0.72rem;
+    max-width: 52vw;
+  }
+
+  .mobile-bottom-nav-item span {
+    font-size: 0.7rem;
+  }
+}
