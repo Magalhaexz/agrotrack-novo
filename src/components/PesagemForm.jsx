@@ -157,10 +157,6 @@ export default function PesagemForm({
       });
   }
 
-  const missingIndexes = linhasAnimais
-    .filter((item) => item.virtual)
-    .map((item) => item.virtualIndex);
-
   /* eslint-disable react-hooks/set-state-in-effect */
   useEffect(() => {
     setForm(normalizarInitialData(initialData));
@@ -338,11 +334,6 @@ export default function PesagemForm({
         {form.tipo === 'animal' && (
           <section className="pesagem-form-section-block">
             <div className="pesagem-form-section-head">Pesagem individual por lote</div>
-            {hasSelectedLote ? (
-              <p style={{ margin: 0, fontSize: '0.9rem', color: 'var(--text-muted)' }}>
-                Este lote possui {expectedHeadCount || 0} cabecas e {animaisIndividuais.length} animais individuais cadastrados.
-              </p>
-            ) : null}
             {!hasSelectedLote ? (
               <p style={{ margin: 0, fontSize: '0.9rem', color: 'var(--text-muted)' }}>
                 Selecione um lote para carregar os animais.
@@ -352,21 +343,7 @@ export default function PesagemForm({
                 Nenhum animal individual encontrado para este lote.
               </p>
             ) : (
-              <div className="fazendas-table-wrap" style={{ display: 'grid', gap: 10 }}>
-                <div>
-                  <Button
-                    variant="outline"
-                    onClick={() => onSave?.({
-                      tipo: 'animal_generate_missing',
-                      lote_id: form.lote_id ? Number(form.lote_id) : null,
-                      expectedHeadCount,
-                      missingIndexes,
-                    })}
-                    disabled={!hasSelectedLote || expectedHeadCount <= 0 || !missingIndexes.length}
-                  >
-                    Gerar animais individuais faltantes
-                  </Button>
-                </div>
+              <div className="fazendas-table-wrap">
                 <table className="data-table herdon-table">
                   <thead>
                     <tr>
