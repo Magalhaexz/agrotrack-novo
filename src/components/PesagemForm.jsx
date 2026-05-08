@@ -12,14 +12,15 @@ function isIndividualAnimal(animal) {
 }
 
 function getExpectedHeadCount(lote, animaisDoLote = []) {
+  if (!lote) return 0;
   const candidates = [
-    lote.qtd,
-    lote.quantidade,
-    lote.quantidade_animais,
-    lote.qtd_inicial,
-    lote.cabecas,
-    lote.total_cabecas,
-    lote.heads,
+    lote?.qtd,
+    lote?.quantidade,
+    lote?.quantidade_animais,
+    lote?.qtd_inicial,
+    lote?.cabecas,
+    lote?.total_cabecas,
+    lote?.heads,
     lote?.indicators?.totalAnimais,
     lote?.resumo?.totalAnimais,
   ];
@@ -102,13 +103,16 @@ export default function PesagemForm({
   const [erro, setErro] = useState('');
   const [pesosAnimais, setPesosAnimais] = useState({});
   const [observacoesAnimais, setObservacoesAnimais] = useState({});
+  const hasSelectedLote = Boolean(form.lote_id);
 
-  const animaisDoLote = animais.filter(
-    (animal) => Number(animal?.lote_id) === Number(form.lote_id)
-  );
+  const animaisDoLote = hasSelectedLote
+    ? animais.filter((animal) => Number(animal?.lote_id) === Number(form.lote_id))
+    : [];
   const animaisIndividuais = animaisDoLote.filter((animal) => isIndividualAnimal(animal));
-  const loteSelecionado = lotes.find((lote) => Number(lote?.id) === Number(form.lote_id)) || null;
-  const expectedHeadCount = getExpectedHeadCount(loteSelecionado, animaisDoLote);
+  const loteSelecionado = hasSelectedLote
+    ? (lotes.find((lote) => Number(lote?.id) === Number(form.lote_id)) || null)
+    : null;
+  const expectedHeadCount = hasSelectedLote ? getExpectedHeadCount(loteSelecionado, animaisDoLote) : 0;
 
   const animalsByIndex = new Map();
   animaisIndividuais.forEach((animal, idx) => {
@@ -241,6 +245,11 @@ export default function PesagemForm({
 
     setErro('');
     if (form.tipo === 'animal') {
+      if (!form.lote_id) {
+        setErro('Selecione um lote para registrar pesagens por animal.');
+        return;
+      }
+
       const registros = linhasAnimais
         .map((animal) => {
           const key = animal.virtual ? `virtual-${animal.virtualIndex}` : String(Number(animal.id));
@@ -330,14 +339,14 @@ export default function PesagemForm({
         {form.tipo === 'animal' && (
           <section className="pesagem-form-section-block">
             <div className="pesagem-form-section-head">Pesagem individual por lote</div>
-            {form.lote_id ? (
+            {hasSelectedLote ? (
               <p style={{ margin: 0, fontSize: '0.9rem', color: 'var(--text-muted)' }}>
-                Este lote possui {expectedHeadCount || 0} cabeças e {animaisIndividuais.length} animais individuais cadastrados.
+                Este lote possui {expectedHeadCount || 0} cabecas e {animaisIndividuais.length} animais individuais cadastrados.
               </p>
             ) : null}
-            {!form.lote_id ? (
+            {!hasSelectedLote ? (
               <p style={{ margin: 0, fontSize: '0.9rem', color: 'var(--text-muted)' }}>
-                Selecione um lote para listar os animais.
+                Selecione um lote para carregar os animais.
               </p>
             ) : linhasAnimais.length === 0 ? (
               <p style={{ margin: 0, fontSize: '0.9rem', color: 'var(--text-muted)' }}>
@@ -354,7 +363,7 @@ export default function PesagemForm({
                       expectedHeadCount,
                       missingIndexes,
                     })}
-                    disabled={!missingIndexes.length}
+                    disabled={!hasSelectedLote || expectedHeadCount <= 0 || !missingIndexes.length}
                   >
                     Gerar animais individuais faltantes
                   </Button>
