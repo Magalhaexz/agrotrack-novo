@@ -715,134 +715,38 @@ export default function PesagensPage({ db, setDb, onConfirmAction, navigationInt
     setPesagemEditando(null);
   }
 
+  const [abaAtiva, setAbaAtiva] = useState('nova');
+
+  const alertas = useMemo(() => {
+    const hoje = new Date();
+    const diasSemPesagem = 30;
+    const lotesSemPesagem = (lotes || []).filter((lote) => {
+      const data = lote?.ultima_pesagem;
+      if (!data) return true;
+      return (hoje - new Date(data)) / (1000 * 60 * 60 * 24) > diasSemPesagem;
+    });
+    const animaisSemPesagem = (animais || []).filter((animal) => !dadosTabela.some((p) => p.tipo === 'animal' && Number(p.animal_id) === Number(animal.id)));
+    return { lotesSemPesagem, animaisSemPesagem, diasSemPesagem };
+  }, [lotes, animais, dadosTabela]);
+
   return (
-    <div className="page page--pesagens page--kpi-compact">
-      <section className="animais-hero pesagens-hero">
-        <div>
-          <span className="animais-hero-kicker">Desempenho zootecnico</span>
-          <h1>Pesagens</h1>
-          <p>Registro e acompanhamento de pesagens por lote e por animal.</p>
-        </div>
+    <div className="page page--pesagens page--kpi-compact"> 
+      <section className="animais-hero pesagens-hero"><div><h1>Pesagens</h1><p>Registre e acompanhe pesagens de forma guiada.</p></div><button className="primary-btn" onClick={() => abrirNovaPesagem(modoPesagem)}>Nova pesagem</button></section>
+      <div className="segmented-control"><button type="button" className={`segment ${abaAtiva === 'nova' ? 'active' : ''}`} onClick={() => setAbaAtiva('nova')}>Nova pesagem</button><button type="button" className={`segment ${abaAtiva === 'historico' ? 'active' : ''}`} onClick={() => setAbaAtiva('historico')}>Historico</button><button type="button" className={`segment ${abaAtiva === 'evolucao' ? 'active' : ''}`} onClick={() => setAbaAtiva('evolucao')}>Evolucao</button><button type="button" className={`segment ${abaAtiva === 'alertas' ? 'active' : ''}`} onClick={() => setAbaAtiva('alertas')}>Alertas</button></div>
 
-        <div className="animais-hero-cta-card">
-          <strong>{modoPesagem === 'animal' ? 'Pesagem individual ativa' : 'Pesagem por lote ativa'}</strong>
-          <p>{modoPesagem === 'animal' ? 'Selecione um animal e registre a medicao com rastreabilidade individual.' : 'Mantenha o fluxo tradicional de pesagem por lote sem alterar o historico existente.'}</p>
-          <button className="primary-btn" onClick={() => abrirNovaPesagem(modoPesagem)}>+ Nova pesagem</button>
-        </div>
-      </section>
+      <div className="kpi-grid-3 kpi-grid-3--compact"><div className="kpi-card kpi-card--compact"><div className="kpi-label">Ultima pesagem</div><div className="kpi-value">{formatarData(resumo.ultimaData)}</div></div><div className="kpi-card kpi-card--compact"><div className="kpi-label">Lotes sem pesagem recente</div><div className="kpi-value">{alertas.lotesSemPesagem.length}</div></div><div className="kpi-card kpi-card--compact"><div className="kpi-label">Total de pesagens</div><div className="kpi-value">{resumo.totalPesagens}</div></div></div>
 
-      <div className="fazendas-card pesagens-mode-shell">
-        <div className="fazendas-card-header">
-          <span className="fazendas-card-title">Modo de pesagem</span>
-        </div>
-        <div className="segmented-control" role="tablist" aria-label="Modo de pesagem">
-          <button type="button" className={`segment ${modoPesagem === 'lote' ? 'active' : ''}`} onClick={() => setModoPesagem('lote')}>Por lote</button>
-          <button type="button" className={`segment ${modoPesagem === 'animal' ? 'active' : ''}`} onClick={() => setModoPesagem('animal')}>Por animal</button>
-        </div>
-      </div>
+      {abaAtiva === 'nova' && <div className="fazendas-card"><div className="segmented-control"><button type="button" className={`segment ${modoPesagem === 'lote' ? 'active' : ''}`} onClick={() => setModoPesagem('lote')}>Por lote</button><button type="button" className={`segment ${modoPesagem === 'animal' ? 'active' : ''}`} onClick={() => setModoPesagem('animal')}>Por animal</button></div><p>Fluxo: escolha tipo, lote, data e pesos.</p><button className="primary-btn" onClick={() => abrirNovaPesagem(modoPesagem)}>Registrar pesagem</button></div>}
 
-      <div className="kpi-grid-3 kpi-grid-3--compact">
-        <div className="kpi-card kpi-card--compact">
-          <div className="kpi-label">Pesagens</div>
-          <div className="kpi-value">{resumo.totalPesagens}</div>
-          <div className="kpi-sub">lote: {resumo.totalPesagensLote} | animal: {resumo.totalPesagensAnimal}</div>
-        </div>
+      {abaAtiva === 'historico' && <div className="fazendas-card"><div className="fazendas-table-wrap">{dadosTabela.length===0?<div className="empty-box"><strong>Nenhuma pesagem cadastrada.</strong></div>:<table className="data-table herdon-table herdon-table--pesagens"><thead><tr><th>Data</th><th>Tipo</th><th>Lote</th><th>Animal</th><th>Peso</th><th>Observacao</th><th>Acoes</th></tr></thead><tbody>{dadosTabela.map((item)=><tr key={item.id}><td>{formatarData(item.data)}</td><td>{item.tipo==='animal'?'Animal':'Lote'}</td><td>{item.loteNome}</td><td>{item.tipo==='animal'?(item.animalNome||'Animal'):'-'}</td><td>{formatarNumero(item.peso_medio)} kg</td><td>{item.observacao||'-'}</td><td><div className="row-actions row-actions--tight"><button className="action-btn" onClick={()=>editarPesagem(item)}>Editar</button><button className="action-btn action-btn-danger" onClick={()=>excluirPesagem(item.id)}>Cancelar registro</button></div></td></tr>)}</tbody></table>}</div></div>}
 
-        <div className="kpi-card kpi-card--compact">
-          <div className="kpi-label">Pesagens por origem</div>
-          <div className="kpi-value">{resumo.totalPesagensLote} / {resumo.totalPesagensAnimal}</div>
-          <div className="kpi-sub">lote | animal</div>
-        </div>
-
-        <div className="kpi-card kpi-card--compact">
-          <div className="kpi-label">Peso medio geral</div>
-          <div className="kpi-value">{formatarNumero(resumo.pesoMedioGeral)} kg</div>
-          <div className="kpi-sub">ultima data: {formatarData(resumo.ultimaData)}</div>
-        </div>
-      </div>
-
-      <div className="fazendas-card">
-        <div className="fazendas-card-header">
-          <span className="fazendas-card-title">Historico de pesagens</span>
-        </div>
-
-        <div className="fazendas-table-wrap">
-          {dadosTabela.length === 0 ? (
-            <div className="empty-box">
-              <strong>Nenhuma pesagem cadastrada.</strong>
-              <span>
-                {(animais || []).length === 0
-                  ? 'Voce pode registrar uma pesagem por lote ou cadastrar um animal para acompanhar individualmente.'
-                  : 'Use o botao "Nova pesagem" para registrar o primeiro peso.'}
-              </span>
-            </div>
-          ) : (
-            <table className="data-table herdon-table herdon-table--pesagens">
-              <thead>
-                <tr>
-                  <th>Origem</th>
-                  <th>Referencia</th>
-                  <th>Lote</th>
-                  <th>Data</th>
-                  <th>Peso medio</th>
-                  <th>Variacao</th>
-                  <th>Observacao</th>
-                  <th>Acoes</th>
-                </tr>
-              </thead>
-              <tbody>
-                {dadosTabela.map((item) => (
-                  <tr key={item.id}>
-                    <td className="cell-chip">
-                      <span className={`badge ${item.tipo === 'animal' ? 'badge-info' : 'badge-g'}`}>
-                        {item.tipo === 'animal' ? 'Animal' : 'Lote'}
-                      </span>
-                    </td>
-                    <td className="text-h">{item.tipo === 'animal' ? (item.animalNome || 'Animal') : item.loteNome}</td>
-                    <td>{item.loteNome}</td>
-                    <td>{formatarData(item.data)}</td>
-                    <td>{formatarNumero(item.peso_medio)} kg</td>
-                    <td className="cell-chip">{renderVariacao(item.variacao, item.tipo)}</td>
-                    <td>{item.observacao || '—'}</td>
-                    <td className="cell-actions">
-                      <div className="row-actions row-actions--tight">
-                        <button className="action-btn" onClick={() => editarPesagem(item)}>
-                          Editar
-                        </button>
-                        <button className="action-btn action-btn-danger" onClick={() => excluirPesagem(item.id)}>
-                          Excluir
-                        </button>
-                      </div>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          )}
-        </div>
-      </div>
+      {abaAtiva === 'evolucao' && <div className="fazendas-card">{dadosTabela.length<2?<div className="empty-box"><strong>Sem dados suficientes para evolucao.</strong></div>:<p>Peso medio por lote e GMD disponiveis no historico de pesagens.</p>}</div>}
+      {abaAtiva === 'alertas' && <div className="fazendas-card"><p>Lotes sem pesagem ha mais de {alertas.diasSemPesagem} dias: {alertas.lotesSemPesagem.length}</p><p>Animais sem pesagem recente: {alertas.animaisSemPesagem.length}</p><button className="primary-btn" onClick={() => { setAbaAtiva('nova'); abrirNovaPesagem('lote'); }}>Registrar pesagem</button></div>}
 
       {abrirForm && (
-        <PesagemForm
-          initialData={pesagemEditando}
-          lotes={lotes || []}
-          animais={animais || []}
-          pesagens={pesagens || []}
-          onSave={salvarPesagem}
-          onCancel={() => {
-            setAbrirForm(false);
-            setPesagemEditando(null);
-          }}
-        />
+        <PesagemForm initialData={pesagemEditando} lotes={lotes || []} animais={animais || []} pesagens={pesagens || []} onSave={salvarPesagem} onCancel={() => { setAbrirForm(false); setPesagemEditando(null); }} />
       )}
     </div>
   );
-}
 
-function renderVariacao(variacao, tipo) {
-  if (tipo === 'animal') return <span className="badge badge-neutral">Nao se aplica</span>;
-  if (variacao === null || variacao === undefined) return '—';
-  if (variacao > 0) return <span className="badge badge-g">+{formatarNumero(variacao)} kg</span>;
-  if (variacao < 0) return <span className="badge badge-r">{formatarNumero(variacao)} kg</span>;
-  return <span className="badge badge-a">0,00 kg</span>;
 }
