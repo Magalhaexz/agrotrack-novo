@@ -1,5 +1,4 @@
 ﻿import { useMemo, useState } from 'react';
-import Card from '../components/ui/Card';
 import Input from '../components/ui/Input';
 import Modal from '../components/ui/Modal';
 import Button from '../components/ui/Button';
@@ -59,7 +58,7 @@ const EMPTY_LIST = [];
 export default function LotesPage({ db, setDb, onRegistrarSaidaAnimal, session }) {
   const { hasPermission } = useAuth();
   const { showToast } = useToast();
-  const [filters, setFilters] = useState({ status: 'todos', fazenda: 'todas', periodo: 'todos' });
+  const [filters, setFilters] = useState({ status: 'todos', fazenda: 'todas', periodo: 'todos', busca: '' });
   const [selectedLoteId, setSelectedLoteId] = useState(null);
   const [activeTab, setActiveTab] = useState('visao_geral');
   const [openRetirada, setOpenRetirada] = useState(false);
@@ -104,6 +103,11 @@ export default function LotesPage({ db, setDb, onRegistrarSaidaAnimal, session }
     if (filters.fazenda !== 'todas' && Number(lote.faz_id) !== Number(filters.fazenda)) return false;
     if (filters.periodo === '30d' && daysFrom(lote.entrada) > 30) return false;
     if (filters.periodo === '90d' && daysFrom(lote.entrada) > 90) return false;
+    if (String(filters.busca || '').trim()) {
+      const termo = String(filters.busca).trim().toLowerCase();
+      const alvo = `${lote?.nome || ''} ${lote?.fazendaNome || ''}`.toLowerCase();
+      if (!alvo.includes(termo)) return false;
+    }
     return true;
   }), [filters, lotesEnriquecidos]);
 
@@ -303,22 +307,36 @@ export default function LotesPage({ db, setDb, onRegistrarSaidaAnimal, session }
         onNovoLote={() => setOpenNovoLote(true)}
       />
 
-      <Card>
-        <LotesFilters
-          filters={filters}
-          fazendas={fazendas}
-          onChange={updateFilter}
-        />
-      </Card>
+      <LotesFilters
+        filters={filters}
+        fazendas={fazendas}
+        onChange={updateFilter}
+      />
 
       <div className="lote-cards-grid">
-        {lotesFiltrados.map((lote) => (
+        {lotesFiltrados.length === 0 ? (
+          <div className="empty-state">
+            <strong>Nenhum lote encontrado.</strong>
+            <span>Ajuste os filtros ou cadastre um novo lote para continuar.</span>
+          </div>
+        ) : lotesFiltrados.map((lote) => (
           <LoteCard
             key={lote.id}
             lote={lote}
+            canMove={hasPermission('animais:movimentar')}
+            canEdit={hasPermission('lotes:editar')}
             onOpen={() => {
               setActiveTab('visao_geral');
               setSelectedLoteId(lote.id);
+            }}
+            onRetirada={() => {
+              setActiveTab('retiradas');
+              setSelectedLoteId(lote.id);
+              setOpenRetirada(true);
+            }}
+            onEncerrar={() => {
+              setSelectedLoteId(lote.id);
+              setOpenFechamento(true);
             }}
           />
         ))}

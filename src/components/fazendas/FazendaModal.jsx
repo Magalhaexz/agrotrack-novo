@@ -1,11 +1,11 @@
-import { useEffect, useState } from 'react';
+﻿import { useEffect, useState } from 'react';
 import Modal from '../ui/Modal';
 import Button from '../ui/Button';
 
 const ESTADOS = [
-  'AC','AL','AM','AP','BA','CE','DF','ES','GO','MA',
-  'MG','MS','MT','PA','PB','PE','PI','PR','RJ','RN',
-  'RO','RR','RS','SC','SE','SP','TO',
+  'AC', 'AL', 'AM', 'AP', 'BA', 'CE', 'DF', 'ES', 'GO', 'MA',
+  'MG', 'MS', 'MT', 'PA', 'PB', 'PE', 'PI', 'PR', 'RJ', 'RN',
+  'RO', 'RR', 'RS', 'SC', 'SE', 'SP', 'TO',
 ];
 
 const FORM_VAZIO = {
@@ -18,6 +18,7 @@ const FORM_VAZIO = {
   responsavel: '',
   telefone: '',
   observacoes: '',
+  status: 'ativa',
 };
 
 function normalizarInitialData(data) {
@@ -25,7 +26,6 @@ function normalizarInitialData(data) {
   return {
     ...FORM_VAZIO,
     ...data,
-    // normaliza campos legados do banco
     hectares: data.hectares ?? data.area_total_ha ?? '',
     hectares_pastagem: data.hectares_pastagem ?? data.area_pastagem_ha ?? '',
     capacidade_lotacao: data.capacidade_lotacao ?? data.capacidade_ua ?? '',
@@ -45,6 +45,7 @@ function normalizarPayload(form, initialData) {
     responsavel: text(form.responsavel),
     telefone: text(form.telefone),
     observacoes: text(form.observacoes),
+    status: form.status || 'ativa',
     data_cadastro: initialData?.data_cadastro || new Date().toISOString().slice(0, 10),
   };
 }
@@ -53,7 +54,6 @@ export default function FazendaModal({ open, initialData, onSave, onCancel }) {
   const [form, setForm] = useState(() => normalizarInitialData(initialData));
   const [erro, setErro] = useState('');
 
-  // reseta o form quando initialData muda (troca de fazenda ou novo cadastro)
   /* eslint-disable react-hooks/set-state-in-effect */
   useEffect(() => {
     if (open) {
@@ -63,7 +63,7 @@ export default function FazendaModal({ open, initialData, onSave, onCancel }) {
   }, [open, initialData]);
   /* eslint-enable react-hooks/set-state-in-effect */
 
-  const titulo = initialData ? 'Editar Fazenda' : 'Cadastrar Fazenda';
+  const titulo = initialData ? 'Editar fazenda' : 'Cadastrar fazenda';
 
   function onChange(e) {
     const { name, value } = e.target;
@@ -83,73 +83,99 @@ export default function FazendaModal({ open, initialData, onSave, onCancel }) {
   }
 
   const footer = (
-    <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8 }}>
+    <div className="modal-footer action-row" style={{ width: '100%' }}>
       <Button variant="ghost" onClick={onCancel}>Cancelar</Button>
-      <Button onClick={handleSubmit}>Salvar</Button>
+      <Button onClick={handleSubmit}>Salvar fazenda</Button>
     </div>
   );
 
   return (
-    <Modal open={open} onClose={onCancel} title={titulo} footer={footer}>
-      <form onSubmit={handleSubmit} style={{ display: 'grid', gap: 10 }}>
+    <Modal open={open} onClose={onCancel} title={titulo} subtitle="Organize dados, localização e capacidade da fazenda." footer={footer}>
+      <form onSubmit={handleSubmit} className="form-section fazenda-form-shell">
+        <section className="section-card fazenda-form-section">
+          <div className="section-header">
+            <h4>Dados principais</h4>
+          </div>
+          <div className="form-grid two">
+            <label className="ui-input-wrap full">
+              <span className="ui-input-label">Nome da fazenda *</span>
+              <input className="ui-input" name="nome" value={form.nome} onChange={onChange} placeholder="Ex.: Fazenda Santa Helena" />
+            </label>
+            <label className="ui-input-wrap">
+              <span className="ui-input-label">Status</span>
+              <select className="ui-input" name="status" value={form.status} onChange={onChange}>
+                <option value="ativa">Ativa</option>
+                <option value="inativa">Inativa</option>
+              </select>
+            </label>
+          </div>
+        </section>
 
-        <label>
-          Nome da fazenda *
-          <input className="ui-input" name="nome" value={form.nome} onChange={onChange} />
-        </label>
+        <section className="section-card fazenda-form-section">
+          <div className="section-header">
+            <h4>Localização</h4>
+          </div>
+          <div className="form-grid two">
+            <label className="ui-input-wrap">
+              <span className="ui-input-label">Estado</span>
+              <select className="ui-input" name="estado" value={form.estado} onChange={onChange}>
+                {ESTADOS.map((uf) => (
+                  <option key={uf} value={uf}>{uf}</option>
+                ))}
+              </select>
+            </label>
+            <label className="ui-input-wrap">
+              <span className="ui-input-label">Cidade</span>
+              <input className="ui-input" name="cidade" value={form.cidade} onChange={onChange} placeholder="Ex.: Uberlândia" />
+            </label>
+          </div>
+        </section>
 
-        <div className="grid-2">
-          <label>
-            Estado
-            <select className="ui-input" name="estado" value={form.estado} onChange={onChange}>
-              {ESTADOS.map((uf) => (
-                <option key={uf} value={uf}>{uf}</option>
-              ))}
-            </select>
-          </label>
-          <label>
-            Cidade
-            <input className="ui-input" name="cidade" value={form.cidade} onChange={onChange} />
-          </label>
-        </div>
+        <section className="section-card fazenda-form-section">
+          <div className="section-header">
+            <h4>Capacidade e área</h4>
+          </div>
+          <div className="form-grid two">
+            <label className="ui-input-wrap">
+              <span className="ui-input-label">Área total (ha)</span>
+              <input className="ui-input" type="number" min={0} name="hectares" value={form.hectares} onChange={onChange} placeholder="ha" />
+            </label>
+            <label className="ui-input-wrap">
+              <span className="ui-input-label">Área de pastagem (ha)</span>
+              <input className="ui-input" type="number" min={0} name="hectares_pastagem" value={form.hectares_pastagem} onChange={onChange} placeholder="ha" />
+            </label>
+            <label className="ui-input-wrap">
+              <span className="ui-input-label">Capacidade (UA)</span>
+              <input className="ui-input" type="number" min={0} name="capacidade_lotacao" value={form.capacidade_lotacao} onChange={onChange} placeholder="UA" />
+            </label>
+          </div>
+        </section>
 
-        <div className="grid-3">
-          <label>
-            Hectares totais
-            <input className="ui-input" type="number" min={0} name="hectares" value={form.hectares} onChange={onChange} />
-          </label>
-          <label>
-            Hectares de pastagem
-            <input className="ui-input" type="number" min={0} name="hectares_pastagem" value={form.hectares_pastagem} onChange={onChange} />
-          </label>
-          <label>
-            Capacidade de lotação
-            <input className="ui-input" type="number" min={0} name="capacidade_lotacao" value={form.capacidade_lotacao} onChange={onChange} />
-          </label>
-        </div>
+        <section className="section-card fazenda-form-section">
+          <div className="section-header">
+            <h4>Contato e observações</h4>
+          </div>
+          <div className="form-grid two">
+            <label className="ui-input-wrap">
+              <span className="ui-input-label">Responsável</span>
+              <input className="ui-input" name="responsavel" value={form.responsavel} onChange={onChange} placeholder="Nome do responsável" />
+            </label>
+            <label className="ui-input-wrap">
+              <span className="ui-input-label">Telefone</span>
+              <input className="ui-input" name="telefone" value={form.telefone} onChange={onChange} placeholder="(00) 00000-0000" />
+            </label>
+            <label className="ui-input-wrap full">
+              <span className="ui-input-label">Observações</span>
+              <textarea className="ui-input" rows={3} name="observacoes" value={form.observacoes} onChange={onChange} placeholder="Detalhes operacionais e anotações relevantes" />
+            </label>
+          </div>
+        </section>
 
-        <div className="grid-2">
-          <label>
-            Responsável
-            <input className="ui-input" name="responsavel" value={form.responsavel} onChange={onChange} />
-          </label>
-          <label>
-            Telefone
-            <input className="ui-input" name="telefone" value={form.telefone} onChange={onChange} />
-          </label>
-        </div>
-
-        <label>
-          Observações
-          <textarea className="ui-input" rows={3} name="observacoes" value={form.observacoes} onChange={onChange} />
-        </label>
-
-        {erro && (
+        {erro ? (
           <p style={{ margin: 0, color: 'var(--color-danger)', fontSize: '0.85rem' }}>
             {erro}
           </p>
-        )}
-
+        ) : null}
       </form>
     </Modal>
   );

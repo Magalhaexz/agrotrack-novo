@@ -6,31 +6,45 @@ import { formatCurrency, formatDate, formatNumber } from '../../utils/calculatio
 function statusVariant(status) {
   if (status === 'ativo') return 'success';
   if (status === 'vendido') return 'info';
+  if (status === 'encerrado') return 'warning';
   return 'neutral';
 }
 
-export default function LoteCard({ lote, onOpen }) {
+export default function LoteCard({ lote, onOpen, onRetirada, onEncerrar, canMove = true, canEdit = true }) {
+  const risco = lote?.gmd30 < 0.3 || lote?.heads <= 0;
+
   return (
-    <Card className="lote-card-modern">
+    <Card className="lote-card-modern section-card">
       <div className="lote-card-title">
-        <h3>{lote.nome}</h3>
-        <Badge variant={statusVariant(lote.status)}>{lote.status}</Badge>
+        <div>
+          <h3>{lote.nome}</h3>
+          <p className="lote-card-subtitle">{lote.fazendaNome || 'Fazenda não vinculada'}</p>
+        </div>
+        <div className="action-row lote-card-statuses">
+          <Badge variant={statusVariant(lote.status)}>{lote.status}</Badge>
+          <span className={`status-badge ${risco ? 'status-badge--atencao' : 'status-badge--sucesso'}`}>
+            {risco ? 'Atenção' : 'OK'}
+          </span>
+        </div>
       </div>
 
-      <div className="lote-metrics">
-        <p><strong>{formatNumber(lote.heads, 0)}</strong> cabeças</p>
-        <p>{formatNumber(lote.pesoAtual, 1)} kg por cabeça</p>
-        <p>Última pesagem: {lote.ultimaPesagem ? formatDate(lote.ultimaPesagem) : 'sem registro'}</p>
-        <p>GMD (30 dias): {formatNumber(lote.gmd30, 3)} kg/dia</p>
-        <p>Resultado: {formatCurrency(lote.resumo?.lucroTotal || 0)}</p>
+      <div className="lote-metrics lote-metrics-grid">
+        <p><strong>{formatNumber(lote.heads, 0)}</strong><span>Cabeças</span></p>
+        <p><strong>{formatNumber(lote.pesoAtual, 1)} kg</strong><span>Peso médio</span></p>
+        <p><strong>{formatNumber(lote.gmd30, 3)} kg/dia</strong><span>GMD (30d)</span></p>
+        <p><strong>{formatCurrency(lote.resumo?.lucroTotal || 0)}</strong><span>Resultado</span></p>
       </div>
+
+      <p className="lote-card-last">Última pesagem: {lote.ultimaPesagem ? formatDate(lote.ultimaPesagem) : 'sem registro'}</p>
 
       <div className="progress-line">
         <span style={{ width: `${Math.max(5, Math.min(100, lote.progressoPeso || 0))}%` }} />
       </div>
 
-      <div className="lote-actions">
-        <Button size="sm" variant="outline" onClick={onOpen}>Abrir lote</Button>
+      <div className="lote-actions action-row">
+        <Button size="sm" variant="outline" onClick={onOpen}>Ver detalhes</Button>
+        <Button size="sm" variant="warning" onClick={onRetirada} disabled={!canMove || lote.bloqueado}>Retirada</Button>
+        <Button size="sm" variant="danger" onClick={onEncerrar} disabled={!canEdit || lote.bloqueado}>Encerrar lote</Button>
       </div>
     </Card>
   );
