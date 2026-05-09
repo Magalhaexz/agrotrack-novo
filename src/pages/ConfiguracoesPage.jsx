@@ -1,14 +1,14 @@
-﻿import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { AlertTriangle, FileText, Plus, X } from 'lucide-react';
 import Card from '../components/ui/Card';
 import Button from '../components/ui/Button';
 import Modal from '../components/ui/Modal';
 import { normalizarPerfil, obterLabelPerfil, perfilPodeGerenciarAcessos } from '../auth/perfis';
-import { supabase } from '../lib/supabase'; // Assumindo que supabase estÃ¡ configurado
+import { supabase } from '../lib/supabase'; // Assumindo que supabase está configurado
 import { useAuth } from '../auth/useAuth';
 import { useToast } from '../hooks/useToast'; // Importa o hook de toast
 import { createInvite, deleteInvite, isAccessModuleUnavailable, listInvites, listProfiles, updateInvite } from '../services/userAccess';
-import { gerarNovoId } from '../utils/id'; // Importa a funÃ§Ã£o de gerar ID
+import { gerarNovoId } from '../utils/id'; // Importa a função de gerar ID
 import { normalizeBackupPayload } from '../utils/backupValidation';
 import {
   createAuditEvent,
@@ -22,20 +22,20 @@ import '../styles/configuracoes.css';
 
 const TABS = [
   { id: 'geral', label: 'Geral' },
-  { id: 'notificacoes', label: 'NotificaÃ§Ãµes' },
-  { id: 'acessos', label: 'UsuÃ¡rios e Acessos' },
-  { id: 'dados', label: 'Dados e SeguranÃ§a' },
+  { id: 'notificacoes', label: 'Notificações' },
+  { id: 'acessos', label: 'Usuários e Acessos' },
+  { id: 'dados', label: 'Dados e Segurança' },
 ];
 
 /**
- * PÃ¡gina de ConfiguraÃ§Ãµes da aplicaÃ§Ã£o.
- * Permite gerenciar parÃ¢metros globais, preferÃªncias de notificaÃ§Ã£o,
- * acessos de usuÃ¡rios e operaÃ§Ãµes de dados (exportar/importar/limpar).
+ * Página de Configurações da aplicação.
+ * Permite gerenciar parâmetros globais, preferências de notificação,
+ * acessos de usuários e operações de dados (exportar/importar/limpar).
  *
  * @param {object} props - As propriedades do componente.
  * @param {object} props.db - O objeto do banco de dados.
- * @param {function} props.setDb - FunÃ§Ã£o para atualizar o banco de dados.
- * @param {function} [props.onConfirmAction] - FunÃ§Ã£o para exibir um modal de confirmaÃ§Ã£o customizado.
+ * @param {function} props.setDb - Função para atualizar o banco de dados.
+ * @param {function} [props.onConfirmAction] - Função para exibir um modal de confirmação customizado.
  */
 export default function ConfiguracoesPage({ db, setDb, onConfirmAction }) {
   const { perfil, user, session, hasPermission } = useAuth();
@@ -69,7 +69,7 @@ export default function ConfiguracoesPage({ db, setDb, onConfirmAction }) {
     dias_antecedencia: configNotificacoes.dias_antecedencia ?? 3,
   });
   const podeGerenciarAcessos = perfilPodeGerenciarAcessos(perfil);
-  const mensagemSemPermissao = 'VocÃª nÃ£o tem permissÃ£o para executar esta aÃ§Ã£o.';
+  const mensagemSemPermissao = 'Você não tem permissão para executar esta ação.';
   const usuariosFallback = useMemo(
     () => (db.usuarios || []).map((item) => ({ ...item, perfil: normalizarPerfil(item.perfil) })),
     [db.usuarios]
@@ -99,11 +99,6 @@ export default function ConfiguracoesPage({ db, setDb, onConfirmAction }) {
 
   function mensagemErroSegura(error, fallbackMessage) {
     const message = String(error?.message || '').toLowerCase();
-    const status = Number(error?.status || error?.code || 0);
-
-    if (status === 406 || message.includes('cannot coerce the result to a single json object')) {
-      return 'Não foi possível atualizar o convite. Atualize a lista e tente novamente.';
-    }
 
     if (
       message.includes('jwt')
@@ -169,16 +164,12 @@ export default function ConfiguracoesPage({ db, setDb, onConfirmAction }) {
     if (!confirmar) return;
     const { error } = await updateInvite(invite.id, { status: 'cancelado' });
     if (error) {
-      showToast({ type: 'error', message: mensagemErroSegura(error, 'Não foi possível cancelar o convite.') });
+      showToast({ type: 'error', message: mensagemErroSegura(error, 'Nao foi possivel cancelar o convite.') });
       return;
     }
     setInvitesRows((prev) => prev.map((item) => (item.id === invite.id ? { ...item, status: 'cancelado' } : item)));
     showToast({ type: 'success', message: 'Convite cancelado com sucesso.' });
-    try {
-      await carregarDadosDeAcesso();
-    } catch {
-      showToast({ type: 'warning', message: 'Convite atualizado, mas não foi possível recarregar a lista agora.' });
-    }
+    await carregarDadosDeAcesso();
   }
 
   async function removerConvitePendente(invite) {
@@ -193,16 +184,12 @@ export default function ConfiguracoesPage({ db, setDb, onConfirmAction }) {
     if (!confirmar) return;
     const { error } = await deleteInvite(invite.id);
     if (error) {
-      showToast({ type: 'error', message: mensagemErroSegura(error, 'Não foi possível remover o convite.') });
+      showToast({ type: 'error', message: mensagemErroSegura(error, 'Nao foi possivel remover o convite.') });
       return;
     }
     setInvitesRows((prev) => prev.filter((item) => item.id !== invite.id));
     showToast({ type: 'success', message: 'Convite pendente removido com sucesso.' });
-    try {
-      await carregarDadosDeAcesso();
-    } catch {
-      showToast({ type: 'warning', message: 'Convite removido, mas não foi possível recarregar a lista agora.' });
-    }
+    await carregarDadosDeAcesso();
   }
 
   /* eslint-disable react-hooks/set-state-in-effect */
@@ -214,7 +201,7 @@ export default function ConfiguracoesPage({ db, setDb, onConfirmAction }) {
   async function salvarGeral() {
     if (!validarPermissao('configuracoes:editar')) return;
     if (!geral.nome_sistema.trim()) {
-      showToast({ type: 'error', message: 'Nome do sistema/empresa Ã© obrigatÃ³rio.' });
+      showToast({ type: 'error', message: 'Nome do sistema/empresa é obrigatório.' });
       return;
     }
 
@@ -238,7 +225,7 @@ export default function ConfiguracoesPage({ db, setDb, onConfirmAction }) {
       },
     }));
     if (!persisted.persisted) {
-      showToast({ type: 'warning', message: 'ConfiguraÃ§Ãµes gerais salvas apenas localmente.' });
+      showToast({ type: 'warning', message: 'Configurações gerais salvas apenas localmente.' });
     }
     registrarEventoAuditoria({
       acao: 'configuracoes_gerais_salvas',
@@ -248,13 +235,13 @@ export default function ConfiguracoesPage({ db, setDb, onConfirmAction }) {
       detalhes: { persistido: persisted.persisted },
     });
 
-    showToast({ type: 'success', message: 'ConfiguraÃ§Ãµes gerais salvas com sucesso.' });
+    showToast({ type: 'success', message: 'Configurações gerais salvas com sucesso.' });
   }
 
   async function salvarNotificacoes() {
     if (!validarPermissao('configuracoes:editar')) return;
     if (Number(notificacoes.dias_antecedencia) < 0) {
-      showToast({ type: 'error', message: 'Dias de antecedÃªncia deve ser maior ou igual a zero.' });
+      showToast({ type: 'error', message: 'Dias de antecedência deve ser maior ou igual a zero.' });
       return;
     }
 
@@ -277,7 +264,7 @@ export default function ConfiguracoesPage({ db, setDb, onConfirmAction }) {
       },
     }));
     if (!persisted.persisted) {
-      showToast({ type: 'warning', message: 'NotificaÃ§Ãµes salvas apenas localmente.' });
+      showToast({ type: 'warning', message: 'Notificações salvas apenas localmente.' });
     }
     registrarEventoAuditoria({
       acao: 'configuracoes_notificacoes_salvas',
@@ -287,7 +274,7 @@ export default function ConfiguracoesPage({ db, setDb, onConfirmAction }) {
       detalhes: { persistido: persisted.persisted },
     });
 
-    showToast({ type: 'success', message: 'PreferÃªncias de notificaÃ§Ã£o salvas com sucesso.' });
+    showToast({ type: 'success', message: 'Preferências de notificação salvas com sucesso.' });
   }
 
   function exportarDados() {
@@ -328,20 +315,20 @@ export default function ConfiguracoesPage({ db, setDb, onConfirmAction }) {
             criticidade: 'alta',
             detalhes: { motivo: 'payload_invalido' },
           });
-          showToast({ type: 'error', message: 'Arquivo de backup invÃ¡lido. Verifique o arquivo e tente novamente.' });
+          showToast({ type: 'error', message: 'Arquivo de backup inválido. Verifique o arquivo e tente novamente.' });
           return;
         }
 
         const confirmarImportacao = onConfirmAction
           ? await onConfirmAction({
               title: 'Importar backup validado',
-              message: 'O backup serÃ¡ aplicado localmente. A sincronizaÃ§Ã£o completa com a nuvem requer confirmaÃ§Ã£o adicional. Deseja continuar?',
+              message: 'O backup será aplicado localmente. A sincronização completa com a nuvem requer confirmação adicional. Deseja continuar?',
               tone: 'danger',
             })
-          : window.confirm('O backup serÃ¡ aplicado localmente. A sincronizaÃ§Ã£o completa com a nuvem requer confirmaÃ§Ã£o adicional. Deseja continuar?');
+          : window.confirm('O backup será aplicado localmente. A sincronização completa com a nuvem requer confirmação adicional. Deseja continuar?');
 
         if (!confirmarImportacao) {
-          showToast({ type: 'info', message: 'ImportaÃ§Ã£o cancelada pelo usuÃ¡rio.' });
+          showToast({ type: 'info', message: 'Importação cancelada pelo usuário.' });
           return;
         }
 
@@ -361,7 +348,7 @@ export default function ConfiguracoesPage({ db, setDb, onConfirmAction }) {
           });
           showToast({
             type: 'warning',
-            message: 'Backup validado localmente. Alguns registros invÃ¡lidos foram ignorados. A sincronizaÃ§Ã£o completa com a nuvem requer confirmaÃ§Ã£o adicional.',
+            message: 'Backup validado localmente. Alguns registros inválidos foram ignorados. A sincronização completa com a nuvem requer confirmação adicional.',
           });
           return;
         }
@@ -372,7 +359,7 @@ export default function ConfiguracoesPage({ db, setDb, onConfirmAction }) {
           criticidade: 'media',
           detalhes: normalized.summary,
         });
-        showToast({ type: 'warning', message: 'Backup validado localmente. A sincronizaÃ§Ã£o completa com a nuvem requer confirmaÃ§Ã£o adicional.' });
+        showToast({ type: 'warning', message: 'Backup validado localmente. A sincronização completa com a nuvem requer confirmação adicional.' });
       } catch {
         registrarEventoAuditoria({
           acao: 'backup_importado_invalido',
@@ -380,7 +367,7 @@ export default function ConfiguracoesPage({ db, setDb, onConfirmAction }) {
           criticidade: 'alta',
           detalhes: { motivo: 'json_invalido' },
         });
-        showToast({ type: 'error', message: 'Arquivo de backup invÃ¡lido. Verifique o arquivo e tente novamente.' });
+        showToast({ type: 'error', message: 'Arquivo de backup inválido. Verifique o arquivo e tente novamente.' });
       }
     };
     reader.readAsText(file);
@@ -390,18 +377,18 @@ export default function ConfiguracoesPage({ db, setDb, onConfirmAction }) {
   async function limparDadosDemo() {
     if (!validarPermissao('dados:limpar')) return;
     const ok = onConfirmAction
-      ? await onConfirmAction({ title: 'Limpar demonstraÃ§Ã£o', message: 'Remover dados fictÃ­cios do ambiente?', tone: 'danger' })
-      : window.confirm('Remover dados fictÃ­cios do ambiente?');
+      ? await onConfirmAction({ title: 'Limpar demonstração', message: 'Remover dados fictícios do ambiente?', tone: 'danger' })
+      : window.confirm('Remover dados fictícios do ambiente?');
 
     if (!ok) return;
 
     const confirmarLocal = onConfirmAction
       ? await onConfirmAction({
           title: 'Confirmar limpeza local',
-          message: 'Esta limpeza afeta apenas os dados locais em memÃ³ria. Deseja continuar?',
+          message: 'Esta limpeza afeta apenas os dados locais em memória. Deseja continuar?',
           tone: 'danger',
         })
-      : window.confirm('Esta limpeza afeta apenas os dados locais em memÃ³ria. Deseja continuar?');
+      : window.confirm('Esta limpeza afeta apenas os dados locais em memória. Deseja continuar?');
 
     if (!confirmarLocal) return;
 
@@ -418,7 +405,7 @@ export default function ConfiguracoesPage({ db, setDb, onConfirmAction }) {
       movimentacoes_animais: [],
       movimentacoes_estoque: [],
       movimentacoes_financeiras: [],
-      // Manter configuraÃ§Ãµes e usuÃ¡rios
+      // Manter configurações e usuários
     }));
 
     const colecoesLimpeza = [
@@ -454,10 +441,10 @@ export default function ConfiguracoesPage({ db, setDb, onConfirmAction }) {
     });
 
     if (houveFalhaPersistencia) {
-      showToast({ type: 'warning', message: 'Dados locais removidos. Parte da limpeza remota nÃ£o foi concluÃ­da.' });
+      showToast({ type: 'warning', message: 'Dados locais removidos. Parte da limpeza remota não foi concluída.' });
       return;
     }
-    showToast({ type: 'success', message: 'Dados de demonstraÃ§Ã£o removidos localmente e na nuvem.' });
+    showToast({ type: 'success', message: 'Dados de demonstração removidos localmente e na nuvem.' });
   }
 
   async function excluirConta() {
@@ -469,24 +456,24 @@ export default function ConfiguracoesPage({ db, setDb, onConfirmAction }) {
     const confirmado = onConfirmAction
       ? await onConfirmAction({
           title: 'Excluir conta',
-          message: 'Esta aÃ§Ã£o Ã© irreversÃ­vel. Deseja realmente continuar?',
+          message: 'Esta ação é irreversível. Deseja realmente continuar?',
           tone: 'danger',
         })
-      : window.confirm('Esta aÃ§Ã£o Ã© irreversÃ­vel. Deseja realmente continuar?');
+      : window.confirm('Esta ação é irreversível. Deseja realmente continuar?');
 
     if (!confirmado) return;
 
-    // SimulaÃ§Ã£o de exclusÃ£o de conta no backend/auth
-    await supabase.auth.signOut(); // Desloga o usuÃ¡rio localmente
+    // Simulação de exclusão de conta no backend/auth
+    await supabase.auth.signOut(); // Desloga o usuário localmente
     showToast({ type: 'success', message: 'Conta encerrada no app local. (Fluxo remoto deve ser conectado ao backend).' });
-    // Em um ambiente real, aqui vocÃª chamaria uma API para excluir a conta do usuÃ¡rio no backend.
+    // Em um ambiente real, aqui você chamaria uma API para excluir a conta do usuário no backend.
   }
 
   return (
     <div className="config-page">
       <header>
-        <h1>ConfiguraÃ§Ãµes</h1>
-        <p>ParÃ¢metros globais, notificaÃ§Ãµes e seguranÃ§a dos dados.</p>
+        <h1>Configurações</h1>
+        <p>Parâmetros globais, notificações e segurança dos dados.</p>
       </header>
 
       <div className="config-tabs">
@@ -505,7 +492,7 @@ export default function ConfiguracoesPage({ db, setDb, onConfirmAction }) {
               <input className="ui-input" value={geral.nome_sistema} onChange={(e) => setGeral((prev) => ({ ...prev, nome_sistema: e.target.value }))} />
             </label>
             <label className="ui-input-wrap">
-              <span className="ui-input-label">Moeda padrÃ£o</span>
+              <span className="ui-input-label">Moeda padrão</span>
               <select className="ui-input" value={geral.moeda} onChange={(e) => setGeral((prev) => ({ ...prev, moeda: e.target.value }))}>
                 <option value="BRL">R$ BRL</option>
                 <option value="USD">$ USD</option>
@@ -519,45 +506,45 @@ export default function ConfiguracoesPage({ db, setDb, onConfirmAction }) {
               </select>
             </label>
             <label className="ui-input-wrap">
-              <span className="ui-input-label">Unidade de peso padrÃ£o</span>
+              <span className="ui-input-label">Unidade de peso padrão</span>
               <select className="ui-input" value={geral.unidade_peso} onChange={(e) => setGeral((prev) => ({ ...prev, unidade_peso: e.target.value }))}>
                 <option value="kg">kg</option>
                 <option value="arroba">@</option>
               </select>
             </label>
             <label className="ui-input-wrap">
-              <span className="ui-input-label">Rendimento de carcaÃ§a padrÃ£o (%)</span>
+              <span className="ui-input-label">Rendimento de carcaça padrão (%)</span>
               <input className="ui-input" type="number" min="0" max="100" value={geral.rendimento_carcaca_padrao} onChange={(e) => setGeral((prev) => ({ ...prev, rendimento_carcaca_padrao: e.target.value }))} />
             </label>
             <label className="ui-input-wrap">
-              <span className="ui-input-label">PreÃ§o da arroba padrÃ£o (R$)</span>
+              <span className="ui-input-label">Preço da arroba padrão (R$)</span>
               <input className="ui-input" type="number" min="0" step="0.01" value={geral.preco_arroba_padrao} onChange={(e) => setGeral((prev) => ({ ...prev, preco_arroba_padrao: e.target.value }))} />
             </label>
             </div>
-          <div className="config-actions"><Button onClick={salvarGeral}>Salvar configuraÃ§Ãµes gerais</Button></div>
+          <div className="config-actions"><Button onClick={salvarGeral}>Salvar configurações gerais</Button></div>
         </Card>
       ) : null}
 
       {tab === 'notificacoes' ? (
-        <Card title="NotificaÃ§Ãµes">
+        <Card title="Notificações">
           <div className="config-grid">
-            <SwitchRow label="Alertas de estoque crÃ­tico" checked={notificacoes.estoque_critico} onChange={(value) => setNotificacoes((prev) => ({ ...prev, estoque_critico: value }))} />
+            <SwitchRow label="Alertas de estoque crítico" checked={notificacoes.estoque_critico} onChange={(value) => setNotificacoes((prev) => ({ ...prev, estoque_critico: value }))} />
             <SwitchRow label="Alertas de vacinas/manejos vencidos" checked={notificacoes.sanitario_vencido} onChange={(value) => setNotificacoes((prev) => ({ ...prev, sanitario_vencido: value }))} />
             <SwitchRow label="Alertas de pesagem atrasada" checked={notificacoes.pesagem_atrasada} onChange={(value) => setNotificacoes((prev) => ({ ...prev, pesagem_atrasada: value }))} />
-            <SwitchRow label="Alertas de lote na data de saÃ­da prevista" checked={notificacoes.lote_data_saida} onChange={(value) => setNotificacoes((prev) => ({ ...prev, lote_data_saida: value }))} />
+            <SwitchRow label="Alertas de lote na data de saída prevista" checked={notificacoes.lote_data_saida} onChange={(value) => setNotificacoes((prev) => ({ ...prev, lote_data_saida: value }))} />
             <label className="ui-input-wrap">
               <span className="ui-input-label">Quantos dias antes avisar</span>
               <input className="ui-input" type="number" min="0" value={notificacoes.dias_antecedencia} onChange={(e) => setNotificacoes((prev) => ({ ...prev, dias_antecedencia: e.target.value }))} />
             </label>
           </div>
-          <div className="config-actions"><Button onClick={salvarNotificacoes}>Salvar preferÃªncias de notificaÃ§Ã£o</Button></div>
+          <div className="config-actions"><Button onClick={salvarNotificacoes}>Salvar preferências de notificação</Button></div>
         </Card>
       ) : null}
 
       {tab === 'acessos' && podeGerenciarAcessos ? (
         <Card
-          title="UsuÃ¡rios e Acessos"
-          action={<Button size="sm" icon={<Plus size={14} />} onClick={() => setOpenInvite(true)}>+ Convidar usuÃ¡rio</Button>}
+          title="Usuários e Acessos"
+          action={<Button size="sm" icon={<Plus size={14} />} onClick={() => setOpenInvite(true)}>+ Convidar usuário</Button>}
         >
           <div className="config-actions-wrap" style={{ marginBottom: 16 }}>
             <Button variant="outline" onClick={carregarDadosDeAcesso} loading={loadingAccessData}>
@@ -565,7 +552,7 @@ export default function ConfiguracoesPage({ db, setDb, onConfirmAction }) {
             </Button>
           </div>
           <p style={{ marginTop: 0, marginBottom: 12, color: 'var(--text-muted)' }}>
-            UsuÃ¡rio = acesso ao sistema HERDON. FuncionÃ¡rio = pessoa da operaÃ§Ã£o da fazenda.
+            Usuário = acesso ao sistema HERDON. Funcionário = pessoa da operação da fazenda.
           </p>
 
           {accessModuleReady ? (
@@ -575,7 +562,7 @@ export default function ConfiguracoesPage({ db, setDb, onConfirmAction }) {
                   <thead><tr><th>Nome</th><th>E-mail</th><th>Perfil atual</th><th>Origem</th><th>Atualizado em</th></tr></thead>
                   <tbody>
                     {profilesRows.length === 0 ? (
-                      <tr><td colSpan="5">Nenhum usuÃ¡rio ativo encontrado.</td></tr>
+                      <tr><td colSpan="5">Nenhum usuário ativo encontrado.</td></tr>
                     ) : (
                       profilesRows.map((item) => (
                         <tr key={item.id}>
@@ -595,7 +582,7 @@ export default function ConfiguracoesPage({ db, setDb, onConfirmAction }) {
 
               <div className="table-responsive">
                 <table className="dashboard-table">
-                  <thead><tr><th>Convite</th><th>Perfil automÃ¡tico</th><th>Status</th><th>Uso</th><th>AÃ§Ãµes</th></tr></thead>
+                  <thead><tr><th>Convite</th><th>Perfil automático</th><th>Status</th><th>Uso</th><th>Ações</th></tr></thead>
                   <tbody>
                     {invitesPendentes.length === 0 ? (
                       <tr><td colSpan="5">Nenhum convite pendente.</td></tr>
@@ -642,7 +629,7 @@ export default function ConfiguracoesPage({ db, setDb, onConfirmAction }) {
                   <thead><tr><th colSpan="5">Convites aceitos</th></tr></thead>
                   <tbody>
                     {invitesAceitos.length === 0 ? <tr><td colSpan="5">Nenhum convite aceito.</td></tr> : invitesAceitos.map((invite) => (
-                      <tr key={invite.id}><td><strong>{invite.nome || 'Convite sem nome'}</strong><div>{invite.email}</div></td><td><span className={badgeStatusClass(invite.perfil)}>{obterLabelPerfil(invite.perfil)}</span></td><td><span className={badgeStatusClass(invite.status)}>{invite.status}</span></td><td>{invite.used_at ? new Date(invite.used_at).toLocaleString('pt-BR') : '-'}</td><td>Este convite jÃ¡ foi aceito. Para remover acesso, altere o usuÃ¡rio.</td></tr>
+                      <tr key={invite.id}><td><strong>{invite.nome || 'Convite sem nome'}</strong><div>{invite.email}</div></td><td><span className={badgeStatusClass(invite.perfil)}>{obterLabelPerfil(invite.perfil)}</span></td><td><span className={badgeStatusClass(invite.status)}>{invite.status}</span></td><td>{invite.used_at ? new Date(invite.used_at).toLocaleString('pt-BR') : '-'}</td><td>Este convite já foi aceito. Para remover acesso, altere o usuário.</td></tr>
                     ))}
                   </tbody>
                 </table>
@@ -662,15 +649,15 @@ export default function ConfiguracoesPage({ db, setDb, onConfirmAction }) {
             </>
           ) : (
             <div className="empty-state empty-state--warning" style={{ marginBottom: 16 }}>
-              <strong>MÃ³dulo de acessos aguardando migration</strong>
-              <span>Rode o SQL de profiles e invites para ativar o gerenciamento automÃ¡tico de perfis.</span>
+              <strong>Módulo de acessos aguardando migration</strong>
+              <span>Rode o SQL de profiles e invites para ativar o gerenciamento automático de perfis.</span>
             </div>
           )}
 
           {!accessModuleReady ? (
           <div className="table-responsive">
             <table className="dashboard-table">
-              <thead><tr><th>Nome</th><th>E-mail</th><th>Perfil atual</th><th>Origem</th><th>Status</th><th>AÃ§Ãµes</th></tr></thead>
+              <thead><tr><th>Nome</th><th>E-mail</th><th>Perfil atual</th><th>Origem</th><th>Status</th><th>Ações</th></tr></thead>
               <tbody>
                 {usuariosFallback.map((item) => (
                   <tr key={item.id}>
@@ -686,18 +673,18 @@ export default function ConfiguracoesPage({ db, setDb, onConfirmAction }) {
                           const novoPerfil = e.target.value;
                           const isSelf = String(item.id) === String(user?.id);
                           if (isSelf && novoPerfil !== 'admin') {
-                            showToast({ type: 'warning', message: 'VocÃª nÃ£o pode rebaixar seu prÃ³prio perfil administrativo.' });
+                            showToast({ type: 'warning', message: 'Você não pode rebaixar seu próprio perfil administrativo.' });
                             return;
                           }
                           const adminAtual = ['admin', 'proprietario'].includes(String(item.perfil || '').toLowerCase());
                           const adminNovo = ['admin', 'proprietario'].includes(String(novoPerfil || '').toLowerCase());
                           if (adminAtual && !adminNovo && totalAdminsAtivosFallback <= 1) {
-                            showToast({ type: 'warning', message: 'NÃ£o Ã© possÃ­vel remover ou rebaixar o Ãºltimo administrador.' });
+                            showToast({ type: 'warning', message: 'Não é possível remover ou rebaixar o último administrador.' });
                             return;
                           }
                           const confirmarAlteracao = onConfirmAction
-                            ? await onConfirmAction({ title: 'Alterar perfil', message: 'Alterar o perfil deste usuÃ¡rio pode limitar o acesso dele ao sistema. Deseja continuar?', tone: 'warning' })
-                            : window.confirm('Alterar o perfil deste usuÃ¡rio pode limitar o acesso dele ao sistema. Deseja continuar?');
+                            ? await onConfirmAction({ title: 'Alterar perfil', message: 'Alterar o perfil deste usuário pode limitar o acesso dele ao sistema. Deseja continuar?', tone: 'warning' })
+                            : window.confirm('Alterar o perfil deste usuário pode limitar o acesso dele ao sistema. Deseja continuar?');
                           if (!confirmarAlteracao) {
                             return;
                           }
@@ -731,11 +718,11 @@ export default function ConfiguracoesPage({ db, setDb, onConfirmAction }) {
                           const novoStatus = e.target.value;
                           const isSelf = String(item.id) === String(user?.id);
                           if (isSelf && novoStatus !== 'ativo') {
-                            showToast({ type: 'warning', message: 'VocÃª nÃ£o pode remover seu prÃ³prio acesso.' });
+                            showToast({ type: 'warning', message: 'Você não pode remover seu próprio acesso.' });
                             return;
                           }
                           if (['admin', 'proprietario'].includes(String(item.perfil || '').toLowerCase()) && novoStatus !== 'ativo' && totalAdminsAtivosFallback <= 1) {
-                            showToast({ type: 'warning', message: 'NÃ£o Ã© possÃ­vel remover ou rebaixar o Ãºltimo administrador.' });
+                            showToast({ type: 'warning', message: 'Não é possível remover ou rebaixar o último administrador.' });
                             return;
                           }
                           void updateOperationalRecord('usuarios', item.id, { status: novoStatus }, user ? { user } : null);
@@ -763,16 +750,16 @@ export default function ConfiguracoesPage({ db, setDb, onConfirmAction }) {
                         onClick={async () => {
                           if (!validarPermissao('acessos:gerenciar')) return;
                           if (String(item.id) === String(user?.id)) {
-                            showToast({ type: 'warning', message: 'VocÃª nÃ£o pode remover seu prÃ³prio acesso.' });
+                            showToast({ type: 'warning', message: 'Você não pode remover seu próprio acesso.' });
                             return;
                           }
                           if (['admin', 'proprietario'].includes(String(item.perfil || '').toLowerCase()) && totalAdminsAtivosFallback <= 1) {
-                            showToast({ type: 'warning', message: 'NÃ£o Ã© possÃ­vel remover ou rebaixar o Ãºltimo administrador.' });
+                            showToast({ type: 'warning', message: 'Não é possível remover ou rebaixar o último administrador.' });
                             return;
                           }
                           const confirmarRemocaoLocal = onConfirmAction
                             ? await onConfirmAction({
-                                title: 'Remover usuÃ¡rio',
+                                title: 'Remover usuário',
                                 message: `Deseja remover ${item.nome} da base local?`,
                                 tone: 'danger',
                               })
@@ -803,18 +790,18 @@ export default function ConfiguracoesPage({ db, setDb, onConfirmAction }) {
       ) : null}
 
       {tab === 'dados' ? (
-        <Card title="Dados e SeguranÃ§a">
+        <Card title="Dados e Segurança">
           <div className="config-data-stack">
             <div className="config-actions-wrap config-actions-wrap--data">
               <div className="config-panel-intro">
-                <span className="config-panel-kicker">Backup e manutenÃ§Ã£o</span>
-                <p>Exporte, importe e limpe dados de demonstraÃ§Ã£o com uma hierarquia visual mais clara e segura.</p>
+                <span className="config-panel-kicker">Backup e manutenção</span>
+                <p>Exporte, importe e limpe dados de demonstração com uma hierarquia visual mais clara e segura.</p>
               </div>
               <div className="config-action-cluster">
                 <Button icon={<FileText size={14} />} onClick={exportarDados}>Exportar todos os dados</Button>
                 <Button icon={<FileText size={14} />} variant="outline" onClick={() => fileInputRef.current?.click()}>Importar dados</Button>
                 <input ref={fileInputRef} type="file" accept="application/json" onChange={importarDados} hidden />
-            <Button icon={<X size={14} />} variant="outline" onClick={limparDadosDemo}>Limpar dados de demonstraÃ§Ã£o</Button>
+            <Button icon={<X size={14} />} variant="outline" onClick={limparDadosDemo}>Limpar dados de demonstração</Button>
               </div>
             </div>
 
@@ -833,7 +820,7 @@ export default function ConfiguracoesPage({ db, setDb, onConfirmAction }) {
         </Card>
       ) : null}
 
-      <Modal open={openInvite} onClose={() => setOpenInvite(false)} title="Convidar usuÃ¡rio">
+      <Modal open={openInvite} onClose={() => setOpenInvite(false)} title="Convidar usuário">
         <InviteForm
           onClose={() => setOpenInvite(false)}
           onInvite={async (payload) => {
@@ -857,7 +844,7 @@ export default function ConfiguracoesPage({ db, setDb, onConfirmAction }) {
                 criticidade: 'alta',
                 detalhes: { email: payload.email, perfil: payload.perfil },
               });
-              showToast({ type: 'success', message: 'Convite salvo no modo local. A migration ativa o fluxo automÃ¡tico.' });
+              showToast({ type: 'success', message: 'Convite salvo no modo local. A migration ativa o fluxo automático.' });
               setOpenInvite(false);
               return;
             }
@@ -883,7 +870,7 @@ export default function ConfiguracoesPage({ db, setDb, onConfirmAction }) {
               detalhes: { email: payload.email, perfil: payload.perfil },
             });
 
-            showToast({ type: 'success', message: 'Convite criado. O perfil serÃ¡ aplicado automaticamente no cadastro.' });
+            showToast({ type: 'success', message: 'Convite criado. O perfil será aplicado automaticamente no cadastro.' });
             setOpenInvite(false);
             carregarDadosDeAcesso();
           }}
@@ -894,10 +881,10 @@ export default function ConfiguracoesPage({ db, setDb, onConfirmAction }) {
 }
 
 /**
- * FormulÃ¡rio para convidar um novo usuÃ¡rio.
+ * Formulário para convidar um novo usuário.
  * @param {object} props - As propriedades do componente.
- * @param {function} props.onInvite - Callback para quando o usuÃ¡rio Ã© convidado.
- * @param {function} props.onClose - Callback para fechar o formulÃ¡rio.
+ * @param {function} props.onInvite - Callback para quando o usuário é convidado.
+ * @param {function} props.onClose - Callback para fechar o formulário.
  */
 function badgeStatusClass(status = '') {
   const s = String(status).toLowerCase();
@@ -917,7 +904,7 @@ function InviteForm({ onInvite, onClose }) {
       onSubmit={(e) => {
         e.preventDefault();
         if (!form.nome.trim() || !form.email.trim()) {
-          showToast({ type: 'error', message: 'Informe nome e e-mail do usuÃ¡rio.' });
+          showToast({ type: 'error', message: 'Informe nome e e-mail do usuário.' });
           return;
         }
         onInvite({ ...form, nome: form.nome.trim(), email: form.email.trim() });
@@ -941,7 +928,7 @@ function InviteForm({ onInvite, onClose }) {
         </select>
       </label>
       <label className="ui-input-wrap">
-        <span className="ui-input-label">ObservaÃ§Ã£o interna</span>
+        <span className="ui-input-label">Observação interna</span>
         <input className="ui-input" value={form.notes} onChange={(e) => setForm((prev) => ({ ...prev, notes: e.target.value }))} />
       </label>
       <div className="config-actions">

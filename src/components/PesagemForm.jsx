@@ -1,4 +1,4 @@
-﻿import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import Modal from './ui/Modal';
 import Button from './ui/Button';
 import ArrobaPreview from './ArrobaPreview';
@@ -86,10 +86,10 @@ function validarForm(form) {
   if (form.tipo === 'lote' && !form.lote_id) return 'Selecione o lote.';
   if (!form.data) return 'Informe a data da pesagem.';
   if (form.tipo === 'lote') {
-    if (!form.peso_medio) return 'Informe o peso médio.';
-    if (Number(form.peso_medio || 0) <= 0) return 'Peso médio deve ser maior que zero.';
+    if (!form.peso_medio) return 'Informe o peso medio.';
+    if (Number(form.peso_medio || 0) <= 0) return 'Peso medio deve ser maior que zero.';
   }
-  if (Number(form.rendimento_carcaca || 0) <= 0) return 'Rendimento de carcaça deve ser maior que zero.';
+  if (Number(form.rendimento_carcaca || 0) <= 0) return 'Rendimento de carcaca deve ser maior que zero.';
   return null;
 }
 
@@ -263,12 +263,10 @@ export default function PesagemForm({
             origem: 'animal',
             lote_id: form.lote_id ? Number(form.lote_id) : null,
             animal_id: animal.virtual ? null : Number(animal.id),
-            virtual_animal: animal.virtual
-              ? {
-                  identificacao: animal.identificacao,
-                  index: animal.virtualIndex,
-                }
-              : null,
+            virtual_animal: animal.virtual ? {
+              identificacao: animal.identificacao,
+              index: animal.virtualIndex,
+            } : null,
             data: form.data,
             peso_medio: peso,
             rendimento_carcaca: Number(form.rendimento_carcaca || 0),
@@ -279,7 +277,7 @@ export default function PesagemForm({
         .filter(Boolean);
 
       if (!registros.length) {
-        setErro('Informe ao menos um peso válido para salvar.');
+        setErro('Informe ao menos um peso valido para salvar.');
         return;
       }
 
@@ -306,7 +304,7 @@ export default function PesagemForm({
   const titulo = initialData ? 'Editar pesagem' : 'Nova pesagem';
 
   const footer = (
-    <div className="modal-footer action-row" style={{ width: '100%' }}>
+    <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8 }}>
       <Button variant="ghost" onClick={onCancel}>Cancelar</Button>
       <Button onClick={handleSubmit}>Salvar pesagem</Button>
     </div>
@@ -314,32 +312,32 @@ export default function PesagemForm({
 
   return (
     <Modal open onClose={onCancel} title={titulo} footer={footer}>
-      <form onSubmit={handleSubmit} className="pesagem-form form-section">
-        <section className="pesagem-form-section-block section-card">
-          <div className="pesagem-form-section-head">Tipo e referência</div>
-          <div className="pesagem-form-section">
-            <label className="pesagem-form-field">
-              Tipo de pesagem
-              <select className="ui-input" name="tipo" value={form.tipo} onChange={handleChange}>
-                <option value="lote">Por lote</option>
-                <option value="animal">Por animal</option>
-              </select>
-            </label>
+      <form onSubmit={handleSubmit} className="pesagem-form">
+        <section className="pesagem-form-section-block">
+        <div className="pesagem-form-section-head">Tipo e referencia</div>
+        <div className="pesagem-form-section">
+        <label className="pesagem-form-field">
+          Tipo de pesagem
+          <select className="ui-input" name="tipo" value={form.tipo} onChange={handleChange}>
+            <option value="lote">Por lote</option>
+            <option value="animal">Por animal</option>
+          </select>
+        </label>
 
-            <label className="pesagem-form-field">
-              Lote
-              <select className="ui-input" name="lote_id" value={form.lote_id} onChange={handleChange}>
-                <option value="">Selecione</option>
-                {lotes.map((lote) => (
-                  <option key={lote.id} value={lote.id}>{lote.nome}</option>
-                ))}
-              </select>
-            </label>
-          </div>
+        <label className="pesagem-form-field">
+          Lote
+          <select className="ui-input" name="lote_id" value={form.lote_id} onChange={handleChange}>
+            <option value="">Selecione</option>
+            {lotes.map((lote) => (
+              <option key={lote.id} value={lote.id}>{lote.nome}</option>
+            ))}
+          </select>
+        </label>
+        </div>
         </section>
 
-        {form.tipo === 'animal' ? (
-          <section className="pesagem-form-section-block section-card">
+        {form.tipo === 'animal' && (
+          <section className="pesagem-form-section-block">
             <div className="pesagem-form-section-head">Pesagem individual por lote</div>
             {!hasSelectedLote ? (
               <p style={{ margin: 0, fontSize: '0.9rem', color: 'var(--text-muted)' }}>
@@ -350,13 +348,13 @@ export default function PesagemForm({
                 Nenhum animal individual encontrado para este lote.
               </p>
             ) : (
-              <div className="responsive-table-wrap fazendas-table-wrap">
+              <div className="fazendas-table-wrap">
                 <table className="data-table herdon-table">
                   <thead>
                     <tr>
                       <th>Animal</th>
-                      <th>Peso atual (kg)</th>
-                      <th>Observação</th>
+                      <th>Peso atual kg</th>
+                      <th>Observacao</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -365,7 +363,9 @@ export default function PesagemForm({
                       const nomeAnimal = animal.identificacao || animal.nome || `Animal #${animal.rowIndex}`;
                       return (
                         <tr key={key}>
-                          <td>{nomeAnimal}</td>
+                          <td>
+                            {nomeAnimal}
+                          </td>
                           <td>
                             <input
                               className="ui-input"
@@ -377,7 +377,7 @@ export default function PesagemForm({
                                 const value = event.target.value;
                                 setPesosAnimais((prev) => ({ ...prev, [key]: value }));
                               }}
-                              placeholder="Ex.: 412"
+                              placeholder="Ex: 412"
                             />
                           </td>
                           <td>
@@ -388,7 +388,7 @@ export default function PesagemForm({
                                 const value = event.target.value;
                                 setObservacoesAnimais((prev) => ({ ...prev, [key]: value }));
                               }}
-                              placeholder="Observação opcional"
+                              placeholder="Observacao opcional"
                             />
                           </td>
                         </tr>
@@ -399,87 +399,88 @@ export default function PesagemForm({
               </div>
             )}
           </section>
-        ) : null}
+        )}
 
-        <section className="pesagem-form-section-block section-card">
-          <div className="pesagem-form-section-head">{form.tipo === 'animal' ? 'Data da pesagem' : 'Medição'}</div>
-          <div className="grid-2 pesagem-form-grid">
-            <label className="pesagem-form-field">
-              Data
-              <input
-                className="ui-input"
-                name="data"
-                type="date"
-                max={new Date().toISOString().slice(0, 10)}
-                value={form.data}
-                onChange={handleChange}
-              />
-            </label>
+        <section className="pesagem-form-section-block">
+          <div className="pesagem-form-section-head">{form.tipo === 'animal' ? 'Data da pesagem' : 'Medicao'}</div>
+        <div className="grid-2 pesagem-form-grid">
+          <label className="pesagem-form-field">
+            Data
+            <input
+              className="ui-input"
+              name="data"
+              type="date"
+              max={new Date().toISOString().slice(0, 10)}
+              value={form.data}
+              onChange={handleChange}
+            />
+          </label>
 
-            {form.tipo === 'lote' ? (
-              <>
-                <label className="pesagem-form-field">
-                  Peso médio (kg)
-                  <input className="ui-input" name="peso_medio" type="number" step="0.01" min={0} value={form.peso_medio} onChange={handleChange} placeholder="Ex.: 412" />
-                </label>
-                <label className="pesagem-form-field">
-                  Quantidade pesada (cabeças)
-                  <input className="ui-input" name="quantidade_pesada" type="number" step="1" min={0} value={form.quantidade_pesada} onChange={handleChange} placeholder="Ex.: 80" />
-                </label>
-              </>
-            ) : null}
-          </div>
+          {form.tipo === 'lote' && (
+            <>
+              <label className="pesagem-form-field">
+                Peso medio (kg)
+                <input className="ui-input" name="peso_medio" type="number" step="0.01" min={0} value={form.peso_medio} onChange={handleChange} placeholder="Ex: 412" />
+              </label>
+              <label className="pesagem-form-field">
+                Quantidade pesada (cabecas)
+                <input className="ui-input" name="quantidade_pesada" type="number" step="1" min={0} value={form.quantidade_pesada} onChange={handleChange} placeholder="Ex: 80" />
+              </label>
+            </>
+          )}
+        </div>
         </section>
 
-        {form.tipo === 'lote' ? (
+        {form.tipo === 'lote' && (
           <label className="pesagem-form-field">
-            Observação
+            Observacao
             <input
               className="ui-input"
               name="observacao"
               value={form.observacao}
               onChange={handleChange}
-              placeholder="Ex.: ganho acima do esperado"
+              placeholder="Ex: ganho acima do esperado"
             />
           </label>
-        ) : null}
+        )}
 
-        <section className="pesagem-form-section-block section-card">
+        <section className="pesagem-form-section-block">
           <div className="pesagem-form-section-head">Indicadores de valor</div>
-          <div className="grid-2 pesagem-form-grid">
-            <label className="pesagem-form-field">
-              Rendimento de carcaça (%)
-              <input
-                className="ui-input"
-                name="rendimento_carcaca"
-                type="number"
-                step="0.1"
-                min={0}
-                max={100}
-                value={form.rendimento_carcaca}
-                onChange={handleChange}
-              />
-            </label>
+        <div className="grid-2 pesagem-form-grid">
+          <label className="pesagem-form-field">
+            Rendimento de carcaca (%)
+            <input
+              className="ui-input"
+              name="rendimento_carcaca"
+              type="number"
+              step="0.1"
+              min={0}
+              max={100}
+              value={form.rendimento_carcaca}
+              onChange={handleChange}
+            />
+          </label>
 
-            <label className="pesagem-form-field">
-              Preço por @ (opcional)
-              <input
-                className="ui-input"
-                name="preco_arroba"
-                type="number"
-                step="0.01"
-                min={0}
-                value={form.preco_arroba}
-                onChange={handleChange}
-              />
-            </label>
-          </div>
+          <label className="pesagem-form-field">
+            Preco por @ (opcional)
+            <input
+              className="ui-input"
+              name="preco_arroba"
+              type="number"
+              step="0.01"
+              min={0}
+              value={form.preco_arroba}
+              onChange={handleChange}
+            />
+          </label>
+        </div>
         </section>
 
         <div className="pesagem-preview-wrap">
           <ArrobaPreview
             peso={form.tipo === 'animal'
-              ? (() => {
+              ? (
+                (() => {
                   const values = Object.values(pesosAnimais)
                     .map((value) => Number(String(value).replace(',', '.')))
                     .filter((value) => Number.isFinite(value) && value > 0);
@@ -487,17 +488,18 @@ export default function PesagemForm({
                   const total = values.reduce((sum, value) => sum + value, 0);
                   return total / values.length;
                 })()
+              )
               : form.peso_medio}
             rendimento={form.rendimento_carcaca}
             precoPorArroba={form.preco_arroba}
           />
         </div>
 
-        {erro ? (
+        {erro && (
           <p style={{ margin: 0, color: 'var(--color-danger)', fontSize: '0.85rem' }}>
             {erro}
           </p>
-        ) : null}
+        )}
       </form>
     </Modal>
   );

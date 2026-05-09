@@ -118,8 +118,8 @@ export default function FuncionariosPage({ db, setDb, onConfirmAction }) {
     <div className="page page--funcionarios">
       <PageHeader
         title="Funcionários"
-        subtitle="Funcionário = pessoa da operação. Usuário = acesso ao sistema."
-        actions={<Button onClick={() => { setEditando(null); setOpenModal(true); }}>+ Novo Funcionário</Button>}
+        subtitle="Gerencie pessoas da operação, status e vínculo com a fazenda."
+        actions={<Button onClick={() => { setEditando(null); setOpenModal(true); }}>Novo funcionário</Button>}
       />
 
       <div className="filters-bar ui-card"> {/* Usando ui-card para a barra de filtros */}

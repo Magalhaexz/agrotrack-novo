@@ -8552,399 +8552,236 @@ body {
   }
 }
 
-/* SPRINT21D - Animais and Pesagens visual polish */
-.animais-page,
-.page--pesagens {
-  gap: 14px;
-}
-
-.animais-hero,
-.page--pesagens .animais-hero {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
+/* SPRINT21F - Financeiro e Relatórios visual polish */
+.financeiro-page .financeiro-header,
+.reports-page--rebuilt .page-header {
+  align-items: end;
   gap: 12px;
 }
 
-.animais-hero p,
-.page--pesagens .animais-hero p {
-  margin-top: 6px;
-  color: rgba(214, 223, 219, 0.72);
-  font-size: 0.9rem;
-}
-
-.animais-kpi-grid .ui-card,
-.page--pesagens .dashboard-grid--kpi-main .ui-card {
-  min-height: 112px;
-}
-
-.animais-kpi-value {
-  font-size: 1.9rem;
-  font-weight: 800;
-  color: #eff6f2;
-}
-
-.animais-page .segment,
-.page--pesagens .segment {
-  white-space: nowrap;
-}
-
-.animais-page .tab-bar,
-.page--pesagens .tab-bar {
-  margin-bottom: 8px;
-}
-
-.animais-empty-state,
-.page--pesagens .empty-box {
-  border-radius: 12px;
-  border: 1px dashed rgba(255, 255, 255, 0.12);
-  background: rgba(255, 255, 255, 0.02);
-  padding: 18px;
-}
-
-.animais-mode-actions {
-  display: grid;
-  gap: 6px;
-  padding: 10px 0;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
-}
-
-.animais-mode-actions:last-child {
-  border-bottom: none;
-}
-
-.animal-form .section-card {
-  padding: 12px;
-}
-
-.animal-form-section-head h4 {
-  margin: 0;
-  font-size: 0.94rem;
-  color: #ecf3ef;
-}
-
-.animal-form-grid {
-  min-width: 0;
-}
-
-.animal-form-grid .full {
-  grid-column: 1 / -1;
-}
-
-.pesagem-form .section-card {
-  padding: 12px;
-}
-
-.pesagem-form-section-head {
-  margin-bottom: 8px;
-  font-weight: 700;
-  color: #eaf2ee;
-}
-
-.pesagem-preview-wrap {
-  margin-top: 2px;
-}
-
-.page--pesagens .fazendas-card,
-.page--pesagens .dashboard-grid--kpi-main .ui-card {
-  border-radius: 14px;
-}
-
-.page--pesagens .action-btn,
-.page--pesagens .primary-btn,
-.animais-page .action-btn {
-  min-height: 44px;
-}
-
-@media (max-width: 900px) {
-  .animais-hero,
-  .page--pesagens .animais-hero {
-    display: grid;
-    gap: 10px;
-  }
-
-  .animais-page .page-actions,
-  .page--pesagens .page-actions {
-    width: 100%;
-  }
-
-  .animais-page .page-actions > *,
-  .page--pesagens .page-actions > * {
-    width: 100%;
-  }
-
-  .animal-form-grid--2,
-  .pesagem-form .grid-2 {
-    grid-template-columns: 1fr;
-  }
-
-  .pesagem-form .responsive-table-wrap {
-    overflow-x: auto;
-    -webkit-overflow-scrolling: touch;
-  }
-}
-
-/* SPRINT21C - Fazendas visual polish */
-.fazendas-grid {
-  gap: 12px;
-}
-
-.fazenda-card {
-  border-radius: 16px;
-  padding: 14px;
-  gap: 12px;
-}
-
-.fazenda-card-nome {
-  font-size: 1.02rem;
-}
-
-.fazenda-card-local {
-  font-size: 0.82rem;
-  color: rgba(214, 223, 219, 0.68);
-}
-
-.fazenda-card-stats {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 10px;
-}
-
-.fazenda-stat-label {
-  font-size: 0.72rem;
-  color: rgba(214, 223, 219, 0.62);
-  text-transform: uppercase;
-  letter-spacing: 0.08em;
-}
-
-.fazenda-stat-value {
-  margin-top: 2px;
-  font-size: 0.9rem;
-  color: #edf4f1;
-}
-
-.fazenda-card-actions .ui-button {
-  min-height: 40px;
-}
-
-.fazenda-form-shell {
-  gap: 10px;
-}
-
-.fazenda-form-section {
-  padding: 12px;
-}
-
-.fazenda-form-section h4 {
-  margin: 0;
-  color: #e9f1ed;
-  font-size: 0.94rem;
-}
-
-@media (max-width: 900px) {
-  .fazendas-grid {
-    grid-template-columns: 1fr;
-  }
-
-  .fazenda-card-stats {
-    grid-template-columns: 1fr;
-  }
-
-  .fazenda-card-actions .ui-button {
-    width: 100%;
-    min-height: 44px;
-  }
-}
-
-/* SPRINT21B - App shell polish (header/sidebar/bottom nav) */
-.header.top-header {
-  backdrop-filter: blur(10px);
-  background: linear-gradient(180deg, rgba(9, 13, 11, 0.96), rgba(9, 13, 11, 0.92));
-  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
-}
-
-.header.top-header .top-header-actions {
-  gap: 10px;
-}
-
-.header-farm-selector,
-.header-user-btn,
-.header-notification-btn,
-.mobile-utility-trigger {
-  min-height: 44px;
-}
-
-.header-farm-selector,
-.header-user-btn {
-  border-color: rgba(255, 255, 255, 0.12);
-}
-
-.sidebar {
-  border-right-color: rgba(255, 255, 255, 0.08);
-}
-
-.sidebar-content {
-  padding-top: 12px;
-}
-
-.sidebar-item {
-  min-height: 42px;
-  border-radius: 12px;
-}
-
-.sidebar-item.active {
-  border-color: rgba(47, 181, 107, 0.4);
-  box-shadow: inset 0 0 0 1px rgba(47, 181, 107, 0.12);
-}
-
-.mobile-bottom-nav {
-  border-top: 1px solid rgba(255, 255, 255, 0.08);
-  background: linear-gradient(180deg, rgba(11, 15, 13, 0.96), rgba(9, 13, 11, 0.98));
-}
-
-.mobile-bottom-nav-item {
-  min-height: 56px;
-  color: rgba(214, 223, 219, 0.72);
-}
-
-.mobile-bottom-nav-item.active {
-  color: #9ef4ba;
-}
-
-.mobile-bottom-nav-item.active svg {
-  filter: drop-shadow(0 0 6px rgba(47, 181, 107, 0.35));
-}
-
-.mobile-fab {
-  bottom: calc(var(--mobile-bottom-nav-height) + env(safe-area-inset-bottom) + 16px);
-}
-
-.main {
-  padding-bottom: calc(var(--herdon-mobile-bottomnav-height) + env(safe-area-inset-bottom) + 20px);
-}
-
-@media (max-width: 900px) {
-  .header.top-header {
-    min-height: var(--herdon-mobile-header-height);
-    height: var(--herdon-mobile-header-height);
-    padding-inline: 10px;
-  }
-
-  .mobile-header-brand span {
-    max-width: 44vw;
-  }
-
-  .mobile-header-menu-btn,
-  .header-notification-btn,
-  .mobile-utility-trigger {
-    min-width: 44px;
-    min-height: 44px;
-  }
-
-  .sidebar {
-    width: min(86vw, 332px);
-  }
-
-  .main {
-    padding-top: calc(var(--herdon-mobile-header-height) + env(safe-area-inset-top) + 10px);
-    padding-bottom: calc(var(--herdon-mobile-bottomnav-height) + env(safe-area-inset-bottom) + 18px);
-  }
-}
-
-@media (max-width: 640px) {
-  .mobile-header-brand strong {
-    font-size: 0.78rem;
-  }
-
-  .mobile-header-brand span {
-    font-size: 0.72rem;
-    max-width: 52vw;
-  }
-
-  .mobile-bottom-nav-item span {
-    font-size: 0.7rem;
-  }
-}
-/* SPRINT21E - Estoque and Nutrição/Suplementação visual polish */
-.page--estoque .page-header,
-.page--suplementacao .page-header {
-  display: flex;
-  align-items: flex-end;
-  justify-content: space-between;
-  gap: 12px;
-}
-
-.page--estoque .page-actions,
-.page--suplementacao .page-actions {
+.financeiro-page .lote-actions,
+.reports-page-actions {
   display: flex;
   flex-wrap: wrap;
   gap: 8px;
 }
 
-.page--estoque .kpi-card,
-.page--suplementacao .kpi-card {
-  min-height: 106px;
+.financeiro-page .lote-actions > *,
+.reports-page-actions > * {
+  min-height: 44px;
 }
 
-.page--estoque .empty-box,
-.page--suplementacao .empty-state {
-  display: grid;
-  gap: 8px;
-  align-content: center;
-}
-
-.page--estoque .filters-wrap,
-.page--suplementacao .filters-wrap {
+.financeiro-page .rebanho-filters,
+.reports-filter-grid--compact {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 10px;
 }
 
-.page--suplementacao .tab-bar {
-  margin-bottom: 8px;
+.financeiro-page .data-table th,
+.reports-page--rebuilt .dashboard-table th,
+.reports-page--rebuilt table th {
+  font-weight: 700;
 }
 
-.page--suplementacao .segment {
-  white-space: nowrap;
+.financeiro-page .data-table td:nth-child(3),
+.financeiro-page .data-table td:nth-child(4),
+.financeiro-page .data-table td:nth-child(5),
+.financeiro-page .data-table td:nth-child(6),
+.financeiro-page .data-table td:nth-child(7),
+.financeiro-page .data-table td:nth-child(8),
+.financeiro-page .data-table td:nth-child(9) {
+  text-align: right;
 }
 
-.page--suplementacao .dashboard-table td,
-.page--suplementacao .dashboard-table th,
-.page--estoque .dashboard-table td,
-.page--estoque .dashboard-table th {
-  vertical-align: middle;
+.financeiro-page .empty-state,
+.reports-page--rebuilt .empty-state,
+.reports-page--rebuilt .empty-box {
+  padding: 16px;
+  border-radius: 12px;
+  border: 1px dashed var(--color-border);
+  background: rgba(255, 255, 255, 0.02);
+}
+
+.financeiro-page .ui-input-wrap,
+.reports-page--rebuilt .ui-input-wrap {
+  gap: 6px;
 }
 
 @media (max-width: 900px) {
-  .page--estoque .page-header,
-  .page--suplementacao .page-header {
+  .financeiro-page .financeiro-header,
+  .reports-page--rebuilt .page-header {
     display: grid;
-    align-items: stretch;
+    grid-template-columns: 1fr;
+    align-items: start;
   }
 
-  .page--estoque .page-actions,
-  .page--suplementacao .page-actions {
-    width: 100%;
+  .financeiro-page .lote-actions,
+  .reports-page-actions,
+  .financeiro-page .rebanho-filters,
+  .reports-filter-grid--compact {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 8px;
   }
 
-  .page--estoque .page-actions > *,
-  .page--suplementacao .page-actions > * {
+  .financeiro-page .lote-actions > *,
+  .reports-page-actions > *,
+  .financeiro-page .rebanho-filters > * {
     width: 100%;
     min-height: 44px;
   }
 
-  .page--estoque .filters-wrap,
-  .page--suplementacao .filters-wrap {
-    grid-template-columns: 1fr;
-  }
-
-  .suplementacao-kpi-grid {
-    grid-template-columns: 1fr 1fr;
+  .financeiro-page .table-responsive,
+  .reports-page--rebuilt .table-responsive {
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
   }
 }
 
-@media (max-width: 640px) {
-  .suplementacao-kpi-grid {
+/* SPRINT21G - Admin, Tarefas e Sanitário visual polish */
+.config-page > header,
+.page--funcionarios .page-header,
+.tarefas-page .page-header,
+.page--sanitario .page-header {
+  display: grid;
+  gap: 8px;
+}
+
+.config-page .config-tabs,
+.page--funcionarios .filters-bar,
+.tarefas-page .tarefas-filters {
+  border: 1px solid var(--color-border);
+  background: rgba(255, 255, 255, 0.02);
+  border-radius: 12px;
+}
+
+.config-page .table-responsive,
+.page--funcionarios .funcionarios-list-shell,
+.page--sanitario .sanitario-table-shell {
+  overflow: hidden;
+  border-radius: 12px;
+}
+
+.config-page .config-actions-wrap,
+.page--funcionarios .row-actions,
+.tarefas-page .kanban-card-actions,
+.page--sanitario .row-actions {
+  gap: 8px;
+}
+
+.config-page button,
+.page--funcionarios button,
+.tarefas-page button,
+.page--sanitario button {
+  min-height: 44px;
+}
+
+.tarefas-page .kanban-card-meta span,
+.page--sanitario .herdon-table td,
+.config-page .dashboard-table td {
+  word-break: break-word;
+}
+
+@media (max-width: 900px) {
+  .config-page .config-tabs,
+  .config-page .config-grid,
+  .page--funcionarios .filters-bar,
+  .tarefas-page .tarefas-filters,
+  .page--sanitario .form-grid.two,
+  .page--sanitario .summary-cards-grid {
+    display: grid;
     grid-template-columns: 1fr;
+    gap: 8px;
+  }
+
+  .config-page .config-actions,
+  .config-page .config-actions-wrap,
+  .page--funcionarios .row-actions,
+  .tarefas-page .kanban-card-actions,
+  .page--sanitario .row-actions {
+    display: flex;
+    flex-wrap: wrap;
+  }
+
+  .config-page .config-actions > *,
+  .config-page .config-actions-wrap > *,
+  .page--funcionarios .filters-bar > *,
+  .page--funcionarios .row-actions > *,
+  .tarefas-page .kanban-card-actions > *,
+  .page--sanitario .row-actions > * {
+    width: 100%;
+    min-height: 44px;
+  }
+}
+
+/* SPRINT21H - final visual QA and regression hardening */
+html, body, #root, .app, .main, .main-content, .page { max-width: 100%; }
+
+.page-header,
+.rebanho-header,
+.financeiro-header,
+.page-actions,
+.lote-actions,
+.tab-buttons,
+.tab-bar {
+  min-width: 0;
+}
+
+.tab-buttons,
+.tab-bar,
+.header-tabs,
+.header-tabs-shell {
+  overflow-x: auto;
+  scrollbar-width: thin;
+  -webkit-overflow-scrolling: touch;
+}
+
+.table-responsive,
+.responsive-table-wrap {
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+}
+
+.modal-content,
+.ui-modal,
+.modal,
+[role='dialog'] {
+  max-height: min(88dvh, calc(100dvh - env(safe-area-inset-top) - env(safe-area-inset-bottom) - 20px));
+}
+
+.modal-footer,
+.ui-modal-footer {
+  position: sticky;
+  bottom: 0;
+  background: inherit;
+  z-index: 2;
+}
+
+@media (max-width: 900px) {
+  .page,
+  .page-container,
+  .reports-page,
+  .dashboard-page,
+  .tarefas-page,
+  .page--sanitario,
+  .page--funcionarios,
+  .config-page {
+    padding-bottom: calc(var(--herdon-mobile-bottomnav-height) + env(safe-area-inset-bottom) + 20px);
+  }
+
+  .tab-buttons > *,
+  .tab-bar > *,
+  .page-actions > *,
+  .lote-actions > * {
+    min-height: 44px;
+    flex-shrink: 0;
+  }
+
+  .dashboard-table th,
+  .dashboard-table td,
+  .data-table th,
+  .data-table td {
+    white-space: nowrap;
   }
 }
