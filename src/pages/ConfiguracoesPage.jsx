@@ -98,6 +98,9 @@ export default function ConfiguracoesPage({ db, setDb, onConfirmAction }) {
   }
 
   function mensagemErroSegura(error, fallbackMessage) {
+    if ([400, 406].includes(Number(error?.status)) || ['400', '406'].includes(String(error?.code || ''))) {
+      return 'Não foi possível atualizar o convite. Atualize a lista e tente novamente.';
+    }
     const message = String(error?.message || '').toLowerCase();
 
     if (
@@ -162,12 +165,24 @@ export default function ConfiguracoesPage({ db, setDb, onConfirmAction }) {
       ? await onConfirmAction({ title: 'Cancelar convite', message: `Deseja cancelar o convite de ${invite.email}?`, tone: 'danger' })
       : window.confirm(`Deseja cancelar o convite de ${invite.email}?`);
     if (!confirmar) return;
-    const { error } = await updateInvite(invite.id, { status: 'cancelado' });
+    const cancelPayload = {
+      status: 'cancelado',
+      canceled_at: new Date().toISOString(),
+      cancelled_at: new Date().toISOString(),
+    };
+    let response = await updateInvite(invite.id, cancelPayload);
+    if (response.error) {
+      response = await updateInvite(invite.id, { status: 'cancelado' });
+    }
+    const { data, error } = response;
+    if (import.meta.env.DEV) {
+      console.debug('[HERDON_INVITES_DEBUG]', { action: 'cancel', inviteId: invite.id, hasData: Boolean(data), error: error?.message || null });
+    }
     if (error) {
       showToast({ type: 'error', message: mensagemErroSegura(error, 'Nao foi possivel cancelar o convite.') });
       return;
     }
-    setInvitesRows((prev) => prev.map((item) => (item.id === invite.id ? { ...item, status: 'cancelado' } : item)));
+    setInvitesRows((prev) => prev.filter((item) => item.id !== invite.id));
     showToast({ type: 'success', message: 'Convite cancelado com sucesso.' });
     await carregarDadosDeAcesso();
   }
@@ -182,9 +197,20 @@ export default function ConfiguracoesPage({ db, setDb, onConfirmAction }) {
       ? await onConfirmAction({ title: 'Remover convite pendente', message: `Remover convite pendente de ${invite.email}?`, tone: 'danger' })
       : window.confirm(`Remover convite pendente de ${invite.email}?`);
     if (!confirmar) return;
+    let removeError = null;
     const { error } = await deleteInvite(invite.id);
     if (error) {
-      showToast({ type: 'error', message: mensagemErroSegura(error, 'Nao foi possivel remover o convite.') });
+      let fallback = await updateInvite(invite.id, { status: 'cancelado', canceled_at: new Date().toISOString(), cancelled_at: new Date().toISOString() });
+      if (fallback.error) {
+        fallback = await updateInvite(invite.id, { status: 'cancelado' });
+      }
+      removeError = fallback.error || error;
+      if (!fallback.error && import.meta.env.DEV) {
+        console.debug('[HERDON_INVITES_DEBUG]', { action: 'remove-fallback-cancel', inviteId: invite.id });
+      }
+    }
+    if (removeError) {
+      showToast({ type: 'error', message: mensagemErroSegura(removeError, 'Nao foi possivel remover o convite.') });
       return;
     }
     setInvitesRows((prev) => prev.filter((item) => item.id !== invite.id));

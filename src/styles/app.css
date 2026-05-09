@@ -8785,3 +8785,110 @@ html, body, #root, .app, .main, .main-content, .page { max-width: 100%; }
     white-space: nowrap;
   }
 }
+
+/* SPRINT22D - Estoque cleanup/empty-state compaction */
+.page--estoque .empty-box {
+  min-height: 96px;
+  padding: 16px;
+}
+
+.page--estoque .empty-box > .ui-button,
+.page--estoque .empty-box > button {
+  min-height: 44px;
+}
+
+@media (max-width: 900px) {
+  .page--estoque {
+    padding-bottom: calc(var(--herdon-mobile-bottomnav-height) + env(safe-area-inset-bottom) + 24px);
+  }
+}
+
+/* SPRINT22F - final mobile hardening pass */
+@media (max-width: 1024px) {
+  html, body, #root, .app, .main, .main-content, .page {
+    overflow-x: hidden;
+  }
+
+  .main,
+  .main-content,
+  .page,
+  .page-container {
+    max-width: 100%;
+  }
+
+  .tab-bar,
+  .tab-buttons,
+  .segmented-control,
+  .config-tabs {
+    overflow-x: auto;
+    flex-wrap: nowrap;
+    white-space: nowrap;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .tab-bar > *,
+  .tab-buttons > *,
+  .segmented-control > *,
+  .config-tabs > * {
+    min-height: 44px;
+    flex-shrink: 0;
+  }
+
+  .table-responsive,
+  .fazendas-table-wrap,
+  .sanitario-table-shell,
+  .funcionarios-list-shell,
+  .reports-table-wrap,
+  .responsive-table-wrap {
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .page--pesagens .pesagem-form-grid,
+  .page--pesagens .pesagem-form-section,
+  .page--estoque .filters-wrap,
+  .page--estoque .filters-bar,
+  .suplementacao-page .filters-wrap,
+  .suplementacao-page .filters-bar,
+  .config-page .config-actions-wrap,
+  .config-page .config-grid,
+  .page--funcionarios .filters-bar {
+    grid-template-columns: 1fr !important;
+  }
+
+  .config-page .config-actions-wrap,
+  .config-page .row-actions,
+  .page--funcionarios .row-actions,
+  .page--sanitario .row-actions,
+  .page--pesagens .row-actions,
+  .page--estoque .lote-actions {
+    flex-wrap: wrap;
+  }
+
+  .config-page .config-actions-wrap > *,
+  .config-page .row-actions > *,
+  .page--funcionarios .row-actions > *,
+  .page--sanitario .row-actions > *,
+  .page--pesagens .row-actions > * {
+    min-height: 44px;
+  }
+
+  .calendar-month-grid {
+    gap: 3px;
+  }
+
+  .calendar-day-cell {
+    min-height: 50px;
+    overflow: hidden;
+  }
+
+  .calendar-day-events,
+  .calendar-day-event,
+  .calendar-day-event-title {
+    display: none;
+  }
+
+  .mobile-fab {
+    bottom: calc(var(--herdon-mobile-bottomnav-height, 72px) + env(safe-area-inset-bottom) + 16px);
+  }
+}
