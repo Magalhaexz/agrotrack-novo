@@ -8714,3 +8714,74 @@ body {
     min-height: 44px;
   }
 }
+
+/* SPRINT21H - final visual QA and regression hardening */
+html, body, #root, .app, .main, .main-content, .page { max-width: 100%; }
+
+.page-header,
+.rebanho-header,
+.financeiro-header,
+.page-actions,
+.lote-actions,
+.tab-buttons,
+.tab-bar {
+  min-width: 0;
+}
+
+.tab-buttons,
+.tab-bar,
+.header-tabs,
+.header-tabs-shell {
+  overflow-x: auto;
+  scrollbar-width: thin;
+  -webkit-overflow-scrolling: touch;
+}
+
+.table-responsive,
+.responsive-table-wrap {
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+}
+
+.modal-content,
+.ui-modal,
+.modal,
+[role='dialog'] {
+  max-height: min(88dvh, calc(100dvh - env(safe-area-inset-top) - env(safe-area-inset-bottom) - 20px));
+}
+
+.modal-footer,
+.ui-modal-footer {
+  position: sticky;
+  bottom: 0;
+  background: inherit;
+  z-index: 2;
+}
+
+@media (max-width: 900px) {
+  .page,
+  .page-container,
+  .reports-page,
+  .dashboard-page,
+  .tarefas-page,
+  .page--sanitario,
+  .page--funcionarios,
+  .config-page {
+    padding-bottom: calc(var(--herdon-mobile-bottomnav-height) + env(safe-area-inset-bottom) + 20px);
+  }
+
+  .tab-buttons > *,
+  .tab-bar > *,
+  .page-actions > *,
+  .lote-actions > * {
+    min-height: 44px;
+    flex-shrink: 0;
+  }
+
+  .dashboard-table th,
+  .dashboard-table td,
+  .data-table th,
+  .data-table td {
+    white-space: nowrap;
+  }
+}

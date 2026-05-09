@@ -243,11 +243,11 @@ export default function TarefasPage({ db, setDb, onConfirmAction }) {
         </Card>
         <Card title="Atrasadas">
           <div className="animais-kpi-value">{resumo.atrasadas}</div>
-          <p className="animais-kpi-sub">Exigem atencao imediata</p>
+          <p className="animais-kpi-sub">Exigem atenção imediata</p>
         </Card>
-        <Card title="Concluidas">
+        <Card title="Concluídas">
           <div className="animais-kpi-value">{resumo.concluidas}</div>
-          <p className="animais-kpi-sub">Ja resolvidas neste quadro</p>
+          <p className="animais-kpi-sub">Já resolvidas neste quadro</p>
         </Card>
       </div>
 
