@@ -296,9 +296,9 @@ export default function SanitarioPage({ db, setDb, onConfirmAction }) {
   return (
     <div className="page page--sanitario page--kpi-compact">
       <PageHeader
-        title="Manejo Sanitário"
-        subtitle="Controle de vacinas, vermífugos e tratamentos do rebanho."
-        actions={<Button className="sanitario-cta" disabled={!hasPermission('sanitario:editar')} onClick={abrirNovo}>+ Novo Manejo</Button>}
+        title="Sanitário / Manejo"
+        subtitle="Controle de vacinas, medicações e manejos com status e responsáveis."
+        actions={<Button className="sanitario-cta" disabled={!hasPermission('sanitario:editar')} onClick={abrirNovo}>Registrar manejo</Button>}
       />
 
       <div className="summary-cards-grid sanitario-summary-grid">
@@ -346,7 +346,7 @@ export default function SanitarioPage({ db, setDb, onConfirmAction }) {
           {dadosTabela.length === 0 ? (
             <div className="empty-state padded">
               <p>Nenhum manejo sanitário registrado.</p>
-              <span>Use o botão "Novo Manejo" para começar.</span>
+              <span>Registre vacinas, medicações e manejos sanitários para acompanhar a rotina.</span>
             </div>
           ) : (
             <table className="dashboard-table herdon-table herdon-table--sanitario">

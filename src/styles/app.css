@@ -8638,3 +8638,79 @@ body {
     -webkit-overflow-scrolling: touch;
   }
 }
+
+/* SPRINT21G - Admin, Tarefas e Sanitário visual polish */
+.config-page > header,
+.page--funcionarios .page-header,
+.tarefas-page .page-header,
+.page--sanitario .page-header {
+  display: grid;
+  gap: 8px;
+}
+
+.config-page .config-tabs,
+.page--funcionarios .filters-bar,
+.tarefas-page .tarefas-filters {
+  border: 1px solid var(--color-border);
+  background: rgba(255, 255, 255, 0.02);
+  border-radius: 12px;
+}
+
+.config-page .table-responsive,
+.page--funcionarios .funcionarios-list-shell,
+.page--sanitario .sanitario-table-shell {
+  overflow: hidden;
+  border-radius: 12px;
+}
+
+.config-page .config-actions-wrap,
+.page--funcionarios .row-actions,
+.tarefas-page .kanban-card-actions,
+.page--sanitario .row-actions {
+  gap: 8px;
+}
+
+.config-page button,
+.page--funcionarios button,
+.tarefas-page button,
+.page--sanitario button {
+  min-height: 44px;
+}
+
+.tarefas-page .kanban-card-meta span,
+.page--sanitario .herdon-table td,
+.config-page .dashboard-table td {
+  word-break: break-word;
+}
+
+@media (max-width: 900px) {
+  .config-page .config-tabs,
+  .config-page .config-grid,
+  .page--funcionarios .filters-bar,
+  .tarefas-page .tarefas-filters,
+  .page--sanitario .form-grid.two,
+  .page--sanitario .summary-cards-grid {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 8px;
+  }
+
+  .config-page .config-actions,
+  .config-page .config-actions-wrap,
+  .page--funcionarios .row-actions,
+  .tarefas-page .kanban-card-actions,
+  .page--sanitario .row-actions {
+    display: flex;
+    flex-wrap: wrap;
+  }
+
+  .config-page .config-actions > *,
+  .config-page .config-actions-wrap > *,
+  .page--funcionarios .filters-bar > *,
+  .page--funcionarios .row-actions > *,
+  .tarefas-page .kanban-card-actions > *,
+  .page--sanitario .row-actions > * {
+    width: 100%;
+    min-height: 44px;
+  }
+}

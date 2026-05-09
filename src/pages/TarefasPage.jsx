@@ -231,9 +231,9 @@ export default function TarefasPage({ db, setDb, onConfirmAction }) {
   return (
     <div className="tarefas-page">
       <header className="page-header">
-        <h1>Gestão de Tarefas</h1>
-        <p>Organize e acompanhe as atividades da sua fazenda.</p>
-        <Button icon={<Plus size={16} />} onClick={openNewTask}>Nova Tarefa</Button>
+        <h1>Tarefas</h1>
+        <p>Organize responsáveis, prioridades e prazos da rotina da fazenda.</p>
+        <Button icon={<Plus size={16} />} onClick={openNewTask}>Nova tarefa</Button>
       </header>
 
       <div className="dashboard-grid dashboard-grid--kpi-main">
@@ -290,7 +290,7 @@ export default function TarefasPage({ db, setDb, onConfirmAction }) {
             <h2 className="kanban-column-title">{column.title} ({tarefasPorStatus[column.id]?.length || 0})</h2>
             <div className="kanban-cards">
               {tarefasPorStatus[column.id]?.length === 0 ? (
-                <div className="empty-state small">Nenhuma tarefa aqui.</div>
+                <div className="empty-state small">Nenhuma tarefa encontrada. Crie tarefas para organizar a rotina da fazenda.</div>
               ) : (
                 tarefasPorStatus[column.id]?.map((task) => (
                   <Card key={task.id} className={`kanban-card ${isOverdue(task.data_vencimento) && task.status !== 'concluida' ? 'overdue' : ''}`}>
