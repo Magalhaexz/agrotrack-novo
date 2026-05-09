@@ -8,7 +8,6 @@ import { useToast } from '../hooks/useToast';
 import { useAuth } from '../auth/useAuth';
 import {
   createOperationalRecord,
-  deleteOperationalRecord,
   updateOperationalRecord,
 } from '../services/operationalPersistence';
 
@@ -27,7 +26,7 @@ export default function FuncionariosPage({ db, setDb, onConfirmAction }) {
   const [openModal, setOpenModal] = useState(false);
   const [editando, setEditando] = useState(null);
   const [busca, setBusca] = useState('');
-  const [status, setStatus] = useState('todos');
+  const [status, setStatus] = useState('ativos');
 
   const funcionarios = useMemo(() => (Array.isArray(db?.funcionarios) ? db.funcionarios : []), [db]);
   const fazendas = useMemo(() => (Array.isArray(db?.fazendas) ? db.fazendas : []), [db]);
@@ -40,7 +39,12 @@ export default function FuncionariosPage({ db, setDb, onConfirmAction }) {
   // Lista de funcionários filtrada e memoizada
   const lista = useMemo(() => {
     return funcionarios
-      .filter((f) => (status === 'todos' ? true : (f.status || 'ativo') === status))
+      .filter((f) => {
+        const s = f.status || 'ativo';
+        if (status === 'todos') return true;
+        if (status === 'ativos') return s === 'ativo';
+        return ['inativo', 'desligado'].includes(s);
+      })
       .filter((f) => {
         const termo = busca.trim().toLowerCase();
         if (!termo) return true;
@@ -101,52 +105,36 @@ export default function FuncionariosPage({ db, setDb, onConfirmAction }) {
    * Exclui um funcionário após confirmação.
    * @param {number} id - O ID do funcionário a ser excluído.
    */
-  async function excluirFuncionario(id) {
-    const funcionario = funcionarios.find((f) => f.id === id);
-    if (!funcionario) return;
-
+  async function atualizarStatusFuncionario(funcionario, novoStatus, mensagemConfirmacao) {
     const confirmado = typeof onConfirmAction === 'function'
-      ? await onConfirmAction({
-          title: 'Excluir funcionário',
-          message: `Deseja realmente excluir o funcionário "${funcionario.nome}"?`,
-          tone: 'danger',
-        })
-      : window.confirm(`Deseja realmente excluir o funcionário "${funcionario.nome}"?`);
-
+      ? await onConfirmAction({ title: 'Confirmar ação', message: mensagemConfirmacao, tone: 'warning' })
+      : window.confirm(mensagemConfirmacao);
     if (!confirmado) return;
-
-    const persisted = await deleteOperationalRecord('funcionarios', id, session);
-    setDb((prev) => ({
-      ...prev,
-      funcionarios: prev.funcionarios.filter((f) => f.id !== id),
-    }));
-    if (!persisted.persisted) {
-      showToast({ type: 'warning', message: 'Exclusão salva apenas localmente.' });
-    }
-    showToast({ type: 'success', message: 'Funcionário excluído com sucesso!' });
+    const persisted = await updateOperationalRecord('funcionarios', funcionario.id, { status: novoStatus }, session);
+    setDb((prev) => ({ ...prev, funcionarios: (prev.funcionarios || []).map((f) => (f.id === funcionario.id ? { ...f, ...(persisted.data || { status: novoStatus }) } : f)) }));
   }
 
   return (
     <div className="page page--funcionarios">
       <PageHeader
         title="Funcionários"
-        subtitle="Gestão de colaboradores e suas informações"
-        actions={<Button onClick={() => { setEditando(null); setOpenModal(true); }}>+ Novo Funcionário</Button>}
+        subtitle="Gerencie pessoas da operação, status e vínculo com a fazenda."
+        actions={<Button onClick={() => { setEditando(null); setOpenModal(true); }}>Novo funcionário</Button>}
       />
 
       <div className="filters-bar ui-card"> {/* Usando ui-card para a barra de filtros */}
         <input className="ui-input" value={busca} onChange={(e) => setBusca(e.target.value)} placeholder="Buscar por nome ou cargo" />
         <select className="ui-input" value={status} onChange={(e) => setStatus(e.target.value)}>
+          <option value="ativos">Ativos</option>
+          <option value="inativos_desligados">Inativos/desligados</option>
           <option value="todos">Todos</option>
-          <option value="ativo">Ativo</option>
-          <option value="inativo">Inativo</option>
         </select>
       </div>
 
       <div className="ui-card no-padding funcionarios-list-shell"> {/* Adicionada classe no-padding para remover padding padrão */}
         {lista.length === 0 ? (
           <div className="empty-state padded"> {/* Adicionada classe padded para padding interno */}
-            <p>Nenhum funcionário encontrado.</p>
+            <p>{status === 'ativos' ? 'Nenhum funcionário ativo.' : status === 'inativos_desligados' ? 'Nenhum funcionário inativo/desligado.' : 'Nenhum funcionário encontrado.'}</p>
             <span>Ajuste os filtros ou adicione um novo funcionário.</span>
           </div>
         ) : (
@@ -156,7 +144,9 @@ export default function FuncionariosPage({ db, setDb, onConfirmAction }) {
               funcionario={funcionario}
               fazendaNome={getNomeFazenda(funcionario.fazenda_id)}
               onEdit={() => { setEditando(funcionario); setOpenModal(true); }}
-              onDelete={() => excluirFuncionario(funcionario.id)}
+              onDesativar={() => atualizarStatusFuncionario(funcionario, 'inativo', 'O funcionário continuará no histórico, mas não aparecerá como ativo.')}
+              onReativar={() => atualizarStatusFuncionario(funcionario, 'ativo', 'Deseja reativar este funcionário?')}
+              onDesligar={() => atualizarStatusFuncionario(funcionario, 'desligado', 'Deseja marcar este funcionário como desligado?')}
             />
           ))
         )}

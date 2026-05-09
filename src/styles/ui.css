@@ -905,3 +905,81 @@ button[type='reset'] {
     width: 100%;
   }
 }
+
+/* SPRINT22A HOTFIX - global modal/form layout regression fix */
+.ui-modal-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 4000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 12px;
+  overflow: hidden;
+}
+
+.ui-modal {
+  width: min(960px, calc(100vw - 24px));
+  max-width: calc(100vw - 24px);
+  max-height: calc(100dvh - 24px);
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.ui-modal-head,
+.ui-modal-foot {
+  flex: 0 0 auto;
+}
+
+.ui-modal-body {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+  overflow-x: hidden;
+  padding-bottom: 16px;
+  -webkit-overflow-scrolling: touch;
+}
+
+.ui-modal-foot {
+  position: sticky;
+  bottom: 0;
+  z-index: 2;
+  padding-bottom: max(12px, env(safe-area-inset-bottom));
+}
+
+.ui-modal .form-grid,
+.ui-modal .form-grid.two,
+.ui-modal .form-grid.three,
+.ui-modal .config-grid,
+.ui-modal .filters-bar,
+.ui-modal .rebanho-filters {
+  width: 100%;
+  min-width: 0;
+}
+
+.ui-modal input,
+.ui-modal select,
+.ui-modal textarea,
+.ui-modal .ui-input,
+.ui-modal .ui-input-wrap {
+  min-width: 0;
+  width: 100%;
+}
+
+@media (max-width: 900px) {
+  .ui-modal {
+    width: calc(100vw - 24px);
+    max-width: calc(100vw - 24px);
+    max-height: calc(100dvh - 24px);
+  }
+
+  .ui-modal .form-grid.two,
+  .ui-modal .form-grid.three,
+  .ui-modal .grid-2,
+  .ui-modal .grid-3,
+  .ui-modal .grid-4 {
+    grid-template-columns: 1fr;
+  }
+}

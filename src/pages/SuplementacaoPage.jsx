@@ -8,650 +8,107 @@ import { useToast } from '../hooks/useToast';
 import { useAuth } from '../auth/useAuth';
 import { gerarNovoId } from '../utils/id';
 import { formatNumber } from '../utils/calculations';
-import {
-  createOperationalRecord,
-  deleteOperationalRecord,
-  updateOperationalRecord,
-} from '../services/operationalPersistence';
 
 const getTodayIso = () => new Date().toISOString().slice(0, 10);
+const CATEGORIAS_NUTRICIONAIS = ['Ração', 'Sal mineral', 'Sal proteinado', 'Proteinado', 'Suplemento', 'Volumoso', 'Concentrado', 'Núcleo', 'Dieta pronta', 'Outro produto nutricional'];
 
-function getDietasNormalizadas(db) {
-  const dietas = Array.isArray(db?.dietas) ? db.dietas : [];
-  if (dietas.length) {
-    return dietas.map((dieta) => ({
-      ...dieta,
-      lote_id: Number(dieta.lote_id),
-      itens: Array.isArray(dieta.itens) ? dieta.itens : [],
-    }));
-  }
-
-  const legacy = Array.isArray(db?.suplementacao) ? db.suplementacao : [];
-  const agrupado = new Map();
-
-  legacy.forEach((item) => {
-    const loteId = Number(item?.lote_id);
-    if (!loteId) {
-      return;
-    }
-
-    if (!agrupado.has(loteId)) {
-      agrupado.set(loteId, {
-        id: loteId,
-        lote_id: loteId,
-        nome: `Dieta ${loteId}`,
-        itens: [],
-      });
-    }
-
-    agrupado.get(loteId).itens.push({
-      item_estoque_id: Number(item.item_estoque_id),
-      qtd_cab_dia: Number(item.consumo_por_cabeca_dia || item.qtd_cab_dia || 0),
-    });
-  });
-
-  return Array.from(agrupado.values());
-}
-
-function getEstoqueSuplementacao(db) {
-  return (db?.estoque || []).filter((item) => {
-    const categoria = String(item?.categoria || item?.tipo || '').toLowerCase();
-    const nome = String(item?.produto || '').toLowerCase();
-    return categoria.includes('insumo') || categoria.includes('suplement') || nome.includes('sal') || nome.includes('nucleo');
-  });
-}
-
-function saveDietasCompat(setDb, updater) {
-  setDb((prevDb) => {
-    const dietasNormalizadas = getDietasNormalizadas(prevDb);
-    const dietasAtualizadas = updater(dietasNormalizadas);
-
-    return {
-      ...prevDb,
-      dietas: dietasAtualizadas,
-    };
-  });
-}
+function getDietasNormalizadas(db) { return Array.isArray(db?.dietas) ? db.dietas : []; }
+function getProdutosNutricionais(db) { return (db?.estoque || []).filter((i) => String(i?.categoria || '').toLowerCase().includes('nutrição') || String(i?.metadata?.modulo || '').toLowerCase() === 'nutricao'); }
 
 export default function SuplementacaoPage({ db, setDb }) {
   const { showToast } = useToast();
-  const { session, hasPermission } = useAuth();
+  const { hasPermission } = useAuth();
+  const [aba, setAba] = useState('produtos');
+  const [openProduto, setOpenProduto] = useState(false);
   const [openDieta, setOpenDieta] = useState(false);
   const [openConsumo, setOpenConsumo] = useState(false);
-  const [dietaEditando, setDietaEditando] = useState(null);
 
+  const lotesAtivos = useMemo(() => (db.lotes || []).filter((l) => l.status === 'ativo'), [db.lotes]);
+  const produtos = useMemo(() => getProdutosNutricionais(db), [db]);
   const dietas = useMemo(() => getDietasNormalizadas(db), [db]);
-  const dietasMap = useMemo(() => new Map(dietas.map((dieta) => [Number(dieta.lote_id), dieta])), [dietas]);
-  const animaisMap = useMemo(() => {
-    const map = new Map();
-    (db.animais || []).forEach((animal) => {
-      const loteId = Number(animal.lote_id);
-      if (!map.has(loteId)) {
-        map.set(loteId, []);
-      }
-      map.get(loteId).push(animal);
-    });
-    return map;
-  }, [db.animais]);
-  const consumoSuplementacaoMap = useMemo(() => {
-    const map = new Map();
-    (db.consumo_suplementacao || []).forEach((consumo) => {
-      const loteId = Number(consumo.lote_id);
-      if (!map.has(loteId)) {
-        map.set(loteId, []);
-      }
-      map.get(loteId).push(consumo);
-    });
-    return map;
-  }, [db.consumo_suplementacao]);
-  const estoqueMap = useMemo(() => new Map((db.estoque || []).map((item) => [Number(item.id), item])), [db.estoque]);
-  const lotesAtivos = useMemo(() => (db.lotes || []).filter((lote) => lote.status === 'ativo'), [db.lotes]);
+  const consumo = useMemo(() => (db.consumo_suplementacao || []), [db]);
 
-  const consumoRows = useMemo(() => {
-    return lotesAtivos.map((lote) => {
-      const dieta = dietasMap.get(Number(lote.id)) || null;
-      const cabecas = (animaisMap.get(Number(lote.id)) || []).reduce((total, animal) => total + Number(animal.qtd || 0), 0);
-      const itensDieta = Array.isArray(dieta?.itens) ? dieta.itens : [];
-      const previstoDia = itensDieta.reduce((total, item) => total + Number(item.qtd_cab_dia || 0) * cabecas, 0);
-      const registros = consumoSuplementacaoMap.get(Number(lote.id)) || [];
-      const realDia = registros.length
-        ? registros.reduce((total, registro) => total + Number(registro.qtd_total || 0), 0) / registros.length
-        : 0;
+  const planejamento = useMemo(() => lotesAtivos.map((lote) => {
+    const dieta = dietas.find((d) => Number(d.lote_id) === Number(lote.id));
+    const cabecas = (db.animais || []).filter((a) => Number(a.lote_id) === Number(lote.id)).reduce((s, a) => s + Number(a.qtd || 0), 0);
+    const previsto = (dieta?.itens || []).reduce((s, i) => s + Number(i.qtd_cab_dia || 0) * cabecas, 0);
+    const realizados = consumo.filter((c) => Number(c.lote_id) === Number(lote.id));
+    const realizado = realizados.length ? realizados.reduce((s, c) => s + Number(c.qtd_total || 0), 0) / realizados.length : 0;
+    return { lote, cabecas, dieta, previsto, realizado, diff: realizado - previsto, custo: (dieta?.itens || []).reduce((acc, item) => {
+      const produto = produtos.find((p) => Number(p.id) === Number(item.item_estoque_id));
+      return acc + (Number(item.qtd_cab_dia || 0) * cabecas * Number(produto?.valor_unitario || 0));
+    }, 0) };
+  }), [lotesAtivos, dietas, db.animais, consumo, produtos]);
 
-      return {
-        lote,
-        dieta,
-        cabecas,
-        itensDieta,
-        previstoDia,
-        realDia,
-        diff: realDia - previstoDia,
-      };
-    });
-  }, [animaisMap, consumoSuplementacaoMap, dietasMap, lotesAtivos]);
+  return <div className="page suplementacao-page">
+    <header className="page-header"><h1>Nutrição / Suplementação</h1><p>Produtos nutricionais, dietas e consumo diário integrados ao estoque e financeiro.</p><div className="page-actions"><Button onClick={() => setOpenProduto(true)} disabled={!hasPermission('estoque:editar')}>Cadastrar produto nutricional</Button><Button variant="outline" onClick={() => setOpenConsumo(true)} disabled={!hasPermission('estoque:editar')}>Registrar consumo</Button></div></header>
 
-  const projecao = useMemo(() => {
-    const consumoPorItem = new Map();
+    <div className="segmented-control tab-bar"><button className={`segment ${aba==='produtos'?'active':''}`} onClick={() => setAba('produtos')} type="button">Produtos nutricionais</button><button className={`segment ${aba==='dietas'?'active':''}`} onClick={() => setAba('dietas')} type="button">Dietas</button><button className={`segment ${aba==='consumo'?'active':''}`} onClick={() => setAba('consumo')} type="button">Consumo diário</button><button className={`segment ${aba==='planejamento'?'active':''}`} onClick={() => setAba('planejamento')} type="button">Planejamento por lote</button><button className={`segment ${aba==='historico'?'active':''}`} onClick={() => setAba('historico')} type="button">Histórico</button></div>
 
-    consumoRows.forEach((row) => {
-      row.itensDieta.forEach((item) => {
-        const itemId = Number(item.item_estoque_id);
-        const consumoAtual = consumoPorItem.get(itemId) || 0;
-        consumoPorItem.set(itemId, consumoAtual + Number(item.qtd_cab_dia || 0) * row.cabecas);
-      });
-    });
+    {aba === 'produtos' && <Card title="Produtos nutricionais"><div className="table-responsive"><table className="data-table"><thead><tr><th>Produto</th><th>Categoria</th><th>Estoque</th><th>Unidade</th><th>Custo unitário</th><th>Fornecedor</th></tr></thead><tbody>{produtos.length?produtos.map((p)=><tr key={p.id}><td>{p.produto}</td><td><Badge variant="info">{p.subcategoria || 'Nutrição'}</Badge></td><td>{formatNumber(p.quantidade_atual || 0,2)}</td><td>{p.unidade_medida || 'kg'}</td><td>R$ {formatNumber(p.valor_unitario || 0,2)}</td><td>{p.fornecedor || '-'}</td></tr>):<tr><td colSpan="6" className="empty-state-td"><strong>Nenhum produto nutricional cadastrado.</strong><div>Cadastre rações, suplementos, sal mineral ou dietas para vincular ao estoque.</div><Button size="sm" onClick={() => setOpenProduto(true)}>Cadastrar produto nutricional</Button></td></tr>}</tbody></table></div></Card>}
 
-    return Array.from(consumoPorItem.entries())
-      .map(([itemId, consumoDia]) => {
-        const item = estoqueMap.get(Number(itemId));
-        const saldo = Number(item?.quantidade_atual || 0);
-        const dias = consumoDia > 0 ? saldo / consumoDia : 999;
-        return { item, consumoDia, dias };
-      })
-      .sort((a, b) => a.dias - b.dias);
-  }, [consumoRows, estoqueMap]);
+    {aba === 'dietas' && <Card title="Dietas"><Button size="sm" onClick={() => setOpenDieta(true)}>Criar dieta</Button><div className="table-responsive"><table className="data-table"><thead><tr><th>Nome</th><th>Lote</th><th>Tipo de consumo</th><th>Qtd/cab/dia</th></tr></thead><tbody>{dietas.length?dietas.map((d)=><tr key={d.id}><td>{d.nome}</td><td>{(db.lotes||[]).find((l)=>Number(l.id)===Number(d.lote_id))?.nome || 'Sem lote'}</td><td>{d.tipo_consumo || 'kg/cabeça/dia'}</td><td>{formatNumber((d.itens||[])[0]?.qtd_cab_dia || 0,3)}</td></tr>):<tr><td colSpan="4" className="empty-state-td">Nenhuma dieta cadastrada.</td></tr>}</tbody></table></div></Card>}
 
-  const handleEditDieta = useCallback((dieta) => {
-    setDietaEditando(dieta);
-    setOpenDieta(true);
-  }, []);
+    {aba === 'consumo' && <Card title="Consumo diário"><p>Registre por lote, produto ou dieta e gere baixa de estoque + custo financeiro.</p><Button onClick={() => setOpenConsumo(true)}>Registrar consumo diário</Button></Card>}
 
-  const handleDeleteDieta = useCallback(async (dietaId) => {
-    const persisted = await deleteOperationalRecord('suplementacao', dietaId, session);
-    saveDietasCompat(setDb, (dietasAtuais) => dietasAtuais.filter((dieta) => dieta.id !== dietaId));
-    if (!persisted.persisted) {
-      showToast({ type: 'warning', message: 'Exclusão salva apenas localmente.' });
-    }
-    showToast({ type: 'success', message: 'Dieta excluida com sucesso.' });
-  }, [session, setDb, showToast]);
+    {aba === 'planejamento' && <Card title="Planejamento por lote"><div className="table-responsive"><table className="data-table"><thead><tr><th>Lote</th><th>Cabeças</th><th>Dieta</th><th>Previsto/dia</th><th>Realizado/dia</th><th>Diferença</th><th>Custo estimado/dia</th><th>Ações</th></tr></thead><tbody>{planejamento.map((r)=><tr key={r.lote.id}><td>{r.lote.nome}</td><td>{r.cabecas}</td><td>{r.dieta?.nome || 'Sem dieta'}</td><td>{formatNumber(r.previsto,2)} kg</td><td>{formatNumber(r.realizado,2)} kg</td><td>{formatNumber(r.diff,2)} kg</td><td>R$ {formatNumber(r.custo,2)}</td><td><button className="action-btn" onClick={() => setOpenDieta(true)}>{r.dieta?'Vincular dieta':'Criar'}</button></td></tr>)}</tbody></table></div></Card>}
 
-  return (
-    <div className="page suplementacao-page">
-      <header className="page-header">
-        <h1>Nutricao / Suplementacao</h1>
-        <p>Dietas, suplementos e planejamento alimentar dos lotes.</p>
-        <div className="page-actions">
-          <Button disabled={!hasPermission('estoque:editar')} onClick={() => { setDietaEditando(null); setOpenDieta(true); }}>Cadastrar dieta</Button>
-          <Button variant="outline" disabled={!hasPermission('estoque:editar')} onClick={() => setOpenConsumo(true)}>Registrar consumo diario</Button>
-        </div>
-      </header>
-      <Card title="Cadastro de nutrição" subtitle="Use este módulo para cadastrar dieta/suplemento e consumo padrão por lote.">
-        <div className="dashboard-list">
-          <div className="dashboard-list-item"><div className="dashboard-list-copy"><strong>Cadastrar dieta/suplemento</strong><p>Defina itens, unidade e consumo por cabeça/dia.</p></div></div>
-          <div className="dashboard-list-item"><div className="dashboard-list-copy"><strong>Registrar consumo</strong><p>Lança consumo diário e atualiza o saldo do estoque vinculado.</p></div></div>
-          <div className="dashboard-list-item"><div className="dashboard-list-copy"><strong>Observação</strong><p>Modelos de consumo em % do peso vivo não possuem schema dedicado neste fluxo atual.</p></div></div>
-        </div>
-      </Card>
+    {aba === 'historico' && <Card title="Histórico"><div className="table-responsive"><table className="data-table"><thead><tr><th>Data</th><th>Lote</th><th>Produto/Dieta</th><th>Quantidade</th><th>Custo</th><th>Responsável</th><th>Observação</th></tr></thead><tbody>{consumo.length?consumo.map((c)=><tr key={c.id}><td>{c.data}</td><td>{(db.lotes||[]).find((l)=>Number(l.id)===Number(c.lote_id))?.nome || '-'}</td><td>{c.produto_nome || c.dieta_nome || 'Consumo nutricional'}</td><td>{formatNumber(c.qtd_total || 0,2)} {c.unidade || 'kg'}</td><td>R$ {formatNumber(c.custo_total || 0,2)}</td><td>{c.responsavel || '-'}</td><td>{c.obs || '-'}</td></tr>):<tr><td colSpan="7" className="empty-state-td">Nenhum consumo registrado.</td></tr>}</tbody></table></div></Card>}
 
-      <Card className="suplementacao-card suplementacao-card--dietas" title="Dietas vinculadas por lote" subtitle="Compatibilidade preservada com os dados legados de suplementacao.">
-        <div className="table-responsive">
-          <table className="dashboard-table herdon-table herdon-table--suplementacao">
-            <thead>
-              <tr>
-                <th>Lote</th>
-                <th>Dieta</th>
-                <th>Cabecas</th>
-                <th>Itens</th>
-                <th>Previsto/dia</th>
-                <th>Real/dia</th>
-                <th>Diferenca</th>
-                <th>Acoes</th>
-              </tr>
-            </thead>
-            <tbody>
-              {consumoRows.length === 0 ? (
-                <tr>
-                  <td colSpan="8" className="empty-state-td">Nenhum lote ativo encontrado.</td>
-                </tr>
-              ) : (
-                consumoRows.map((row) => (
-                  <tr key={row.lote.id}>
-                    <td>{row.lote.nome}</td>
-                    <td>{row.dieta?.nome || 'Sem dieta'}</td>
-                    <td>{row.cabecas}</td>
-                    <td>{row.itensDieta.length}</td>
-                    <td>{formatNumber(row.previstoDia, 2)} kg</td>
-                    <td>{formatNumber(row.realDia, 2)} kg</td>
-                    <td className="cell-chip">
-                      <Badge variant={row.diff > 0 ? 'warning' : row.diff < 0 ? 'danger' : 'success'}>
-                        {formatNumber(row.diff, 2)} kg
-                      </Badge>
-                    </td>
-                    <td className="cell-actions">
-                      <div className="row-actions row-actions--tight">
-                        <button className="action-btn" disabled={!hasPermission('estoque:editar')} type="button" onClick={() => handleEditDieta(row.dieta || { lote_id: row.lote.id, nome: '', itens: [] })}>
-                          {row.dieta ? 'Editar' : 'Criar'}
-                        </button>
-                        {row.dieta ? (
-                          <button className="action-btn action-btn-danger" disabled={!hasPermission('estoque:editar')} type="button" onClick={() => handleDeleteDieta(row.dieta.id)}>
-                            Excluir
-                          </button>
-                        ) : null}
-                      </div>
-                    </td>
-                  </tr>
-                ))
-              )}
-            </tbody>
-          </table>
-        </div>
-      </Card>
-
-      <Card className="suplementacao-card suplementacao-card--projecao" title="Projecao de consumo de estoque" subtitle="Mostra o item mais pressionado pela dieta atual de cada lote.">
-        <div className="table-responsive">
-          <table className="dashboard-table herdon-table herdon-table--suplementacao">
-            <thead>
-              <tr>
-                <th>Item</th>
-                <th>Consumo diario total</th>
-                <th>Saldo</th>
-                <th>Dias restantes</th>
-              </tr>
-            </thead>
-            <tbody>
-              {projecao.length === 0 ? (
-                <tr>
-                  <td colSpan="4" className="empty-state-td">Nenhuma projecao disponivel.</td>
-                </tr>
-              ) : (
-                projecao.map((item) => (
-                  <tr key={item.item?.id || `proj-${item.consumoDia}`}>
-                    <td>{item.item?.produto || 'Item nao encontrado'}</td>
-                    <td>{formatNumber(item.consumoDia, 2)} kg</td>
-                    <td>{formatNumber(item.item?.quantidade_atual || 0, 2)} kg</td>
-                    <td className="cell-chip">
-                      <Badge variant={item.dias < 7 ? 'danger' : item.dias < 30 ? 'warning' : 'success'}>
-                        {item.dias === 999 ? 'Sem consumo' : `${formatNumber(item.dias, 0)} dias`}
-                      </Badge>
-                    </td>
-                  </tr>
-                ))
-              )}
-            </tbody>
-          </table>
-        </div>
-      </Card>
-
-      {openDieta ? (
-        <DietaModal
-          db={db}
-          setDb={setDb}
-          initialData={dietaEditando}
-          onClose={() => {
-            setOpenDieta(false);
-            setDietaEditando(null);
-          }}
-          showToast={showToast}
-          session={session}
-        />
-      ) : null}
-
-      {openConsumo ? (
-        <ConsumoModal
-          db={db}
-          setDb={setDb}
-          onClose={() => setOpenConsumo(false)}
-          showToast={showToast}
-        />
-      ) : null}
-    </div>
-  );
+    {openProduto && <ProdutoNutricionalModal db={db} setDb={setDb} onClose={() => setOpenProduto(false)} showToast={showToast} />}
+    {openDieta && <DietaModal db={db} setDb={setDb} onClose={() => setOpenDieta(false)} showToast={showToast} />}
+    {openConsumo && <ConsumoModal db={db} setDb={setDb} onClose={() => setOpenConsumo(false)} showToast={showToast} />}
+  </div>;
 }
 
-function DietaModal({ db, setDb, initialData, onClose, showToast, session }) {
-  const dietas = useMemo(() => getDietasNormalizadas(db), [db]);
-  const estoqueItens = useMemo(() => getEstoqueSuplementacao(db), [db]);
-  const [form, setForm] = useState(() => ({
-    id: initialData?.id || gerarNovoId(dietas),
-    nome: initialData?.nome || '',
-    lote_id: Number(initialData?.lote_id || '') || '',
-    itens: Array.isArray(initialData?.itens) ? initialData.itens : [],
-  }));
-  const [editingItemIndex, setEditingItemIndex] = useState(null);
-  const [errors, setErrors] = useState({});
-
-  const lotesComDieta = useMemo(
-    () => new Set(dietas.filter((dieta) => dieta.id !== form.id).map((dieta) => Number(dieta.lote_id))),
-    [dietas, form.id]
-  );
-  const lotesDisponiveis = useMemo(
-    () => (db.lotes || []).filter((lote) => lote.status === 'ativo' && (!lotesComDieta.has(Number(lote.id)) || Number(lote.id) === Number(form.lote_id))),
-    [db.lotes, form.lote_id, lotesComDieta]
-  );
-  const estoqueMap = useMemo(() => new Map(estoqueItens.map((item) => [Number(item.id), item])), [estoqueItens]);
-
-  const validate = useCallback(() => {
-    const nextErrors = {};
-    if (!form.nome.trim()) nextErrors.nome = 'Informe um nome para a dieta.';
-    if (!form.lote_id) nextErrors.lote_id = 'Selecione um lote.';
-    if (!form.itens.length) nextErrors.itens = 'Adicione pelo menos um item.';
-    setErrors(nextErrors);
-    return Object.keys(nextErrors).length === 0;
-  }, [form]);
-
-  async function submit() {
-    if (!validate()) {
-      showToast({ type: 'error', message: 'Corrija os campos da dieta antes de salvar.' });
-      return;
-    }
-
-    const payload = {
-      ...form,
-      lote_id: Number(form.lote_id),
-      itens: form.itens.map((item) => ({
-        item_estoque_id: Number(item.item_estoque_id),
-        qtd_cab_dia: Number(item.qtd_cab_dia),
-      })),
-    };
-
-    const persisted = initialData?.id
-      ? await updateOperationalRecord('suplementacao', initialData.id, payload, session)
-      : await createOperationalRecord('suplementacao', payload, session);
-
-    saveDietasCompat(setDb, (dietasAtuais) => {
-      const existe = dietasAtuais.some((dieta) => dieta.id === payload.id);
-      const dietaPersistida = { ...payload, ...(persisted.data || {}), id: persisted.data?.id ?? payload.id };
-      return existe
-        ? dietasAtuais.map((dieta) => (dieta.id === payload.id ? dietaPersistida : dieta))
-        : [...dietasAtuais, dietaPersistida];
-    });
-    if (!persisted.persisted) {
-      showToast({ type: 'warning', message: 'Dieta salva apenas localmente.' });
-    }
-
-    showToast({ type: 'success', message: `Dieta ${payload.nome} salva com sucesso.` });
+function ProdutoNutricionalModal({ db, setDb, onClose, showToast }) {
+  const [form, setForm] = useState({ produto: '', subcategoria: 'Ração', unidade_medida: 'kg', quantidade_embalagens: '', tipo_embalagem: 'saco', conteudo_por_embalagem: '', unidade_conteudo: 'kg', valor_unitario: '', fornecedor: '', validade: '', obs: '' });
+  const totalEstoque = Number(form.quantidade_embalagens || 0) * Number(form.conteudo_por_embalagem || 0);
+  const custoTotal = totalEstoque * Number(form.valor_unitario || 0);
+  function salvar() {
+    if (!form.produto.trim()) return;
+    const existente = (db.estoque || []).find((i) => String(i.produto || '').toLowerCase() === form.produto.trim().toLowerCase());
+    setDb((prev) => ({ ...prev, estoque: existente ? prev.estoque.map((item) => Number(item.id) === Number(existente.id) ? { ...item, quantidade_atual: Number(item.quantidade_atual || 0) + totalEstoque, valor_unitario: Number(form.valor_unitario || item.valor_unitario || 0), categoria: 'Nutrição / Alimentação', subcategoria: form.subcategoria, fornecedor: form.fornecedor || item.fornecedor, validade: form.validade || item.validade, metadata: { ...(item.metadata || {}), modulo: 'nutricao' } } : item) : [...(prev.estoque || []), { id: gerarNovoId(prev.estoque || []), produto: form.produto.trim(), categoria: 'Nutrição / Alimentação', subcategoria: form.subcategoria, unidade_medida: form.unidade_medida, quantidade_atual: totalEstoque, valor_unitario: Number(form.valor_unitario || 0), fornecedor: form.fornecedor, validade: form.validade, obs: form.obs, metadata: { modulo: 'nutricao', tipo_embalagem: form.tipo_embalagem, conteudo_por_embalagem: Number(form.conteudo_por_embalagem || 0), unidade_conteudo: form.unidade_conteudo, custo_total: custoTotal } }] }));
+    showToast({ type: 'success', message: existente ? 'Produto vinculado e estoque atualizado.' : 'Produto nutricional cadastrado.' });
     onClose();
   }
-
-  return (
-    <Modal open onClose={onClose} title={initialData?.id ? 'Editar dieta' : 'Cadastrar dieta'} size="lg" footer={<Button onClick={submit}>Salvar dieta</Button>}>
-      <div className="form-grid two">
-        <Input label="Nome da dieta" value={form.nome} error={errors.nome} onChange={(event) => setForm((prev) => ({ ...prev, nome: event.target.value }))} />
-        <label className="ui-input-wrap">
-          <span className="ui-input-label">Lote</span>
-          <select className="ui-input" value={form.lote_id} onChange={(event) => setForm((prev) => ({ ...prev, lote_id: event.target.value }))}>
-            <option value="">Selecione</option>
-            {lotesDisponiveis.map((lote) => (
-              <option key={lote.id} value={lote.id}>{lote.nome}</option>
-            ))}
-          </select>
-          {errors.lote_id ? <small className="input-error">{errors.lote_id}</small> : null}
-        </label>
-      </div>
-
-      <h3 className="modal-section-title">Itens da dieta</h3>
-      {errors.itens ? <small className="input-error full" style={{ marginBottom: 10 }}>{errors.itens}</small> : null}
-
-      <div className="table-responsive" style={{ marginBottom: 14 }}>
-        <table className="dashboard-table herdon-table herdon-table--suplementacao-modal">
-          <thead>
-            <tr>
-              <th>Item</th>
-              <th>Qtd/cabeca/dia</th>
-              <th>Acoes</th>
-            </tr>
-          </thead>
-          <tbody>
-            {form.itens.length === 0 ? (
-              <tr>
-                <td colSpan="3" className="empty-state-td">Nenhum item adicionado.</td>
-              </tr>
-            ) : (
-              form.itens.map((item, index) => (
-                <tr key={`${item.item_estoque_id}-${index}`}>
-                  <td>{estoqueMap.get(Number(item.item_estoque_id))?.produto || 'Item desconhecido'}</td>
-                  <td className="cell-number">{formatNumber(item.qtd_cab_dia, 3)} kg</td>
-                  <td className="cell-actions">
-                    <div className="row-actions row-actions--tight">
-                      <button className="action-btn" type="button" onClick={() => setEditingItemIndex(index)}>Editar</button>
-                      <button
-                        className="action-btn action-btn-danger"
-                        type="button"
-                        onClick={() => setForm((prev) => ({ ...prev, itens: prev.itens.filter((_, itemIndex) => itemIndex !== index) }))}
-                      >
-                        Remover
-                      </button>
-                    </div>
-                  </td>
-                </tr>
-              ))
-            )}
-          </tbody>
-        </table>
-      </div>
-
-      <Button variant="outline" onClick={() => setEditingItemIndex(form.itens.length)}>Adicionar item</Button>
-
-      {editingItemIndex !== null ? (
-        <ItemDietaModal
-          estoqueItens={estoqueItens}
-          initialData={form.itens[editingItemIndex] || null}
-          onCancel={() => setEditingItemIndex(null)}
-          onSave={(itemData) => {
-            setForm((prev) => {
-              const itens = [...prev.itens];
-              if (editingItemIndex < itens.length) {
-                itens[editingItemIndex] = itemData;
-              } else {
-                itens.push(itemData);
-              }
-              return { ...prev, itens };
-            });
-            setEditingItemIndex(null);
-          }}
-          showToast={showToast}
-        />
-      ) : null}
-    </Modal>
-  );
+  return <Modal open onClose={onClose} title="Cadastrar produto nutricional" footer={<Button onClick={salvar}>Salvar produto</Button>} size="lg"><div className="form-grid two"><Input label="Nome do produto" value={form.produto} onChange={(e) => setForm((p) => ({ ...p, produto: e.target.value }))} /><label className="ui-input-wrap"><span className="ui-input-label">Categoria</span><select className="ui-input" value={form.subcategoria} onChange={(e) => setForm((p) => ({ ...p, subcategoria: e.target.value }))}>{CATEGORIAS_NUTRICIONAIS.map((c) => <option key={c}>{c}</option>)}</select></label><label className="ui-input-wrap"><span className="ui-input-label">Unidade de controle</span><select className="ui-input" value={form.unidade_medida} onChange={(e) => setForm((p) => ({ ...p, unidade_medida: e.target.value }))}><option>kg</option><option>g</option><option>tonelada</option><option>saco</option><option>unidade</option><option>litro</option></select></label><Input label="Quantidade em estoque (embalagens)" type="number" value={form.quantidade_embalagens} onChange={(e) => setForm((p) => ({ ...p, quantidade_embalagens: e.target.value }))} /><label className="ui-input-wrap"><span className="ui-input-label">Tipo de embalagem</span><select className="ui-input" value={form.tipo_embalagem} onChange={(e) => setForm((p) => ({ ...p, tipo_embalagem: e.target.value }))}><option>saco</option><option>bag</option><option>unidade</option><option>tonelada</option><option>outro</option></select></label><Input label="Conteúdo por embalagem" type="number" value={form.conteudo_por_embalagem} onChange={(e) => setForm((p) => ({ ...p, conteudo_por_embalagem: e.target.value }))} /><label className="ui-input-wrap"><span className="ui-input-label">Unidade do conteúdo</span><select className="ui-input" value={form.unidade_conteudo} onChange={(e) => setForm((p) => ({ ...p, unidade_conteudo: e.target.value }))}><option>kg</option><option>g</option><option>L</option><option>ml</option><option>unidade</option></select></label><Input label="Custo unitário" type="number" value={form.valor_unitario} onChange={(e) => setForm((p) => ({ ...p, valor_unitario: e.target.value }))} /><Input label="Fornecedor" value={form.fornecedor} onChange={(e) => setForm((p) => ({ ...p, fornecedor: e.target.value }))} /><Input label="Validade" type="date" value={form.validade} onChange={(e) => setForm((p) => ({ ...p, validade: e.target.value }))} /><Input label="Observação" value={form.obs} onChange={(e) => setForm((p) => ({ ...p, obs: e.target.value }))} /></div><p>Total calculado: <strong>{formatNumber(totalEstoque, 2)} {form.unidade_conteudo}</strong> | Custo total: <strong>R$ {formatNumber(custoTotal, 2)}</strong></p></Modal>;
 }
 
-function ItemDietaModal({ estoqueItens, initialData, onSave, onCancel, showToast }) {
-  const [form, setForm] = useState(() => ({
-    item_estoque_id: initialData?.item_estoque_id || '',
-    qtd_cab_dia: initialData?.qtd_cab_dia || '',
-  }));
-  const [errors, setErrors] = useState({});
-
-  function submit() {
-    const nextErrors = {};
-    if (!form.item_estoque_id) nextErrors.item_estoque_id = 'Selecione um item.';
-    if (Number(form.qtd_cab_dia) <= 0) nextErrors.qtd_cab_dia = 'Informe uma quantidade maior que zero.';
-    setErrors(nextErrors);
-
-    if (Object.keys(nextErrors).length) {
-      showToast({ type: 'error', message: 'Corrija os dados do item antes de salvar.' });
-      return;
-    }
-
-    onSave({
-      item_estoque_id: Number(form.item_estoque_id),
-      qtd_cab_dia: Number(form.qtd_cab_dia),
-    });
-    showToast({ type: 'success', message: 'Item da dieta salvo com sucesso.' });
-    onCancel();
-  }
-
-  return (
-    <Modal open onClose={onCancel} title={initialData ? 'Editar item da dieta' : 'Adicionar item a dieta'} footer={<Button onClick={submit}>Salvar item</Button>}>
-      <label className="ui-input-wrap">
-        <span className="ui-input-label">Item de estoque</span>
-        <select className="ui-input" value={form.item_estoque_id} onChange={(event) => setForm((prev) => ({ ...prev, item_estoque_id: event.target.value }))}>
-          <option value="">Selecione</option>
-          {estoqueItens.map((item) => (
-            <option key={item.id} value={item.id}>{item.produto} (saldo: {formatNumber(item.quantidade_atual, 2)})</option>
-          ))}
-        </select>
-        {errors.item_estoque_id ? <small className="input-error">{errors.item_estoque_id}</small> : null}
-      </label>
-      <Input
-        label="Quantidade por cabeca/dia (kg)"
-        type="number"
-        value={form.qtd_cab_dia}
-        error={errors.qtd_cab_dia}
-        onChange={(event) => setForm((prev) => ({ ...prev, qtd_cab_dia: event.target.value }))}
-      />
-    </Modal>
-  );
-}
+function DietaModal({ db, setDb, onClose, showToast }) { const produtos = getProdutosNutricionais(db); const lotes = (db.lotes || []).filter((l) => l.status === 'ativo'); const [form, setForm] = useState({ nome: '', lote_id: '', item_estoque_id: '', qtd_cab_dia: '', tipo_consumo: 'kg/cabeça/dia', obs: '' }); function salvar() { if (!form.nome || !form.item_estoque_id) return; setDb((prev) => ({ ...prev, dietas: [...(prev.dietas || []), { id: gerarNovoId(prev.dietas || []), nome: form.nome, lote_id: Number(form.lote_id) || null, tipo_consumo: form.tipo_consumo, obs: form.obs, itens: [{ item_estoque_id: Number(form.item_estoque_id), qtd_cab_dia: Number(form.qtd_cab_dia || 0) }] }] })); showToast({ type: 'success', message: 'Dieta criada.' }); onClose(); } return <Modal open onClose={onClose} title="Criar dieta" footer={<Button onClick={salvar}>Salvar dieta</Button>}><div className="form-grid two"><Input label="Nome da dieta" value={form.nome} onChange={(e) => setForm((p) => ({ ...p, nome: e.target.value }))} /><label className="ui-input-wrap"><span className="ui-input-label">Lote vinculado (opcional)</span><select className="ui-input" value={form.lote_id} onChange={(e) => setForm((p) => ({ ...p, lote_id: e.target.value }))}><option value="">Sem lote</option>{lotes.map((l) => <option key={l.id} value={l.id}>{l.nome}</option>)}</select></label><label className="ui-input-wrap"><span className="ui-input-label">Produto nutricional</span><select className="ui-input" value={form.item_estoque_id} onChange={(e) => setForm((p) => ({ ...p, item_estoque_id: e.target.value }))}><option value="">Selecione</option>{produtos.map((p) => <option key={p.id} value={p.id}>{p.produto}</option>)}</select></label><Input label="Quantidade por cabeça/dia" type="number" value={form.qtd_cab_dia} onChange={(e) => setForm((p) => ({ ...p, qtd_cab_dia: e.target.value }))} /><label className="ui-input-wrap"><span className="ui-input-label">Tipo de consumo</span><select className="ui-input" value={form.tipo_consumo} onChange={(e) => setForm((p) => ({ ...p, tipo_consumo: e.target.value }))}><option>kg/cabeça/dia</option><option>% do peso vivo</option><option>unidade/cabeça/dia</option></select></label><Input label="Observação" value={form.obs} onChange={(e) => setForm((p) => ({ ...p, obs: e.target.value }))} /></div></Modal>; }
 
 function ConsumoModal({ db, setDb, onClose, showToast }) {
-  const dietas = useMemo(() => getDietasNormalizadas(db), [db]);
-  const dietasMap = useMemo(() => new Map(dietas.map((dieta) => [Number(dieta.lote_id), dieta])), [dietas]);
-  const lotesAtivos = useMemo(() => (db.lotes || []).filter((lote) => lote.status === 'ativo'), [db.lotes]);
-  const animaisMap = useMemo(() => {
-    const map = new Map();
-    (db.animais || []).forEach((animal) => {
-      const loteId = Number(animal.lote_id);
-      if (!map.has(loteId)) {
-        map.set(loteId, []);
-      }
-      map.get(loteId).push(animal);
-    });
-    return map;
-  }, [db.animais]);
-  const estoqueMap = useMemo(() => new Map((db.estoque || []).map((item) => [Number(item.id), item])), [db.estoque]);
-  const [form, setForm] = useState({ lote_id: '', data: getTodayIso(), qtd_total: '' });
-  const [errors, setErrors] = useState({});
-
-  const selectedLote = useMemo(
-    () => lotesAtivos.find((lote) => Number(lote.id) === Number(form.lote_id)) || null,
-    [form.lote_id, lotesAtivos]
-  );
-  const dieta = useMemo(
-    () => (selectedLote ? dietasMap.get(Number(selectedLote.id)) || null : null),
-    [dietasMap, selectedLote]
-  );
-  const itensDieta = useMemo(() => (Array.isArray(dieta?.itens) ? dieta.itens : []), [dieta]);
-  const cabecas = useMemo(
-    () => (animaisMap.get(Number(selectedLote?.id)) || []).reduce((total, animal) => total + Number(animal.qtd || 0), 0),
-    [animaisMap, selectedLote]
-  );
-  const previsto = useMemo(
-    () => itensDieta.reduce((total, item) => total + Number(item.qtd_cab_dia || 0) * cabecas, 0),
-    [cabecas, itensDieta]
-  );
-
-  function validate() {
-    const nextErrors = {};
-    if (!form.lote_id) nextErrors.lote_id = 'Selecione um lote.';
-    if (!form.data) nextErrors.data = 'Informe a data.';
-    if (!dieta) nextErrors.dieta = 'O lote selecionado ainda nao possui dieta cadastrada.';
-
-    const qtdTotalConsumida = Number(form.qtd_total || previsto);
-    if (qtdTotalConsumida <= 0) nextErrors.qtd_total = 'Informe um consumo maior que zero.';
-
-    itensDieta.forEach((item) => {
-      const estoqueItem = estoqueMap.get(Number(item.item_estoque_id));
-      const qtdNecessaria = Number(item.qtd_cab_dia || 0) * cabecas;
-      if (!estoqueItem || Number(estoqueItem.quantidade_atual || 0) < qtdNecessaria) {
-        nextErrors.estoque = `Saldo insuficiente para ${estoqueItem?.produto || 'um item da dieta'}.`;
-      }
-    });
-
-    setErrors(nextErrors);
-    return Object.keys(nextErrors).length === 0;
-  }
-
-  function submit() {
-    if (!validate()) {
-      showToast({ type: 'error', message: errors.estoque || 'Corrija os campos antes de confirmar o consumo.' });
-      return;
+  const lotes = (db.lotes || []).filter((l) => l.status === 'ativo');
+  const produtos = getProdutosNutricionais(db);
+  const dietas = getDietasNormalizadas(db);
+  const [form, setForm] = useState({ data: getTodayIso(), lote_id: '', origem: 'produto', ref_id: '', quantidade: '', unidade: 'kg', obs: '' });
+  const custoEstimado = useMemo(() => {
+    if (form.origem === 'produto') {
+      const p = produtos.find((i) => Number(i.id) === Number(form.ref_id));
+      return Number(form.quantidade || 0) * Number(p?.valor_unitario || 0);
     }
+    const d = dietas.find((i) => Number(i.id) === Number(form.ref_id));
+    const item = produtos.find((p) => Number(p.id) === Number((d?.itens || [])[0]?.item_estoque_id));
+    return Number(form.quantidade || 0) * Number(item?.valor_unitario || 0);
+  }, [form, produtos, dietas]);
 
-    const qtdTotalConsumida = Number(form.qtd_total || previsto);
-
-    setDb((prevDb) => {
-      let estoqueAtualizado = [...(prevDb.estoque || [])];
-      const movimentacoesEstoque = [...(prevDb.movimentacoes_estoque || [])];
-      const movimentacoesFinanceiras = [...(prevDb.movimentacoes_financeiras || [])];
-
-      itensDieta.forEach((item) => {
-        const itemId = Number(item.item_estoque_id);
-        const quantidadeConsumida = Number(item.qtd_cab_dia || 0) * cabecas;
-        const estoqueItem = estoqueMap.get(itemId);
-
-        if (!estoqueItem) {
-          return;
-        }
-
-        estoqueAtualizado = estoqueAtualizado.map((estoque) => (
-          Number(estoque.id) === itemId
-            ? { ...estoque, quantidade_atual: Math.max(0, Number(estoque.quantidade_atual || 0) - quantidadeConsumida) }
-            : estoque
-        ));
-
-        const valorTotal = quantidadeConsumida * Number(estoqueItem.valor_unitario || 0);
-
-        movimentacoesEstoque.push({
-          id: gerarNovoId(movimentacoesEstoque),
-          item_estoque_id: itemId,
-          tipo: 'consumo',
-          lote_id: Number(form.lote_id),
-          quantidade: quantidadeConsumida,
-          data: form.data,
-          valor_total: valorTotal,
-          obs: `Consumo diario - ${estoqueItem.produto}`,
-        });
-
-        movimentacoesFinanceiras.push({
-          id: gerarNovoId(movimentacoesFinanceiras),
-          tipo: 'despesa',
-          categoria: 'Suplementacao',
-          valor: valorTotal,
-          data: form.data,
-          lote_id: Number(form.lote_id),
-          descricao: `Consumo da dieta ${dieta?.nome || 'sem nome'} - ${estoqueItem.produto}`,
-        });
-      });
-
-      return {
-        ...prevDb,
-        estoque: estoqueAtualizado,
-        movimentacoes_estoque: movimentacoesEstoque,
-        movimentacoes_financeiras: movimentacoesFinanceiras,
-        consumo_suplementacao: [
-          ...(prevDb.consumo_suplementacao || []),
-          {
-            id: gerarNovoId(prevDb.consumo_suplementacao || []),
-            lote_id: Number(form.lote_id),
-            data: form.data,
-            qtd_total: qtdTotalConsumida,
-          },
-        ],
-      };
+  const submit = useCallback(() => {
+    const produto = form.origem === 'produto' ? produtos.find((p) => Number(p.id) === Number(form.ref_id)) : null;
+    const dieta = form.origem === 'dieta' ? dietas.find((d) => Number(d.id) === Number(form.ref_id)) : null;
+    const produtoDaDieta = dieta ? produtos.find((p) => Number(p.id) === Number((dieta.itens || [])[0]?.item_estoque_id)) : null;
+    const item = produto || produtoDaDieta;
+    if (!item) return;
+    const qtd = Number(form.quantidade || 0);
+    const saldo = Number(item.quantidade_atual || 0);
+    if (qtd > saldo && !window.confirm('Consumo maior que estoque disponível. Deseja continuar com saldo negativo?')) return;
+    setDb((prev) => {
+      const estoque = (prev.estoque || []).map((e) => Number(e.id) === Number(item.id) ? { ...e, quantidade_atual: Number(e.quantidade_atual || 0) - qtd } : e);
+      const consumoId = gerarNovoId(prev.consumo_suplementacao || []);
+      const movFinId = gerarNovoId(prev.movimentacoes_financeiras || []);
+      return { ...prev, estoque, consumo_suplementacao: [...(prev.consumo_suplementacao || []), { id: consumoId, data: form.data, lote_id: Number(form.lote_id), produto_nome: item.produto, dieta_nome: dieta?.nome || null, qtd_total: qtd, unidade: form.unidade, custo_total: custoEstimado, obs: form.obs }], movimentacoes_financeiras: [...(prev.movimentacoes_financeiras || []), { id: movFinId, tipo: 'despesa', categoria: 'nutricao', subcategoria: 'alimentacao', lote_id: Number(form.lote_id), valor: custoEstimado, data: form.data, descricao: `Consumo nutricional - ${item.produto}`, origem_tipo: 'consumo_suplementacao', origem_id: consumoId }] };
     });
+    showToast({ type: 'success', message: 'Consumo registrado com baixa de estoque e custo financeiro.' }); onClose();
+  }, [form, produtos, dietas, setDb, showToast, onClose, custoEstimado]);
 
-    showToast({ type: 'success', message: 'Consumo diario registrado com sucesso.' });
-    onClose();
-  }
-
-  return (
-    <Modal open onClose={onClose} title="Registrar consumo diario" footer={<Button onClick={submit}>Confirmar consumo</Button>}>
-      <div className="form-grid two">
-        <label className="ui-input-wrap">
-          <span className="ui-input-label">Lote</span>
-          <select className="ui-input" value={form.lote_id} onChange={(event) => setForm((prev) => ({ ...prev, lote_id: event.target.value }))}>
-            <option value="">Selecione</option>
-            {lotesAtivos.map((lote) => (
-              <option key={lote.id} value={lote.id}>{lote.nome}</option>
-            ))}
-          </select>
-          {errors.lote_id ? <small className="input-error">{errors.lote_id}</small> : null}
-        </label>
-        <Input label="Data" type="date" value={form.data} error={errors.data} onChange={(event) => setForm((prev) => ({ ...prev, data: event.target.value }))} />
-        <Input label="Consumo previsto" value={formatNumber(previsto, 2)} readOnly />
-        <Input
-          label="Consumo real (ajuste)"
-          type="number"
-          value={form.qtd_total}
-          error={errors.qtd_total}
-          onChange={(event) => setForm((prev) => ({ ...prev, qtd_total: event.target.value }))}
-        />
-        {errors.dieta ? <small className="input-error full">{errors.dieta}</small> : null}
-        {errors.estoque ? <small className="input-error full">{errors.estoque}</small> : null}
-        <p className="full">Dieta: {dieta?.nome || 'Sem dieta cadastrada'}</p>
-      </div>
-    </Modal>
-  );
+  return <Modal open onClose={onClose} title="Registrar consumo diário" footer={<Button onClick={submit}>Salvar consumo</Button>}><div className="form-grid two"><Input label="Data" type="date" value={form.data} onChange={(e) => setForm((p) => ({ ...p, data: e.target.value }))} /><label className="ui-input-wrap"><span className="ui-input-label">Lote</span><select className="ui-input" value={form.lote_id} onChange={(e) => setForm((p) => ({ ...p, lote_id: e.target.value }))}><option value="">Selecione</option>{lotes.map((l) => <option key={l.id} value={l.id}>{l.nome}</option>)}</select></label><label className="ui-input-wrap"><span className="ui-input-label">Produto ou dieta</span><select className="ui-input" value={form.origem} onChange={(e) => setForm((p) => ({ ...p, origem: e.target.value, ref_id: '' }))}><option value="produto">Produto</option><option value="dieta">Dieta</option></select></label><label className="ui-input-wrap"><span className="ui-input-label">Seleção</span><select className="ui-input" value={form.ref_id} onChange={(e) => setForm((p) => ({ ...p, ref_id: e.target.value }))}><option value="">Selecione</option>{(form.origem === 'produto' ? produtos : dietas).map((i) => <option key={i.id} value={i.id}>{i.produto || i.nome}</option>)}</select></label><Input label="Quantidade consumida" type="number" value={form.quantidade} onChange={(e) => setForm((p) => ({ ...p, quantidade: e.target.value }))} /><label className="ui-input-wrap"><span className="ui-input-label">Unidade</span><select className="ui-input" value={form.unidade} onChange={(e) => setForm((p) => ({ ...p, unidade: e.target.value }))}><option>kg</option><option>g</option><option>litro</option><option>unidade</option></select></label><Input label="Observação" value={form.obs} onChange={(e) => setForm((p) => ({ ...p, obs: e.target.value }))} /></div><p>Custo estimado: <strong>R$ {formatNumber(custoEstimado, 2)}</strong></p></Modal>;
 }
