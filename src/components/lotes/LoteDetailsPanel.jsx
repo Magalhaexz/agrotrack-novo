@@ -31,12 +31,12 @@ export default function LoteDetailsPanel({
 }) {
   return (
     <div className="rebanho-page">
-      <div className="rebanho-header">
+      <div className="rebanho-header page-header">
         <div>
           <h1>{lote.nome}</h1>
-          <p>Fazenda {lote.fazendaNome || 'não vinculada'} · Status {lote.status}</p>
+          <p>Fazenda {lote.fazendaNome || 'não vinculada'} • Status {lote.status}</p>
         </div>
-        <div className="lote-actions">
+        <div className="lote-actions page-actions action-row">
           <Button variant="ghost" onClick={onBack}>Voltar para lotes</Button>
           <Button variant="outline" onClick={onNovaPesagem} disabled={!canEditPesagem || lote.bloqueado}>Nova pesagem</Button>
           <Button variant="warning" onClick={onNovaRetirada} disabled={!canMove || lote.bloqueado}>Retirada</Button>
@@ -44,7 +44,7 @@ export default function LoteDetailsPanel({
         </div>
       </div>
 
-      <div className="tabs-row tabs-row-scroll">
+      <div className="tabs-row tabs-row-scroll tab-bar">
         {LOTE_TABS.map((tab) => (
           <button
             type="button"

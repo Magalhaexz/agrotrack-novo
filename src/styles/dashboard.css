@@ -949,3 +949,96 @@
     gap: 12px;
   }
 }
+
+/* SPRINT21B - Dashboard cockpit and visual hierarchy polish */
+.dashboard-page {
+  gap: 18px;
+}
+
+.dashboard-toolbar {
+  align-items: center;
+  gap: 14px;
+  padding: 2px 2px 2px;
+}
+
+.dashboard-toolbar-copy p {
+  max-width: 680px;
+  margin-top: 8px;
+  font-size: 0.92rem;
+  line-height: 1.5;
+}
+
+.dashboard-toolbar-actions {
+  gap: 8px;
+}
+
+.dashboard-hero-shell {
+  padding: 16px 18px;
+}
+
+.dashboard-section-title {
+  margin: 0;
+  font-size: 1.08rem;
+  color: #ecf3ef;
+}
+
+.dashboard-section-subtitle {
+  margin-top: 6px;
+  color: rgba(214, 223, 219, 0.74);
+  font-size: 0.86rem;
+}
+
+.dashboard-executive-strip--compact {
+  gap: 12px;
+}
+
+.dashboard-grid--kpi-main {
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+
+.kpi-panel {
+  min-height: 150px;
+  padding: 18px;
+}
+
+.kpi-panel-header {
+  margin-bottom: 16px;
+}
+
+.kpi-panel strong {
+  margin-bottom: 8px;
+  font-size: clamp(1.5rem, 1.7vw, 2.2rem);
+}
+
+.kpi-variation {
+  min-height: 30px;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+@media (max-width: 1200px) {
+  .dashboard-grid--kpi-main {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 760px) {
+  .dashboard-grid--kpi-main {
+    grid-template-columns: 1fr;
+  }
+
+  .dashboard-hero-shell {
+    padding: 14px;
+  }
+
+  .dashboard-toolbar-actions {
+    width: 100%;
+    justify-content: flex-start;
+  }
+
+  .dashboard-toolbar-actions .ui-button {
+    min-height: 44px;
+  }
+}

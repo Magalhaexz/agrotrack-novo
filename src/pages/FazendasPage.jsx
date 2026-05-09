@@ -655,9 +655,9 @@ export default function FazendasPage({ db, setDb, onConfirmAction, session: sess
     <div className="page">
       <PageHeader
         title="Fazendas"
-        subtitle="Gestão completa das propriedades e suas capacidades"
+        subtitle="Organize propriedades, capacidade e responsáveis da operação."
         actions={(
-          <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+          <div className="action-row">
             <Button disabled={!hasPermission('fazendas:editar')} onClick={() => {
               if (!hasPermission('fazendas:editar')) {
                 showToast({ type: 'error', message: mensagemSemPermissao });
@@ -667,7 +667,7 @@ export default function FazendasPage({ db, setDb, onConfirmAction, session: sess
               setOpenModal(true);
             }}
             >
-              + Nova Fazenda
+              Cadastrar fazenda
             </Button>
           </div>
         )}
@@ -676,10 +676,23 @@ export default function FazendasPage({ db, setDb, onConfirmAction, session: sess
       {cards.length === 0 ? (
         <div className="ui-card empty-state">
           <strong>Nenhuma fazenda cadastrada.</strong>
-          <span>Use o botão "Nova Fazenda" para começar.</span>
+          <span>Cadastre a primeira fazenda para organizar lotes, animais e operação.</span>
+          <Button
+            variant="primary"
+            onClick={() => {
+              if (!hasPermission('fazendas:editar')) {
+                showToast({ type: 'error', message: mensagemSemPermissao });
+                return;
+              }
+              setEditando(null);
+              setOpenModal(true);
+            }}
+          >
+            Cadastrar fazenda
+          </Button>
         </div>
       ) : (
-        <div className="grid-3">
+        <div className="grid-3 fazendas-grid">
           {cards.map((fazenda) => (
             <FazendaCard
               key={fazenda.id}

@@ -1,4 +1,4 @@
-import { useMemo, useState, useEffect } from 'react';
+﻿import { useMemo, useState, useEffect } from 'react';
 import Modal from '../ui/Modal';
 import Button from '../ui/Button';
 import { formatarNumero } from '../utils/formatters';
@@ -26,18 +26,11 @@ function normalizarInitialForm(itens, itemInicialId) {
   return { ...FORM_VAZIO, item_id: initialItemId };
 }
 
-export default function SaidaEstoqueModal({
-  itens = [],
-  lotes = [],
-  itemInicialId = '',
-  handleRegistrarSaidaEstoque,
-  onClose,
-}) {
+export default function SaidaEstoqueModal({ itens = [], lotes = [], itemInicialId = '', handleRegistrarSaidaEstoque, onClose }) {
   const [salvando, setSalvando] = useState(false);
   const [form, setForm] = useState(() => normalizarInitialForm(itens, itemInicialId));
   const [erro, setErro] = useState('');
 
-  // Atualiza o formulário se itemInicialId ou itens mudarem
   useEffect(() => {
     setForm(normalizarInitialForm(itens, itemInicialId));
     setErro('');
@@ -60,160 +53,90 @@ export default function SaidaEstoqueModal({
 
   async function handleSubmit(e) {
     e.preventDefault();
-    setErro(''); // Limpa erros anteriores
+    setErro('');
     const quantidade = Number(form.quantidade || 0);
 
-    if (!form.item_id) {
-      setErro('Selecione um item.');
-      return;
-    }
-
-    if (!form.data) {
-      setErro('Informe a data.');
-      return;
-    }
-
-    if (quantidade <= 0) {
-      setErro('Informe uma quantidade válida.');
-      return;
-    }
-
-    if (quantidade > saldoAtual) {
-      setErro(`Saldo insuficiente. Disponível: ${formatarNumero(saldoAtual)} ${unidade}`);
-      return;
-    }
+    if (!form.item_id) return setErro('Selecione um item.');
+    if (!form.data) return setErro('Informe a data.');
+    if (quantidade <= 0) return setErro('Informe uma quantidade válida.');
+    if (quantidade > saldoAtual) return setErro(`Saldo insuficiente. Disponível: ${formatarNumero(saldoAtual)} ${unidade}`);
 
     setSalvando(true);
     try {
       await Promise.resolve(handleRegistrarSaidaEstoque({
         itemId: Number(form.item_id),
-        loteId: form.lote_id ? Number(form.lote_id) : null, // Usar null para "Sem lote"
+        loteId: form.lote_id ? Number(form.lote_id) : null,
         quantidade,
         tipo: form.tipo,
         data: form.data,
         obs: form.obs.trim(),
       }));
-      // alert('Saída registrada com sucesso'); // Evitar alert nativo
       onClose();
-    } catch (error) {
-      console.error('Erro ao registrar saída:', error);
+    } catch {
       setErro('Erro ao registrar saída. Tente novamente.');
     } finally {
       setSalvando(false);
     }
   }
 
+  const footer = (
+    <div className="modal-footer action-row" style={{ width: '100%' }}>
+      <Button variant="ghost" onClick={onClose}>Cancelar</Button>
+      <Button onClick={handleSubmit} disabled={salvando}>{salvando ? 'Salvando...' : 'Confirmar saída'}</Button>
+    </div>
+  );
+
   return (
-    <Modal
-      open
-      onClose={onClose}
-      title="Registrar saída / consumo"
-      footer={(
-        <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8 }}>
-          <Button variant="ghost" onClick={onClose}>Cancelar</Button>
-          <Button onClick={handleSubmit} disabled={salvando}>
-            {salvando ? 'Salvando...' : 'Confirmar saída'}
-          </Button>
-        </div>
-      )}
-    >
-      <form onSubmit={handleSubmit} style={{ display: 'grid', gap: 14 }}>
-        <label className="ui-input-wrap">
-          <span className="ui-input-label">Item</span>
-          <select
-            className="ui-input"
-            name="item_id"
-            value={form.item_id}
-            onChange={handleChange}
-          >
-            <option value="">Selecione</option>
-            {itens.map((item) => (
-              <option key={item.id} value={item.id}>
-                {item.produto} (Saldo: {formatarNumero(item.quantidade_atual)} {item.unidade})
-              </option>
-            ))}
-          </select>
-        </label>
+    <Modal open onClose={onClose} title="Registrar saída / consumo" subtitle="Baixe quantidades com rastreabilidade por tipo e lote." footer={footer}>
+      <form onSubmit={handleSubmit} className="form-section">
+        <section className="section-card">
+          <div className="section-header"><h4>Dados principais</h4></div>
+          <div className="form-grid two">
+            <label className="ui-input-wrap">
+              <span className="ui-input-label">Item</span>
+              <select className="ui-input" name="item_id" value={form.item_id} onChange={handleChange}>
+                <option value="">Selecione</option>
+                {itens.map((item) => (
+                  <option key={item.id} value={item.id}>
+                    {item.produto} (Saldo: {formatarNumero(item.quantidade_atual)} {item.unidade})
+                  </option>
+                ))}
+              </select>
+            </label>
 
-        <div className="grid-2">
-          <label className="ui-input-wrap">
-            <span className="ui-input-label">Lote vinculado (opcional)</span>
-            <select
-              className="ui-input"
-              name="lote_id"
-              value={form.lote_id}
-              onChange={handleChange}
-            >
-              <option value="">Sem lote</option>
-              {lotesAtivos.map((lote) => (
-                <option key={lote.id} value={lote.id}>
-                  {lote.nome}
-                </option>
-              ))}
-            </select>
-          </label>
+            <label className="ui-input-wrap">
+              <span className="ui-input-label">Tipo de saída</span>
+              <select className="ui-input" name="tipo" value={form.tipo} onChange={handleChange}>
+                {TIPOS_SAIDA.map((tipo) => <option key={tipo.value} value={tipo.value}>{tipo.label}</option>)}
+              </select>
+            </label>
 
-          <label className="ui-input-wrap">
-            <span className="ui-input-label">Tipo de saída</span>
-            <select
-              className="ui-input"
-              name="tipo"
-              value={form.tipo}
-              onChange={handleChange}
-            >
-              {TIPOS_SAIDA.map((tipo) => (
-                <option key={tipo.value} value={tipo.value}>
-                  {tipo.label}
-                </option>
-              ))}
-            </select>
-          </label>
-        </div>
+            <label className="ui-input-wrap">
+              <span className="ui-input-label">Lote vinculado (opcional)</span>
+              <select className="ui-input" name="lote_id" value={form.lote_id} onChange={handleChange}>
+                <option value="">Sem lote</option>
+                {lotesAtivos.map((lote) => <option key={lote.id} value={lote.id}>{lote.nome}</option>)}
+              </select>
+            </label>
 
-        <div className="grid-2">
-          <label className="ui-input-wrap">
-            <span className="ui-input-label">Quantidade</span>
-            <input
-              className="ui-input"
-              name="quantidade"
-              type="number"
-              step="0.01"
-              max={saldoAtual}
-              min={0}
-              value={form.quantidade}
-              onChange={handleChange}
-            />
-          </label>
+            <label className="ui-input-wrap">
+              <span className="ui-input-label">Quantidade ({unidade})</span>
+              <input className="ui-input" name="quantidade" type="number" step="0.01" max={saldoAtual} min={0} value={form.quantidade} onChange={handleChange} />
+            </label>
 
-          <label className="ui-input-wrap">
-            <span className="ui-input-label">Data</span>
-            <input
-              className="ui-input"
-              name="data"
-              type="date"
-              max={new Date().toISOString().slice(0, 10)}
-              value={form.data}
-              onChange={handleChange}
-            />
-          </label>
-        </div>
+            <label className="ui-input-wrap">
+              <span className="ui-input-label">Data</span>
+              <input className="ui-input" name="data" type="date" max={hojeISO()} value={form.data} onChange={handleChange} />
+            </label>
 
-        <label className="ui-input-wrap">
-          <span className="ui-input-label">Observações</span>
-          <textarea
-            className="ui-input"
-            name="obs"
-            value={form.obs}
-            onChange={handleChange}
-            style={{ minHeight: 90, resize: 'vertical' }}
-          />
-        </label>
+            <label className="ui-input-wrap full">
+              <span className="ui-input-label">Observação</span>
+              <textarea className="ui-input" name="obs" value={form.obs} onChange={handleChange} style={{ minHeight: 90, resize: 'vertical' }} />
+            </label>
+          </div>
+        </section>
 
-        {erro && (
-          <p style={{ margin: 0, color: 'var(--color-danger)', fontSize: '0.85rem' }}>
-            {erro}
-          </p>
-        )}
+        {erro ? <p style={{ margin: 0, color: 'var(--color-danger)', fontSize: '0.85rem' }}>{erro}</p> : null}
       </form>
     </Modal>
   );
