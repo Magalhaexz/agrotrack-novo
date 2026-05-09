@@ -175,15 +175,6 @@ export default function EstoquePage({ db, setDb, onRegistrarSaidaEstoque }) {
         </div>
       </div>
 
-      <Card title="Como funciona" subtitle="Cadastro, entrada e saída em poucos passos." >
-        <div className="dashboard-list">
-          <div className="dashboard-list-item"><div className="dashboard-list-copy"><strong>Cadastrar item</strong><p>Cria o item base do Estoque Geral.</p></div></div>
-          <div className="dashboard-list-item"><div className="dashboard-list-copy"><strong>Registrar entrada</strong><p>Adiciona quantidade em item já cadastrado.</p></div></div>
-          <div className="dashboard-list-item"><div className="dashboard-list-copy"><strong>Registrar saída</strong><p>Baixa quantidade de item existente.</p></div></div>
-          <div className="dashboard-list-item"><div className="dashboard-list-copy"><strong>Separação com Nutrição / Suplementação</strong><p>Itens de alimentação e suplementação devem ser priorizados no módulo Nutrição / Suplementação. Se já existirem no Estoque, a separação é somente por classificação visual.</p></div></div>
-        </div>
-      </Card>
-
       <div className="dashboard-grid dashboard-grid--kpi-secondary">
         <Card className="kpi-card" title="Total de itens">{resumo.total}</Card>
         <Card className="kpi-card" title="Itens críticos">{resumo.criticos}</Card>

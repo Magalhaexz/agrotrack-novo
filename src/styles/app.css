@@ -8785,3 +8785,14 @@ html, body, #root, .app, .main, .main-content, .page { max-width: 100%; }
     white-space: nowrap;
   }
 }
+
+/* SPRINT22D - Estoque cleanup/empty-state compaction */
+.page--estoque .empty-box {
+  min-height: 96px;
+  padding: 16px;
+}
+
+.page--estoque .empty-box > .ui-button,
+.page--estoque .empty-box > button {
+  min-height: 44px;
+}
