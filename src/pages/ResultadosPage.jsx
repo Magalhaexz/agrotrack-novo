@@ -22,6 +22,7 @@ import Input from '../components/ui/Input';
 import Table from '../components/ui/Table';
 import { calcLote, formatCurrency, formatDate, formatNumber } from '../utils/calculations';
 import { getResumoLote } from '../domain/resumoLote';
+import { exportarCsvCompatExcel, exportarExcelXmlCompat } from '../utils/exportadores';
 import '../styles/relatorios.css';
 
 const REPORT_TYPES = [
@@ -190,32 +191,42 @@ export default function ResultadosPage({ db }) {
     setIsExporting(true);
     setValidationError('');
     try {
-      const csv = buildCsvFromSheets(sheets);
-      const blob = new Blob([`\uFEFF${csv}`], { type: 'text/csv;charset=utf-8;' });
-      const url = URL.createObjectURL(blob);
-      const anchor = document.createElement('a');
-      anchor.href = url;
-      anchor.download = `${activeReport.exportConfig.filename}.csv`;
-      document.body.appendChild(anchor);
-      anchor.click();
-      document.body.removeChild(anchor);
-      URL.revokeObjectURL(url);
+      const primary = sheets[0];
+      const columns = (primary.columns || []).map((key) => ({ key, header: formatCsvHeader(key) }));
+      exportarCsvCompatExcel({ filename: activeReport.exportConfig.filename, rows: primary.rows || [], columns });
     } finally {
       setIsExporting(false);
     }
   }
 
+  function exportarExcelArquivo() {
+    const sheets = Array.isArray(activeReport?.exportConfig?.sheets) ? activeReport.exportConfig.sheets : [];
+    if (!sheets.length) {
+      setValidationError('Nenhum registro encontrado');
+      return;
+    }
+    exportarExcelXmlCompat({
+      filename: activeReport.exportConfig.filename,
+      sheets: sheets.map((sheet) => ({
+        name: sheet.name,
+        rows: sheet.rows || [],
+        columns: (sheet.columns || []).map((key) => ({ key, header: formatCsvHeader(key) })),
+      })),
+    });
+  }
+
   return (
-    <div className="reports-page reports-page--rebuilt">
+    <div className="reports-page reports-page--rebuilt" data-print-date={new Date().toLocaleDateString('pt-BR')}>
       <PageHeader
-        title="Relatorios"
-        subtitle="Filtros rapidos, leitura executiva e tabelas prontas para exportacao."
+        title="Relatórios / Resultados"
+        subtitle="Resumo financeiro e operacional com filtros, exportações e impressão." 
         actions={(
           <div className="reports-page-actions">
             <Button variant="outline" onClick={resetFilters}>Limpar filtros</Button>
             <Button variant="outline" onClick={() => window.print()}>Imprimir</Button>
+            <Button variant="outline" onClick={exportarExcelArquivo}>Exportar Excel</Button>
             <Button variant="primary" onClick={exportarCsv} loading={isExporting}>Exportar CSV</Button>
-            <Button loading={isGenerating} onClick={applyFilters}>Atualizar visao</Button>
+            <Button loading={isGenerating} onClick={applyFilters}>Atualizar visão</Button>
           </div>
         )}
       />
@@ -1122,33 +1133,7 @@ function createExportConfig(baseName, filters, sheets) {
   };
 }
 
-function buildCsvFromSheets(sheets) {
-  const lines = [];
-  sheets.forEach((sheet, index) => {
-    const rows = Array.isArray(sheet.rows) ? sheet.rows : [];
-    const columns = rows.length ? Object.keys(rows[0]) : sheet.columns || [];
-    if (index > 0) lines.push('');
-    lines.push(`Aba: ${sheet.name}`);
-    if (!columns.length) {
-      lines.push('Observação;Nenhum registro encontrado');
-      return;
-    }
-    lines.push(columns.map((col) => toCsvCell(formatCsvHeader(col))).join(';'));
-    if (!rows.length) {
-      lines.push(toCsvCell('Nenhum registro encontrado'));
-      return;
-    }
-    rows.forEach((row) => {
-      lines.push(columns.map((col) => toCsvCell(toSafeExportValue(row[col]))).join(';'));
-    });
-  });
-  return lines.join('\n');
-}
 
-function toCsvCell(value) {
-  const text = String(value ?? '').replace(/"/g, '""');
-  return `"${text}"`;
-}
 
 function formatCsvHeader(key) {
   const map = {
@@ -1168,11 +1153,6 @@ function formatCsvHeader(key) {
     .replace(/^./, (char) => char.toUpperCase());
 }
 
-function toSafeExportValue(value) {
-  if (value == null || value === '') return 'Sem dados suficientes';
-  if (typeof value === 'number' && Number.isNaN(value)) return 'Estimativa indisponível';
-  return value;
-}
 
 function buildLotHighlights(rows) {
   if (!rows.length) {

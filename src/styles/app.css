@@ -1375,6 +1375,193 @@ a:hover {
   }
 }
 
+/* SPRINT20I - mobile layout hardening for shell, dashboard, calendar and estoque */
+@media (max-width: 900px) {
+  .header.top-header {
+    height: auto;
+    min-height: 58px;
+    padding: 6px 10px;
+    align-items: center;
+    overflow: hidden;
+  }
+
+  .mobile-header-core {
+    flex: 1;
+    min-width: 0;
+  }
+
+  .mobile-header-brand {
+    min-width: 0;
+    max-width: calc(100vw - 132px);
+  }
+
+  .mobile-header-menu-btn,
+  .mobile-utility-trigger,
+  .header-notification-btn {
+    width: 44px;
+    height: 44px;
+    min-height: 44px;
+  }
+
+  .main,
+  .main-content {
+    padding-bottom: calc(var(--herdon-mobile-bottomnav-height) + env(safe-area-inset-bottom) + 28px);
+  }
+
+  .page,
+  .page-container,
+  .dashboard-page,
+  .calendario-page,
+  .page--estoque {
+    padding-bottom: calc(var(--herdon-mobile-bottomnav-height) + env(safe-area-inset-bottom) + 18px);
+  }
+
+  .mobile-fab {
+    bottom: calc(var(--herdon-mobile-bottomnav-height) + env(safe-area-inset-bottom) + 16px);
+  }
+
+  .dashboard-toolbar {
+    display: grid;
+    gap: 12px;
+    align-items: start;
+  }
+
+  .dashboard-toolbar-copy h1 {
+    font-size: clamp(1.45rem, 7vw, 1.95rem);
+    line-height: 1.1;
+  }
+
+  .dashboard-toolbar-copy p {
+    font-size: 0.88rem;
+    line-height: 1.45;
+    margin-top: 6px;
+  }
+
+  .dashboard-toolbar-actions {
+    width: 100%;
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 8px;
+  }
+
+  .dashboard-toolbar-actions > * {
+    width: 100%;
+    min-height: 44px;
+  }
+
+  .dashboard-grid--kpi-main {
+    grid-template-columns: 1fr;
+    gap: 10px;
+  }
+
+  .kpi-panel,
+  .kpi-panel--compact {
+    min-height: 118px;
+    padding: 16px;
+  }
+
+  .calendar-shell {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 12px;
+  }
+
+  .calendar-toolbar {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 8px;
+  }
+
+  .calendar-month-grid {
+    gap: 4px;
+  }
+
+  .calendar-day-cell {
+    min-height: 54px;
+    padding: 4px;
+    overflow: hidden;
+  }
+
+  .calendar-day-events,
+  .calendar-day-event,
+  .calendar-day-event-title {
+    display: none;
+  }
+
+  .calendar-day-head {
+    font-size: 0.72rem;
+    line-height: 1.1;
+  }
+
+  .calendar-day-dot {
+    width: 8px;
+    height: 8px;
+    margin-top: 4px;
+  }
+
+  .calendar-event-card,
+  .calendar-upcoming-item {
+    overflow: hidden;
+  }
+
+  .calendar-event-content,
+  .calendar-event-title,
+  .calendar-event-meta {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .page--estoque .rebanho-header,
+  .page--estoque .lote-actions,
+  .page--estoque .dashboard-grid--kpi-secondary {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 10px;
+  }
+
+  .page--estoque .empty-state,
+  .page--estoque .empty-box,
+  .page--estoque .calendar-empty-state {
+    text-align: left;
+    padding: 16px;
+    border-radius: 12px;
+  }
+
+  .page--estoque .filters-wrap,
+  .page--estoque .filters-bar {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 8px;
+  }
+
+  .page--estoque .filters-wrap > *,
+  .page--estoque .filters-bar > * {
+    width: 100%;
+    min-height: 44px;
+  }
+}
+
+@media (max-width: 640px) {
+  .dashboard-toolbar-actions {
+    grid-template-columns: 1fr;
+  }
+
+  .calendar-month-grid {
+    gap: 3px;
+  }
+
+  .calendar-day-cell {
+    min-height: 48px;
+    padding: 3px;
+  }
+
+  .calendar-weekdays span {
+    font-size: 0.62rem;
+  }
+}
+
 @media (max-width: 600px) {
   .page-header h1 {
     font-size: 1.5rem;
@@ -8267,5 +8454,334 @@ body {
 @media (min-width: 901px) {
   .mobile-header-core {
     display: none !important;
+  }
+}
+
+@media print {
+  body { background: #fff !important; color: #111 !important; }
+  .sidebar, .app-header, .mobile-bottom-nav, .mobile-header-core, .mobile-fab,
+  .page-actions, .reports-page-actions, button, .action-btn, .no-print { display: none !important; }
+  .main, .page, .reports-page { padding: 0 !important; margin: 0 !important; background: #fff !important; }
+  .card, .reports-card, table { background: #fff !important; color: #111 !important; border-color: #d1d5db !important; }
+  .table-responsive { overflow: visible !important; }
+  tr, td, th, .card { page-break-inside: avoid; }
+  .reports-page::before { content: 'HERDON - Relatório\A Emissão: ' attr(data-print-date); white-space: pre; display: block; margin-bottom: 12px; font-weight: 700; color: #111; }
+}
+
+.config-actions-wrap .action-btn,
+.funcionario-row .action-btn,
+.funcionario-row .ui-input,
+.configuracoes-page .ui-input,
+.configuracoes-page button {
+  min-height: 44px;
+}
+
+.funcionario-row {
+  display: grid;
+  grid-template-columns: auto 1fr auto auto;
+  gap: 10px;
+  align-items: center;
+}
+
+@media (max-width: 900px) {
+  .table-responsive { overflow-x: auto; }
+  .dashboard-table { min-width: 680px; }
+  .funcionario-row {
+    grid-template-columns: auto 1fr;
+    align-items: start;
+  }
+  .funcionario-row .funcionario-phone,
+  .funcionario-row .funcionario-status,
+  .funcionario-row .row-actions {
+    grid-column: 2;
+  }
+  .funcionario-row .row-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin-top: 6px;
+  }
+  .config-actions-wrap {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+}
+
+.tab-bar {
+  display: flex;
+  gap: 8px;
+  flex-wrap: nowrap;
+  overflow-x: auto;
+  padding-bottom: 4px;
+}
+
+.animais-empty-state,
+.empty-box,
+.empty-state-td {
+  min-height: 120px;
+}
+
+.dashboard-grid--kpi-main .card,
+.kpi-card--compact {
+  min-height: 96px;
+}
+
+.page-actions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+@media (max-width: 900px) {
+  .animais-hero,
+  .rebanho-header,
+  .page-header {
+    display: grid;
+    gap: 10px;
+  }
+  .page-actions,
+  .lote-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+  .dashboard-grid--kpi-main {
+    grid-template-columns: 1fr 1fr;
+  }
+}
+
+/* SPRINT21F - Financeiro e Relatórios visual polish */
+.financeiro-page .financeiro-header,
+.reports-page--rebuilt .page-header {
+  align-items: end;
+  gap: 12px;
+}
+
+.financeiro-page .lote-actions,
+.reports-page-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.financeiro-page .lote-actions > *,
+.reports-page-actions > * {
+  min-height: 44px;
+}
+
+.financeiro-page .rebanho-filters,
+.reports-filter-grid--compact {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.financeiro-page .data-table th,
+.reports-page--rebuilt .dashboard-table th,
+.reports-page--rebuilt table th {
+  font-weight: 700;
+}
+
+.financeiro-page .data-table td:nth-child(3),
+.financeiro-page .data-table td:nth-child(4),
+.financeiro-page .data-table td:nth-child(5),
+.financeiro-page .data-table td:nth-child(6),
+.financeiro-page .data-table td:nth-child(7),
+.financeiro-page .data-table td:nth-child(8),
+.financeiro-page .data-table td:nth-child(9) {
+  text-align: right;
+}
+
+.financeiro-page .empty-state,
+.reports-page--rebuilt .empty-state,
+.reports-page--rebuilt .empty-box {
+  padding: 16px;
+  border-radius: 12px;
+  border: 1px dashed var(--color-border);
+  background: rgba(255, 255, 255, 0.02);
+}
+
+.financeiro-page .ui-input-wrap,
+.reports-page--rebuilt .ui-input-wrap {
+  gap: 6px;
+}
+
+@media (max-width: 900px) {
+  .financeiro-page .financeiro-header,
+  .reports-page--rebuilt .page-header {
+    display: grid;
+    grid-template-columns: 1fr;
+    align-items: start;
+  }
+
+  .financeiro-page .lote-actions,
+  .reports-page-actions,
+  .financeiro-page .rebanho-filters,
+  .reports-filter-grid--compact {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 8px;
+  }
+
+  .financeiro-page .lote-actions > *,
+  .reports-page-actions > *,
+  .financeiro-page .rebanho-filters > * {
+    width: 100%;
+    min-height: 44px;
+  }
+
+  .financeiro-page .table-responsive,
+  .reports-page--rebuilt .table-responsive {
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+}
+
+/* SPRINT21G - Admin, Tarefas e Sanitário visual polish */
+.config-page > header,
+.page--funcionarios .page-header,
+.tarefas-page .page-header,
+.page--sanitario .page-header {
+  display: grid;
+  gap: 8px;
+}
+
+.config-page .config-tabs,
+.page--funcionarios .filters-bar,
+.tarefas-page .tarefas-filters {
+  border: 1px solid var(--color-border);
+  background: rgba(255, 255, 255, 0.02);
+  border-radius: 12px;
+}
+
+.config-page .table-responsive,
+.page--funcionarios .funcionarios-list-shell,
+.page--sanitario .sanitario-table-shell {
+  overflow: hidden;
+  border-radius: 12px;
+}
+
+.config-page .config-actions-wrap,
+.page--funcionarios .row-actions,
+.tarefas-page .kanban-card-actions,
+.page--sanitario .row-actions {
+  gap: 8px;
+}
+
+.config-page button,
+.page--funcionarios button,
+.tarefas-page button,
+.page--sanitario button {
+  min-height: 44px;
+}
+
+.tarefas-page .kanban-card-meta span,
+.page--sanitario .herdon-table td,
+.config-page .dashboard-table td {
+  word-break: break-word;
+}
+
+@media (max-width: 900px) {
+  .config-page .config-tabs,
+  .config-page .config-grid,
+  .page--funcionarios .filters-bar,
+  .tarefas-page .tarefas-filters,
+  .page--sanitario .form-grid.two,
+  .page--sanitario .summary-cards-grid {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 8px;
+  }
+
+  .config-page .config-actions,
+  .config-page .config-actions-wrap,
+  .page--funcionarios .row-actions,
+  .tarefas-page .kanban-card-actions,
+  .page--sanitario .row-actions {
+    display: flex;
+    flex-wrap: wrap;
+  }
+
+  .config-page .config-actions > *,
+  .config-page .config-actions-wrap > *,
+  .page--funcionarios .filters-bar > *,
+  .page--funcionarios .row-actions > *,
+  .tarefas-page .kanban-card-actions > *,
+  .page--sanitario .row-actions > * {
+    width: 100%;
+    min-height: 44px;
+  }
+}
+
+/* SPRINT21H - final visual QA and regression hardening */
+html, body, #root, .app, .main, .main-content, .page { max-width: 100%; }
+
+.page-header,
+.rebanho-header,
+.financeiro-header,
+.page-actions,
+.lote-actions,
+.tab-buttons,
+.tab-bar {
+  min-width: 0;
+}
+
+.tab-buttons,
+.tab-bar,
+.header-tabs,
+.header-tabs-shell {
+  overflow-x: auto;
+  scrollbar-width: thin;
+  -webkit-overflow-scrolling: touch;
+}
+
+.table-responsive,
+.responsive-table-wrap {
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+}
+
+.modal-content,
+.ui-modal,
+.modal,
+[role='dialog'] {
+  max-height: min(88dvh, calc(100dvh - env(safe-area-inset-top) - env(safe-area-inset-bottom) - 20px));
+}
+
+.modal-footer,
+.ui-modal-footer {
+  position: sticky;
+  bottom: 0;
+  background: inherit;
+  z-index: 2;
+}
+
+@media (max-width: 900px) {
+  .page,
+  .page-container,
+  .reports-page,
+  .dashboard-page,
+  .tarefas-page,
+  .page--sanitario,
+  .page--funcionarios,
+  .config-page {
+    padding-bottom: calc(var(--herdon-mobile-bottomnav-height) + env(safe-area-inset-bottom) + 20px);
+  }
+
+  .tab-buttons > *,
+  .tab-bar > *,
+  .page-actions > *,
+  .lote-actions > * {
+    min-height: 44px;
+    flex-shrink: 0;
+  }
+
+  .dashboard-table th,
+  .dashboard-table td,
+  .data-table th,
+  .data-table td {
+    white-space: nowrap;
   }
 }
