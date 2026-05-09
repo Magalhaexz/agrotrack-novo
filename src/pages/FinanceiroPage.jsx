@@ -239,15 +239,17 @@ export default function FinanceiroPage({ db, setDb }) {
       <div className="rebanho-header financeiro-header">
         <div>
           <h1>Financeiro</h1>
-          <p className="financeiro-subtitle">Acompanhe DRE, lotes, lançamentos e pagamentos diários em uma visão única.</p>
+          <p className="financeiro-subtitle">Receitas, despesas e pendências em leitura rápida para decisão operacional.</p>
         </div>
         <div className="lote-actions">
+          <Button variant="outline" onClick={() => { if (!podeEditarFinanceiro()) return; setOpenLanc(true); }}>Nova receita</Button>
+          <Button variant="outline" onClick={() => { if (!podeEditarFinanceiro()) return; setOpenLanc(true); }}>Nova despesa</Button>
           <Button onClick={() => {
             if (!podeEditarFinanceiro()) return;
             setOpenLanc(true);
           }}
           >
-            + Novo lancamento
+            Registrar movimentação
           </Button>
         </div>
       </div>
@@ -468,8 +470,8 @@ export default function FinanceiroPage({ db, setDb }) {
             <div className="alerts-list">
               {lancamentos.length === 0 ? (
                 <div className="empty-state">
-                  <strong>Nenhum lancamento encontrado.</strong>
-                  <span>Ajuste os filtros ou adicione um novo lancamento.</span>
+                  <strong>Nenhuma movimentação financeira encontrada.</strong>
+                  <span>Registre receitas e despesas para acompanhar o resultado da operação.</span>
                 </div>
               ) : (
                 lancamentos.map((item) => (
