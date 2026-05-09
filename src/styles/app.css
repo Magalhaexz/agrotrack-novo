@@ -8796,3 +8796,9 @@ html, body, #root, .app, .main, .main-content, .page { max-width: 100%; }
 .page--estoque .empty-box > button {
   min-height: 44px;
 }
+
+@media (max-width: 900px) {
+  .page--estoque {
+    padding-bottom: calc(var(--herdon-mobile-bottomnav-height) + env(safe-area-inset-bottom) + 24px);
+  }
+}
