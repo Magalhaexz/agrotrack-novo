@@ -152,6 +152,27 @@ export default function DashboardPage({
       })),
     [alerts]
   );
+  const alertasCriticos = useMemo(
+    () => alertasFormatados.filter((alerta) => String(alerta.prioridade || '').toLowerCase() === 'alta'),
+    [alertasFormatados]
+  );
+  const tarefasDoDia = useMemo(() => {
+    const hoje = getTodayIso();
+    return (db.tarefas || []).filter((tarefa) => (
+      String(tarefa?.status || '').toLowerCase() !== 'concluida'
+      && String(tarefa?.status || '').toLowerCase() !== 'feita'
+      && String(tarefa?.data_vencimento || '') === hoje
+    ));
+  }, [db.tarefas]);
+  const pesagensPendentes = useMemo(() => {
+    const hoje = new Date();
+    const limiteDias = 30;
+    return (lotesAtivos || []).filter((lote) => {
+      if (!lote?.ultima_pesagem) return true;
+      const diferencaDias = (hoje - new Date(lote.ultima_pesagem)) / (1000 * 60 * 60 * 24);
+      return diferencaDias > limiteDias;
+    });
+  }, [lotesAtivos]);
 
   const kpisMain = [
     {
@@ -235,21 +256,18 @@ export default function DashboardPage({
 
   return (
     <div className="dashboard-page">
-      <header className="dashboard-toolbar">
+      <header className="dashboard-toolbar page-header">
         <div className="dashboard-toolbar-copy">
           <h1>Dashboard</h1>
-          <p>Monitoramento executivo da operacao, com foco em risco, desempenho e proximos passos.</p>
+          <p>Cockpit executivo da operacao: riscos, desempenho e prioridades do dia.</p>
         </div>
 
-        <div className="dashboard-toolbar-actions">
+        <div className="dashboard-toolbar-actions page-actions">
           <Button variant="outline" onClick={() => onNavigate?.('lotes')}>
             Novo lote
           </Button>
           <Button variant="outline" onClick={() => onNavigate?.('pesagens', { action: 'novo' })}>
             Nova pesagem
-          </Button>
-          <Button variant="outline" onClick={() => onNavigate?.('sanitario')}>
-            Registrar manejo
           </Button>
           <Button variant="primary" onClick={() => onNavigate?.('suplementacao')}>
             Registrar consumo
@@ -259,14 +277,108 @@ export default function DashboardPage({
 
       {tabAtiva === 'geral' && (
         <>
+          <section className="section-card dashboard-hero-shell">
+            <div className="section-header">
+              <div>
+                <h3 className="dashboard-section-title">Visao geral</h3>
+                <p className="dashboard-section-subtitle">Resumo rapido para apoiar decisoes imediatas.</p>
+              </div>
+              <div className="action-row">
+                <span className={`status-badge ${alertasCriticos.length > 0 ? 'status-badge--critico' : 'status-badge--sucesso'}`}>
+                  {alertasCriticos.length > 0 ? `${alertasCriticos.length} criticos` : 'Sem criticos'}
+                </span>
+              </div>
+            </div>
+
+            <div className="dashboard-executive-strip dashboard-executive-strip--compact">
+              <article className="dashboard-executive-chip">
+                <span>Cabecas ativas</span>
+                <strong>{formatNumber(totalCabecasAtivas, 0)}</strong>
+                <small>Rebanho total em lotes ativos</small>
+              </article>
+              <article className="dashboard-executive-chip">
+                <span>Estoque critico</span>
+                <strong>{formatNumber(estoqueCritico.length, 0)}</strong>
+                <small>Itens abaixo da minima</small>
+              </article>
+              <article className="dashboard-executive-chip">
+                <span>Pendencias hoje</span>
+                <strong>{formatNumber(tarefasDoDia.length + pagamentosResumo.hoje, 0)}</strong>
+                <small>Tarefas e pagamentos com vencimento hoje</small>
+              </article>
+            </div>
+          </section>
+
           <section className="dashboard-grid dashboard-grid--kpi-main">
             {kpisMain.map((item) => (
               <KpiPanel key={item.title} {...item} />
             ))}
           </section>
 
+          <section className="dashboard-grid dashboard-grid--operations">
+            <Card className="section-card" title="Alertas importantes" subtitle="Focos prioritarios para a equipe.">
+              {alertasCriticos.length === 0 ? (
+                <div className="empty-state">
+                  <p>Nenhum alerta critico ativo.</p>
+                </div>
+              ) : (
+                <div className="dashboard-list">
+                  {alertasCriticos.slice(0, 4).map((alerta) => (
+                    <article key={alerta.id} className="dashboard-list-item dashboard-list-item--button">
+                      <div className="dashboard-list-copy">
+                        <strong>{alerta.titulo}</strong>
+                        <p>{alerta.descricao}</p>
+                      </div>
+                      <span className="status-badge status-badge--critico">Critico</span>
+                    </article>
+                  ))}
+                </div>
+              )}
+            </Card>
+
+            <Card className="section-card" title="Tarefas do dia" subtitle="Pendencias com vencimento em hoje.">
+              {tarefasDoDia.length === 0 ? (
+                <div className="empty-state">
+                  <p>Sem tarefas pendentes para hoje.</p>
+                </div>
+              ) : (
+                <div className="dashboard-list">
+                  {tarefasDoDia.slice(0, 5).map((tarefa) => (
+                    <article key={tarefa.id} className="dashboard-list-item">
+                      <div className="dashboard-list-copy">
+                        <strong>{tarefa.titulo}</strong>
+                        <p>{tarefa.descricao || 'Sem descricao adicional.'}</p>
+                      </div>
+                      <span className="status-badge status-badge--pendente">Hoje</span>
+                    </article>
+                  ))}
+                </div>
+              )}
+            </Card>
+
+            <Card className="section-card" title="Pesagens pendentes" subtitle="Lotes sem pesagem recente.">
+              {pesagensPendentes.length === 0 ? (
+                <div className="empty-state">
+                  <p>Todos os lotes estao com pesagem em dia.</p>
+                </div>
+              ) : (
+                <div className="dashboard-list">
+                  {pesagensPendentes.slice(0, 5).map((lote) => (
+                    <article key={lote.id} className="dashboard-list-item">
+                      <div className="dashboard-list-copy">
+                        <strong>{lote.nome}</strong>
+                        <p>{lote.ultima_pesagem ? `Ultima pesagem: ${formatDate(lote.ultima_pesagem)}` : 'Sem pesagem registrada'}</p>
+                      </div>
+                      <span className="status-badge status-badge--atencao">Atrasada</span>
+                    </article>
+                  ))}
+                </div>
+              )}
+            </Card>
+          </section>
+
           <section className="dashboard-task-board">
-            <Card title="Quadro de tarefas" subtitle="Tarefas acionaveis do dia com status claro para a equipe.">
+            <Card className="section-card" title="Quadro de tarefas" subtitle="Tarefas acionaveis do dia com status claro para a equipe.">
               <div className="dashboard-task-create">
                 <input className="ui-input" placeholder="Titulo da tarefa" value={novaTarefa.titulo} onChange={(e) => setNovaTarefa((p) => ({ ...p, titulo: e.target.value }))} />
                 <select className="ui-input" value={novaTarefa.funcionario_id} onChange={(e) => setNovaTarefa((p) => ({ ...p, funcionario_id: e.target.value }))}>
@@ -301,6 +413,7 @@ export default function DashboardPage({
 
           <section className="dashboard-grid dashboard-grid--dual">
             <Card
+              className="section-card"
               title="Resumo financeiro"
               subtitle="Situacao diaria de pagamentos pendentes e liquidados."
               action={
@@ -318,7 +431,7 @@ export default function DashboardPage({
               </div>
             </Card>
 
-            <Card title="Resumo do rebanho" subtitle="Visao objetiva para decisao diaria da operacao.">
+            <Card className="section-card" title="Resumo do rebanho" subtitle="Visao objetiva para decisao diaria da operacao.">
               <div className="dashboard-list">
                 <div className="dashboard-list-item"><div className="dashboard-list-copy"><strong>Cabecas ativas</strong><p>{formatNumber(totalCabecasAtivas, 0)}</p></div></div>
                 <div className="dashboard-list-item"><div className="dashboard-list-copy"><strong>Lotes ativos</strong><p>{formatNumber(lotesAtivos.length, 0)}</p></div></div>
@@ -522,9 +635,19 @@ export default function DashboardPage({
 
 function KpiPanel({ title, value, variation, icon, variant = 'neutral', compact = false }) {
   const IconComp = icon;
+  const variationValue = typeof variation === 'number'
+    ? variation
+    : Number(variation?.value || 0);
+  const variationDirection = typeof variation === 'object' ? String(variation?.direction || '') : '';
+  const variationLabel = typeof variation === 'object' && variation?.value
+    ? String(variation.value)
+    : `${formatNumber(Math.abs(variationValue), 1)}% vs. base recente`;
+  const directionUp = variationDirection
+    ? variationDirection !== 'down'
+    : variationValue >= 0;
 
   return (
-    <Card className={`kpi-panel kpi-panel--${variant} ${compact ? 'kpi-panel--compact' : ''}`}>
+    <Card className={`kpi-panel kpi-panel--${variant} kpi-card ${compact ? 'kpi-panel--compact' : ''}`}>
       <div className="kpi-panel-header">
         <span className="kpi-panel-label">{title}</span>
         <span className="kpi-panel-icon">
@@ -534,9 +657,9 @@ function KpiPanel({ title, value, variation, icon, variant = 'neutral', compact 
 
       <strong>{value}</strong>
 
-      <div className={`kpi-variation ${variation >= 0 ? 'up' : 'down'}`}>
-        {variation >= 0 ? <ArrowUp size={14} /> : <ArrowDown size={14} />}
-        {formatNumber(Math.abs(variation), 1)}% vs. base recente
+      <div className={`kpi-variation ${directionUp ? 'up' : 'down'}`}>
+        {directionUp ? <ArrowUp size={14} /> : <ArrowDown size={14} />}
+        {variationLabel}
       </div>
     </Card>
   );

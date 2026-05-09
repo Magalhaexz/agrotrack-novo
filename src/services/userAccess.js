@@ -215,7 +215,7 @@ export async function updateInvite(inviteId, payload) {
     .update(payload)
     .eq('id', inviteId)
     .select(INVITE_COLUMNS)
-    .single();
+    .maybeSingle();
 }
 
 export async function deleteInvite(inviteId) {

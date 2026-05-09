@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+﻿import { useEffect, useState } from 'react';
 import ArrobaPreview from './ArrobaPreview';
 import Button from './ui/Button';
 import Modal from './ui/Modal';
@@ -28,7 +28,7 @@ const VALIDACOES_GRUPO = [
   { campo: 'Peso atual', key: 'p_at' },
   { campo: 'Dias no lote', key: 'dias' },
   { campo: 'Consumo', key: 'consumo' },
-  { campo: 'Rendimento de carcaca', key: 'rendimento_carcaca' },
+  { campo: 'Rendimento de carcaça', key: 'rendimento_carcaca' },
 ];
 
 function normalizarInitialData(data) {
@@ -60,11 +60,11 @@ function obterNumero(form, key) {
 function validarForm(form) {
   if (form.tipo_registro === 'grupo' && !form.lote_id) return 'Selecione o lote vinculado.';
   if (form.tipo_registro === 'individual' && !form.identificacao.trim()) {
-    return 'Informe a identificacao / brinco / codigo.';
+    return 'Informe a identificação / brinco / código.';
   }
 
   if (form.tipo_registro === 'grupo') {
-    if (!form.gen.trim()) return 'Informe a genetica/raca.';
+    if (!form.gen.trim()) return 'Informe a genética/raça.';
     const invalido = VALIDACOES_GRUPO.find(({ key }) => obterNumero(form, key) <= 0);
     if (invalido) return `${invalido.campo} deve ser maior que zero.`;
   } else {
@@ -101,6 +101,7 @@ export default function AnimalForm({ initialData, lotes = [], onSave, onCancel }
         }
         return { ...prev, tipo_registro: value };
       }
+
       return { ...prev, [name]: value };
     });
   }
@@ -137,7 +138,7 @@ export default function AnimalForm({ initialData, lotes = [], onSave, onCancel }
   const titulo = initialData ? 'Editar animais' : 'Novo cadastro de animais';
 
   const footer = (
-    <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8 }}>
+    <div className="modal-footer action-row" style={{ width: '100%' }}>
       <Button variant="ghost" onClick={onCancel}>Cancelar</Button>
       <Button onClick={handleSubmit}>Salvar</Button>
     </div>
@@ -148,210 +149,144 @@ export default function AnimalForm({ initialData, lotes = [], onSave, onCancel }
       open
       onClose={onCancel}
       title={titulo}
-      subtitle="Preencha os dados e acompanhe o reflexo em arrobas em tempo real."
+      subtitle="Preencha os dados do grupo ou do animal individual com clareza operacional."
       footer={footer}
       size="lg"
     >
-      <form onSubmit={handleSubmit} className="animal-form">
-        <section className="animal-form-section">
-          <div className="animal-form-section-head">Registro</div>
+      <form onSubmit={handleSubmit} className="animal-form form-section">
+        <section className="animal-form-section section-card">
+          <div className="animal-form-section-head section-header"><h4>Tipo de cadastro</h4></div>
           <label className="animal-form-field">
-            <span className="animal-form-label">Tipo de cadastro</span>
+            <span className="animal-form-label">Modo</span>
             <select className="ui-input" name="tipo_registro" value={form.tipo_registro} onChange={handleChange}>
-              <option value="grupo">Grupo por lote</option>
-              <option value="individual">Cadastro individual opcional</option>
+              <option value="grupo">Grupo de animais</option>
+              <option value="individual">Animal individual</option>
             </select>
           </label>
         </section>
 
-        {form.tipo_registro === 'individual' ? (
-          <div className="animal-form-note">
-            Cadastro individual opcional para acompanhar animais específicos dentro de um lote.
-          </div>
-        ) : null}
-
-        <section className="animal-form-section">
-          <div className="animal-form-section-head">Identificacao e vinculo</div>
-        <div className="animal-form-grid animal-form-grid--2">
-          <label className="animal-form-field">
-            <span className="animal-form-label">Lote vinculado</span>
-            <select className="ui-input" name="lote_id" value={form.lote_id} onChange={handleChange}>
-              <option value="">Selecione</option>
-              {lotes.map((lote) => (
-                <option key={lote.id} value={lote.id}>{lote.nome}</option>
-              ))}
-            </select>
-          </label>
-
-          <label className="animal-form-field">
-            <span className="animal-form-label">Sexo</span>
-            <select className="ui-input" name="sexo" value={form.sexo} onChange={handleChange}>
-              <option value="macho">Macho</option>
-              <option value="femea">Femea</option>
-            </select>
-          </label>
-
-          <label className="animal-form-field">
-            <span className="animal-form-label">Data de entrada / referencia</span>
-            <input className="ui-input" type="date" name="data_referencia" value={form.data_referencia} onChange={handleChange} />
-          </label>
-        </div>
-        </section>
-
-        {form.tipo_registro === 'individual' ? (
+        <section className="animal-form-section section-card">
+          <div className="animal-form-section-head section-header"><h4>Identificação</h4></div>
           <div className="animal-form-grid animal-form-grid--2">
             <label className="animal-form-field">
-              <span className="animal-form-label">Identificacao / brinco / codigo</span>
+              <span className="animal-form-label">Lote vinculado</span>
+              <select className="ui-input" name="lote_id" value={form.lote_id} onChange={handleChange}>
+                <option value="">Selecione</option>
+                {lotes.map((lote) => (
+                  <option key={lote.id} value={lote.id}>{lote.nome}</option>
+                ))}
+              </select>
+            </label>
+
+            <label className="animal-form-field">
+              <span className="animal-form-label">Sexo</span>
+              <select className="ui-input" name="sexo" value={form.sexo} onChange={handleChange}>
+                <option value="macho">Macho</option>
+                <option value="femea">Fêmea</option>
+              </select>
+            </label>
+
+            <label className="animal-form-field">
+              <span className="animal-form-label">Data de referência</span>
+              <input className="ui-input" type="date" name="data_referencia" value={form.data_referencia} onChange={handleChange} />
+            </label>
+
+            {form.tipo_registro === 'individual' ? (
+              <label className="animal-form-field">
+                <span className="animal-form-label">Identificação / brinco / código</span>
+                <input
+                  className="ui-input"
+                  name="identificacao"
+                  value={form.identificacao}
+                  onChange={handleChange}
+                  placeholder="Ex.: BR-0241"
+                />
+              </label>
+            ) : null}
+          </div>
+        </section>
+
+        <section className="animal-form-section section-card">
+          <div className="animal-form-section-head section-header"><h4>Dados do lote e pesos</h4></div>
+          <div className="animal-form-grid animal-form-grid--2">
+            <label className="animal-form-field">
+              <span className="animal-form-label">Genética / raça</span>
               <input
                 className="ui-input"
-                name="identificacao"
-                value={form.identificacao}
+                name="gen"
+                value={form.gen}
                 onChange={handleChange}
-                placeholder="Ex: BR-0241"
+                placeholder="Ex.: Nelore PO, Brangus"
               />
             </label>
 
             <label className="animal-form-field">
-              <span className="animal-form-label">Status</span>
-              <select className="ui-input" name="status" value={form.status} onChange={handleChange}>
-                <option value="ativo">Ativo</option>
-                <option value="em_tratamento">Em tratamento</option>
-                <option value="vendido">Vendido</option>
-                <option value="inativo">Inativo</option>
-              </select>
+              <span className="animal-form-label">Quantidade (cabeças)</span>
+              <input
+                className="ui-input"
+                type="text"
+                inputMode="numeric"
+                name="qtd"
+                value={form.qtd}
+                onChange={handleChange}
+                placeholder="Ex.: 80"
+                disabled={form.tipo_registro === 'individual'}
+              />
+            </label>
+
+            <label className="animal-form-field">
+              <span className="animal-form-label">Peso inicial (kg)</span>
+              <input
+                className="ui-input"
+                type="text"
+                inputMode="decimal"
+                name="p_ini"
+                value={form.p_ini}
+                onChange={handleChange}
+                placeholder="Ex.: 320,5"
+              />
+            </label>
+
+            <label className="animal-form-field">
+              <span className="animal-form-label">Peso atual (kg)</span>
+              <input
+                className="ui-input"
+                type="text"
+                inputMode="decimal"
+                name="p_at"
+                value={form.p_at}
+                onChange={handleChange}
+                placeholder="Ex.: 440,5"
+              />
             </label>
           </div>
-        ) : null}
-
-        <section className="animal-form-section">
-          <div className="animal-form-section-head">Dados zootecnicos</div>
-        <div className="animal-form-grid animal-form-grid--2">
-          <label className="animal-form-field">
-            <span className="animal-form-label">Genetica / raca</span>
-            <input
-              className="ui-input"
-              name="gen"
-              value={form.gen}
-              onChange={handleChange}
-              placeholder="Ex: Nelore PO, Brangus, Cruzado"
-            />
-          </label>
-
-          <label className="animal-form-field">
-            <span className="animal-form-label">Quantidade</span>
-            <input
-              className="ui-input"
-              type="text"
-              inputMode="numeric"
-              name="qtd"
-              value={form.qtd}
-              onChange={handleChange}
-              placeholder="Ex: 80"
-              disabled={form.tipo_registro === 'individual'}
-            />
-          </label>
-        </div>
-
-        <div className="animal-form-grid animal-form-grid--2">
-          <label className="animal-form-field">
-            <span className="animal-form-label">Peso inicial (kg)</span>
-            <input
-              className="ui-input"
-              type="text"
-              inputMode="decimal"
-              name="p_ini"
-              value={form.p_ini}
-              onChange={handleChange}
-              placeholder="Ex: 320 ou 320,5"
-            />
-          </label>
-
-          <label className="animal-form-field">
-            <span className="animal-form-label">Peso atual (kg)</span>
-            <input
-              className="ui-input"
-              type="text"
-              inputMode="decimal"
-              name="p_at"
-              value={form.p_at}
-              onChange={handleChange}
-              placeholder="Ex: 440 ou 440,5"
-            />
-          </label>
-        </div>
         </section>
 
-        <section className="animal-form-section">
-          <div className="animal-form-section-head">Preco e rendimento</div>
-        <div className="animal-form-grid animal-form-grid--2">
-          <label className="animal-form-field">
-            <span className="animal-form-label">Dias no lote</span>
-            <input
-              className="ui-input"
-              type="text"
-              inputMode="numeric"
-              name="dias"
-              value={form.dias}
-              onChange={handleChange}
-              placeholder="Ex: 120"
-            />
-          </label>
-
-          <label className="animal-form-field">
-            <span className="animal-form-label">Consumo (kg/dia)</span>
-            <input
-              className="ui-input"
-              type="text"
-              inputMode="decimal"
-              name="consumo"
-              value={form.consumo}
-              onChange={handleChange}
-              placeholder="Ex: 12,5"
-            />
-          </label>
-        </div>
+        <section className="animal-form-section section-card">
+          <div className="animal-form-section-head section-header"><h4>Dados avançados</h4></div>
+          <div className="animal-form-grid animal-form-grid--2">
+            <label className="animal-form-field">
+              <span className="animal-form-label">Dias no lote</span>
+              <input className="ui-input" type="text" inputMode="numeric" name="dias" value={form.dias} onChange={handleChange} placeholder="Ex.: 120" />
+            </label>
+            <label className="animal-form-field">
+              <span className="animal-form-label">Consumo (kg/dia)</span>
+              <input className="ui-input" type="text" inputMode="decimal" name="consumo" value={form.consumo} onChange={handleChange} placeholder="Ex.: 12,5" />
+            </label>
+            <label className="animal-form-field">
+              <span className="animal-form-label">Rendimento de carcaça (%)</span>
+              <input className="ui-input" type="text" inputMode="decimal" name="rendimento_carcaca" value={form.rendimento_carcaca} onChange={handleChange} placeholder="Ex.: 52" />
+            </label>
+            <label className="animal-form-field">
+              <span className="animal-form-label">Preço por @ (opcional)</span>
+              <input className="ui-input" type="text" inputMode="decimal" name="preco_arroba" value={form.preco_arroba} onChange={handleChange} placeholder="Ex.: 290" />
+            </label>
+            <label className="animal-form-field full">
+              <span className="animal-form-label">Observação</span>
+              <input className="ui-input" name="observacao" value={form.observacao} onChange={handleChange} placeholder="Ex.: observação operacional" />
+            </label>
+          </div>
         </section>
-
-        <div className="animal-form-grid animal-form-grid--2">
-          <label className="animal-form-field">
-            <span className="animal-form-label">Rendimento de carcaca (%)</span>
-            <input
-              className="ui-input"
-              type="text"
-              inputMode="decimal"
-              name="rendimento_carcaca"
-              value={form.rendimento_carcaca}
-              onChange={handleChange}
-              placeholder="Ex: 52"
-            />
-          </label>
-
-          <label className="animal-form-field">
-            <span className="animal-form-label">Preco por @ (opcional)</span>
-            <input
-              className="ui-input"
-              type="text"
-              inputMode="decimal"
-              name="preco_arroba"
-              value={form.preco_arroba}
-              onChange={handleChange}
-              placeholder="Ex: 290"
-            />
-          </label>
-        </div>
-
-        {form.tipo_registro === 'individual' ? (
-          <label className="animal-form-field">
-            <span className="animal-form-label">Observacoes</span>
-            <input
-              className="ui-input"
-              name="observacao"
-              value={form.observacao}
-              onChange={handleChange}
-              placeholder="Ex: animal de referencia para acompanhamento individual"
-            />
-          </label>
-        ) : null}
 
         <ArrobaPreview
           peso={form.p_at || form.p_ini}
