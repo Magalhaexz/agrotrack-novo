@@ -56,7 +56,7 @@ export default function AnimaisPage({ db, setDb, onConfirmAction }) {
   const listaAtiva = abaAtiva === 'grupos' ? grupos : individuais;
 
   return <div className="page animais-page">
-    <section className="animais-hero"><div><h1>Animais</h1><p>Cadastro organizado para grupos, individuais e movimentações.</p></div><div className="page-actions"><Button size="sm" icon={<Plus size={16} />} onClick={abrirNovo}>Novo cadastro</Button></div></section>
+    <section className="animais-hero"><div><h1>Animais</h1><p>Cadastro organizado para grupos, individuais e movimentações.</p></div><div className="page-actions"><Button size="sm" variant="primary" icon={<Plus size={16} />} onClick={abrirNovo}>Novo cadastro</Button></div></section>
 
     <div className="dashboard-grid dashboard-grid--kpi-main">
     <Card title="Total de cabeças"><div className="animais-kpi-value">{resumo.totalCabecas}</div></Card>
@@ -72,12 +72,12 @@ export default function AnimaisPage({ db, setDb, onConfirmAction }) {
         <button type="button" className={`segment ${abaAtiva === 'movimentacoes' ? 'active' : ''}`} onClick={() => setAbaAtiva('movimentacoes')}>Movimentações</button>
       </div>
       {abaAtiva !== 'movimentacoes' && listaAtiva.length > 0 && (<div className="table-responsive"><table className="data-table"><thead><tr><th>Identificação/Lote</th><th>Fazenda/Lote</th><th>Quantidade</th><th>Peso inicial</th><th>Peso atual</th><th>Status</th><th>Ações</th></tr></thead><tbody>{listaAtiva.map((animal) => <tr key={animal.id}><td>{animal.identificacao} / {animal.loteNome}</td><td>{lotesMap.get(Number(animal.lote_id))?.fazenda || '-'} / {animal.loteNome}</td><td>{animal.qtd}</td><td>{formatarNumero(animal.p_ini)} kg</td><td>{formatarNumero(animal.p_at)} kg</td><td>{animal.status}</td><td><div className="row-actions"><button className="action-btn" onClick={() => editarAnimal(animal)}>Editar</button><button className="action-btn action-btn-danger" onClick={() => excluirAnimal(animal.id)}>Excluir</button></div></td></tr>)}</tbody></table></div>)}
-      {abaAtiva === 'grupos' && grupos.length === 0 && <div className="animais-empty-state"><strong>Nenhum grupo cadastrado.</strong><Button size="sm" onClick={() => abrirNovoPorModo('grupo')}>Cadastrar grupo</Button></div>}
+      {abaAtiva === 'grupos' && grupos.length === 0 && <div className="animais-empty-state"><strong>Nenhum grupo cadastrado.</strong><Button size="sm" variant="primary" onClick={() => abrirNovoPorModo('grupo')}>Cadastrar grupo</Button></div>}
       {abaAtiva === 'individuais' && individuais.length === 0 && <div className="animais-empty-state"><strong>Nenhum animal individual cadastrado.</strong></div>}
       {abaAtiva === 'movimentacoes' && (historicoSaidas.length ? <div className="table-responsive"><table className="data-table"><thead><tr><th>Data</th><th>Tipo</th><th>Lote</th><th>Quantidade</th><th>Observação</th></tr></thead><tbody>{historicoSaidas.map((m) => <tr key={m.id}><td>{formatarData(m.data)}</td><td>{normalizarSaida(m.tipo)}</td><td>{m.loteNome}</td><td>{m.qtd}</td><td>{m.observacao || '-'}</td></tr>)}</tbody></table></div> : <div className="animais-empty-state"><strong>Nenhuma movimentação registrada.</strong></div>)}
     </Card>
 
-    {mostrarCadastro && <Card title="O que você quer cadastrar?"><div className="animais-mode-actions"><Button onClick={() => abrirNovoPorModo('grupo')}>Grupo de animais</Button><p>Use para cadastrar várias cabeças juntas em um lote.</p></div><div className="animais-mode-actions"><Button onClick={() => abrirNovoPorModo('individual')}>Animal individual</Button><p>Use para acompanhar um animal específico.</p></div></Card>}
+    {mostrarCadastro && <Card title="O que você quer cadastrar?"><div className="animais-mode-actions"><Button variant="primary" onClick={() => abrirNovoPorModo('grupo')}>Grupo de animais</Button><p>Use para cadastrar várias cabeças juntas em um lote.</p></div><div className="animais-mode-actions"><Button variant="primary" onClick={() => abrirNovoPorModo('individual')}>Animal individual</Button><p>Use para acompanhar um animal específico.</p></div></Card>}
 
     {abrirForm && <AnimalForm initialData={animalEditando} lotes={lotes} onSave={salvarAnimal} onCancel={() => { setAbrirForm(false); setAnimalEditando(null); }} />}
   </div>;
