@@ -106,13 +106,16 @@ export default function PesagemForm({
   const [pesosAnimais, setPesosAnimais] = useState({});
   const [observacoesAnimais, setObservacoesAnimais] = useState({});
   const hasSelectedLote = Boolean(form.lote_id);
+  const safeAnimais = Array.isArray(animais) ? animais : [];
+  const safeLotes = Array.isArray(lotes) ? lotes : [];
+  const safePesagens = Array.isArray(pesagens) ? pesagens : [];
 
   const animaisDoLote = hasSelectedLote
-    ? animais.filter((animal) => Number(animal?.lote_id) === Number(form.lote_id))
+    ? safeAnimais.filter((animal) => Number(animal?.lote_id) === Number(form.lote_id))
     : [];
   const animaisIndividuais = animaisDoLote.filter((animal) => isIndividualAnimal(animal));
   const loteSelecionado = hasSelectedLote
-    ? (lotes.find((lote) => Number(lote?.id) === Number(form.lote_id)) || null)
+    ? (safeLotes.find((lote) => Number(lote?.id) === Number(form.lote_id)) || null)
     : null;
   const expectedHeadCount = hasSelectedLote ? getExpectedHeadCount(loteSelecionado, animaisDoLote) : 0;
 
@@ -123,7 +126,7 @@ export default function PesagemForm({
     animalsByIndex.set(index, animal);
   });
 
-  const rowCount = Math.max(expectedHeadCount, animalsByIndex.size);
+  const rowCount = Math.max(0, Number(expectedHeadCount || 0), animalsByIndex.size);
   const linhasAnimais = Array.from({ length: rowCount }, (_, idx) => {
     const index = idx + 1;
     const existing = animalsByIndex.get(index) || null;
@@ -146,7 +149,7 @@ export default function PesagemForm({
   const pesagensDoDiaPorAnimalId = useMemo(() => {
     const map = new Map();
     if (form.tipo !== 'animal' || !form.data) return map;
-    pesagens
+    safePesagens
       .filter((item) => (
         String(item?.data || '') === String(form.data)
         && Number(item?.lote_id) === Number(form.lote_id)
@@ -159,7 +162,7 @@ export default function PesagemForm({
         }
       });
     return map;
-  }, [form.tipo, form.data, form.lote_id, pesagens]);
+  }, [form.tipo, form.data, form.lote_id, safePesagens]);
 
   /* eslint-disable react-hooks/set-state-in-effect */
   useEffect(() => {
@@ -257,22 +260,25 @@ export default function PesagemForm({
           if (!pesoBruto) return null;
           const peso = Number(pesoBruto.replace(',', '.'));
           if (!Number.isFinite(peso) || peso <= 0) return null;
-
-          return {
+          const base = {
             tipo: 'animal',
             origem: 'animal',
             lote_id: form.lote_id ? Number(form.lote_id) : null,
             animal_id: animal.virtual ? null : Number(animal.id),
-            virtual_animal: animal.virtual ? {
-              identificacao: animal.identificacao,
-              index: animal.virtualIndex,
-            } : null,
             data: form.data,
             peso_medio: peso,
             rendimento_carcaca: Number(form.rendimento_carcaca || 0),
             preco_arroba: form.preco_arroba === '' ? null : Number(form.preco_arroba),
             observacao: String(observacoesAnimais[key] ?? '').trim(),
           };
+          if (!base.lote_id || !base.data || !base.peso_medio) return null;
+          if (animal.virtual) {
+            base.virtual_animal = {
+              identificacao: animal.identificacao,
+              index: animal.virtualIndex,
+            };
+          }
+          return base;
         })
         .filter(Boolean);
 

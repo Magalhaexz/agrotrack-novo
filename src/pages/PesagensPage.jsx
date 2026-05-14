@@ -4,6 +4,7 @@ import { formatarNumero, formatarData } from '../utils/formatters';
 import { gerarNovoId } from '../utils/id';
 import { useToast } from '../hooks/useToast';
 import { useAuth } from '../auth/useAuth';
+import { getAnimalIdentityKeys, normalizeIdKey, resolveAnimalFromMap } from '../utils/animalIdentity';
 import {
   createOperationalRecord,
   deleteOperationalRecord,
@@ -14,12 +15,6 @@ import {
 function toFiniteNumber(value, fallback = 0) {
   const normalized = Number(value);
   return Number.isFinite(normalized) ? normalized : fallback;
-}
-
-function normalizeIdKey(value) {
-  if (value === undefined || value === null) return null;
-  const text = String(value).trim();
-  return text ? text : null;
 }
 
 function getAnimalIndex(animal, fallbackIndex = null) {
@@ -187,13 +182,12 @@ export default function PesagensPage({ db, setDb, onConfirmAction, navigationInt
 
   const animaisMap = useMemo(() => {
     const map = new Map();
-    (animais || []).forEach((animal) => {
-      const idKey = normalizeIdKey(animal?.id);
-      const cloudKey = normalizeIdKey(animal?.cloud_id);
-      const localKey = normalizeIdKey(animal?.metadata?.local_id);
-      if (idKey) map.set(`id:${idKey}`, animal);
-      if (cloudKey) map.set(`cloud:${cloudKey}`, animal);
-      if (localKey) map.set(`local:${localKey}`, animal);
+    const baseAnimais = Array.isArray(animais) ? animais : [];
+    baseAnimais.forEach((animal) => {
+      const keys = getAnimalIdentityKeys(animal);
+      if (keys.id) map.set(`id:${keys.id}`, animal);
+      if (keys.cloud) map.set(`cloud:${keys.cloud}`, animal);
+      if (keys.local) map.set(`local:${keys.local}`, animal);
     });
     return map;
   }, [animais]);
@@ -221,15 +215,12 @@ export default function PesagensPage({ db, setDb, onConfirmAction, navigationInt
     return [...(pesagens || [])]
       .map((pesagem) => {
         const tipo = resolveTipoPesagem(pesagem);
-        const animalId = normalizeIdKey(pesagem?.animal_id);
-        const cloudAnimalId = normalizeIdKey(pesagem?.metadata?.animal_cloud_id);
-        const localAnimalId = normalizeIdKey(pesagem?.metadata?.animal_local_id);
-        const animal = (
-          (animalId ? animaisMap.get(`id:${animalId}`) : null)
-          || (cloudAnimalId ? animaisMap.get(`cloud:${cloudAnimalId}`) : null)
-          || (localAnimalId ? animaisMap.get(`local:${localAnimalId}`) : null)
-          || null
-        );
+        const animal = resolveAnimalFromMap({
+          map: animaisMap,
+          animalId: pesagem?.animal_id,
+          cloudAnimalId: pesagem?.metadata?.animal_cloud_id,
+          localAnimalId: pesagem?.metadata?.animal_local_id,
+        });
         const fallbackAnimalName = (
           pesagem?.metadata?.animal_identificacao
           || (pesagem?.metadata?.virtualIndex ? `Animal #${pesagem.metadata.virtualIndex}` : null)
