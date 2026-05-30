@@ -131,12 +131,10 @@ export default function EstoquePage({ db, setDb, onRegistrarSaidaEstoque }) {
 
   return (
     <div className="page rebanho-page page--estoque">
-      <header className="page-header">
-        <div>
-          <h1>Estoque</h1>
-          <p className="financeiro-subtitle">Controle de insumos, movimentações e níveis críticos de forma operacional.</p>
-        </div>
-        <div className="page-actions">
+      <div className="rebanho-header">
+        <h1>Estoque</h1>
+        <p className="financeiro-subtitle">Medicamentos, vacinas, materiais e insumos gerais.</p>
+        <div className="lote-actions">
           <select className="ui-input" value={escopoEstoque} onChange={(e) => setEscopoEstoque(e.target.value)} style={{ minWidth: 210 }}>
             <option value="geral">Estoque geral</option>
             <option value="nutricao">Nutrição / suplementação</option>
@@ -175,16 +173,7 @@ export default function EstoquePage({ db, setDb, onRegistrarSaidaEstoque }) {
             {showOnlyCrit ? 'Mostrar todos' : 'Mostrar apenas críticos'}
           </Button>
         </div>
-      </header>
-
-      <Card className="section-card" title="Como funciona" subtitle="Cadastro, entrada e saída em poucos passos." >
-        <div className="dashboard-list">
-          <div className="dashboard-list-item"><div className="dashboard-list-copy"><strong>Cadastrar item</strong><p>Cria o item base do Estoque Geral.</p></div></div>
-          <div className="dashboard-list-item"><div className="dashboard-list-copy"><strong>Registrar entrada</strong><p>Adiciona quantidade em item já cadastrado.</p></div></div>
-          <div className="dashboard-list-item"><div className="dashboard-list-copy"><strong>Registrar saída</strong><p>Baixa quantidade de item existente.</p></div></div>
-          <div className="dashboard-list-item"><div className="dashboard-list-copy"><strong>Separação com Nutrição / Suplementação</strong><p>Itens de alimentação e suplementação devem ser priorizados no módulo Nutrição / Suplementação. Se já existirem no Estoque, a separação é somente por classificação visual.</p></div></div>
-        </div>
-      </Card>
+      </div>
 
       <div className="dashboard-grid dashboard-grid--kpi-secondary">
         <Card className="kpi-card" title="Total de itens">{resumo.total}</Card>
@@ -244,7 +233,7 @@ export default function EstoquePage({ db, setDb, onRegistrarSaidaEstoque }) {
         )}
       </div>
 
-      <Card className="section-card" title="Histórico de Movimentações" action={<Button variant="outline" icon={<FileText size={14} />} onClick={exportCsv}>Exportar CSV</Button>}>
+      <Card title="Histórico de Movimentações" action={<Button variant="outline" icon={<FileText size={14} />} onClick={exportCsv}>Exportar CSV</Button>}>
         <div className="filters-wrap">
           <label>Item
             <select className="ui-input" value={filters.item} onChange={(e) => setFilters((p) => ({ ...p, item: e.target.value }))}>
@@ -271,16 +260,14 @@ export default function EstoquePage({ db, setDb, onRegistrarSaidaEstoque }) {
           </label>
         </div>
         {movs.length > 0 ? (
-          <div className="responsive-table-wrap">
-            <table className="dashboard-table">
-              <thead><tr><th>Data</th><th>Item</th><th>Tipo</th><th>Qtd</th><th>Lote</th><th>Valor</th></tr></thead>
-              <tbody>{movs.map((m) => {
-                const item = estoqueMap.get(m.item_estoque_id);
-                const lote = lotesMap.get(m.lote_id);
-                return <tr key={m.id}><td>{formatDate(m.data)}</td><td>{item?.produto || '—'}</td><td>{m.tipo}</td><td>{formatNumber(m.quantidade, 2)} {item?.unidade || ''}</td><td>{lote?.nome || '—'}</td><td>{formatCurrency(m.valor_total || 0)}</td></tr>;
-              })}</tbody>
-            </table>
-          </div>
+          <table className="dashboard-table">
+            <thead><tr><th>Data</th><th>Item</th><th>Tipo</th><th>Qtd</th><th>Lote</th><th>Valor</th></tr></thead>
+            <tbody>{movs.map((m) => {
+              const item = estoqueMap.get(m.item_estoque_id);
+              const lote = lotesMap.get(m.lote_id);
+              return <tr key={m.id}><td>{formatDate(m.data)}</td><td>{item?.produto || '—'}</td><td>{m.tipo}</td><td>{formatNumber(m.quantidade, 2)} {item?.unidade || ''}</td><td>{lote?.nome || '—'}</td><td>{formatCurrency(m.valor_total || 0)}</td></tr>;
+            })}</tbody>
+          </table>
         ) : (
           <div className="table-empty"><AlertTriangle className="table-empty-icon" size={20} />Nenhuma movimentação encontrada para os filtros selecionados.</div>
         )}

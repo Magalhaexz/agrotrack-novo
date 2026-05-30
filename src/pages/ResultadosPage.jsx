@@ -218,15 +218,15 @@ export default function ResultadosPage({ db }) {
   return (
     <div className="reports-page reports-page--rebuilt" data-print-date={new Date().toLocaleDateString('pt-BR')}>
       <PageHeader
-        title="Relatorios"
-        subtitle="Filtros rapidos, leitura executiva e tabelas prontas para exportacao."
+        title="Relatórios / Resultados"
+        subtitle="Resumo financeiro e operacional com filtros, exportações e impressão." 
         actions={(
           <div className="reports-page-actions">
             <Button variant="outline" onClick={resetFilters}>Limpar filtros</Button>
             <Button variant="outline" onClick={() => window.print()}>Imprimir</Button>
             <Button variant="outline" onClick={exportarExcelArquivo}>Exportar Excel</Button>
             <Button variant="primary" onClick={exportarCsv} loading={isExporting}>Exportar CSV</Button>
-            <Button loading={isGenerating} onClick={applyFilters}>Atualizar visao</Button>
+            <Button loading={isGenerating} onClick={applyFilters}>Atualizar visão</Button>
           </div>
         )}
       />
