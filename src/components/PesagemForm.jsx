@@ -3,6 +3,12 @@ import Modal from './ui/Modal';
 import Button from './ui/Button';
 import ArrobaPreview from './ArrobaPreview';
 
+function normalizeIdKey(value) {
+  if (value === undefined || value === null) return null;
+  const text = String(value).trim();
+  return text ? text : null;
+}
+
 function isIndividualAnimal(animal) {
   if (!animal) return false;
   const tipoRegistro = String(animal?.tipo_registro || '').toLowerCase();
@@ -153,8 +159,8 @@ export default function PesagemForm({
         && (item?.tipo === 'animal' || item?.origem === 'animal')
       ))
       .forEach((item) => {
-        const animalId = Number(item?.animal_id);
-        if (animalId > 0 && !map.has(animalId)) {
+        const animalId = normalizeIdKey(item?.animal_id);
+        if (animalId && !map.has(animalId)) {
           map.set(animalId, item);
         }
       });
@@ -167,8 +173,8 @@ export default function PesagemForm({
     setErro('');
 
     if (initialData?.tipo === 'animal' || initialData?.origem === 'animal') {
-      const animalId = Number(initialData?.animal_id);
-      if (animalId > 0) {
+      const animalId = normalizeIdKey(initialData?.animal_id);
+      if (animalId) {
         setPesosAnimais({ [animalId]: String(initialData?.peso_medio ?? '') });
         setObservacoesAnimais({ [animalId]: initialData?.observacao || '' });
       } else {
@@ -191,7 +197,7 @@ export default function PesagemForm({
       const next = { ...prev };
       linhasAnimais.forEach((animal) => {
         if (animal.virtual) return;
-        const animalId = Number(animal.id);
+        const animalId = normalizeIdKey(animal.id);
         if (!animalId || next[animalId]) return;
         const existingPesagem = pesagensDoDiaPorAnimalId.get(animalId);
         if (existingPesagem?.peso_medio !== undefined && existingPesagem?.peso_medio !== null) {
@@ -207,7 +213,7 @@ export default function PesagemForm({
       const next = { ...prev };
       linhasAnimais.forEach((animal) => {
         if (animal.virtual) return;
-        const animalId = Number(animal.id);
+        const animalId = normalizeIdKey(animal.id);
         if (!animalId || next[animalId]) return;
         const existingPesagem = pesagensDoDiaPorAnimalId.get(animalId);
         if (existingPesagem?.observacao) {
@@ -252,7 +258,7 @@ export default function PesagemForm({
 
       const registros = linhasAnimais
         .map((animal) => {
-          const key = animal.virtual ? `virtual-${animal.virtualIndex}` : String(Number(animal.id));
+          const key = animal.virtual ? `virtual-${animal.virtualIndex}` : normalizeIdKey(animal.id);
           const pesoBruto = String(pesosAnimais[key] ?? '').trim();
           if (!pesoBruto) return null;
           const peso = Number(pesoBruto.replace(',', '.'));
@@ -262,7 +268,7 @@ export default function PesagemForm({
             tipo: 'animal',
             origem: 'animal',
             lote_id: form.lote_id ? Number(form.lote_id) : null,
-            animal_id: animal.virtual ? null : Number(animal.id),
+            animal_id: animal.virtual ? null : normalizeIdKey(animal.id),
             virtual_animal: animal.virtual
               ? {
                   identificacao: animal.identificacao,
