@@ -6,8 +6,8 @@
   "scripts": {
     "dev": "vite",
     "build": "vite build --configLoader native",
-    "test": "NODE_ENV=test node --test --experimental-specifier-resolution=node",
-    "test:run": "NODE_ENV=test node --test --experimental-specifier-resolution=node",
+    "test": "node scripts/run-node-tests.mjs",
+    "test:run": "node scripts/run-node-tests.mjs",
     "lint": "eslint .",
     "preview": "vite preview",
     "e2e": "node scripts/run-e2e.mjs",

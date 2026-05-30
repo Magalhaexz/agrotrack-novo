@@ -65,10 +65,10 @@ export const navSections = [
   },
   {
     id: 'analises_relatorios',
-    title: 'Análises e Relatórios',
+    title: 'Análises e Resultados',
     items: [
       { id: 'comparativo', label: 'Comparativo', icon: TrendingUp },
-      { id: 'resultados', label: 'Relatórios', icon: ClipboardList },
+      { id: 'resultados', label: 'Resultados e Relatórios', icon: ClipboardList },
     ],
   },
   {

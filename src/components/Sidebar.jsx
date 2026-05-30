@@ -257,7 +257,7 @@ export default function Sidebar({
                 role="menuitem"
               >
                 <Settings size={15} aria-hidden="true" />
-                Configuracoes
+                Configurações
               </button>
 
               <div className="user-dropdown-divider" />

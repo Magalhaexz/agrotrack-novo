@@ -45,6 +45,6 @@ export const formatarData = (data) => {
 
 export const formatarArroba = (valor) => {
   const numero = parseNumeroEntrada(valor);
-  if (!Number.isFinite(numero)) return '—';
+  if (!Number.isFinite(numero)) return '-';
   return `${formatarNumero(numero)} @`;
 };

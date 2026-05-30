@@ -17,19 +17,19 @@ import Modal from '../components/ui/Modal';
 import { formatDate } from '../utils/calculations';
 import { gerarNovoId } from '../utils/id';
 
-const MONTH_LABELS = ['Janeiro', 'Fevereiro', 'Marco', 'Abril', 'Maio', 'Junho', 'Julho', 'Agosto', 'Setembro', 'Outubro', 'Novembro', 'Dezembro'];
+const MONTH_LABELS = ['Janeiro', 'Fevereiro', 'Março', 'Abril', 'Maio', 'Junho', 'Julho', 'Agosto', 'Setembro', 'Outubro', 'Novembro', 'Dezembro'];
 const WEEKDAY_LABELS = ['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sab'];
 
 const typeMap = {
   vacina: { icon: Syringe, color: 'var(--color-info)', label: 'Vacina' },
-  vermifugo: { icon: Pill, color: 'var(--color-primary)', label: 'Vermifugo' },
+  vermifugo: { icon: Pill, color: 'var(--color-primary)', label: 'Vermífugo' },
   pesagem: { icon: Scale, color: 'var(--color-success)', label: 'Pesagem' },
   dieta: { icon: Leaf, color: 'var(--color-warning)', label: 'Dieta' },
-  suplementacao: { icon: Leaf, color: 'var(--color-warning)', label: 'Suplementacao' },
+  suplementacao: { icon: Leaf, color: 'var(--color-warning)', label: 'Suplementação' },
   estoque: { icon: Package, color: 'var(--color-danger)', label: 'Estoque' },
-  saida: { icon: Truck, color: 'var(--color-text-secondary)', label: 'Saida' },
+  saida: { icon: Truck, color: 'var(--color-text-secondary)', label: 'Saída' },
   livre: { icon: CheckSquare, color: 'var(--color-text-secondary)', label: 'Livre' },
-  sanitario: { icon: Syringe, color: 'var(--color-info)', label: 'Sanitario' },
+  sanitario: { icon: Syringe, color: 'var(--color-info)', label: 'Sanitário' },
   operacional: { icon: CalendarDays, color: 'var(--color-text-secondary)', label: 'Operacional' },
 };
 
@@ -126,9 +126,9 @@ export default function CalendarioOperacionalPage({ db, setDb }) {
     <div className="page calendario-page">
       <section className="calendar-hero">
         <div>
-          <span className="calendar-hero-kicker">Operacao coordenada</span>
-          <h1>Calendario Operacional</h1>
-          <p>Monitore eventos sanitarios e operacionais, navegue entre periodos e abra o detalhe de qualquer data com contexto completo.</p>
+          <span className="calendar-hero-kicker">Operação coordenada</span>
+          <h1>Calendário Operacional</h1>
+          <p>Monitore eventos sanitários e operacionais, navegue entre períodos e abra o detalhe de qualquer data com contexto completo.</p>
         </div>
 
         <div className="calendar-hero-actions">
@@ -142,13 +142,13 @@ export default function CalendarioOperacionalPage({ db, setDb }) {
           <strong>{selectedSummary.total}</strong>
           <p className="calendar-kpi-sub">{formatDate(selectedDate)}</p>
         </Card>
-        <Card title="Sanitarios">
+        <Card title="Sanitários">
           <strong>{selectedSummary.sanitarios}</strong>
-          <p className="calendar-kpi-sub">Agenda clinica e preventiva</p>
+          <p className="calendar-kpi-sub">Agenda clínica e preventiva</p>
         </Card>
         <Card title="Operacionais">
           <strong>{selectedSummary.operacionais}</strong>
-          <p className="calendar-kpi-sub">Pesagens, saidas e eventos livres</p>
+          <p className="calendar-kpi-sub">Pesagens, saídas e eventos livres</p>
         </Card>
       </div>
 
@@ -159,9 +159,9 @@ export default function CalendarioOperacionalPage({ db, setDb }) {
               <Button variant="ghost" size="sm" icon={<ChevronRight size={16} style={{ transform: 'rotate(180deg)' }} />} onClick={goToPreviousPeriod}>Anterior</Button>
               <div className="calendar-period-label">
                 <strong>{viewMode === 'anual' ? `Ano ${currentYear}` : currentMonthLabel}</strong>
-                <span>{viewMode === 'anual' ? 'Visao consolidada dos 12 meses' : 'Visao detalhada do mes selecionado'}</span>
+                <span>{viewMode === 'anual' ? 'Visão consolidada dos 12 meses' : 'Visão detalhada do mês selecionado'}</span>
               </div>
-              <Button variant="ghost" size="sm" icon={<ChevronRight size={16} />} onClick={goToNextPeriod}>Proximo</Button>
+              <Button variant="ghost" size="sm" icon={<ChevronRight size={16} />} onClick={goToNextPeriod}>Próximo</Button>
             </div>
 
             <div className="calendar-view-toggle">
@@ -220,7 +220,7 @@ export default function CalendarioOperacionalPage({ db, setDb }) {
             )}
           </Card>
 
-          <Card title="Proximos eventos" subtitle="Visao rapida dos compromissos futuros.">
+          <Card title="Próximos eventos" subtitle="Visão rápida dos compromissos futuros.">
             {upcomingEvents.length === 0 ? (
               <div className="calendar-empty-state compact">
                 <strong>Nenhum evento futuro.</strong>

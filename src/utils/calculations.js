@@ -1,13 +1,13 @@
 /**
  * Formata um número para exibição com um número específico de casas decimais, usando o locale pt-BR.
- * Retorna '—' para valores indefinidos, nulos ou não numéricos.
+ * Retorna '-' para valores indefinidos, nulos ou não numéricos.
  * @param {number} value - O número a ser formatado.
  * @param {number} [digits=1] - O número de casas decimais.
  * @returns {string} O número formatado ou '—'.
  */
 export const formatNumber = (value, digits = 1) => {
   const normalized = Number(value);
-  if (value === undefined || value === null || !Number.isFinite(normalized)) return '—';
+  if (value === undefined || value === null || !Number.isFinite(normalized)) return '-';
   return normalized.toLocaleString('pt-BR', {
     minimumFractionDigits: digits,
     maximumFractionDigits: digits,
@@ -16,13 +16,13 @@ export const formatNumber = (value, digits = 1) => {
 
 /**
  * Formata um número como moeda brasileira (R$), com 2 casas decimais.
- * Retorna '—' para valores indefinidos, nulos ou não numéricos.
+ * Retorna '-' para valores indefinidos, nulos ou não numéricos.
  * @param {number} value - O valor monetário a ser formatado.
  * @returns {string} O valor formatado como moeda ou '—'.
  */
 export const formatCurrency = (value) => {
   const normalized = Number(value);
-  if (value === undefined || value === null || !Number.isFinite(normalized)) return '—';
+  if (value === undefined || value === null || !Number.isFinite(normalized)) return '-';
   return `R$ ${normalized.toLocaleString('pt-BR', {
     minimumFractionDigits: 2,
     maximumFractionDigits: 2,
@@ -31,12 +31,12 @@ export const formatCurrency = (value) => {
 
 /**
  * Formata uma string de data (YYYY-MM-DD) para o formato brasileiro (DD/MM/YYYY).
- * Retorna '—' para valores nulos ou vazios.
+ * Retorna '-' para valores nulos ou vazios.
  * @param {string} value - A string de data.
  * @returns {string} A data formatada ou '—'.
  */
 export const formatDate = (value) => {
-  if (!value) return '—';
+  if (!value) return '-';
   const [y, m, d] = value.split('-');
   return `${d}/${m}/${y}`;
 };
