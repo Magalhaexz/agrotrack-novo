@@ -2,6 +2,7 @@
 import Input from '../components/ui/Input';
 import Modal from '../components/ui/Modal';
 import Button from '../components/ui/Button';
+import LoteForm from '../components/LoteForm';
 import { useAuth } from '../auth/useAuth';
 import { useToast } from '../hooks/useToast';
 import { getResumoLote } from '../domain/resumoLote';
@@ -47,6 +48,24 @@ function calculateGmd30(pesagens = []) {
   return gain / days;
 }
 
+function calculateDailyPlannedConsumption(lote, heads, pesoAtual) {
+  const consumoTipo = String(lote?.consumo_tipo || '').toLowerCase();
+  const consumoInformado = toNumber(lote?.consumo_por_cabeca_dia);
+
+  if (consumoTipo === 'kg_cab_dia' && consumoInformado > 0 && heads > 0) {
+    return heads * consumoInformado;
+  }
+
+  if (toNumber(lote?.consumo_total_estimado) > 0 && toNumber(lote?.dias_estimados) > 0) {
+    return toNumber(lote.consumo_total_estimado) / toNumber(lote.dias_estimados);
+  }
+
+  const percentualPv = consumoTipo === 'percentual_pv'
+    ? consumoInformado
+    : toNumber(lote?.supl_pv_pct);
+  return heads * (pesoAtual * (percentualPv / 100));
+}
+
 function normalizeStatus(lote) {
   const status = String(lote?.status || 'ativo').toLowerCase();
   return status;
@@ -78,10 +97,11 @@ export default function LotesPage({ db, setDb, onRegistrarSaidaAnimal, session }
     const latestPesagem = [...lotePesagens].sort((a, b) => new Date(b.data) - new Date(a.data))[0];
     const resumo = getResumoLote(db, lote.id);
     const indicators = calcLote(db, lote.id);
-    const pesoAtual = toNumber(lote.p_at || latestPesagem?.peso_medio || indicators.pesoAtualMedio);
+    const pesoInicialPlanejado = toNumber(lote.p_ini || indicators.pesoInicialMedio);
+    const pesoAtual = toNumber(lote.p_at || latestPesagem?.peso_medio || indicators.pesoAtualMedio || lote.p_ini);
     const heads = toNumber(lote.qtd || resumo.totalAnimais || indicators.totalAnimais);
-    const progressoPeso = indicators.pesoInicialMedio > 0
-      ? ((indicators.pesoAtualMedio - indicators.pesoInicialMedio) / Math.max(1, toNumber(lote.peso_alvo || indicators.pesoInicialMedio) - indicators.pesoInicialMedio)) * 100
+    const progressoPeso = pesoInicialPlanejado > 0
+      ? ((pesoAtual - pesoInicialPlanejado) / Math.max(1, toNumber(lote.peso_alvo || pesoInicialPlanejado) - pesoInicialPlanejado)) * 100
       : 0;
     const fazendaNome = fazendas.find((f) => Number(f.id) === Number(lote.faz_id))?.nome || '—';
     return {
@@ -213,18 +233,32 @@ export default function LotesPage({ db, setDb, onRegistrarSaidaAnimal, session }
 
     const novoLote = {
       id: gerarNovoId(lotes),
+      ...payload,
       status: 'ativo',
       sistema: payload.sistema || 'confinamento',
       tipo: payload.tipo || 'confinamento',
       tem_recria: false,
       dias_recria: 0,
       tem_engorda: true,
-      dias_engorda: 120,
+      dias_engorda: toNumber(payload.dias_estimados || payload.dias_engorda),
       gmd_meta: toNumber(payload.gmd_meta),
       investimento: toNumber(payload.investimento),
       preco_arroba: toNumber(payload.preco_arroba),
       rendimento_carcaca: toNumber(payload.rendimento_carcaca),
-      ...payload,
+      qtd: toNumber(payload.qtd),
+      p_ini: toNumber(payload.p_ini),
+      p_at: toNumber(payload.p_at || payload.p_ini),
+      peso_alvo: toNumber(payload.peso_alvo),
+      dias_estimados: toNumber(payload.dias_estimados),
+      consumo_tipo: payload.consumo_tipo || 'percentual_pv',
+      consumo_por_cabeca_dia: toNumber(payload.consumo_por_cabeca_dia),
+      consumo_total_estimado: toNumber(payload.consumo_total_estimado),
+      custo_total_estimado: toNumber(payload.custo_total_estimado),
+      preco_kg: toNumber(payload.preco_kg || payload.supl_rkg),
+      supl_nome: payload.supl_nome || '',
+      supl_rkg: toNumber(payload.supl_rkg || payload.preco_kg),
+      supl_pv_pct: toNumber(payload.supl_pv_pct),
+      supl_meta_dias: toNumber(payload.supl_meta_dias || payload.dias_estimados),
     };
 
     setDb((prev) => ({ ...prev, lotes: [...(prev.lotes || []), novoLote] }));
@@ -250,7 +284,7 @@ export default function LotesPage({ db, setDb, onRegistrarSaidaAnimal, session }
       ...movAnimais.filter((item) => Number(item.lote_id) === Number(selectedLote.id)).map((item) => ({ ...item, key: `mov-${item.id}` })),
     ].sort((a, b) => new Date(b.data) - new Date(a.data));
 
-    const consumoNutricao = selectedLote.heads * (selectedLote.pesoAtual * (toNumber(selectedLote.supl_pv_pct) / 100));
+    const consumoNutricao = calculateDailyPlannedConsumption(selectedLote, selectedLote.heads, selectedLote.pesoAtual);
 
     return (
       <>
@@ -342,12 +376,14 @@ export default function LotesPage({ db, setDb, onRegistrarSaidaAnimal, session }
         ))}
       </div>
 
-      <NovoLoteModal
-        open={openNovoLote}
-        fazendas={fazendas}
-        onClose={() => setOpenNovoLote(false)}
-        onSubmit={handleNovoLote}
-      />
+      {openNovoLote ? (
+        <LoteForm
+          initialData={null}
+          fazendas={fazendas}
+          onCancel={() => setOpenNovoLote(false)}
+          onSave={handleNovoLote}
+        />
+      ) : null}
     </div>
   );
 }
@@ -382,73 +418,6 @@ function PesagemModal({ open, lote, onClose, onSubmit }) {
         <Input type="date" label="Data" value={data} onChange={(e) => setData(e.target.value)} />
         <Input type="number" label="Peso médio (kg)" value={pesoMedio} onChange={(e) => setPesoMedio(e.target.value)} />
         <Input as="textarea" label="Observação" value={observacao} onChange={(e) => setObservacao(e.target.value)} />
-      </div>
-      {error ? <p className="err">{error}</p> : null}
-    </Modal>
-  );
-}
-
-function NovoLoteModal({ open, onClose, onSubmit, fazendas }) {
-  const [form, setForm] = useState({
-    nome: '',
-    faz_id: '',
-    entrada: todayIso,
-    saida: '',
-    qtd: '',
-    p_at: '',
-    gmd_meta: '',
-    investimento: '',
-    preco_arroba: '',
-    rendimento_carcaca: '52',
-  });
-  const [error, setError] = useState('');
-
-  function updateField(field, value) {
-    setForm((prev) => ({ ...prev, [field]: value }));
-  }
-
-  function handleSave() {
-    setError('');
-    if (!form.nome.trim()) return setError('Informe o nome do lote.');
-    if (!Number(form.faz_id)) return setError('Selecione a fazenda.');
-    if (!form.entrada) return setError('Informe a data de entrada.');
-
-    onSubmit({
-      ...form,
-      nome: form.nome.trim(),
-      faz_id: Number(form.faz_id),
-      qtd: Number(form.qtd || 0),
-      p_at: Number(form.p_at || 0),
-    });
-  }
-
-  return (
-    <Modal
-      open={open}
-      onClose={onClose}
-      title="Novo lote"
-      subtitle="Cadastro rápido para operação"
-      footer={(
-        <>
-          <Button variant="ghost" onClick={onClose}>Cancelar</Button>
-          <Button onClick={handleSave}>Criar lote</Button>
-        </>
-      )}
-    >
-      <div className="form-grid two">
-        <Input className="full" label="Nome" value={form.nome} onChange={(e) => updateField('nome', e.target.value)} />
-        <Input as="select" label="Fazenda" value={form.faz_id} onChange={(e) => updateField('faz_id', e.target.value)}>
-          <option value="">Selecione</option>
-          {fazendas.map((fazenda) => <option key={fazenda.id} value={String(fazenda.id)}>{fazenda.nome}</option>)}
-        </Input>
-        <Input type="date" label="Entrada" value={form.entrada} onChange={(e) => updateField('entrada', e.target.value)} />
-        <Input type="date" label="Saída prevista" value={form.saida} onChange={(e) => updateField('saida', e.target.value)} />
-        <Input type="number" label="Cabeças" value={form.qtd} onChange={(e) => updateField('qtd', e.target.value)} />
-        <Input type="number" label="Peso médio inicial (kg)" value={form.p_at} onChange={(e) => updateField('p_at', e.target.value)} />
-        <Input type="number" label="Meta GMD (kg/dia)" value={form.gmd_meta} onChange={(e) => updateField('gmd_meta', e.target.value)} />
-        <Input type="number" label="Investimento (R$)" value={form.investimento} onChange={(e) => updateField('investimento', e.target.value)} />
-        <Input type="number" label="Preço da arroba (R$)" value={form.preco_arroba} onChange={(e) => updateField('preco_arroba', e.target.value)} />
-        <Input type="number" label="Rendimento de carcaça (%)" value={form.rendimento_carcaca} onChange={(e) => updateField('rendimento_carcaca', e.target.value)} />
       </div>
       {error ? <p className="err">{error}</p> : null}
     </Modal>

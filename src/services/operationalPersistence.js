@@ -736,6 +736,40 @@ function buildOperationalCreatePayload(table, record, userId) {
     delete payload.id;
     return Object.fromEntries(Object.entries(payload).filter(([, value]) => value !== undefined));
   }
+  if (normalizedTable === 'lotes') {
+    const safe = sanitizeRecord(record);
+    const cloudUuid = normalizeCloudUuid(safe?.cloud_id ?? safe?.metadata?.cloud_id);
+    const metadataBase = isObject(safe?.metadata) ? { ...safe.metadata } : {};
+    if (!Object.prototype.hasOwnProperty.call(metadataBase, 'local_id')) {
+      metadataBase.local_id = safe?.id ?? null;
+    }
+    const metadata = buildLotePlanningMetadata(safe, metadataBase);
+    const payload = {
+      owner_user_id: userId || null,
+      nome: toNullableString(safe?.nome),
+      faz_id: toNullableNumber(safe?.faz_id),
+      entrada: toNullableDateString(safe?.entrada),
+      saida: toNullableDateString(safe?.saida),
+      status: toNullableString(safe?.status),
+      tipo: toNullableString(safe?.tipo),
+      sistema: toNullableString(safe?.sistema),
+      gmd_meta: toNullableNumber(safe?.gmd_meta),
+      preco_arroba: toNullableNumber(safe?.preco_arroba),
+      rendimento_carcaca: toNullableNumber(safe?.rendimento_carcaca),
+      investimento: toNullableNumber(safe?.investimento),
+      peso_alvo: toNullableNumber(safe?.peso_alvo),
+      obs: toNullableString(safe?.obs),
+      p_ini: toNullableNumber(safe?.p_ini),
+      p_at: toNullableNumber(safe?.p_at),
+      ultima_pesagem: toNullableDateString(safe?.ultima_pesagem),
+      data_saida: toNullableDateString(safe?.data_saida),
+      fechamento: isObject(safe?.fechamento) ? safe.fechamento : null,
+      metadata,
+      cloud_id: cloudUuid || undefined,
+    };
+    delete payload.id;
+    return Object.fromEntries(Object.entries(payload).filter(([, value]) => value !== undefined));
+  }
   const safe = sanitizeRecord(record);
   if (tableSupportsOwnerScope(normalizedTable)) {
     return {
@@ -835,6 +869,32 @@ function buildAdaptiveVariants(table, payload = {}) {
       observacao: v6.observacao,
     };
     pushVariant(v7, ['owner_user_id', 'cloud_id', 'metadata', 'origem', 'rendimento_carcaca', 'preco_arroba', 'minimal']);
+  } else if (normalizedTable === 'lotes') {
+    const v1 = pruneKeys(payload, ['owner_user_id']);
+    pushVariant(v1, ['owner_user_id']);
+    const v2 = pruneKeys(v1, ['cloud_id']);
+    pushVariant(v2, ['owner_user_id', 'cloud_id']);
+    const v3 = pruneKeys(v2, ['metadata']);
+    pushVariant(v3, ['owner_user_id', 'cloud_id', 'metadata']);
+    const v4 = pruneKeys(v3, ['fechamento', 'ultima_pesagem', 'data_saida']);
+    pushVariant(v4, ['owner_user_id', 'cloud_id', 'metadata', 'fechamento', 'ultima_pesagem', 'data_saida']);
+    const v5 = pruneKeys(v4, ['investimento', 'peso_alvo', 'rendimento_carcaca']);
+    pushVariant(v5, ['owner_user_id', 'cloud_id', 'metadata', 'fechamento', 'ultima_pesagem', 'data_saida', 'investimento', 'peso_alvo', 'rendimento_carcaca']);
+    const v6 = {
+      nome: v5.nome,
+      faz_id: v5.faz_id,
+      entrada: v5.entrada,
+      saida: v5.saida,
+      status: v5.status,
+      tipo: v5.tipo,
+      sistema: v5.sistema,
+      gmd_meta: v5.gmd_meta,
+      preco_arroba: v5.preco_arroba,
+      obs: v5.obs,
+      p_ini: v5.p_ini,
+      p_at: v5.p_at,
+    };
+    pushVariant(v6, ['owner_user_id', 'cloud_id', 'metadata', 'fechamento', 'ultima_pesagem', 'data_saida', 'investimento', 'peso_alvo', 'rendimento_carcaca', 'minimal']);
   } else if (normalizedTable === 'alertas_resolvidos') {
     const v1 = pruneKeys(payload, ['owner_user_id']);
     pushVariant(v1, ['owner_user_id']);
@@ -908,6 +968,53 @@ function sanitizeMetadataForModule(metadata, localId, syncedFrom) {
   return base;
 }
 
+function buildLotePlanningMetadata(safe = {}, metadata = {}) {
+  return {
+    ...metadata,
+    planejamento_lote: {
+      qtd: toNullableNumber(safe?.qtd),
+      p_ini: toNullableNumber(safe?.p_ini),
+      p_at: toNullableNumber(safe?.p_at),
+      peso_alvo: toNullableNumber(safe?.peso_alvo),
+      dias_estimados: toNullableNumber(safe?.dias_estimados),
+      consumo_tipo: toNullableString(safe?.consumo_tipo),
+      consumo_por_cabeca_dia: toNullableNumber(safe?.consumo_por_cabeca_dia),
+      consumo_total_estimado: toNullableNumber(safe?.consumo_total_estimado),
+      custo_total_estimado: toNullableNumber(safe?.custo_total_estimado),
+      preco_kg: toNullableNumber(safe?.preco_kg ?? safe?.supl_rkg),
+      supl_nome: toNullableString(safe?.supl_nome),
+      supl_rkg: toNullableNumber(safe?.supl_rkg ?? safe?.preco_kg),
+      supl_pv_pct: toNullableNumber(safe?.supl_pv_pct),
+      supl_meta_dias: toNullableNumber(safe?.supl_meta_dias),
+      saida: toNullableDateString(safe?.saida),
+      preco_arroba: toNullableNumber(safe?.preco_arroba),
+    },
+  };
+}
+
+function hydrateLotePlanningFields(row = {}) {
+  const planning = isObject(row?.metadata?.planejamento_lote) ? row.metadata.planejamento_lote : {};
+  return {
+    ...row,
+    qtd: row?.qtd ?? planning?.qtd ?? 0,
+    p_ini: row?.p_ini ?? planning?.p_ini ?? null,
+    p_at: row?.p_at ?? planning?.p_at ?? planning?.p_ini ?? null,
+    peso_alvo: row?.peso_alvo ?? planning?.peso_alvo ?? null,
+    dias_estimados: row?.dias_estimados ?? planning?.dias_estimados ?? null,
+    consumo_tipo: row?.consumo_tipo ?? planning?.consumo_tipo ?? null,
+    consumo_por_cabeca_dia: row?.consumo_por_cabeca_dia ?? planning?.consumo_por_cabeca_dia ?? null,
+    consumo_total_estimado: row?.consumo_total_estimado ?? planning?.consumo_total_estimado ?? null,
+    custo_total_estimado: row?.custo_total_estimado ?? planning?.custo_total_estimado ?? null,
+    preco_kg: row?.preco_kg ?? planning?.preco_kg ?? null,
+    supl_nome: row?.supl_nome ?? planning?.supl_nome ?? null,
+    supl_rkg: row?.supl_rkg ?? planning?.supl_rkg ?? planning?.preco_kg ?? null,
+    supl_pv_pct: row?.supl_pv_pct ?? planning?.supl_pv_pct ?? null,
+    supl_meta_dias: row?.supl_meta_dias ?? planning?.supl_meta_dias ?? planning?.dias_estimados ?? null,
+    saida: row?.saida ?? planning?.saida ?? null,
+    preco_arroba: row?.preco_arroba ?? planning?.preco_arroba ?? null,
+  };
+}
+
 function toNullableDateString(value) {
   if (value === undefined || value === null) return null;
   const text = String(value).trim();
@@ -958,7 +1065,10 @@ function mapFazendaToCloudPayload(localRow, userId) {
 function mapLoteToCloudPayload(localRow, userId) {
   const safe = sanitizeRecord(localRow);
   const localId = safe?.id ?? null;
-  const metadata = sanitizeMetadataForModule(safe?.metadata, localId, 'herdon_manual_lotes_sync');
+  const metadata = buildLotePlanningMetadata(
+    safe,
+    sanitizeMetadataForModule(safe?.metadata, localId, 'herdon_manual_lotes_sync')
+  );
   const cloudUuid = normalizeCloudUuid(safe?.cloud_id ?? safe?.metadata?.cloud_id);
   if (cloudUuid) {
     metadata.cloud_id = cloudUuid;
@@ -1097,12 +1207,12 @@ function mergeLotesSafe(localRows = [], remoteRows = []) {
   localRows.forEach((localRow) => {
     const remoteIndex = findRemoteMatch(localRow);
     if (remoteIndex === -1) {
-      merged.push(localRow);
+      merged.push(hydrateLotePlanningFields(localRow));
       return;
     }
     usedRemoteIndexes.add(remoteIndex);
     const remote = remoteRows[remoteIndex];
-    merged.push({
+    merged.push(hydrateLotePlanningFields({
       ...localRow,
       ...remote,
       metadata: {
@@ -1110,12 +1220,12 @@ function mergeLotesSafe(localRows = [], remoteRows = []) {
         ...(isObject(remote?.metadata) ? remote.metadata : {}),
         cloud_id: remote?.cloud_id ?? remote?.id ?? (remote?.metadata?.cloud_id ?? null),
       },
-    });
+    }));
   });
 
   remoteRows.forEach((remote, index) => {
     if (!usedRemoteIndexes.has(index)) {
-      merged.push(remote);
+      merged.push(hydrateLotePlanningFields(remote));
     }
   });
 
