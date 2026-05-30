@@ -125,6 +125,40 @@ function resolveLatestPesagem(pesagens) {
     })[0] || null;
 }
 
+function calculateAverageGmdByLote(pesagens = []) {
+  const pesagensPorLote = new Map();
+
+  (pesagens || []).forEach((pesagem) => {
+    if (resolveTipoPesagem(pesagem) !== 'lote') return;
+    const loteId = Number(pesagem?.lote_id);
+    if (!Number.isFinite(loteId) || loteId <= 0) return;
+    if (!pesagensPorLote.has(loteId)) pesagensPorLote.set(loteId, []);
+    pesagensPorLote.get(loteId).push(pesagem);
+  });
+
+  const gmdValues = [];
+  pesagensPorLote.forEach((lotePesagens) => {
+    const sorted = [...lotePesagens]
+      .filter((item) => item?.data && Number.isFinite(Number(item?.peso_medio)))
+      .sort((a, b) => new Date(a.data) - new Date(b.data));
+
+    if (sorted.length < 2) return;
+
+    const primeira = sorted[0];
+    const ultima = sorted[sorted.length - 1];
+    const dias = Math.round((new Date(ultima.data) - new Date(primeira.data)) / 86400000);
+    if (!Number.isFinite(dias) || dias <= 0) return;
+
+    const ganho = Number(ultima.peso_medio) - Number(primeira.peso_medio);
+    const gmd = ganho / dias;
+    if (Number.isFinite(gmd)) gmdValues.push(gmd);
+  });
+
+  if (!gmdValues.length) return null;
+  const media = gmdValues.reduce((total, value) => total + value, 0) / gmdValues.length;
+  return Number.isFinite(media) ? media : null;
+}
+
 function recalculateLoteFromPesagens(prevDb, loteId, nextPesagens) {
   const lotes = Array.isArray(prevDb?.lotes) ? prevDb.lotes : [];
   const animais = Array.isArray(prevDb?.animais) ? prevDb.animais : [];
@@ -276,6 +310,8 @@ export default function PesagensPage({ db, setDb, onConfirmAction, navigationInt
       }
     });
 
+    const gmdMedio = calculateAverageGmdByLote(basePesagens);
+
     return {
       totalPesagens,
       totalPesagensAnimal,
@@ -283,6 +319,8 @@ export default function PesagensPage({ db, setDb, onConfirmAction, navigationInt
       lotesComPesagem: lotesComPesagem.size,
       ultimaData,
       pesoMedioGeral: totalPesagens ? totalPesoMedio / totalPesagens : 0,
+      gmdMedio,
+      gmdMedioDisponivel: Number.isFinite(gmdMedio),
     };
   }, [pesagens]);
 
@@ -783,7 +821,7 @@ export default function PesagensPage({ db, setDb, onConfirmAction, navigationInt
       <section className="animais-hero pesagens-hero"><div><h1>Pesagens</h1><p>Registre e acompanhe pesagens de forma guiada.</p></div><button className="primary-btn" onClick={() => abrirNovaPesagem(modoPesagem)}>Nova pesagem</button></section>
       <div className="segmented-control tab-bar"><button type="button" className={`segment ${abaAtiva === 'nova' ? 'active' : ''}`} onClick={() => setAbaAtiva('nova')}>Nova pesagem</button><button type="button" className={`segment ${abaAtiva === 'historico' ? 'active' : ''}`} onClick={() => setAbaAtiva('historico')}>Histórico</button><button type="button" className={`segment ${abaAtiva === 'evolucao' ? 'active' : ''}`} onClick={() => setAbaAtiva('evolucao')}>Evolução</button><button type="button" className={`segment ${abaAtiva === 'alertas' ? 'active' : ''}`} onClick={() => setAbaAtiva('alertas')}>Alertas</button></div>
 
-      <div className="dashboard-grid dashboard-grid--kpi-main"><Card title="Última pesagem">{formatarData(resumo.ultimaData)}</Card><Card title="Lotes sem pesagem recente">{alertas.lotesSemPesagem.length}</Card><Card title="Total de pesagens">{resumo.totalPesagens}</Card><Card title="GMD médio">{formatarNumero(resumo?.gmdMedio || 0)} kg/dia</Card></div>
+      <div className="dashboard-grid dashboard-grid--kpi-main"><Card title="Última pesagem">{formatarData(resumo.ultimaData)}</Card><Card title="Lotes sem pesagem recente">{alertas.lotesSemPesagem.length}</Card><Card title="Total de pesagens">{resumo.totalPesagens}</Card><Card title="GMD médio">{resumo.gmdMedioDisponivel ? `${formatarNumero(resumo.gmdMedio, 3)} kg/dia` : 'Sem dados suficientes'}</Card></div>
 
       {ultimoResumoBatch?.totalFalhas ? (
         <Card title="Pendencias da ultima pesagem" subtitle="Revise os registros que nao foram concluidos totalmente.">
@@ -804,7 +842,7 @@ export default function PesagensPage({ db, setDb, onConfirmAction, navigationInt
 
       {abaAtiva === 'historico' && <div className="fazendas-card"><div className="fazendas-table-wrap">{dadosTabela.length===0?<div className="empty-box"><strong>Nenhuma pesagem cadastrada.</strong></div>:<table className="data-table herdon-table herdon-table--pesagens"><thead><tr><th>Data</th><th>Tipo</th><th>Lote</th><th>Animal</th><th>Peso</th><th>Observação</th><th>Ações</th></tr></thead><tbody>{dadosTabela.map((item)=><tr key={item.id}><td>{formatarData(item.data)}</td><td>{item.tipo==='animal'?'Animal':'Lote'}</td><td>{item.loteNome}</td><td>{item.tipo==='animal'?(item.animalNome||'Animal'):'-'}</td><td>{formatarNumero(item.peso_medio)} kg</td><td>{item.observacao||'-'}</td><td><div className="row-actions row-actions--tight"><button className="action-btn" onClick={()=>editarPesagem(item)}>Editar</button><button className="action-btn action-btn-danger" onClick={()=>excluirPesagem(item.id)}>Cancelar registro</button></div></td></tr>)}</tbody></table>}</div></div>}
 
-      {abaAtiva === 'evolucao' && <div className="fazendas-card">{dadosTabela.length<2?<div className="empty-box"><strong>Sem dados suficientes para evolucao.</strong></div>:<p>Peso medio por lote e GMD disponiveis no historico de pesagens.</p>}</div>}
+      {abaAtiva === 'evolucao' && <div className="fazendas-card">{dadosTabela.length<2?<div className="empty-box"><strong>Sem dados suficientes para evolução.</strong></div>:<p>Peso médio por lote e GMD disponíveis no histórico de pesagens.</p>}</div>}
       {abaAtiva === 'alertas' && <div className="fazendas-card"><p>Lotes sem pesagem ha mais de {alertas.diasSemPesagem} dias: {alertas.lotesSemPesagem.length}</p><p>Animais sem pesagem recente: {alertas.animaisSemPesagem.length}</p><button className="primary-btn" onClick={() => { setAbaAtiva('nova'); abrirNovaPesagem('lote'); }}>Registrar pesagem</button></div>}
 
       {abrirForm && (

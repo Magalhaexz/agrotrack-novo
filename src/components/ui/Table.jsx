@@ -1,11 +1,16 @@
 import EmptyState from '../EmptyState';
 
-function getCellValue(row, column) {
-  if (typeof column.render === 'function') {
-    return column.render(row);
-  }
+function isRenderablePrimitive(value) {
+  if (value === undefined || value === null) return false;
+  if (typeof value === 'number') return Number.isFinite(value);
+  return true;
+}
 
-  return row?.[column.key];
+function getCellValue(row, column) {
+  const rawValue = typeof column.render === 'function'
+    ? column.render(row)
+    : row?.[column.key];
+  return isRenderablePrimitive(rawValue) ? rawValue : '-';
 }
 
 function resolveMobileText(row, key, fallback) {
@@ -13,7 +18,7 @@ function resolveMobileText(row, key, fallback) {
     return key(row);
   }
 
-  if (typeof key === 'string' && row?.[key] != null) {
+  if (typeof key === 'string' && isRenderablePrimitive(row?.[key])) {
     return row[key];
   }
 

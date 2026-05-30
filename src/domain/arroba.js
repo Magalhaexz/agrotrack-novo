@@ -1,5 +1,5 @@
-import { parseNumeroEntrada } from '../utils/formatters';
-import { calcularRendimentoCarcaca } from './indicadores';
+import { parseNumeroEntrada } from '../utils/formatters.js';
+import { calcularRendimentoCarcaca } from './indicadores.js';
 
 const KG_POR_ARROBA = 15;
 const RENDIMENTO_PADRAO = 52;
