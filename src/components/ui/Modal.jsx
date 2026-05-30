@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect } from 'react';
 import { X } from 'lucide-react';
 
 export default function Modal({
@@ -10,8 +10,6 @@ export default function Modal({
   footer,
   size = 'md',
 }) {
-  const [touchStartY, setTouchStartY] = useState(null);
-
   useEffect(() => {
     if (!open) {
       return undefined;
@@ -38,21 +36,12 @@ export default function Modal({
   }
 
   return (
-    <div className="ui-modal-overlay" onClick={onClose}>
+    <div className="ui-modal-overlay">
       <div
         className={`ui-modal ui-modal--${size}`}
         role="dialog"
         aria-modal="true"
         aria-label={title || 'Janela modal'}
-        onClick={(event) => event.stopPropagation()}
-        onTouchStart={(event) => setTouchStartY(event.changedTouches[0]?.clientY || null)}
-        onTouchEnd={(event) => {
-          const endY = event.changedTouches[0]?.clientY || 0;
-          if (touchStartY && endY - touchStartY > 80) {
-            onClose?.();
-          }
-          setTouchStartY(null);
-        }}
       >
         <div className="ui-modal-drag-handle" />
         <div className="ui-modal-head">

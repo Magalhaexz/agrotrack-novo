@@ -11,6 +11,17 @@ function getSessionUserId(session) {
   return session?.user?.id || null;
 }
 
+function toNullableId(value) {
+  if (value === undefined || value === null) return null;
+  if (typeof value === 'number') {
+    return Number.isFinite(value) ? value : null;
+  }
+  const text = String(value).trim();
+  if (!text) return null;
+  const asNumber = Number(text);
+  return Number.isFinite(asNumber) && text === String(asNumber) ? asNumber : text;
+}
+
 function getErrorMessage(error) {
   if (!error) return '';
   if (typeof error === 'string') return error;
@@ -689,7 +700,7 @@ function buildOperationalCreatePayload(table, record, userId) {
     const payload = {
       owner_user_id: userId || null,
       lote_id: toNullableNumber(safe?.lote_id),
-      animal_id: toNullableNumber(safe?.animal_id),
+      animal_id: toNullableId(safe?.animal_id),
       data: toNullableDateString(safe?.data ?? safe?.data_pesagem),
       peso_medio: toNullableNumber(safe?.peso_medio ?? safe?.peso ?? safe?.peso_kg),
       tipo: toNullableString(safe?.tipo),
@@ -1525,7 +1536,7 @@ export async function updateOperationalRecord(table, id, patch, session, options
           query = query.contains('metadata', { local_id: String(selector.value) });
         } else if (selector.type === 'animal_date_tipo') {
           query = query
-            .eq('animal_id', Number(selector?.animal_id))
+            .eq('animal_id', toNullableId(selector?.animal_id))
             .eq('lote_id', Number(selector?.lote_id))
             .eq('tipo', String(selector?.tipo || 'animal'))
             .eq('data', String(selector?.data || '').slice(0, 10));

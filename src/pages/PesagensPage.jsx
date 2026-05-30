@@ -1,5 +1,7 @@
 import { useMemo, useState } from 'react';
 import PesagemForm from '../components/PesagemForm';
+import Card from '../components/ui/Card';
+import Button from '../components/ui/Button';
 import { formatarNumero, formatarData } from '../utils/formatters';
 import { gerarNovoId } from '../utils/id';
 import { useToast } from '../hooks/useToast';
@@ -20,6 +22,12 @@ function normalizeIdKey(value) {
   if (value === undefined || value === null) return null;
   const text = String(value).trim();
   return text ? text : null;
+}
+
+function idsMatch(left, right) {
+  const leftKey = normalizeIdKey(left);
+  const rightKey = normalizeIdKey(right);
+  return Boolean(leftKey && rightKey && leftKey === rightKey);
 }
 
 function getAnimalIndex(animal, fallbackIndex = null) {
@@ -87,7 +95,7 @@ function buildSafePesagemPayload(payload = {}) {
 
   const safe = {
     lote_id: Number.isFinite(Number(payload?.lote_id)) ? Number(payload.lote_id) : null,
-    animal_id: Number.isFinite(Number(payload?.animal_id)) ? Number(payload.animal_id) : null,
+    animal_id: normalizeIdKey(payload?.animal_id),
     data: payload?.data ? String(payload.data) : null,
     tipo: 'animal',
     peso_medio: Number.isFinite(Number(payload?.peso_medio)) ? Number(payload.peso_medio) : null,
@@ -174,6 +182,7 @@ export default function PesagensPage({ db, setDb, onConfirmAction, navigationInt
   const [abrirForm, setAbrirForm] = useState(shouldStartWithNewPesagem);
   const [modoPesagem, setModoPesagem] = useState('lote');
   const [pesagemEditando, setPesagemEditando] = useState(null);
+  const [ultimoResumoBatch, setUltimoResumoBatch] = useState(null);
 
   const lotes = db?.lotes;
   const animais = db?.animais;
@@ -446,6 +455,7 @@ export default function PesagensPage({ db, setDb, onConfirmAction, navigationInt
       const createdAnimais = [];
       const createAnimalResults = [];
       const normalizedRegistros = [];
+      const failedRecords = [];
       const indexToAnimal = new Map();
       loteAnimais.forEach((animal, idx) => {
         const index = getAnimalIndex(animal, idx + 1);
@@ -453,9 +463,12 @@ export default function PesagensPage({ db, setDb, onConfirmAction, navigationInt
       });
 
       for (const registro of registros) {
-        const directAnimalId = Number(registro?.animal_id);
-        if (Number.isFinite(directAnimalId) && directAnimalId > 0) {
-          normalizedRegistros.push(buildSafePesagemPayload(registro));
+        const directAnimalId = normalizeIdKey(registro?.animal_id);
+        if (directAnimalId) {
+          normalizedRegistros.push(buildSafePesagemPayload({
+            ...registro,
+            animal_id: directAnimalId,
+          }));
           continue;
         }
         const virtualIndex = Number(registro?.virtual_animal?.index);
@@ -501,8 +514,13 @@ export default function PesagensPage({ db, setDb, onConfirmAction, navigationInt
           indexToAnimal.set(virtualIndex, animalTarget);
         }
 
-        const resolvedAnimalId = Number(animalTarget?.id);
-        if (!Number.isFinite(resolvedAnimalId) || resolvedAnimalId <= 0) {
+        const resolvedAnimalId = normalizeIdKey(
+          animalTarget?.cloud_id
+          ?? animalTarget?.id
+          ?? animalTarget?.metadata?.cloud_id
+          ?? animalTarget?.metadata?.local_id
+        );
+        if (!resolvedAnimalId) {
           logBatchWeighingSave({
             stage: 'skip_pesagem_missing_animal_id',
             table: 'pesagens',
@@ -515,6 +533,10 @@ export default function PesagensPage({ db, setDb, onConfirmAction, navigationInt
             syncStatus: 'skipped',
             code: 'ANIMAL_ID_MISSING',
             safeMessage: 'Animal não persistido para vincular pesagem.',
+          });
+          failedRecords.push({
+            identification: registro?.virtual_animal?.identificacao || `Animal #${virtualIndex}`,
+            message: 'Nao foi possivel vincular a pesagem ao animal criado.',
           });
           continue;
         }
@@ -541,13 +563,19 @@ export default function PesagensPage({ db, setDb, onConfirmAction, navigationInt
 
       for (const payload of normalizedRegistros) {
         const loteId = Number(payload?.lote_id);
-        const animalId = Number(payload?.animal_id);
+        const animalId = normalizeIdKey(payload?.animal_id);
         const data = payload?.data;
-        if (!Number.isFinite(animalId) || animalId <= 0) continue;
+        if (!animalId) {
+          failedRecords.push({
+            identification: payload?.metadata?.animal_identificacao || 'Animal sem identificacao',
+            message: 'Pesagem sem identificador valido para o animal.',
+          });
+          continue;
+        }
         const existente = nextPesagens.find((item) => (
           resolveTipoPesagem(item) === 'animal'
           && Number(item?.lote_id) === loteId
-          && Number(item?.animal_id) === animalId
+          && idsMatch(item?.animal_id, animalId)
           && String(item?.data || '') === String(data || '')
         ));
 
@@ -580,6 +608,12 @@ export default function PesagensPage({ db, setDb, onConfirmAction, navigationInt
             code: persisted?.code,
             safeMessage: persisted?.error || null,
           });
+          if (!persisted?.persisted) {
+            failedRecords.push({
+              identification: payload?.metadata?.animal_identificacao || 'Animal sem identificacao',
+              message: persisted?.error || 'Pesagem atualizada apenas localmente.',
+            });
+          }
         } else {
           logBatchWeighingSave({
             stage: 'before_create_pesagem',
@@ -608,6 +642,12 @@ export default function PesagensPage({ db, setDb, onConfirmAction, navigationInt
             code: persisted?.code,
             safeMessage: persisted?.error || null,
           });
+          if (!persisted?.persisted) {
+            failedRecords.push({
+              identification: payload?.metadata?.animal_identificacao || 'Animal sem identificacao',
+              message: persisted?.error || 'Pesagem criada apenas localmente.',
+            });
+          }
         }
       }
 
@@ -621,7 +661,14 @@ export default function PesagensPage({ db, setDb, onConfirmAction, navigationInt
       }));
 
       const persistedBatch = await persistCollectionMutation(resultados.map((item) => Promise.resolve(item)));
-      if (!persistedBatch.persisted) {
+      const totalFalhas = failedRecords.length;
+      const totalSucessos = normalizedRegistros.length - totalFalhas;
+      setUltimoResumoBatch(totalFalhas ? { failedRecords, totalSucessos, totalFalhas } : null);
+      if (totalFalhas && totalSucessos > 0) {
+        showToast({ type: 'warning', message: `Pesagem concluida parcialmente: ${totalSucessos} registro(s) salvo(s) e ${totalFalhas} com pendencia.` });
+      } else if (totalFalhas) {
+        showToast({ type: 'error', message: `Nenhuma pesagem foi concluida sem pendencia. ${totalFalhas} registro(s) exigem revisao.` });
+      } else if (!persistedBatch.persisted) {
         showToast({ type: 'warning', message: 'Pesagem salva localmente. Sincronizacao pendente.' });
       } else {
         showToast({ type: 'success', message: 'Pesagem salva na nuvem.' });
@@ -725,23 +772,40 @@ export default function PesagensPage({ db, setDb, onConfirmAction, navigationInt
       if (!data) return true;
       return (hoje - new Date(data)) / (1000 * 60 * 60 * 24) > diasSemPesagem;
     });
-    const animaisSemPesagem = (animais || []).filter((animal) => !dadosTabela.some((p) => p.tipo === 'animal' && Number(p.animal_id) === Number(animal.id)));
+    const animaisSemPesagem = (animais || []).filter((animal) => !dadosTabela.some((p) => (
+      p.tipo === 'animal' && idsMatch(p.animal_id, animal.id)
+    )));
     return { lotesSemPesagem, animaisSemPesagem, diasSemPesagem };
   }, [lotes, animais, dadosTabela]);
 
   return (
     <div className="page page--pesagens page--kpi-compact"> 
-      <section className="animais-hero pesagens-hero"><div><h1>Pesagens</h1><p>Registre e acompanhe pesagens de forma guiada.</p></div><Button variant="primary" onClick={() => abrirNovaPesagem(modoPesagem)}>Nova pesagem</Button></section>
+      <section className="animais-hero pesagens-hero"><div><h1>Pesagens</h1><p>Registre e acompanhe pesagens de forma guiada.</p></div><button className="primary-btn" onClick={() => abrirNovaPesagem(modoPesagem)}>Nova pesagem</button></section>
       <div className="segmented-control tab-bar"><button type="button" className={`segment ${abaAtiva === 'nova' ? 'active' : ''}`} onClick={() => setAbaAtiva('nova')}>Nova pesagem</button><button type="button" className={`segment ${abaAtiva === 'historico' ? 'active' : ''}`} onClick={() => setAbaAtiva('historico')}>Histórico</button><button type="button" className={`segment ${abaAtiva === 'evolucao' ? 'active' : ''}`} onClick={() => setAbaAtiva('evolucao')}>Evolução</button><button type="button" className={`segment ${abaAtiva === 'alertas' ? 'active' : ''}`} onClick={() => setAbaAtiva('alertas')}>Alertas</button></div>
 
       <div className="dashboard-grid dashboard-grid--kpi-main"><Card title="Última pesagem">{formatarData(resumo.ultimaData)}</Card><Card title="Lotes sem pesagem recente">{alertas.lotesSemPesagem.length}</Card><Card title="Total de pesagens">{resumo.totalPesagens}</Card><Card title="GMD médio">{formatarNumero(resumo?.gmdMedio || 0)} kg/dia</Card></div>
 
-      {abaAtiva === 'nova' && <Card className="form-section-card" title="Nova pesagem" subtitle="Escolha o tipo e preencha os dados para registrar."><div className="segmented-control tab-bar"><button type="button" className={`segment ${modoPesagem === 'lote' ? 'active' : ''}`} onClick={() => setModoPesagem('lote')}>Por lote</button><button type="button" className={`segment ${modoPesagem === 'animal' ? 'active' : ''}`} onClick={() => setModoPesagem('animal')}>Por animal</button></div><div style={{ marginTop: 12 }}><Button variant="primary" onClick={() => abrirNovaPesagem(modoPesagem)}>Registrar pesagem</Button></div></Card>}
+      {ultimoResumoBatch?.totalFalhas ? (
+        <Card title="Pendencias da ultima pesagem" subtitle="Revise os registros que nao foram concluidos totalmente.">
+          <p style={{ marginTop: 0 }}>
+            {ultimoResumoBatch.totalSucessos > 0
+              ? `${ultimoResumoBatch.totalSucessos} registro(s) foram processados e ${ultimoResumoBatch.totalFalhas} ficaram com pendencia.`
+              : `${ultimoResumoBatch.totalFalhas} registro(s) ficaram com pendencia.`}
+          </p>
+          <ul style={{ margin: 0, paddingLeft: 18 }}>
+            {ultimoResumoBatch.failedRecords.map((item, index) => (
+              <li key={`${item.identification}-${index}`}>{item.identification}: {item.message}</li>
+            ))}
+          </ul>
+        </Card>
+      ) : null}
+
+      {abaAtiva === 'nova' && <Card className="form-section-card" title="Nova pesagem" subtitle="Escolha o tipo e preencha os dados para registrar."><div className="segmented-control tab-bar"><button type="button" className={`segment ${modoPesagem === 'lote' ? 'active' : ''}`} onClick={() => setModoPesagem('lote')}>Por lote</button><button type="button" className={`segment ${modoPesagem === 'animal' ? 'active' : ''}`} onClick={() => setModoPesagem('animal')}>Por animal</button></div><div style={{ marginTop: 12 }}><Button onClick={() => abrirNovaPesagem(modoPesagem)}>Salvar pesagem</Button></div></Card>}
 
       {abaAtiva === 'historico' && <div className="fazendas-card"><div className="fazendas-table-wrap">{dadosTabela.length===0?<div className="empty-box"><strong>Nenhuma pesagem cadastrada.</strong></div>:<table className="data-table herdon-table herdon-table--pesagens"><thead><tr><th>Data</th><th>Tipo</th><th>Lote</th><th>Animal</th><th>Peso</th><th>Observação</th><th>Ações</th></tr></thead><tbody>{dadosTabela.map((item)=><tr key={item.id}><td>{formatarData(item.data)}</td><td>{item.tipo==='animal'?'Animal':'Lote'}</td><td>{item.loteNome}</td><td>{item.tipo==='animal'?(item.animalNome||'Animal'):'-'}</td><td>{formatarNumero(item.peso_medio)} kg</td><td>{item.observacao||'-'}</td><td><div className="row-actions row-actions--tight"><button className="action-btn" onClick={()=>editarPesagem(item)}>Editar</button><button className="action-btn action-btn-danger" onClick={()=>excluirPesagem(item.id)}>Cancelar registro</button></div></td></tr>)}</tbody></table>}</div></div>}
 
       {abaAtiva === 'evolucao' && <div className="fazendas-card">{dadosTabela.length<2?<div className="empty-box"><strong>Sem dados suficientes para evolucao.</strong></div>:<p>Peso medio por lote e GMD disponiveis no historico de pesagens.</p>}</div>}
-      {abaAtiva === 'alertas' && <div className="fazendas-card"><p>Lotes sem pesagem ha mais de {alertas.diasSemPesagem} dias: {alertas.lotesSemPesagem.length}</p><p>Animais sem pesagem recente: {alertas.animaisSemPesagem.length}</p><Button variant="primary" onClick={() => { setAbaAtiva('nova'); abrirNovaPesagem('lote'); }}>Registrar pesagem</Button></div>}
+      {abaAtiva === 'alertas' && <div className="fazendas-card"><p>Lotes sem pesagem ha mais de {alertas.diasSemPesagem} dias: {alertas.lotesSemPesagem.length}</p><p>Animais sem pesagem recente: {alertas.animaisSemPesagem.length}</p><button className="primary-btn" onClick={() => { setAbaAtiva('nova'); abrirNovaPesagem('lote'); }}>Registrar pesagem</button></div>}
 
       {abrirForm && (
         <PesagemForm initialData={pesagemEditando} lotes={lotes || []} animais={animais || []} pesagens={pesagens || []} onSave={salvarPesagem} onCancel={() => { setAbrirForm(false); setPesagemEditando(null); }} />
