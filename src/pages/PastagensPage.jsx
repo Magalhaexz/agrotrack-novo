@@ -49,11 +49,9 @@ export default function PastagensPage({ db, setDb, session, onConfirmAction }) {
   const [editando, setEditando] = useState(null);
 
   const mensagemSemPermissao = 'Você não tem permissão para executar esta ação.';
-  const pastagens = useMemo(() => (Array.isArray(db?.pastagens) ? db.pastagens : []), [db?.pastagens]);
-  const animais = useMemo(() => (Array.isArray(db?.animais) ? db.animais : []), [db?.animais]);
-  const lotes = useMemo(() => (Array.isArray(db?.lotes) ? db.lotes : []), [db?.lotes]);
-
   const indicadores = useMemo(() => {
+    const pastagens = Array.isArray(db?.pastagens) ? db.pastagens : [];
+    const animais = Array.isArray(db?.animais) ? db.animais : [];
     const areaTotalPastagem = pastagens.reduce((sum, item) => sum + toNumber(item.area_ha), 0);
     const capacidadeTotalUa = calcularCapacidadeTotalUa(pastagens);
     const cabecasTotais = animais.reduce((sum, item) => sum + toNumber(item.qtd), 0);
@@ -80,15 +78,17 @@ export default function PastagensPage({ db, setDb, session, onConfirmAction }) {
       saldoCapacidadeUa,
       statusCapacidade,
     };
-  }, [pastagens, animais]);
+  }, [db]);
 
   const uaPorLote = useMemo(() => (
-    lotes.map((lote) => ({
+    (Array.isArray(db?.lotes) ? db.lotes : []).map((lote) => ({
       id: lote.id,
       nome: lote.nome || `Lote ${lote.id}`,
-      ua: calcularUaPorLote(animais, lote.id),
+      ua: calcularUaPorLote(Array.isArray(db?.animais) ? db.animais : [], lote.id),
     }))
-  ), [lotes, animais]);
+  ), [db]);
+
+  const pastagens = Array.isArray(db?.pastagens) ? db.pastagens : [];
 
   function resetForm() {
     setForm(emptyForm());

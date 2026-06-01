@@ -46,6 +46,7 @@ export const navSections = [
       { id: 'pastagens', label: 'Pastagens', icon: MapPin },
       { id: 'evolucaoRebanho', label: 'Evolução do Rebanho', icon: TrendingUp },
       { id: 'indicadores', label: 'Indicadores', icon: Scale },
+      { id: 'cenarios', label: 'Cenários', icon: ClipboardList },
     ],
   },
   {
