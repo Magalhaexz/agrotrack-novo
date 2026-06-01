@@ -105,6 +105,21 @@ export const initialDb = {
     },
   ],
 
+  pastagens: [
+    {
+      id: 1,
+      fazenda_id: 1,
+      nome: 'Pasto Sede',
+      area_ha: 120,
+      capacidade_suporte_ua_ha: 1.3,
+      custo_pasto_r_cab_mes: 38,
+      arrendamento_ativo: false,
+      area_arrendada_ha: 0,
+      custo_arrendamento_mes: 0,
+      observacoes: 'Pasto principal de apoio para recria.',
+    },
+  ],
+
   // REMOVER ANTES DE PRODUÇÃO: massa inicial fictícia para testes de interface.
   animais: [
     { id: 1, lote_id: 1, sexo: 'macho', gen: 'Cruzado', qtd: 80, p_ini: 320, p_at: 440, dias: 120, consumo: 12.5 },
