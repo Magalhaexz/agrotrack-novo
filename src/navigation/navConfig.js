@@ -4,6 +4,7 @@ import {
   CheckSquare,
   ClipboardList,
   DollarSign,
+  FileText,
   LayoutDashboard,
   MapPin,
   Package,
@@ -47,6 +48,8 @@ export const navSections = [
       { id: 'evolucaoRebanho', label: 'Evolução do Rebanho', icon: TrendingUp },
       { id: 'indicadores', label: 'Indicadores', icon: Scale },
       { id: 'cenarios', label: 'Cenários', icon: ClipboardList },
+      { id: 'dashboardPremium', label: 'Dashboard Premium', icon: LayoutDashboard },
+      { id: 'relatoriosGerenciais', label: 'Relatórios Gerenciais', icon: FileText },
     ],
   },
   {
