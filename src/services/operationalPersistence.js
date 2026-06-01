@@ -13,6 +13,12 @@ function getSessionUserId(session) {
   return session?.user?.id || null;
 }
 
+function normalizeOwnerUserId(value) {
+  if (value === undefined || value === null) return null;
+  const text = String(value).trim();
+  return text || null;
+}
+
 function toNullableId(value) {
   if (value === undefined || value === null) return null;
   if (typeof value === 'number') {
@@ -330,6 +336,24 @@ function readPendingSyncQueue() {
   }
 }
 
+function resolveQueueOwnerUserId(item = {}) {
+  return normalizeOwnerUserId(
+    item?.ownerUserId
+      ?? item?.payload?.owner_user_id
+      ?? item?.payload?.metadata?.owner_user_id
+      ?? null
+  );
+}
+
+function filterQueueByOwner(queue = [], ownerUserId = null) {
+  const normalizedOwner = normalizeOwnerUserId(ownerUserId);
+  if (!normalizedOwner) return Array.isArray(queue) ? queue : [];
+  return (Array.isArray(queue) ? queue : []).filter((item) => {
+    const itemOwner = resolveQueueOwnerUserId(item);
+    return itemOwner === normalizedOwner;
+  });
+}
+
 function writePendingSyncQueue(queue) {
   try {
     localStorage.setItem(PENDING_SYNC_QUEUE_KEY, JSON.stringify(Array.isArray(queue) ? queue : []));
@@ -338,12 +362,18 @@ function writePendingSyncQueue(queue) {
   }
 }
 
-function removePendingSyncItems(matcher) {
+function removePendingSyncItems(matcher, ownerUserId = null) {
   const queue = readPendingSyncQueue();
-  const next = queue.filter((item) => !matcher(item));
+  const normalizedOwner = normalizeOwnerUserId(ownerUserId);
+  const next = queue.filter((item) => {
+    if (!normalizedOwner) return !matcher(item);
+    const itemOwner = resolveQueueOwnerUserId(item);
+    if (itemOwner !== normalizedOwner) return true;
+    return !matcher(item);
+  });
   if (next.length !== queue.length) {
     writePendingSyncQueue(next);
-    emitPendingSyncState(next, 'cleanup');
+    emitPendingSyncState(filterQueueByOwner(next, normalizedOwner), 'cleanup');
   }
 }
 
@@ -367,6 +397,11 @@ function emitPendingSyncState(queue = [], reason = 'updated') {
 
 function enqueuePendingSync(item = {}) {
   const current = readPendingSyncQueue();
+  const normalizedOwner = normalizeOwnerUserId(
+    item?.ownerUserId
+      ?? item?.payload?.owner_user_id
+      ?? null
+  );
   const nextItem = {
     id: `${Date.now()}-${Math.random().toString(16).slice(2)}`,
     table: item.table || null,
@@ -380,26 +415,35 @@ function enqueuePendingSync(item = {}) {
     retryCount: Number(item.retryCount || 0),
     code: item.code || 'unknown',
     message: item.message || 'Registro salvo localmente. SincronizaÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â§ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â£o pendente.',
+    ownerUserId: normalizedOwner,
   };
   const fingerprint = buildQueueFingerprint(nextItem);
-  const deduped = current.filter((queued) => buildQueueFingerprint(queued) !== fingerprint);
+  const deduped = current.filter((queued) => {
+    const sameFingerprint = buildQueueFingerprint(queued) === fingerprint;
+    if (!sameFingerprint) return true;
+    return resolveQueueOwnerUserId(queued) !== normalizedOwner;
+  });
   const queue = [...deduped, nextItem];
   writePendingSyncQueue(queue);
-  emitPendingSyncState(queue, 'enqueue');
+  emitPendingSyncState(filterQueueByOwner(queue, normalizedOwner), 'enqueue');
   return nextItem;
 }
 
-export function getPendingSyncQueueSnapshot() {
+export function getPendingSyncQueueSnapshot(sessionOrUserId = null) {
   const queue = readPendingSyncQueue();
+  const ownerUserId = typeof sessionOrUserId === 'string'
+    ? sessionOrUserId
+    : getSessionUserId(sessionOrUserId);
+  const scopedQueue = filterQueueByOwner(queue, ownerUserId);
   const schemaErrorTables = [...new Set(
-    queue
+    scopedQueue
       .filter((item) => String(item?.code || '').includes('schema_error'))
       .map((item) => String(item?.table || '').trim())
       .filter(Boolean)
   )];
   return {
-    queue,
-    pendingCount: queue.length,
+    queue: scopedQueue,
+    pendingCount: scopedQueue.length,
     schemaErrorTables,
     checkedAt: Date.now(),
   };
@@ -1303,6 +1347,7 @@ export async function createOperationalRecord(table, record, session, options = 
         payload: sanitizeRecord(record),
         code: classifyCloudSaveCode(readiness.code),
         message: fallback.error,
+        ownerUserId: getSessionUserId(session),
       });
     }
     logCloudRuntime({
@@ -1344,6 +1389,7 @@ export async function createOperationalRecord(table, record, session, options = 
             payload: sanitizeRecord(record),
             code: classifyCloudSaveCode(validation.code),
             message: fallback.error,
+            ownerUserId: userId,
           });
         }
         logCloudRuntime({
@@ -1380,6 +1426,7 @@ export async function createOperationalRecord(table, record, session, options = 
             payload: sanitizeRecord(record),
             code: 'schema_error',
             message: fallback.error,
+            ownerUserId: userId,
           });
         }
         logCloudRuntime({
@@ -1434,7 +1481,7 @@ export async function createOperationalRecord(table, record, session, options = 
         (metadataLocalId && String(item?.payload?.metadata?.local_id || '') === String(metadataLocalId))
         || (data?.id !== undefined && String(item?.payload?.id || '') === String(data.id))
       )
-    ));
+    ), userId);
     emitCloudSaveState({
       table,
       action: 'create',
@@ -1518,6 +1565,7 @@ export async function createOperationalRecord(table, record, session, options = 
         payload: sanitizeRecord(record),
         code: classifiedCode,
         message: fallback.error,
+        ownerUserId: userId,
       });
     }
     logCloudRuntime({
@@ -1619,6 +1667,7 @@ export async function updateOperationalRecord(table, id, patch, session, options
         selector: options?.selector || null,
         code: classifyCloudSaveCode(readiness.code),
         message: fallback.error,
+        ownerUserId: getSessionUserId(session),
       });
     }
     logCloudRuntime({
@@ -1717,7 +1766,7 @@ export async function updateOperationalRecord(table, id, patch, session, options
         String(item?.localId || '') === String(id || '')
         || String(item?.payload?.metadata?.local_id || '') === String(sanitizeRecord(patch)?.metadata?.local_id || '')
       )
-    ));
+    ), userId);
     emitCloudSaveState({
       table,
       action: 'update',
@@ -1802,6 +1851,7 @@ export async function updateOperationalRecord(table, id, patch, session, options
         selector: options?.selector || null,
         code: classifiedCode,
         message: fallback.error,
+        ownerUserId: userId,
       });
     }
     logCloudRuntime({
@@ -1849,6 +1899,7 @@ export async function deleteOperationalRecord(table, id, session, options = {}) 
         selector: options?.selector || null,
         code: classifyCloudSaveCode(readiness.code),
         message: fallback.error,
+        ownerUserId: getSessionUserId(session),
       });
     }
     logCloudRuntime({
@@ -1911,7 +1962,7 @@ export async function deleteOperationalRecord(table, id, session, options = {}) 
         String(item?.localId || '') === String(id || '')
         || String(item?.selector?.type || '') === String(options?.selector?.type || '')
       )
-    ));
+    ), userId);
     emitCloudSaveState({
       table,
       action: 'delete',
@@ -1982,6 +2033,7 @@ export async function deleteOperationalRecord(table, id, session, options = {}) 
         selector: options?.selector || null,
         code: classifiedCode,
         message: fallback.error,
+        ownerUserId: userId,
       });
     }
     logCloudRuntime({
@@ -1996,7 +2048,8 @@ export async function deleteOperationalRecord(table, id, session, options = {}) 
 
 export async function processPendingSyncQueue(session, options = {}) {
   const isManual = Boolean(options?.manual);
-  const queue = readPendingSyncQueue();
+  const ownerUserId = getSessionUserId(session);
+  const queue = filterQueueByOwner(readPendingSyncQueue(), ownerUserId);
   if (!queue.length) {
     emitPendingSyncState([], 'empty');
     return { processed: 0, synced: 0, failed: 0, pendingCount: 0, firstError: null };
@@ -2080,7 +2133,9 @@ export async function processPendingSyncQueue(session, options = {}) {
     }
   }
 
-  writePendingSyncQueue(remaining);
+  const allQueue = readPendingSyncQueue();
+  const queueForOthers = allQueue.filter((item) => resolveQueueOwnerUserId(item) !== ownerUserId);
+  writePendingSyncQueue([...queueForOthers, ...remaining]);
   emitPendingSyncState(remaining, 'processed');
   const firstError = remaining.find((item) => item?.code);
   return {

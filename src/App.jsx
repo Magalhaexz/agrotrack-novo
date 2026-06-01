@@ -198,7 +198,7 @@ export default function App() {
   const [forcarTelaLogin, setForcarTelaLogin] = useState(false);
   const [showBootRecovery, setShowBootRecovery] = useState(false);
   const [cloudDiagnosticState, setCloudDiagnosticState] = useState({ verified: false, checkedAt: null, message: '' });
-  const [pendingSyncState, setPendingSyncState] = useState(() => getPendingSyncQueueSnapshot());
+  const [pendingSyncState, setPendingSyncState] = useState(() => getPendingSyncQueueSnapshot(session));
   const [confirmState, setConfirmState] = useState({
     open: false,
     title: '',
@@ -314,7 +314,7 @@ export default function App() {
     let retryTimer = null;
 
     function refreshPendingState() {
-      setPendingSyncState(getPendingSyncQueueSnapshot());
+      setPendingSyncState(getPendingSyncQueueSnapshot(session));
     }
 
     async function runRetry() {
