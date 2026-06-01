@@ -19,6 +19,7 @@ function getTipoBucket(tipo) {
   if (tipo === 'nascimento') return 'nascimentos';
   if (tipo === 'transferencia_entrada') return 'transferencias_entrada';
   if (tipo === 'venda') return 'vendas';
+  if (['abate', 'descarte', 'perda', 'outro'].includes(tipo)) return 'vendas';
   if (tipo === 'morte') return 'mortes';
   if (tipo === 'transferencia_saida') return 'transferencias_saida';
   return null;
