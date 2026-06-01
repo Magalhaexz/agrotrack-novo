@@ -44,6 +44,7 @@ export const navSections = [
     title: 'Planejamento Premium',
     items: [
       { id: 'pastagens', label: 'Pastagens', icon: MapPin },
+      { id: 'evolucaoRebanho', label: 'Evolução do Rebanho', icon: TrendingUp },
     ],
   },
   {

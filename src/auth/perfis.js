@@ -64,6 +64,7 @@ export const permissoesPorPerfil = {
     'pastagens:ver',
     'pastagens:editar',
     'pastagens:excluir',
+    'evolucao_rebanho:ver',
     'dados:importar',
     'dados:limpar',
     'funcionarios:ver',
@@ -98,6 +99,7 @@ export const permissoesPorPerfil = {
     'suplementacao:editar',
     'pastagens:ver',
     'pastagens:editar',
+    'evolucao_rebanho:ver',
   ],
   [PERFIS.VISUALIZADOR]: [
     'perfil:ver',
@@ -113,6 +115,7 @@ export const permissoesPorPerfil = {
     'comparativo:ver',
     'financeiro:ver',
     'pastagens:ver',
+    'evolucao_rebanho:ver',
     'tarefas:ver',
     'funcionarios:ver',
   ],
@@ -139,6 +142,7 @@ export const permissoesPorPagina = {
   perfil: 'perfil:ver',
   configuracoes: 'configuracoes:ver',
   pastagens: 'pastagens:ver',
+  evolucaoRebanho: 'evolucao_rebanho:ver',
 };
 
 export function normalizarPerfil(perfil) {
