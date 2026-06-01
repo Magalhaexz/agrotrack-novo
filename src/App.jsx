@@ -65,6 +65,8 @@ const PastagensPage = lazy(() => import('./pages/PastagensPage'));
 const EvolucaoRebanhoPage = lazy(() => import('./pages/EvolucaoRebanhoPage'));
 const IndicadoresPage = lazy(() => import('./pages/IndicadoresPage'));
 const CenariosPage = lazy(() => import('./pages/CenariosPage'));
+const DashboardPremiumPage = lazy(() => import('./pages/DashboardPremiumPage'));
+const RelatoriosGerenciaisPage = lazy(() => import('./pages/RelatoriosGerenciaisPage'));
 const LoginPage = lazy(() => import('./pages/LoginPage'));
 const TODAY_BOOT_ISO = new Date().toISOString().slice(0, 10);
 const MENSAGEM_SEM_PERMISSAO = 'Você não tem permissão para executar esta ação.';
@@ -160,6 +162,8 @@ const pageMap = {
   evolucaoRebanho: EvolucaoRebanhoPage,
   indicadores: IndicadoresPage,
   cenarios: CenariosPage,
+  dashboardPremium: DashboardPremiumPage,
+  relatoriosGerenciais: RelatoriosGerenciaisPage,
 };
 
 export default function App() {
