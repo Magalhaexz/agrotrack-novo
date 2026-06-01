@@ -4,6 +4,7 @@ import { supabase } from '../lib/supabase';
 const OPERACIONAL_TABLES = [
   'fazendas',
   'lotes',
+  'pastagens',
   'animais',
   'custos',
   'pesagens',
@@ -185,6 +186,7 @@ function normalizeDb(baseDb) {
           data_venda: lote?.data_venda || null,
         }))
       : [],
+    pastagens: Array.isArray(baseDb?.pastagens) ? baseDb.pastagens : [],
     fazendas: Array.isArray(baseDb?.fazendas) ? dedupeFazendas(baseDb.fazendas) : [],
     tarefas: Array.isArray(baseDb?.tarefas) ? baseDb.tarefas : [],
     configuracoes: baseDb?.configuracoes || {

@@ -40,6 +40,13 @@ export const navSections = [
     ],
   },
   {
+    id: 'planejamento_premium',
+    title: 'Planejamento Premium',
+    items: [
+      { id: 'pastagens', label: 'Pastagens', icon: MapPin },
+    ],
+  },
+  {
     id: 'estoque',
     title: 'Estoque',
     items: [
