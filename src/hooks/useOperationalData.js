@@ -20,6 +20,7 @@ const OPERACIONAL_TABLES = [
   'alertas_adiados',
   'usuarios',
   'configuracoes',
+  'cenarios',
 ];
 
 const OWNER_SCOPED_TABLES = new Set(OPERACIONAL_TABLES);
@@ -207,6 +208,7 @@ function normalizeDb(baseDb) {
       },
     },
     usuarios: Array.isArray(baseDb?.usuarios) ? baseDb.usuarios : [],
+    cenarios: Array.isArray(baseDb?.cenarios) ? baseDb.cenarios : [],
   };
 }
 
