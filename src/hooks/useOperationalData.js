@@ -32,10 +32,13 @@ const HYDRATION_FAILURE_COOLDOWN_MS = 45000;
 const HYDRATION_FAILURES_TO_OPEN_CIRCUIT = 4;
 const MANUAL_SYNC_TIMEOUT_MS = 15000;
 const HERDON_DISABLE_SUPABASE_SYNC = 'HERDON_DISABLE_SUPABASE_SYNC';
+const HERDON_OPTIONAL_MISSING_TABLES = 'HERDON_OPTIONAL_MISSING_TABLES';
 const inFlightSnapshots = new Map();
 const failedHydrationAt = new Map();
 const schemaWarningTables = new Set();
 const ownerScopeCapabilityByTable = new Map();
+const OPTIONAL_STRATEGIC_TABLES = new Set(['pastagens', 'cenarios']);
+const missingOptionalTables = new Set();
 
 function nowMs() {
   return typeof performance !== 'undefined' ? performance.now() : Date.now();
@@ -89,9 +92,11 @@ function isTransientHydrationError(error) {
 
 function isSchemaNotFoundError(error) {
   const message = getErrorMessage(error).toLowerCase();
+  const code = String(error?.code || '').toUpperCase();
   return (
     error?.status === 404
     || error?.code === '42P01'
+    || code === 'PGRST205'
     || message.includes('404')
     || message.includes('not found')
     || message.includes('relation')
@@ -109,6 +114,42 @@ function shouldDisableSupabaseSync() {
     return false;
   }
 }
+
+function readMissingOptionalTables() {
+  try {
+    const raw = localStorage.getItem(HERDON_OPTIONAL_MISSING_TABLES);
+    if (!raw) return [];
+    const parsed = JSON.parse(raw);
+    return Array.isArray(parsed) ? parsed.map((item) => String(item || '').trim()).filter(Boolean) : [];
+  } catch {
+    return [];
+  }
+}
+
+function persistMissingOptionalTables() {
+  try {
+    localStorage.setItem(HERDON_OPTIONAL_MISSING_TABLES, JSON.stringify([...missingOptionalTables]));
+  } catch {
+    // noop
+  }
+}
+
+function registerMissingOptionalTable(table) {
+  if (!OPTIONAL_STRATEGIC_TABLES.has(table)) return;
+  if (missingOptionalTables.has(table)) return;
+  missingOptionalTables.add(table);
+  persistMissingOptionalTables();
+}
+
+function isKnownMissingOptionalTable(table) {
+  return OPTIONAL_STRATEGIC_TABLES.has(table) && missingOptionalTables.has(table);
+}
+
+readMissingOptionalTables().forEach((table) => {
+  if (OPTIONAL_STRATEGIC_TABLES.has(table)) {
+    missingOptionalTables.add(table);
+  }
+});
 
 
 function logSyncGuard(payload, level = 'debug') {
@@ -217,6 +258,15 @@ export function createOperationalFallbackDb(initialDb) {
 }
 
 async function fetchOperationalTableWithCircuit(table, userId, shouldApply, circuitState) {
+  if (isKnownMissingOptionalTable(table)) {
+    if (import.meta.env.DEV) {
+      console.debug('[HERDON_DATA_BOOT]', {
+        stage: 'skip_known_missing_optional_table',
+        table,
+      });
+    }
+    return [table, []];
+  }
   if (!shouldApply()) {
     return [table, []];
   }
@@ -284,6 +334,9 @@ async function fetchOperationalTableWithCircuit(table, userId, shouldApply, circ
           code: error?.code || null,
           message: getErrorMessage(error) || 'schema_not_found',
         });
+      }
+      if (schema404) {
+        registerMissingOptionalTable(table);
       }
 
       if (import.meta.env.DEV) {

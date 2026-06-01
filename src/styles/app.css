@@ -8892,3 +8892,73 @@ html, body, #root, .app, .main, .main-content, .page { max-width: 100%; }
     bottom: calc(var(--herdon-mobile-bottomnav-height, 72px) + env(safe-area-inset-bottom) + 16px);
   }
 }
+
+/* SPRINT12A - cloud hotfix support + cadastro compact layout */
+.ui-modal .modal-footer {
+  position: static;
+  background: transparent;
+}
+
+.page .section-card {
+  padding: 16px;
+}
+
+.page .form-grid,
+.page .form-grid.two,
+.page .form-grid.three {
+  gap: 10px;
+}
+
+.page .ui-input-wrap {
+  gap: 6px;
+}
+
+.page .ui-input,
+.page select.ui-input,
+.page textarea.ui-input {
+  min-height: 40px;
+  padding-top: 9px;
+  padding-bottom: 9px;
+}
+
+.page textarea.ui-input {
+  min-height: 90px;
+}
+
+.fazenda-form-shell {
+  display: grid;
+  gap: 10px;
+}
+
+.fazenda-form-section.section-card {
+  padding: 12px;
+}
+
+.fazenda-form-section .section-header h4 {
+  margin: 0;
+  font-size: 0.92rem;
+}
+
+.fazenda-form-shell .form-grid.two {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.fazenda-form-shell .ui-input {
+  min-height: 38px;
+}
+
+.fazenda-form-shell textarea.ui-input {
+  min-height: 78px;
+}
+
+.fazenda-form-shell .action-row,
+.fazenda-form-shell .modal-footer {
+  margin-top: 4px;
+}
+
+@media (max-width: 900px) {
+  .fazenda-form-shell .form-grid.two {
+    grid-template-columns: 1fr;
+  }
+}
