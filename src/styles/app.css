@@ -8962,3 +8962,133 @@ html, body, #root, .app, .main, .main-content, .page { max-width: 100%; }
     grid-template-columns: 1fr;
   }
 }
+
+/* SPRINT12B - Sanitario and IATF UX refinement */
+.page--sanitario .sanitario-iatf-layout {
+  display: grid;
+  gap: 10px;
+  margin-top: 4px;
+}
+
+.page--sanitario .sanitario-iatf-section {
+  padding: 12px;
+}
+
+.page--sanitario .sanitario-iatf-section .section-header h4 {
+  margin: 0;
+  font-size: 0.92rem;
+}
+
+.page--sanitario .sanitario-iatf-days-grid .ui-input-label::after {
+  content: " em dias";
+  color: var(--color-text-muted);
+  font-weight: 500;
+  font-size: 0.72rem;
+}
+
+.page--sanitario .sanitario-iatf-preview {
+  margin-top: 10px;
+  border: 1px solid color-mix(in srgb, var(--color-border) 88%, #4b5563 12%);
+  border-radius: 12px;
+  background: rgba(10, 14, 13, 0.65);
+  padding: 12px;
+  display: grid;
+  gap: 10px;
+}
+
+.page--sanitario .sanitario-iatf-preview-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.page--sanitario .sanitario-iatf-next {
+  display: grid;
+  gap: 2px;
+  padding: 8px 10px;
+  border-radius: 10px;
+  border: 1px solid color-mix(in srgb, var(--color-primary) 22%, var(--color-border));
+  background: color-mix(in srgb, var(--color-primary) 9%, transparent);
+}
+
+.page--sanitario .sanitario-iatf-next-label {
+  color: var(--color-text-secondary);
+  font-size: 0.76rem;
+}
+
+.page--sanitario .sanitario-iatf-next-date {
+  color: var(--color-primary-light);
+  font-weight: 600;
+  font-size: 0.85rem;
+}
+
+.page--sanitario .sanitario-iatf-timeline {
+  display: grid;
+  gap: 6px;
+}
+
+.page--sanitario .sanitario-iatf-event {
+  display: grid;
+  grid-template-columns: 60px 1fr;
+  gap: 10px;
+  align-items: center;
+  padding: 8px 10px;
+  border-radius: 10px;
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  background: rgba(255, 255, 255, 0.015);
+}
+
+.page--sanitario .sanitario-iatf-event-day {
+  color: var(--color-text-secondary);
+  font-size: 0.8rem;
+  font-weight: 700;
+}
+
+.page--sanitario .sanitario-iatf-event strong {
+  display: block;
+  font-size: 0.88rem;
+}
+
+.page--sanitario .sanitario-iatf-event small {
+  color: var(--color-text-secondary);
+  font-size: 0.75rem;
+}
+
+.page--sanitario .sanitario-iatf-event.is-next {
+  border-color: color-mix(in srgb, var(--color-primary) 40%, var(--color-border));
+  background: color-mix(in srgb, var(--color-primary) 12%, transparent);
+}
+
+.page--sanitario .herdon-table--sanitario th,
+.page--sanitario .herdon-table--sanitario td {
+  padding-top: 10px;
+  padding-bottom: 10px;
+}
+
+.page--sanitario .sanitario-table-actions {
+  display: flex;
+  gap: 6px;
+  justify-content: flex-end;
+  flex-wrap: wrap;
+}
+
+.page--sanitario .sanitario-table-actions .action-btn {
+  min-height: 34px;
+  padding: 6px 10px;
+}
+
+.page--sanitario .empty-state.padded {
+  padding: 18px 14px;
+}
+
+@media (max-width: 900px) {
+  .page--sanitario .sanitario-iatf-event {
+    grid-template-columns: 1fr;
+    gap: 3px;
+  }
+
+  .page--sanitario .sanitario-table-actions {
+    justify-content: flex-start;
+  }
+}
