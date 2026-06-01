@@ -67,6 +67,7 @@ const IndicadoresPage = lazy(() => import('./pages/IndicadoresPage'));
 const CenariosPage = lazy(() => import('./pages/CenariosPage'));
 const DashboardPremiumPage = lazy(() => import('./pages/DashboardPremiumPage'));
 const RelatoriosGerenciaisPage = lazy(() => import('./pages/RelatoriosGerenciaisPage'));
+const PlanejamentoPage = lazy(() => import('./pages/PlanejamentoPage'));
 const LoginPage = lazy(() => import('./pages/LoginPage'));
 const TODAY_BOOT_ISO = new Date().toISOString().slice(0, 10);
 const MENSAGEM_SEM_PERMISSAO = 'Você não tem permissão para executar esta ação.';
@@ -164,6 +165,7 @@ const pageMap = {
   cenarios: CenariosPage,
   dashboardPremium: DashboardPremiumPage,
   relatoriosGerenciais: RelatoriosGerenciaisPage,
+  planejamento: PlanejamentoPage,
 };
 
 export default function App() {
@@ -793,16 +795,6 @@ export default function App() {
       />
 
       <main className="main">
-        {isOperationalSyncing ? (
-          <div style={{ padding: '8px 16px 0', fontSize: 12, color: 'var(--text-secondary, #6b7280)' }}>
-            Sincronizando dados da operação...
-          </div>
-        ) : null}
-        {(dataSource === 'fallback_error' || dataSource === 'fallback_timeout') ? (
-          <div style={{ padding: '8px 16px 0', fontSize: 12, color: 'var(--text-secondary, #6b7280)' }}>
-            Sincronização instável. Seus dados locais continuam disponíveis.
-          </div>
-        ) : null}
         <AppHeader
           currentPage={pageKey}
           farmName={fazendaSelecionada?.nome || db?.fazendas?.[0]?.nome || 'Fazenda Atual'}
@@ -826,6 +818,7 @@ export default function App() {
             cloudVerifiedAt: cloudDiagnosticState.checkedAt,
             cloudVerifiedMessage: cloudDiagnosticState.message,
           }}
+          hideSyncTechnicalStatus
           onResolveAlert={marcarAlertaComoFeito}
           onSnoozeAlert={adiarAlerta}
           onAlertNavigate={(alert) => {
