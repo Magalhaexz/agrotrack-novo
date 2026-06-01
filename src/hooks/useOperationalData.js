@@ -477,8 +477,9 @@ export function useOperationalData(initialDb, session, options = {}) {
     hydrationGenerationRef.current = generationId;
     hydratingRef.current = true;
 
-    const fallbackDb = createOperationalFallbackDb(initialDb);
     const userId = session?.user?.id || null;
+    const fallbackSeed = userId ? {} : initialDb;
+    const fallbackDb = createOperationalFallbackDb(fallbackSeed);
     const syncDisabled = shouldDisableSupabaseSync();
     const manualSyncRequested = manualSyncNonce > 0;
     const syncTrigger = manualSyncRequested ? 'manual_sync' : 'auto_sync';

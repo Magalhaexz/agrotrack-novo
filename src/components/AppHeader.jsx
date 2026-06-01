@@ -1,4 +1,4 @@
-import { Activity, AlertTriangle, Bell, ChevronDown, Loader2, LogOut, Menu, MoreHorizontal, Package, Settings, User } from 'lucide-react';
+import { Bell, ChevronDown, LogOut, Menu, MoreHorizontal, Settings, User } from 'lucide-react';
 import { createPortal } from 'react-dom';
 import { useEffect, useRef, useState } from 'react';
 import { obterLabelPerfil } from '../auth/perfis';
@@ -36,119 +36,6 @@ function useDropdown(initialState = false) {
   return [ref, isOpen, setIsOpen];
 }
 
-function formatSyncTime(value) {
-  if (!value) return 'Aguardando nuvem';
-  try {
-    return new Intl.DateTimeFormat('pt-BR', {
-      hour: '2-digit',
-      minute: '2-digit',
-    }).format(new Date(value));
-  } catch {
-    return 'Sincronizado';
-  }
-}
-
-function messageIsSessionError(message) {
-  const text = String(message || '').toLowerCase();
-  return text.includes('sessao expirada') || text.includes('sessao invalida');
-}
-
-function getCloudState(syncStatus) {
-  const source = syncStatus?.dataSource || 'signed_out';
-  const message = syncStatus?.dataError?.message || '';
-  const pendingCount = Number(syncStatus?.pendingCount || 0);
-
-  if (syncStatus?.isSyncing || source === 'syncing') {
-    return {
-      tone: 'syncing',
-      icon: 'loading',
-      label: 'Sincronizando...',
-      detail: syncStatus?.lastSyncAt ? `Ultima sync: ${formatSyncTime(syncStatus.lastSyncAt)}` : 'Sincronizacao em andamento',
-      title: 'Sincronizacao em andamento',
-      disabled: true,
-    };
-  }
-
-  if (pendingCount > 0) {
-    const schemaTables = Array.isArray(syncStatus?.schemaErrorTables) ? syncStatus.schemaErrorTables : [];
-    const devDetail = schemaTables.length ? `schema_error em ${schemaTables.join('/')}` : null;
-    return {
-      tone: 'warning',
-      icon: 'loading',
-      label: 'Sincronizacao pendente',
-      detail: import.meta.env.DEV && devDetail
-        ? devDetail
-        : (pendingCount === 1 ? '1 pendencia de sync' : `${pendingCount} pendencias de sync`),
-      title: 'Pendencias serao sincronizadas automaticamente.',
-      disabled: false,
-    };
-  }
-
-  if (syncStatus?.cloudVerified) {
-    return {
-      tone: 'online',
-      icon: 'cloud',
-      label: 'Nuvem ativa',
-      detail: syncStatus?.lastSyncAt ? `Ultima sync: ${formatSyncTime(syncStatus.lastSyncAt)}` : 'Conexao validada',
-      title: syncStatus?.cloudVerifiedMessage || 'Nuvem conectada pelo servidor.',
-      disabled: false,
-    };
-  }
-
-  if (messageIsSessionError(message)) {
-    return {
-      tone: 'warning',
-      icon: 'warning',
-      label: 'Modo local',
-      detail: 'Sessao expirada',
-      title: 'Sessao expirada. Reconecte para voltar a sincronizar.',
-      disabled: false,
-    };
-  }
-
-  if (source === 'supabase') {
-    return {
-      tone: 'online',
-      icon: 'cloud',
-      label: 'Nuvem ativa',
-      detail: formatSyncTime(syncStatus?.lastSyncAt),
-      title: 'Dados sincronizados com o Supabase',
-      disabled: false,
-    };
-  }
-
-  if (source === 'offline_circuit_open' || source === 'fallback_error' || source === 'fallback_timeout') {
-    return {
-      tone: 'warning',
-      icon: 'warning',
-      label: 'Modo local',
-      detail: message || 'Nuvem indisponivel no momento',
-      title: message || 'Falha de nuvem detectada. O modo local continua ativo.',
-      disabled: false,
-    };
-  }
-
-  if (source === 'offline_disabled') {
-    return {
-      tone: 'muted',
-      icon: 'local',
-      label: 'Nuvem pausada',
-      detail: 'Modo local ativo',
-      title: 'Sincronizacao com Supabase desativada neste navegador',
-      disabled: false,
-    };
-  }
-
-  return {
-    tone: 'local',
-    icon: 'local',
-    label: 'Modo local',
-    detail: 'Nuvem nao verificada',
-    title: 'Sincronizacao manual disponivel',
-    disabled: false,
-  };
-}
-
 export default function AppHeader({
   currentPage = 'dashboard',
   farmName = 'Fazenda Santa Rita',
@@ -169,6 +56,7 @@ export default function AppHeader({
   fazendaSelecionada = null,
   onSelectFazenda,
   syncStatus = null,
+  hideSyncTechnicalStatus = false,
   getAlertAckKey = (alert) => alert?.ackKey || alert?.id || 'alerta-sem-chave',
   alertDebugState = null,
 }) {
@@ -177,7 +65,6 @@ export default function AppHeader({
   const notifRef = useRef(null);
   const notifPanelRef = useRef(null);
   const [farmsRef, openFarms, setOpenFarms] = useDropdown(false);
-  const [cloudMenuRef, openCloudMenu, setOpenCloudMenu] = useDropdown(false);
   const [mobilePanelRef, openMobilePanel, setOpenMobilePanel] = useDropdown(false);
   const notifButtonRef = useRef(null);
   const [notifPosition, setNotifPosition] = useState({
@@ -264,7 +151,6 @@ export default function AppHeader({
   const nomeExibicao = usuarioLogado?.nome || 'Usuário';
   const perfilExibicao = obterLabelPerfil(usuarioLogado?.perfilLabel || usuarioLogado?.perfil);
   const mobilePageTitle = getNavLabel(currentPage);
-  const cloudState = getCloudState(syncStatus);
   const resolvedAlertKeys = alertDebugState?.resolvedAlertKeys || new Set();
   const snoozedAlerts = Array.isArray(alertDebugState?.snoozedAlerts) ? alertDebugState.snoozedAlerts : [];
   const renderedAlerts = alerts.filter((alert) => !dismissedAlertKeys.has(getAlertAckKey(alert)));
@@ -494,75 +380,17 @@ export default function AppHeader({
       </nav>
 
       <div className="top-header-actions">
-        <div className={`header-sync-chip header-sync-chip--${cloudState.tone}`} title={cloudState.title}>
-          <span className="header-sync-icon" aria-hidden="true">
-            {cloudState.icon === 'loading' ? (
-              <Loader2 size={15} className="ui-spin" />
-            ) : cloudState.icon === 'warning' ? (
-              <AlertTriangle size={15} />
-            ) : cloudState.icon === 'local' ? (
-              <Package size={15} />
-            ) : (
-              <Activity size={15} />
-            )}
-          </span>
-          <span className="header-sync-copy">
-            <strong>{cloudState.label}</strong>
-            <small>{cloudState.detail}</small>
-          </span>
-          <div className="header-sync-menu-wrap" ref={cloudMenuRef}>
-            <button
-              type="button"
-              className="header-sync-refresh header-sync-menu-trigger"
-              onClick={() => setOpenCloudMenu((value) => !value)}
-              aria-expanded={openCloudMenu}
-              aria-controls="cloud-dropdown-menu"
-              aria-label="Acoes de nuvem"
-            >
-              <MoreHorizontal size={14} aria-hidden="true" />
-            </button>
-
-            {openCloudMenu && (
-              <div id="cloud-dropdown-menu" className="header-sync-dropdown" role="menu" aria-label="Acoes de nuvem">
-                <button
-                  type="button"
-                  className="header-sync-dropdown-item"
-                  onClick={() => {
-                    syncStatus?.onTestCloud?.();
-                    setOpenCloudMenu(false);
-                  }}
-                  disabled={Boolean(syncStatus?.testingCloud)}
-                  role="menuitem"
-                >
-                  Testar conexao</button>
-                <button
-                  type="button"
-                  className="header-sync-dropdown-item"
-                  onClick={() => {
-                    syncStatus?.onSyncNow?.();
-                    setOpenCloudMenu(false);
-                  }}
-                  disabled={Boolean(syncStatus?.syncingCloud) || cloudState.disabled}
-                  role="menuitem"
-                >
-                  Sincronizar
-                </button>
-                <button
-                  type="button"
-                  className="header-sync-dropdown-item"
-                  onClick={() => {
-                    syncStatus?.onReconnectCloud?.();
-                    setOpenCloudMenu(false);
-                  }}
-                  disabled={Boolean(syncStatus?.reconnectingCloud)}
-                  role="menuitem"
-                >
-                  Reconectar
-                </button>
-              </div>
-            )}
-          </div>
-        </div>
+        {!hideSyncTechnicalStatus ? (
+          <button
+            type="button"
+            className="header-notification-btn"
+            onClick={() => syncStatus?.onSyncNow?.()}
+            aria-label="Sincronizar dados"
+            title="Sincronizar dados"
+          >
+            <MoreHorizontal size={16} />
+          </button>
+        ) : null}
 
         <div className="user-menu-wrap" ref={notifRef}>
           <button
@@ -640,38 +468,6 @@ export default function AppHeader({
                         {tab[0].toUpperCase() + tab.slice(1)}
                       </button>
                     ))}
-                  </div>
-                </section>
-
-                <section className="mobile-header-panel-section">
-                  <p className="mobile-header-panel-title">Nuvem</p>
-                  <div className={`header-sync-chip header-sync-chip--${cloudState.tone}`}>
-                    <span className="header-sync-icon" aria-hidden="true">
-                      {cloudState.icon === 'loading' ? (
-                        <Loader2 size={15} className="ui-spin" />
-                      ) : cloudState.icon === 'warning' ? (
-                        <AlertTriangle size={15} />
-                      ) : cloudState.icon === 'local' ? (
-                        <Package size={15} />
-                      ) : (
-                        <Activity size={15} />
-                      )}
-                    </span>
-                    <span className="header-sync-copy">
-                      <strong>{cloudState.label}</strong>
-                      <small>{cloudState.detail}</small>
-                    </span>
-                  </div>
-                  <div className="mobile-header-cloud-actions">
-                    <button type="button" className="header-sync-dropdown-item" onClick={() => syncStatus?.onTestCloud?.()}>
-                      Testar conexao
-                    </button>
-                    <button type="button" className="header-sync-dropdown-item" onClick={() => syncStatus?.onSyncNow?.()}>
-                      Sincronizar
-                    </button>
-                    <button type="button" className="header-sync-dropdown-item" onClick={() => syncStatus?.onReconnectCloud?.()}>
-                      Reconectar
-                    </button>
                   </div>
                 </section>
 

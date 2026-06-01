@@ -64,6 +64,7 @@ export const permissoesPorPerfil = {
     'pastagens:ver',
     'pastagens:editar',
     'pastagens:excluir',
+    'planejamento:ver',
     'evolucao_rebanho:ver',
     'indicadores:ver',
     'cenarios:ver',
@@ -104,6 +105,7 @@ export const permissoesPorPerfil = {
     'suplementacao:editar',
     'pastagens:ver',
     'pastagens:editar',
+    'planejamento:ver',
     'evolucao_rebanho:ver',
     'indicadores:ver',
     'cenarios:ver',
@@ -125,6 +127,7 @@ export const permissoesPorPerfil = {
     'comparativo:ver',
     'financeiro:ver',
     'pastagens:ver',
+    'planejamento:ver',
     'evolucao_rebanho:ver',
     'indicadores:ver',
     'cenarios:ver',
@@ -161,6 +164,7 @@ export const permissoesPorPagina = {
   cenarios: 'cenarios:ver',
   dashboardPremium: 'dashboard_premium:ver',
   relatoriosGerenciais: 'relatorios_gerenciais:ver',
+  planejamento: 'planejamento:ver',
 };
 
 export function normalizarPerfil(perfil) {
