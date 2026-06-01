@@ -20,6 +20,7 @@ const env = {
 const hasAuthEnv = Boolean(env.adminEmail && env.adminPassword);
 const hasPersistenceEnv = Boolean(env.userAEmail && env.userAPassword);
 const hasRlsEnv = Boolean(env.userAEmail && env.userAPassword && env.userBEmail && env.userBPassword);
+const KNOWN_MOCK_FARMS = ['Fazenda Santa Rita', 'Rancho Bom Jesus'];
 
 async function openLogin(page) {
   await page.goto('/');
@@ -39,6 +40,12 @@ async function login(page, email, password) {
 async function logout(page) {
   await page.getByText('Sair da conta').first().click();
   await expect(page.getByRole('button', { name: /^Entrar$/ })).toBeVisible();
+}
+
+async function assertNoMockDataVisible(page) {
+  for (const farmName of KNOWN_MOCK_FARMS) {
+    await expect(page.getByText(farmName)).toHaveCount(0);
+  }
 }
 
 async function openFazendas(page) {
@@ -71,6 +78,15 @@ test.describe('Smoke E2E - Herdon', () => {
     await logout(page);
     await page.reload();
     await expect(page.getByRole('button', { name: /^Entrar$/ })).toBeVisible();
+  });
+
+  test('authenticated shell smoke: dashboard abre sem dados mock visiveis', async ({ page }) => {
+    test.skip(!hasAuthEnv, 'E2E_SHELL_SKIP: defina E2E_ADMIN_EMAIL e E2E_ADMIN_PASSWORD.');
+    await login(page, env.adminEmail, env.adminPassword);
+    await page.getByRole('button', { name: /^Dashboard$/ }).click();
+    await expect(page.getByRole('heading', { name: /^Dashboard$/ })).toBeVisible();
+    await assertNoMockDataVisible(page);
+    await logout(page);
   });
 
   test('cross-tab logout', async ({ browser }) => {
