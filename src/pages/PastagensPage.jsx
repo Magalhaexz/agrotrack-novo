@@ -11,6 +11,11 @@ import {
   deleteOperationalRecord,
   updateOperationalRecord,
 } from '../services/operationalPersistence';
+import {
+  calcularCapacidadeTotalUa,
+  calcularDiagnosticoCapacidade,
+  calcularUaPorLote,
+} from '../domain/unidadeAnimal';
 
 function toNumber(value) {
   const parsed = Number(value);
@@ -46,21 +51,19 @@ export default function PastagensPage({ db, setDb, session, onConfirmAction }) {
   const mensagemSemPermissao = 'Você não tem permissão para executar esta ação.';
   const pastagens = useMemo(() => (Array.isArray(db?.pastagens) ? db.pastagens : []), [db?.pastagens]);
   const animais = useMemo(() => (Array.isArray(db?.animais) ? db.animais : []), [db?.animais]);
+  const lotes = useMemo(() => (Array.isArray(db?.lotes) ? db.lotes : []), [db?.lotes]);
 
   const indicadores = useMemo(() => {
     const areaTotalPastagem = pastagens.reduce((sum, item) => sum + toNumber(item.area_ha), 0);
-    const capacidadeTotalUa = pastagens.reduce(
-      (sum, item) => sum + (toNumber(item.area_ha) * toNumber(item.capacidade_suporte_ua_ha)),
-      0
-    );
+    const capacidadeTotalUa = calcularCapacidadeTotalUa(pastagens);
     const cabecasTotais = animais.reduce((sum, item) => sum + toNumber(item.qtd), 0);
-    const uaTotalFazenda = animais.reduce((sum, item) => {
-      const pesoVivo = toNumber(item.p_at || item.peso_vivo_kg || item.p_ini);
-      return sum + ((pesoVivo / 450) * toNumber(item.qtd));
-    }, 0);
+    const diagnostico = calcularDiagnosticoCapacidade({ animais, pastagens });
+    const uaTotalFazenda = diagnostico.uaTotalFazenda;
     const taxaLotacaoUaHa = areaTotalPastagem > 0 ? uaTotalFazenda / areaTotalPastagem : 0;
     const lotacaoCabecaHa = areaTotalPastagem > 0 ? cabecasTotais / areaTotalPastagem : 0;
-    const superlotacao = uaTotalFazenda > capacidadeTotalUa;
+    const superlotacao = diagnostico.superlotado;
+    const saldoCapacidadeUa = diagnostico.saldoCapacidadeUa;
+    const statusCapacidade = diagnostico.statusCapacidade;
     const pastoAArrendarHa = superlotacao
       ? (uaTotalFazenda - capacidadeTotalUa) / Math.max(0.0001, taxaLotacaoUaHa || 1)
       : 0;
@@ -74,8 +77,18 @@ export default function PastagensPage({ db, setDb, session, onConfirmAction }) {
       superlotacao,
       pastoAArrendarHa,
       cabecasTotais,
+      saldoCapacidadeUa,
+      statusCapacidade,
     };
   }, [pastagens, animais]);
+
+  const uaPorLote = useMemo(() => (
+    lotes.map((lote) => ({
+      id: lote.id,
+      nome: lote.nome || `Lote ${lote.id}`,
+      ua: calcularUaPorLote(animais, lote.id),
+    }))
+  ), [lotes, animais]);
 
   function resetForm() {
     setForm(emptyForm());
@@ -236,10 +249,10 @@ export default function PastagensPage({ db, setDb, session, onConfirmAction }) {
       </Card>
 
       <div className="dashboard-grid dashboard-grid--kpi-main">
-        <Card title="Capacidade total da pastagem, UA">
+        <Card title="Capacidade total, UA">
           <strong>{formatNumber(indicadores.capacidadeTotalUa, 2)}</strong>
         </Card>
-        <Card title="UA total estimada da fazenda">
+        <Card title="UA total da fazenda">
           <strong>{formatNumber(indicadores.uaTotalFazenda, 2)}</strong>
         </Card>
         <Card title="Taxa de lotação, UA/ha">
@@ -250,13 +263,40 @@ export default function PastagensPage({ db, setDb, session, onConfirmAction }) {
         </Card>
       </div>
 
-      <Card title="Diagnóstico de lotação">
+      <Card title="Diagnóstico de capacidade">
         <div className="metrics-2col">
           <p>Área total de pastagem: <strong>{formatNumber(indicadores.areaTotalPastagem, 2)} ha</strong></p>
           <p>Capacidade total: <strong>{formatNumber(indicadores.capacidadeTotalUa, 2)} UA</strong></p>
           <p>UA da fazenda: <strong>{formatNumber(indicadores.uaTotalFazenda, 2)} UA</strong></p>
+          <p>Saldo entre capacidade e demanda: <strong>{formatNumber(indicadores.saldoCapacidadeUa, 2)} UA</strong></p>
+          <p>Status: <strong>{indicadores.statusCapacidade === 'superlotado' ? 'Superlotado' : 'Dentro da capacidade'}</strong></p>
           <p>Alerta de superlotação: <strong>{indicadores.superlotacao ? 'Sim' : 'Não'}</strong></p>
           <p>Pasto a arrendar, ha: <strong>{formatNumber(indicadores.pastoAArrendarHa, 2)}</strong></p>
+        </div>
+      </Card>
+
+      <Card title="UA por lote">
+        <div className="table-responsive">
+          <table className="data-table">
+            <thead>
+              <tr>
+                <th>Lote</th>
+                <th>UA estimada</th>
+              </tr>
+            </thead>
+            <tbody>
+              {!uaPorLote.length ? (
+                <tr>
+                  <td colSpan="2" className="empty-state-td">Nenhum lote cadastrado.</td>
+                </tr>
+              ) : uaPorLote.map((item) => (
+                <tr key={item.id}>
+                  <td>{item.nome}</td>
+                  <td>{formatNumber(item.ua, 2)}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
         </div>
       </Card>
 
