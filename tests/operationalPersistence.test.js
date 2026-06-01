@@ -4,9 +4,22 @@ import {
   createAuditEvent,
   createOperationalRecord,
   deleteOwnerScopedCollection,
+  getPendingSyncQueueSnapshot,
 } from '../src/services/operationalPersistence.js';
 import { supabase } from '../src/lib/supabase.js';
 import { makeSession } from './fixtures.js';
+
+function installLocalStorageMock() {
+  const store = new Map();
+  globalThis.localStorage = {
+    getItem: (key) => (store.has(key) ? store.get(key) : null),
+    setItem: (key, value) => { store.set(String(key), String(value)); },
+    removeItem: (key) => { store.delete(String(key)); },
+    clear: () => { store.clear(); },
+  };
+}
+
+installLocalStorageMock();
 
 function mockInsertSuccess(capture) {
   supabase.from = () => ({
@@ -21,7 +34,7 @@ function mockInsertSuccess(capture) {
   });
 }
 
-test('createOperationalRecord injeta owner_user_id da sessão e ignora owner vindo da UI', async () => {
+test('createOperationalRecord injeta owner_user_id da sessao e ignora owner vindo da UI', async () => {
   const capture = {};
   mockInsertSuccess(capture);
   const result = await createOperationalRecord('tarefas', {
@@ -34,7 +47,7 @@ test('createOperationalRecord injeta owner_user_id da sessão e ignora owner vin
   assert.equal(capture.payload.titulo, 'Tarefa');
 });
 
-test('createOperationalRecord sem sessão retorna fallback seguro', async () => {
+test('createOperationalRecord sem sessao retorna fallback seguro', async () => {
   const result = await createOperationalRecord('tarefas', { titulo: 'Local only' }, null);
   assert.equal(result.persisted, false);
   assert.equal(result.data.titulo, 'Local only');
@@ -54,7 +67,7 @@ test('createOperationalRecord com erro do supabase retorna falha estruturada', a
   assert.match(String(result.error), /erro remoto/i);
 });
 
-test('deleteOwnerScopedCollection aplica filtro owner_user_id da sessão', async () => {
+test('deleteOwnerScopedCollection aplica filtro owner_user_id da sessao', async () => {
   const calls = [];
   supabase.from = (table) => ({
     delete: () => ({
@@ -79,7 +92,7 @@ test('deleteOwnerScopedCollection aplica filtro owner_user_id da sessão', async
   assert.equal(calls[0].value, 'user-1');
 });
 
-test('createAuditEvent remove campos sensíveis de detalhes e não propaga secrets', async () => {
+test('createAuditEvent remove campos sensiveis de detalhes e nao propaga secrets', async () => {
   const capture = {};
   mockInsertSuccess(capture);
   const result = await createAuditEvent({
@@ -98,4 +111,37 @@ test('createAuditEvent remove campos sensíveis de detalhes e não propaga secre
   assert.equal(capture.payload.detalhes.token, undefined);
   assert.equal(capture.payload.detalhes.nested.secret, undefined);
   assert.equal(capture.payload.detalhes.nested.visivel, 'sim');
+});
+
+test('pending sync snapshot is user-scoped', () => {
+  localStorage.setItem('herdon-pending-sync-queue', JSON.stringify([
+    { id: '1', ownerUserId: 'user-1', table: 'animais', action: 'create', code: 'network_error' },
+    { id: '2', ownerUserId: 'user-2', table: 'lotes', action: 'update', code: 'schema_error' },
+  ]));
+
+  const userOne = getPendingSyncQueueSnapshot({ user: { id: 'user-1' } });
+  const userTwo = getPendingSyncQueueSnapshot({ user: { id: 'user-2' } });
+
+  assert.equal(userOne.pendingCount, 1);
+  assert.equal(userOne.queue[0].ownerUserId, 'user-1');
+  assert.equal(userTwo.pendingCount, 1);
+  assert.equal(userTwo.queue[0].ownerUserId, 'user-2');
+});
+
+test('repeated failed create does not duplicate pending queue for same user', async () => {
+  localStorage.clear();
+  supabase.from = () => ({
+    insert: () => ({
+      select: () => ({
+        single: async () => ({ data: null, error: { message: 'network fail' } }),
+      }),
+    }),
+  });
+
+  await createOperationalRecord('tarefas', { id: 'local-1', titulo: 'A' }, makeSession());
+  await createOperationalRecord('tarefas', { id: 'local-1', titulo: 'A' }, makeSession());
+
+  const snapshot = getPendingSyncQueueSnapshot(makeSession());
+  assert.equal(snapshot.pendingCount, 1);
+  assert.equal(snapshot.queue[0].localId, 'local-1');
 });

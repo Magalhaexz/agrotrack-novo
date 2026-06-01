@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { supabase } from '../lib/supabase';
+import { supabase } from '../lib/supabase.js';
 
 const OPERACIONAL_TABLES = [
   'fazendas',
@@ -33,6 +33,7 @@ const HYDRATION_FAILURES_TO_OPEN_CIRCUIT = 4;
 const MANUAL_SYNC_TIMEOUT_MS = 15000;
 const HERDON_DISABLE_SUPABASE_SYNC = 'HERDON_DISABLE_SUPABASE_SYNC';
 const HERDON_OPTIONAL_MISSING_TABLES = 'HERDON_OPTIONAL_MISSING_TABLES';
+const OPERATIONAL_SNAPSHOT_KEY_PREFIX = 'herdon-operational-snapshot';
 const inFlightSnapshots = new Map();
 const failedHydrationAt = new Map();
 const schemaWarningTables = new Set();
@@ -251,6 +252,48 @@ function normalizeDb(baseDb) {
     usuarios: Array.isArray(baseDb?.usuarios) ? baseDb.usuarios : [],
     cenarios: Array.isArray(baseDb?.cenarios) ? baseDb.cenarios : [],
   };
+}
+
+function buildSnapshotStorageKey(userId, fazendaId = null) {
+  const normalizedUser = String(userId || '').trim();
+  const normalizedFarm = String(fazendaId || '').trim();
+  if (!normalizedUser) return null;
+  return normalizedFarm
+    ? `${OPERATIONAL_SNAPSHOT_KEY_PREFIX}:${normalizedUser}:${normalizedFarm}`
+    : `${OPERATIONAL_SNAPSHOT_KEY_PREFIX}:${normalizedUser}`;
+}
+
+export function saveOperationalSnapshotLocal({ userId, db, fazendaId = null } = {}) {
+  const key = buildSnapshotStorageKey(userId, fazendaId);
+  if (!key) return false;
+  try {
+    const snapshot = createOperationalFallbackDb(db || {});
+    localStorage.setItem(key, JSON.stringify({
+      version: 1,
+      userId: String(userId),
+      fazendaId: fazendaId ?? null,
+      savedAt: new Date().toISOString(),
+      snapshot,
+    }));
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+export function loadOperationalSnapshotLocal({ userId, fazendaId = null } = {}) {
+  const key = buildSnapshotStorageKey(userId, fazendaId);
+  if (!key) return null;
+  try {
+    const raw = localStorage.getItem(key);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw);
+    if (!parsed || typeof parsed !== 'object') return null;
+    if (String(parsed?.userId || '') !== String(userId)) return null;
+    return createOperationalFallbackDb(parsed?.snapshot || {});
+  } catch {
+    return null;
+  }
 }
 
 export function createOperationalFallbackDb(initialDb) {
@@ -496,10 +539,20 @@ export function useOperationalData(initialDb, session, options = {}) {
   const localMutationRef = useRef(0);
   const currentUserIdRef = useRef(null);
   const previousUserIdRef = useRef(null);
+  const persistSnapshotRef = useRef(() => {});
 
   const setDb = useCallback((updater) => {
     localMutationRef.current += 1;
-    setDbState(updater);
+    setDbState((previousDb) => {
+      const nextDb = typeof updater === 'function' ? updater(previousDb) : updater;
+      const normalizedNextDb = createOperationalFallbackDb(nextDb || {});
+      try {
+        persistSnapshotRef.current(normalizedNextDb);
+      } catch {
+        // noop
+      }
+      return normalizedNextDb;
+    });
   }, []);
 
   const syncNow = useCallback(() => {
@@ -517,6 +570,11 @@ export function useOperationalData(initialDb, session, options = {}) {
 
   useEffect(() => {
     const userId = session?.user?.id || null;
+    persistSnapshotRef.current = (nextDb) => {
+      if (!userId) return;
+      const selectedFarmId = nextDb?.configuracoes?.fazendaSelecionadaId ?? null;
+      saveOperationalSnapshotLocal({ userId, db: nextDb, fazendaId: selectedFarmId });
+    };
     currentUserIdRef.current = userId;
     if (previousUserIdRef.current !== userId) {
       previousUserIdRef.current = userId;
@@ -533,6 +591,8 @@ export function useOperationalData(initialDb, session, options = {}) {
     const userId = session?.user?.id || null;
     const fallbackSeed = userId ? {} : initialDb;
     const fallbackDb = createOperationalFallbackDb(fallbackSeed);
+    const persistedSnapshot = userId ? loadOperationalSnapshotLocal({ userId }) : null;
+    const localBaselineDb = persistedSnapshot || fallbackDb;
     const syncDisabled = shouldDisableSupabaseSync();
     const manualSyncRequested = manualSyncNonce > 0;
     const syncTrigger = manualSyncRequested ? 'manual_sync' : 'auto_sync';
@@ -565,7 +625,7 @@ export function useOperationalData(initialDb, session, options = {}) {
     }
 
     if (syncDisabled) {
-      setDbState(fallbackDb);
+      setDbState(localBaselineDb);
       setDataSource('offline_disabled');
       setDataError(null);
       setDataReady(true);
@@ -581,7 +641,7 @@ export function useOperationalData(initialDb, session, options = {}) {
       };
     }
 
-    setDbState(fallbackDb);
+    setDbState(localBaselineDb);
       setDataSource('fallback');
       setDataError(null);
       setDataReady(true);
@@ -646,7 +706,9 @@ export function useOperationalData(initialDb, session, options = {}) {
         }
 
         const snapshot = snapshotResult?.snapshot || {};
-        setDbState(createOperationalFallbackDb(snapshot));
+        const normalizedSnapshot = createOperationalFallbackDb(snapshot);
+        setDbState(normalizedSnapshot);
+        saveOperationalSnapshotLocal({ userId, db: normalizedSnapshot });
         if (snapshotResult?.circuitOpen) {
           setDataSource('offline_circuit_open');
           setDataError(new Error('Sincronizacao com a nuvem instavel. O app continuara em modo local.'));
