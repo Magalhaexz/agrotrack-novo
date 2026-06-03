@@ -7,6 +7,7 @@ import { gerarNovoId } from '../utils/id';
 import { useToast } from '../hooks/useToast';
 import { useAuth } from '../auth/useAuth';
 import { resetSupabaseAuthLocally, supabase, validateSupabaseSessionForCloud } from '../lib/supabase';
+import { perfilEhAdministrador } from '../auth/perfis';
 import {
   createOperationalRecord,
   deleteOperationalRecord,
@@ -56,7 +57,7 @@ export default function FazendasPage({ db, setDb, onConfirmAction, session: sess
   const [reconectandoNuvem, setReconectandoNuvem] = useState(false);
   const loadingToastRef = useRef(null);
   const manualSyncRef = useRef({ inFlight: false, lastStartAt: 0 });
-  const isAdmin = String(user?.perfil || '').toLowerCase() === 'admin' || hasPermission('configuracoes:editar');
+  const isAdmin = perfilEhAdministrador(user?.perfil) || hasPermission('configuracoes:editar');
   const podeVerDiagnostico = Boolean(import.meta.env.DEV || isAdmin);
 
   const fazendas = useMemo(() => (Array.isArray(db?.fazendas) ? db.fazendas : []), [db?.fazendas]);

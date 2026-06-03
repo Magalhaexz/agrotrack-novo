@@ -24,6 +24,13 @@ test('admin e gerente gerenciam acessos conforme matriz de permissões', () => {
   assert.equal(perfilPodeGerenciarAcessos(PERFIS.GERENTE), expectedGerente);
 });
 
+test('admin, proprietario e maiúsculas normalizam para proprietário', () => {
+  assert.equal(perfilTemPermissao('admin', 'acessos:gerenciar'), true);
+  assert.equal(perfilTemPermissao('proprietario', 'acessos:gerenciar'), true);
+  assert.equal(perfilTemPermissao('PROPRIETARIO', 'acessos:gerenciar'), true);
+  assert.equal(perfilPodeGerenciarAcessos('ADMIN'), true);
+});
+
 test('operador/visualizador não recebem permissões sensíveis de exclusão/gestão', () => {
   assert.equal(perfilTemPermissao(PERFIS.OPERADOR, 'acessos:gerenciar'), false);
   assert.equal(perfilTemPermissao(PERFIS.VISUALIZADOR, 'acessos:gerenciar'), false);

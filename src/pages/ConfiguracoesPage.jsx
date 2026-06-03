@@ -3,7 +3,7 @@ import { AlertTriangle, FileText, Plus, X } from 'lucide-react';
 import Card from '../components/ui/Card';
 import Button from '../components/ui/Button';
 import Modal from '../components/ui/Modal';
-import { normalizarPerfil, obterLabelPerfil, perfilPodeGerenciarAcessos } from '../auth/perfis';
+import { obterLabelPerfil, perfilEhAdministrador, perfilPodeGerenciarAcessos } from '../auth/perfis';
 import { supabase } from '../lib/supabase'; // Assumindo que supabase está configurado
 import { useAuth } from '../auth/useAuth';
 import { useToast } from '../hooks/useToast'; // Importa o hook de toast
@@ -70,10 +70,7 @@ export default function ConfiguracoesPage({ db, setDb, onConfirmAction }) {
   });
   const podeGerenciarAcessos = perfilPodeGerenciarAcessos(perfil);
   const mensagemSemPermissao = 'Você não tem permissão para executar esta ação.';
-  const usuariosFallback = useMemo(
-    () => (db.usuarios || []).map((item) => ({ ...item, perfil: normalizarPerfil(item.perfil) })),
-    [db.usuarios]
-  );
+  const usuariosFallback = useMemo(() => (db.usuarios || []).map((item) => ({ ...item })), [db.usuarios]);
   const invitesPendentes = useMemo(
     () => invitesRows.filter((invite) => ['pendente', 'enviado'].includes(String(invite?.status || '').toLowerCase())),
     [invitesRows]
@@ -87,7 +84,7 @@ export default function ConfiguracoesPage({ db, setDb, onConfirmAction }) {
     [invitesRows]
   );
   const totalAdminsAtivosFallback = useMemo(
-    () => usuariosFallback.filter((item) => ['admin', 'proprietario'].includes(String(item?.perfil || '').toLowerCase()) && String(item?.status || 'ativo') === 'ativo').length,
+    () => usuariosFallback.filter((item) => perfilEhAdministrador(item?.perfil) && String(item?.status || 'ativo') === 'ativo').length,
     [usuariosFallback]
   );
 
@@ -702,8 +699,8 @@ export default function ConfiguracoesPage({ db, setDb, onConfirmAction }) {
                             showToast({ type: 'warning', message: 'Você não pode rebaixar seu próprio perfil administrativo.' });
                             return;
                           }
-                          const adminAtual = ['admin', 'proprietario'].includes(String(item.perfil || '').toLowerCase());
-                          const adminNovo = ['admin', 'proprietario'].includes(String(novoPerfil || '').toLowerCase());
+                          const adminAtual = perfilEhAdministrador(item.perfil);
+                          const adminNovo = perfilEhAdministrador(novoPerfil);
                           if (adminAtual && !adminNovo && totalAdminsAtivosFallback <= 1) {
                             showToast({ type: 'warning', message: 'Não é possível remover ou rebaixar o último administrador.' });
                             return;
@@ -728,7 +725,7 @@ export default function ConfiguracoesPage({ db, setDb, onConfirmAction }) {
                           }));
                         }}
                       >
-                        <option value="admin">Admin</option>
+                        <option value="admin">Proprietário</option>
                         <option value="gerente">Gerente</option>
                         <option value="operador">Operador</option>
                         <option value="visualizador">Visualizador</option>
@@ -747,7 +744,7 @@ export default function ConfiguracoesPage({ db, setDb, onConfirmAction }) {
                             showToast({ type: 'warning', message: 'Você não pode remover seu próprio acesso.' });
                             return;
                           }
-                          if (['admin', 'proprietario'].includes(String(item.perfil || '').toLowerCase()) && novoStatus !== 'ativo' && totalAdminsAtivosFallback <= 1) {
+                          if (perfilEhAdministrador(item.perfil) && novoStatus !== 'ativo' && totalAdminsAtivosFallback <= 1) {
                             showToast({ type: 'warning', message: 'Não é possível remover ou rebaixar o último administrador.' });
                             return;
                           }
@@ -779,7 +776,7 @@ export default function ConfiguracoesPage({ db, setDb, onConfirmAction }) {
                             showToast({ type: 'warning', message: 'Você não pode remover seu próprio acesso.' });
                             return;
                           }
-                          if (['admin', 'proprietario'].includes(String(item.perfil || '').toLowerCase()) && totalAdminsAtivosFallback <= 1) {
+                          if (perfilEhAdministrador(item.perfil) && totalAdminsAtivosFallback <= 1) {
                             showToast({ type: 'warning', message: 'Não é possível remover ou rebaixar o último administrador.' });
                             return;
                           }
@@ -947,7 +944,7 @@ function InviteForm({ onInvite, onClose }) {
       <label className="ui-input-wrap">
         <span className="ui-input-label">Perfil</span>
         <select className="ui-input" value={form.perfil} onChange={(e) => setForm((prev) => ({ ...prev, perfil: e.target.value }))}>
-          <option value="admin">Admin</option>
+          <option value="admin">Proprietário</option>
           <option value="gerente">Gerente</option>
           <option value="operador">Operador</option>
           <option value="visualizador">Visualizador</option>
