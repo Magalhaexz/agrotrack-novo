@@ -1,4 +1,4 @@
-import { obterLabelPerfil, obterPerfilDoUsuario, PERFIS, normalizarPerfil } from '../auth/perfis.js';
+import { obterLabelPerfil, obterPerfilDoUsuario, PERFIS, normalizarPerfil, perfilEhAdministrador } from '../auth/perfis.js';
 import { supabase } from '../lib/supabase.js';
 
 const PROFILE_COLUMNS = 'id, email, nome, perfil, telefone, cargo, foto_url, created_at, updated_at';
@@ -63,7 +63,11 @@ export function resolveUserRoleFromAuthAndCache(user, profile) {
   const metadataPerfil = normalizarPerfil(metadataRawPerfil);
   const metadataExplicitRole =
     metadataRawHasValue
-    && (metadataPerfil === PERFIS.ADMIN || metadataPerfil === PERFIS.GERENTE || metadataPerfil === PERFIS.OPERADOR);
+    && (
+      perfilEhAdministrador(metadataPerfil)
+      || metadataPerfil === PERFIS.GERENTE
+      || metadataPerfil === PERFIS.OPERADOR
+    );
 
   const profilePerfil = normalizarPerfil(profile?.perfil || null);
   const hasProfilePerfil = Boolean(String(profile?.perfil || '').trim());
@@ -76,7 +80,7 @@ export function resolveUserRoleFromAuthAndCache(user, profile) {
     return { perfil: metadataPerfil, source: 'auth_metadata' };
   }
   if (isBootstrapOwnerEmail(user)) {
-    return { perfil: PERFIS.ADMIN, source: 'bootstrap_owner_email' };
+    return { perfil: PERFIS.PROPRIETARIO, source: 'bootstrap_owner_email' };
   }
   if (hasProfilePerfil) {
     return { perfil: profilePerfil, source: 'cached_profile' };

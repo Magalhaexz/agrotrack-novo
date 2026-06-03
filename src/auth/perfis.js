@@ -1,22 +1,24 @@
 export const PERFIS = {
-  ADMIN: 'admin',
+  PROPRIETARIO: 'proprietario',
+  ADMIN: 'proprietario',
   GERENTE: 'gerente',
   OPERADOR: 'operador',
   VISUALIZADOR: 'visualizador',
 };
 
 export const PERFIL_LABELS = {
-  [PERFIS.ADMIN]: 'Admin',
+  [PERFIS.PROPRIETARIO]: 'Proprietário',
   [PERFIS.GERENTE]: 'Gerente',
   [PERFIS.OPERADOR]: 'Operador',
   [PERFIS.VISUALIZADOR]: 'Visualizador',
 };
 
 const PERFIL_ALIASES = {
-  admin: PERFIS.ADMIN,
-  administrador: PERFIS.ADMIN,
-  proprietario: PERFIS.ADMIN,
-  owner: PERFIS.ADMIN,
+  admin: PERFIS.PROPRIETARIO,
+  administrador: PERFIS.PROPRIETARIO,
+  proprietario: PERFIS.PROPRIETARIO,
+  proprietário: PERFIS.PROPRIETARIO,
+  owner: PERFIS.PROPRIETARIO,
   gerente: PERFIS.GERENTE,
   gestor: PERFIS.GERENTE,
   operador: PERFIS.OPERADOR,
@@ -171,6 +173,10 @@ export function normalizarPerfil(perfil) {
   const valor = String(perfil || '').trim().toLowerCase();
   if (PERFIL_ALIASES[valor]) return PERFIL_ALIASES[valor];
   return PERFIS.VISUALIZADOR;
+}
+
+export function perfilEhAdministrador(perfil) {
+  return normalizarPerfil(perfil) === PERFIS.PROPRIETARIO;
 }
 
 export function obterPerfilDoUsuario(user) {
