@@ -18,6 +18,7 @@ export default function LoteDetailsPanel({
   canMove,
   canEdit,
   canEditPesagem,
+  onEdit,
   onNovaRetirada,
   onNovaPesagem,
   onEncerrar,
@@ -34,10 +35,21 @@ export default function LoteDetailsPanel({
       <div className="rebanho-header page-header">
         <div>
           <h1>{lote.nome}</h1>
-          <p>Fazenda {lote.fazendaNome || 'não vinculada'} • Status {lote.status}</p>
+          <p>
+            Fazenda {lote.fazendaNome || 'não vinculada'}
+            {' '}
+            • Pastagem {lote.pastagemNome || '—'}
+            {' '}
+            • Categoria {lote.categoriaAnimal || '—'}
+            {' '}
+            • Raça {lote.raca || '—'}
+            {' '}
+            • Status {lote.status}
+          </p>
         </div>
         <div className="lote-actions page-actions action-row">
           <Button variant="ghost" onClick={onBack}>Voltar para lotes</Button>
+          <Button variant="outline" onClick={onEdit} disabled={!canEdit || lote.bloqueado}>Editar lote</Button>
           <Button variant="outline" onClick={onNovaPesagem} disabled={!canEditPesagem || lote.bloqueado}>Nova pesagem</Button>
           <Button variant="warning" onClick={onNovaRetirada} disabled={!canMove || lote.bloqueado}>Retirada</Button>
           <Button variant="danger" onClick={onEncerrar} disabled={!canEdit || lote.bloqueado}>Encerrar lote</Button>

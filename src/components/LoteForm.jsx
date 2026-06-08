@@ -1,9 +1,12 @@
 import { useEffect, useMemo, useState } from 'react';
 import Modal from './ui/Modal';
 import Button from './ui/Button';
+import Input from './ui/Input';
 
 const TIPOS_OPERACAO = ['recria', 'engorda', 'recria+engorda', 'confinamento'];
 const SISTEMAS = ['confinamento', 'semi-confinamento', 'pasto'];
+const CATEGORIAS_ANIMAL = ['Bezerros', 'Bezerras', 'Garrotes', 'Novilhas', 'Vacas', 'Touros', 'Bois', 'Misto'];
+const RACOES = ['Nelore', 'Angus', 'Cruzado', 'Senepol', 'Brahman', 'Tabapuã', 'Outro'];
 const TIPOS_CONSUMO = [
   { value: 'percentual_pv', label: '% PV' },
   { value: 'kg_cab_dia', label: 'kg/cab/dia' },
@@ -12,6 +15,9 @@ const TIPOS_CONSUMO = [
 const FORM_VAZIO = {
   nome: '',
   faz_id: '',
+  pastagem_id: '',
+  categoria_animal: '',
+  raca: '',
   tipo: 'engorda',
   sistema: 'confinamento',
   entrada: new Date().toISOString().slice(0, 10),
@@ -111,12 +117,20 @@ function getInitialConsumoValue(data) {
   return data?.consumo_por_cabeca_dia ?? data?.supl_pv_pct ?? '';
 }
 
-function normalizarInitialData(data) {
+function findPastagemLabel(pastagens, pastagemId) {
+  if (!pastagemId) return '';
+  return pastagens.find((item) => String(item.id) === String(pastagemId))?.nome || '';
+}
+
+function normalizarInitialData(data, pastagens = []) {
   if (!data) return FORM_VAZIO;
   return {
     ...FORM_VAZIO,
     nome: data.nome || '',
     faz_id: data.faz_id ?? '',
+    pastagem_id: data.pastagem_id ?? data.pastagemId ?? data.pastagem_atual_id ?? '',
+    categoria_animal: data.categoria_animal ?? data.categoria ?? '',
+    raca: data.raca ?? data.raca_animal ?? data.gen ?? '',
     tipo: data.tipo || 'engorda',
     sistema: data.sistema || 'confinamento',
     entrada: data.entrada || new Date().toISOString().slice(0, 10),
@@ -142,6 +156,7 @@ function normalizarInitialData(data) {
     supl_pv_pct: data.supl_pv_pct ?? 0,
     supl_estoque_kg: data.supl_estoque_kg ?? 0,
     supl_meta_dias: data.supl_meta_dias ?? data.dias_estimados ?? 30,
+    pastagem_nome: data.pastagem_nome || findPastagemLabel(pastagens, data.pastagem_id ?? data.pastagemId ?? data.pastagem_atual_id ?? ''),
   };
 }
 
@@ -196,15 +211,15 @@ function validarForm(form, planejamento) {
   return null;
 }
 
-export default function LoteForm({ initialData, fazendas = [], onSave, onCancel }) {
+export default function LoteForm({ initialData, fazendas = [], pastagens = [], onSave, onCancel }) {
   const [form, setForm] = useState(() => normalizarInitialData(initialData));
   const [erro, setErro] = useState('');
 
   /* eslint-disable react-hooks/set-state-in-effect */
   useEffect(() => {
-    setForm(normalizarInitialData(initialData));
+    setForm(normalizarInitialData(initialData, pastagens));
     setErro('');
-  }, [initialData]);
+  }, [initialData, pastagens]);
   /* eslint-enable react-hooks/set-state-in-effect */
 
   const planejamento = useMemo(() => calcularPlanejamento(form), [form]);
@@ -243,6 +258,9 @@ export default function LoteForm({ initialData, fazendas = [], onSave, onCancel 
     onSave?.({
       nome: form.nome.trim(),
       faz_id: Number(form.faz_id),
+      pastagem_id: form.pastagem_id ? Number(form.pastagem_id) : null,
+      categoria_animal: form.categoria_animal || '',
+      raca: form.raca || '',
       tipo: form.tipo,
       sistema: form.sistema,
       entrada: form.entrada,
@@ -279,6 +297,9 @@ export default function LoteForm({ initialData, fazendas = [], onSave, onCancel 
   }
 
   const titulo = initialData ? 'Editar lote' : 'Novo lote';
+  const pastagemSelecionada = form.pastagem_id
+    ? findPastagemLabel(pastagens, form.pastagem_id)
+    : '';
   const consumoLabel = form.consumo_tipo === 'percentual_pv'
     ? 'Consumo diário por animal (% PV)'
     : 'Consumo diário por animal (kg/cab/dia)';
@@ -326,6 +347,48 @@ export default function LoteForm({ initialData, fazendas = [], onSave, onCancel 
               onChange={handleChange}
             />
           </label>
+        </div>
+
+        <div className="grid-3">
+          {pastagens.length > 0 ? (
+            <Input
+              as="select"
+              name="pastagem_id"
+              label="Pastagem atual"
+              value={form.pastagem_id}
+              onChange={handleChange}
+              hint="Selecione a pastagem que está vinculada ao lote."
+            >
+              <option value="">Selecione</option>
+              {pastagens.map((pastagem) => (
+                <option key={pastagem.id} value={pastagem.id}>{pastagem.nome}</option>
+              ))}
+              {form.pastagem_id && !pastagemSelecionada ? (
+                <option value={form.pastagem_id}>Pastagem vinculada não encontrada</option>
+              ) : null}
+            </Input>
+          ) : (
+            <div className="ui-input-wrap">
+              <span className="ui-input-label">Pastagem atual</span>
+              <div className="ui-input-shell" style={{ minHeight: 48 }}>
+                <span className="ui-input-affix">Cadastre uma pastagem para vincular ao lote.</span>
+              </div>
+            </div>
+          )}
+
+          <Input as="select" name="categoria_animal" label="Categoria animal" value={form.categoria_animal} onChange={handleChange}>
+            <option value="">Selecione</option>
+            {CATEGORIAS_ANIMAL.map((categoria) => (
+              <option key={categoria} value={categoria}>{categoria}</option>
+            ))}
+          </Input>
+
+          <Input as="select" name="raca" label="Raça" value={form.raca} onChange={handleChange}>
+            <option value="">Selecione</option>
+            {RACOES.map((raca) => (
+              <option key={raca} value={raca}>{raca}</option>
+            ))}
+          </Input>
         </div>
 
         <div className="grid-3">
