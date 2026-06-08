@@ -169,6 +169,7 @@ export default function Sidebar({
                   onClick={() => setOpenSections((prev) => ({ ...prev, [section.id]: !prev[section.id] }))}
                   aria-expanded={section.isOpen}
                   aria-controls={`nav-section-${section.id}`}
+                  title={section.title}
                 >
                   <div className="sidebar-group-copy">
                     <span>{section.title}</span>
