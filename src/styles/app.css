@@ -9462,10 +9462,8 @@ html, body, #root, .app, .main, .main-content, .page { max-width: 100%; }
     display: flex;
     flex-direction: column;
     overflow-x: hidden;
-    overflow-y: auto;
+    overflow-y: hidden;
     overscroll-behavior: contain;
-    scrollbar-width: thin;
-    scrollbar-color: rgba(109, 135, 120, 0.5) rgba(255, 255, 255, 0.02);
     background:
       linear-gradient(180deg, rgba(255, 255, 255, 0.04), transparent 22%),
       linear-gradient(180deg, rgba(10, 14, 14, 0.96), rgba(7, 10, 10, 0.98));
@@ -9475,32 +9473,20 @@ html, body, #root, .app, .main, .main-content, .page { max-width: 100%; }
     transition: width 0.22s ease, min-width 0.22s ease, max-width 0.22s ease;
   }
 
-  .app-shell .sidebar::-webkit-scrollbar {
-    width: 10px;
-  }
-
-  .app-shell .sidebar::-webkit-scrollbar-track {
-    background: rgba(255, 255, 255, 0.02);
-  }
-
-  .app-shell .sidebar::-webkit-scrollbar-thumb {
-    background: rgba(109, 135, 120, 0.5);
-    border: 2px solid rgba(10, 12, 12, 0.92);
-    border-radius: 999px;
-  }
-
   .app-shell .sidebar-header {
     position: relative;
     display: flex;
     align-items: center;
-    min-height: 84px;
-    padding: 18px 56px 14px 18px;
+    justify-content: center;
+    min-height: 112px;
+    padding: 52px 24px 18px;
     border-bottom: 1px solid rgba(255, 255, 255, 0.06);
   }
 
   .app-shell .sidebar-brand {
     display: flex;
     align-items: center;
+    justify-content: center;
     gap: 14px;
     min-width: 0;
     width: 100%;
@@ -9531,8 +9517,8 @@ html, body, #root, .app, .main, .main-content, .page { max-width: 100%; }
 
   .app-shell .sidebar-logo-actions {
     position: absolute;
-    top: 18px;
-    right: 16px;
+    top: 24px;
+    right: 18px;
     display: flex;
     align-items: center;
     justify-content: center;
@@ -9563,6 +9549,23 @@ html, body, #root, .app, .main, .main-content, .page { max-width: 100%; }
     flex: 1 1 auto;
     padding: 14px 14px 10px;
     overflow-x: hidden;
+    overflow-y: auto;
+    scrollbar-width: thin;
+    scrollbar-color: rgba(109, 135, 120, 0.42) rgba(255, 255, 255, 0.02);
+  }
+
+  .app-shell .sidebar-nav::-webkit-scrollbar {
+    width: 8px;
+  }
+
+  .app-shell .sidebar-nav::-webkit-scrollbar-track {
+    background: rgba(255, 255, 255, 0.02);
+  }
+
+  .app-shell .sidebar-nav::-webkit-scrollbar-thumb {
+    background: rgba(109, 135, 120, 0.42);
+    border: 2px solid rgba(10, 12, 12, 0.92);
+    border-radius: 999px;
   }
 
   .app-shell .sidebar-section {
@@ -9640,7 +9643,7 @@ html, body, #root, .app, .main, .main-content, .page { max-width: 100%; }
   }
 
   .app-shell.app-shell--sidebar-collapsed .sidebar {
-    overflow-y: hidden;
+    overflow: hidden;
     scrollbar-width: none;
   }
 
@@ -9651,14 +9654,23 @@ html, body, #root, .app, .main, .main-content, .page { max-width: 100%; }
 
   .app-shell.app-shell--sidebar-collapsed .sidebar-header {
     justify-content: center;
-    min-height: 88px;
-    padding: 18px 12px 14px;
+    min-height: 110px;
+    padding: 56px 12px 16px;
+    border-bottom-color: rgba(255, 255, 255, 0.03);
   }
 
   .app-shell.app-shell--sidebar-collapsed .sidebar-brand {
     justify-content: center;
     gap: 0;
     width: 100%;
+  }
+
+  .app-shell.app-shell--sidebar-collapsed .sidebar-section {
+    gap: 10px;
+    padding: 0;
+    background: transparent;
+    border: 0;
+    box-shadow: none;
   }
 
   .app-shell.app-shell--sidebar-collapsed .sidebar-logo-copy,
@@ -9674,8 +9686,16 @@ html, body, #root, .app, .main, .main-content, .page { max-width: 100%; }
   }
 
   .app-shell.app-shell--sidebar-collapsed .sidebar-logo-actions {
-    top: 14px;
-    right: 14px;
+    top: 24px;
+    right: 50%;
+    transform: translateX(50%);
+    width: 38px;
+    justify-content: center;
+    pointer-events: none;
+  }
+
+  .app-shell.app-shell--sidebar-collapsed .sidebar-desktop-toggle {
+    pointer-events: auto;
     transform: none;
   }
 
@@ -9687,24 +9707,66 @@ html, body, #root, .app, .main, .main-content, .page { max-width: 100%; }
   }
 
   .app-shell.app-shell--sidebar-collapsed .sidebar-nav {
-    padding: 12px 12px 8px;
+    padding: 12px 10px 8px;
+    overflow: hidden;
+    scrollbar-width: none;
   }
 
-  .app-shell.app-shell--sidebar-collapsed .sidebar-section {
-    gap: 8px;
+  .app-shell.app-shell--sidebar-collapsed .sidebar-nav::-webkit-scrollbar {
+    width: 0;
+    height: 0;
   }
 
   .app-shell.app-shell--sidebar-collapsed .nav-sublist {
-    gap: 8px;
+    display: grid;
+    justify-items: center;
+    gap: 10px;
     padding-top: 0;
   }
 
   .app-shell.app-shell--sidebar-collapsed .sidebar-link {
-    width: 100%;
-    min-height: 48px;
+    width: 44px;
+    min-width: 44px;
+    max-width: 44px;
+    min-height: 44px;
+    height: 44px;
     padding: 0;
     justify-content: center;
     gap: 0;
+    margin-inline: auto;
+    border-radius: 14px;
+    overflow: hidden;
+    flex: 0 0 44px;
+  }
+
+  .app-shell.app-shell--sidebar-collapsed .sidebar-link.active,
+  .app-shell.app-shell--sidebar-collapsed .sidebar-link.on,
+  .app-shell.app-shell--sidebar-collapsed .sidebar-item.nav.subnav.active,
+  .app-shell.app-shell--sidebar-collapsed .sidebar-item.nav.subnav.on,
+  .app-shell.app-shell--sidebar-collapsed .sidebar--collapsed .sidebar-link.active,
+  .app-shell.app-shell--sidebar-collapsed .sidebar--collapsed .sidebar-link.on {
+    width: 44px !important;
+    min-width: 44px !important;
+    max-width: 44px !important;
+    height: 44px !important;
+    min-height: 44px !important;
+    padding: 0 !important;
+    margin-inline: auto !important;
+    justify-content: center !important;
+    gap: 0 !important;
+    overflow: hidden !important;
+    border-radius: 14px !important;
+    box-shadow:
+      inset 0 0 0 1px rgba(102, 196, 132, 0.5),
+      0 0 0 1px rgba(102, 196, 132, 0.1),
+      0 12px 24px rgba(34, 84, 52, 0.18) !important;
+  }
+
+  .app-shell.app-shell--sidebar-collapsed .sidebar-link .nav-icon,
+  .app-shell.app-shell--sidebar-collapsed .sidebar-link.active .nav-icon,
+  .app-shell.app-shell--sidebar-collapsed .sidebar-link.on .nav-icon {
+    margin: 0 !important;
+    flex: 0 0 16px;
   }
 
   .app-shell.app-shell--sidebar-collapsed .sidebar-logo-mark {
@@ -9714,17 +9776,25 @@ html, body, #root, .app, .main, .main-content, .page { max-width: 100%; }
     margin: 0 auto;
   }
 
+  .app-shell.app-shell--sidebar-collapsed .sidebar-logo {
+    overflow: hidden;
+  }
+
   .app-shell.app-shell--sidebar-collapsed .sidebar-user-wrap {
-    padding: 12px 12px 16px;
+    padding: 12px 10px 16px;
   }
 
   .app-shell.app-shell--sidebar-collapsed .sidebar-user-card {
-    width: 100%;
+    width: 44px;
     min-height: 64px;
-    padding: 12px 0;
+    min-width: 44px;
+    padding: 0;
     justify-content: center;
     align-items: center;
-    border-radius: 18px;
+    border-radius: 16px;
+    background: transparent;
+    border-color: transparent;
+    box-shadow: none;
   }
 }
 
