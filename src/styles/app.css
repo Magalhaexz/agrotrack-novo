@@ -9442,3 +9442,270 @@ html, body, #root, .app, .main, .main-content, .page { max-width: 100%; }
     padding: 12px 0 10px;
   }
 }
+
+/* Hotfix: rebuild sidebar collapse UX with a clean desktop model */
+@media (min-width: 901px) {
+  .app-shell {
+    --sidebar-width-expanded: 272px;
+    --sidebar-width-collapsed: 80px;
+    --sidebar-width: var(--sidebar-width-expanded);
+  }
+
+  .app-shell.app-shell--sidebar-collapsed {
+    --sidebar-width: var(--sidebar-width-collapsed);
+  }
+
+  .app-shell .sidebar {
+    width: var(--sidebar-width) !important;
+    min-width: var(--sidebar-width) !important;
+    max-width: var(--sidebar-width) !important;
+    display: flex;
+    flex-direction: column;
+    overflow-x: hidden;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    scrollbar-width: thin;
+    scrollbar-color: rgba(109, 135, 120, 0.5) rgba(255, 255, 255, 0.02);
+    background:
+      linear-gradient(180deg, rgba(255, 255, 255, 0.04), transparent 22%),
+      linear-gradient(180deg, rgba(10, 14, 14, 0.96), rgba(7, 10, 10, 0.98));
+    box-shadow:
+      inset -1px 0 0 rgba(255, 255, 255, 0.04),
+      14px 0 34px rgba(0, 0, 0, 0.22);
+    transition: width 0.22s ease, min-width 0.22s ease, max-width 0.22s ease;
+  }
+
+  .app-shell .sidebar::-webkit-scrollbar {
+    width: 10px;
+  }
+
+  .app-shell .sidebar::-webkit-scrollbar-track {
+    background: rgba(255, 255, 255, 0.02);
+  }
+
+  .app-shell .sidebar::-webkit-scrollbar-thumb {
+    background: rgba(109, 135, 120, 0.5);
+    border: 2px solid rgba(10, 12, 12, 0.92);
+    border-radius: 999px;
+  }
+
+  .app-shell .sidebar-header {
+    position: relative;
+    display: flex;
+    align-items: center;
+    min-height: 84px;
+    padding: 18px 56px 14px 18px;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+  }
+
+  .app-shell .sidebar-brand {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    min-width: 0;
+    width: 100%;
+  }
+
+  .app-shell .sidebar-logo-mark {
+    width: 44px;
+    height: 44px;
+    flex: 0 0 44px;
+  }
+
+  .app-shell .sidebar-logo-copy {
+    display: flex !important;
+    align-items: center;
+    min-width: 0;
+    overflow: visible;
+  }
+
+  .app-shell .sidebar-brand-text,
+  .app-shell .sidebar-logo-text {
+    display: block !important;
+    white-space: nowrap;
+    overflow: visible;
+    text-overflow: clip;
+    letter-spacing: 0.16em;
+    font-size: 1rem;
+  }
+
+  .app-shell .sidebar-logo-actions {
+    position: absolute;
+    top: 18px;
+    right: 16px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0;
+    z-index: 3;
+  }
+
+  .app-shell .sidebar-toggle {
+    width: 36px;
+    height: 36px;
+    min-width: 36px;
+    border-radius: 12px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    box-shadow: 0 8px 20px rgba(0, 0, 0, 0.18);
+  }
+
+  .app-shell .sidebar-nav {
+    flex: 1 1 auto;
+    padding: 14px 14px 10px;
+    overflow-x: hidden;
+  }
+
+  .app-shell .sidebar-section {
+    gap: 10px;
+  }
+
+  .app-shell .sidebar-section-title {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    min-height: 38px;
+    padding: 8px 12px;
+    border-radius: 14px;
+  }
+
+  .app-shell .sidebar-group-copy,
+  .app-shell .sidebar-link-label,
+  .app-shell .sidebar-user-info {
+    min-width: 0;
+  }
+
+  .app-shell .nav-sublist {
+    display: grid;
+    gap: 8px;
+  }
+
+  .app-shell .sidebar-link {
+    min-height: 48px;
+    padding: 0 14px;
+    border-radius: 16px;
+    justify-content: flex-start;
+    gap: 12px;
+  }
+
+  .app-shell .sidebar-link .nav-icon {
+    flex: 0 0 16px;
+    margin: 0;
+  }
+
+  .app-shell .sidebar-link-label {
+    display: block;
+    white-space: nowrap;
+    overflow: visible;
+    text-overflow: clip;
+  }
+
+  .app-shell .sidebar-user-wrap {
+    margin-top: auto;
+    padding: 12px 14px 16px;
+  }
+
+  .app-shell .sidebar-user-card {
+    min-height: 76px;
+    padding: 12px 14px;
+    border-radius: 18px;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    background: rgba(255, 255, 255, 0.03);
+    border: 1px solid rgba(255, 255, 255, 0.05);
+  }
+
+  .app-shell .sidebar-user-card .avatar,
+  .app-shell .sidebar-user-card > :first-child {
+    flex: 0 0 auto;
+  }
+
+  .app-shell .sidebar-user-caret {
+    margin-left: auto;
+    flex: 0 0 auto;
+  }
+
+  .app-shell .main-content {
+    box-shadow: inset 1px 0 0 rgba(255, 255, 255, 0.025);
+  }
+
+  .app-shell.app-shell--sidebar-collapsed .sidebar {
+    overflow-y: hidden;
+    scrollbar-width: none;
+  }
+
+  .app-shell.app-shell--sidebar-collapsed .sidebar::-webkit-scrollbar {
+    width: 0;
+    height: 0;
+  }
+
+  .app-shell.app-shell--sidebar-collapsed .sidebar-header {
+    justify-content: center;
+    min-height: 78px;
+    padding: 16px 12px 12px;
+  }
+
+  .app-shell.app-shell--sidebar-collapsed .sidebar-brand {
+    justify-content: center;
+    gap: 0;
+  }
+
+  .app-shell.app-shell--sidebar-collapsed .sidebar-logo-copy,
+  .app-shell.app-shell--sidebar-collapsed .sidebar-section-title,
+  .app-shell.app-shell--sidebar-collapsed .sidebar-link-label,
+  .app-shell.app-shell--sidebar-collapsed .sidebar-item-copy,
+  .app-shell.app-shell--sidebar-collapsed .sidebar-user-info,
+  .app-shell.app-shell--sidebar-collapsed .sidebar-user-caret,
+  .app-shell.app-shell--sidebar-collapsed .sidebar-badge,
+  .app-shell.app-shell--sidebar-collapsed .nav-group-arrow,
+  .app-shell.app-shell--sidebar-collapsed .sidebar-group-copy {
+    display: none !important;
+  }
+
+  .app-shell.app-shell--sidebar-collapsed .sidebar-logo-actions {
+    top: 14px;
+    right: 12px;
+    transform: none;
+  }
+
+  .app-shell.app-shell--sidebar-collapsed .sidebar-toggle {
+    width: 38px;
+    height: 38px;
+    min-width: 38px;
+    border-radius: 12px;
+  }
+
+  .app-shell.app-shell--sidebar-collapsed .sidebar-nav {
+    padding: 10px 10px 8px;
+  }
+
+  .app-shell.app-shell--sidebar-collapsed .sidebar-section {
+    gap: 8px;
+  }
+
+  .app-shell.app-shell--sidebar-collapsed .nav-sublist {
+    gap: 8px;
+    padding-top: 0;
+  }
+
+  .app-shell.app-shell--sidebar-collapsed .sidebar-link {
+    width: 100%;
+    min-height: 48px;
+    padding: 0;
+    justify-content: center;
+    gap: 0;
+  }
+
+  .app-shell.app-shell--sidebar-collapsed .sidebar-user-wrap {
+    padding: 10px 10px 14px;
+  }
+
+  .app-shell.app-shell--sidebar-collapsed .sidebar-user-card {
+    min-height: 60px;
+    padding: 10px 0;
+    justify-content: center;
+    border-radius: 18px;
+  }
+}
