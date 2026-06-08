@@ -1,4 +1,4 @@
-﻿import { useMemo, useState } from 'react';
+﻿import { useEffect, useMemo, useState } from 'react';
 import { AlertTriangle, ArrowDownCircle, ArrowUpCircle, FileText, Plus } from 'lucide-react';
 import Card from '../components/ui/Card';
 import Badge from '../components/ui/Badge';
@@ -20,6 +20,36 @@ const CATEGORIAS_ESTOQUE_GERAL = [
   'Insumo geral',
   'Outro',
 ];
+
+const FORM_CADASTRO_ITEM_VAZIO = {
+  produto: '',
+  categoria: CATEGORIAS_ESTOQUE_GERAL[0],
+  unidade: 'kg',
+  quantidade_inicial: '',
+  quantidade_minima: '',
+  custo_unitario: '',
+  validade: '',
+  fornecedor: '',
+  obs: '',
+};
+
+function getCadastroItemInicial(data) {
+  if (!data) return FORM_CADASTRO_ITEM_VAZIO;
+
+  const quantidadeAtual = Number(data.quantidade_atual ?? data.quantidade ?? 0);
+
+  return {
+    produto: data.produto || data.nome || '',
+    categoria: data.categoria || CATEGORIAS_ESTOQUE_GERAL[0],
+    unidade: data.unidade || 'kg',
+    quantidade_inicial: quantidadeAtual || '',
+    quantidade_minima: data.quantidade_minima ?? '',
+    custo_unitario: data.valor_unitario ?? data.custo_unitario ?? data.preco_unitario ?? '',
+    validade: data.data_validade || data.validade || '',
+    fornecedor: data.fornecedor || '',
+    obs: data.obs || data.observacoes || '',
+  };
+}
 
 function itemEhNutricao(item) {
   const categoria = String(item?.categoria || item?.tipo || '').toLowerCase();
@@ -52,6 +82,7 @@ export default function EstoquePage({ db, setDb, onRegistrarSaidaEstoque }) {
   const [openEntrada, setOpenEntrada] = useState(false);
   const [openSaida, setOpenSaida] = useState(false);
   const [selectedItem, setSelectedItem] = useState(null);
+  const [itemEmEdicao, setItemEmEdicao] = useState(null);
   const [filters, setFilters] = useState({ item: 'todos', tipo: 'todos', lote: 'todos', periodo: 'todos' });
 
   const lotesMap = useMemo(() => new Map((db.lotes || []).map((l) => [l.id, l])), [db.lotes]);
@@ -145,6 +176,7 @@ export default function EstoquePage({ db, setDb, onRegistrarSaidaEstoque }) {
               showToast({ type: 'error', message: mensagemSemPermissao });
               return;
             }
+            setItemEmEdicao(null);
             setOpenCadastroItem(true);
           }}>
             Novo item
@@ -186,7 +218,7 @@ export default function EstoquePage({ db, setDb, onRegistrarSaidaEstoque }) {
           <div className="empty-box">
             <strong>{showOnlyCrit ? 'Nenhum item crítico.' : 'Nenhum item cadastrado.'}</strong>
             <span>{showOnlyCrit ? 'Todos os itens estão em nível normal.' : 'Cadastre o primeiro item para controlar entradas e saídas.'}</span>
-            {!showOnlyCrit ? <Button icon={<Plus size={14} />} onClick={() => setOpenCadastroItem(true)}>Novo item</Button> : null}
+            {!showOnlyCrit ? <Button icon={<Plus size={14} />} onClick={() => { setItemEmEdicao(null); setOpenCadastroItem(true); }}>Novo item</Button> : null}
           </div>
         ) : (
           itensView.map((item) => {
@@ -226,6 +258,17 @@ export default function EstoquePage({ db, setDb, onRegistrarSaidaEstoque }) {
                   <button type="button" className="btn-saida" disabled={!hasPermission('estoque:editar')} onClick={() => { setSelectedItem(item); setOpenSaida(true); }}>
                     Saída
                   </button>
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    disabled={!hasPermission('estoque:editar')}
+                    onClick={() => {
+                      setItemEmEdicao(item);
+                      setOpenCadastroItem(true);
+                    }}
+                  >
+                    Editar
+                  </Button>
                 </div>
               </Card>
             );
@@ -274,10 +317,20 @@ export default function EstoquePage({ db, setDb, onRegistrarSaidaEstoque }) {
       </Card>
 
       {openCadastroItem && (
-        <CadastroItemModal setDb={setDb} onClose={() => setOpenCadastroItem(false)} hasPermission={hasPermission} showToast={showToast} session={session} />
+        <CadastroItemModal
+          setDb={setDb}
+          initialData={itemEmEdicao}
+          onClose={() => {
+            setOpenCadastroItem(false);
+            setItemEmEdicao(null);
+          }}
+          hasPermission={hasPermission}
+          showToast={showToast}
+          session={session}
+        />
       )}
       {openEntrada && (
-        <EntradaModal db={db} setDb={setDb} selectedItem={selectedItem} estoqueMap={estoqueMap} onOpenCadastroItem={() => setOpenCadastroItem(true)} onClose={() => { setSelectedItem(null); setOpenEntrada(false); }} hasPermission={hasPermission} showToast={showToast} session={session} />
+        <EntradaModal db={db} setDb={setDb} selectedItem={selectedItem} estoqueMap={estoqueMap} onOpenCadastroItem={() => { setItemEmEdicao(null); setOpenCadastroItem(true); }} onClose={() => { setSelectedItem(null); setOpenEntrada(false); }} hasPermission={hasPermission} showToast={showToast} session={session} />
       )}
       {openSaida && (
         <SaidaModal db={db} setDb={setDb} selectedItem={selectedItem} onRegistrarSaidaEstoque={onRegistrarSaidaEstoque} estoqueMap={estoqueMap} onClose={() => { setSelectedItem(null); setOpenSaida(false); }} hasPermission={hasPermission} showToast={showToast} session={session} />
@@ -286,18 +339,16 @@ export default function EstoquePage({ db, setDb, onRegistrarSaidaEstoque }) {
   );
 }
 
-function CadastroItemModal({ setDb, onClose, hasPermission, showToast, session }) {
-  const [form, setForm] = useState({
-    produto: '',
-    categoria: CATEGORIAS_ESTOQUE_GERAL[0],
-    unidade: 'kg',
-    quantidade_inicial: '',
-    quantidade_minima: '',
-    custo_unitario: '',
-    validade: '',
-    fornecedor: '',
-    obs: '',
-  });
+function CadastroItemModal({ setDb, initialData = null, onClose, hasPermission, showToast, session }) {
+  const [form, setForm] = useState(() => getCadastroItemInicial(initialData));
+  const [erro, setErro] = useState('');
+
+  /* eslint-disable react-hooks/set-state-in-effect */
+  useEffect(() => {
+    setForm(getCadastroItemInicial(initialData));
+    setErro('');
+  }, [initialData]);
+  /* eslint-enable react-hooks/set-state-in-effect */
 
   async function submit() {
     if (!hasPermission('estoque:editar')) {
@@ -305,44 +356,72 @@ function CadastroItemModal({ setDb, onClose, hasPermission, showToast, session }
       return;
     }
     if (!String(form.produto || '').trim()) {
-      alert('Informe o nome do item.');
+      setErro('Informe o nome do item.');
+      return;
+    }
+    if (Number(form.quantidade_inicial || 0) < 0) {
+      setErro('Informe uma quantidade válida.');
+      return;
+    }
+    if (Number(form.custo_unitario || 0) < 0) {
+      setErro('Informe um custo unitário válido.');
       return;
     }
 
     const payload = {
       produto: String(form.produto || '').trim(),
+      nome: String(form.produto || '').trim(),
       categoria: form.categoria || 'Outro',
       unidade: form.unidade || 'un',
+      unidade_medida: form.unidade || 'un',
       quantidade_atual: Number(form.quantidade_inicial || 0),
+      quantidade: Number(form.quantidade_inicial || 0),
       quantidade_minima: Number(form.quantidade_minima || 0),
       valor_unitario: Number(form.custo_unitario || 0),
       preco_unitario: Number(form.custo_unitario || 0),
+      custo_unitario: Number(form.custo_unitario || 0),
+      valor_total: Number(form.quantidade_inicial || 0) * Number(form.custo_unitario || 0),
       data_validade: form.validade || null,
+      validade: form.validade || null,
       fornecedor: form.fornecedor || '',
       obs: form.obs || '',
+      observacoes: form.obs || '',
     };
 
-    const persisted = await createOperationalRecord('estoque', payload, session);
+    const isEdit = Boolean(initialData?.id);
+    const persisted = isEdit
+      ? await updateOperationalRecord('estoque', Number(initialData.id), payload, session)
+      : await createOperationalRecord('estoque', payload, session);
+
     setDb((prev) => ({
       ...prev,
-      estoque: [
-        ...(prev.estoque || []),
-        persisted.data || { id: gerarNovoId(prev.estoque || []), ...payload },
-      ],
+      estoque: isEdit
+        ? (prev.estoque || []).map((item) => (
+            Number(item.id) === Number(initialData.id)
+              ? { ...item, ...(persisted.data || payload), id: item.id }
+              : item
+          ))
+        : [
+            ...(prev.estoque || []),
+            persisted.data || { id: gerarNovoId(prev.estoque || []), ...payload },
+          ],
     }));
 
-    if (persisted.syncStatus === 'cloud_success') {
-      showToast({ type: 'success', message: 'Registro salvo na nuvem.' });
-    }
-    if (persisted.syncStatus === 'pending_sync' || persisted.syncStatus === 'local_only') {
+    if (persisted?.syncStatus === 'cloud_success') {
+      showToast({ type: 'success', message: isEdit ? 'Item atualizado na nuvem.' : 'Registro salvo na nuvem.' });
+    } else if (persisted?.syncStatus === 'pending_sync' || persisted?.syncStatus === 'local_only') {
       showToast({ type: 'warning', message: `Registro salvo localmente. Sincronização pendente.${import.meta.env.DEV ? ` Motivo: ${persisted.error || persisted.code || 'unknown'}.` : ''}` });
+    } else if (!persisted?.persisted) {
+      showToast({ type: 'error', message: persisted?.error || 'Não foi possível salvar o item.' });
+      return;
+    } else {
+      showToast({ type: 'success', message: isEdit ? 'Item atualizado com sucesso.' : 'Item cadastrado com sucesso.' });
     }
-    showToast({ type: 'success', message: 'Item cadastrado com sucesso.' });
     onClose();
   }
 
   return (
-    <Modal open onClose={onClose} title="Cadastrar item de estoque" footer={<Button onClick={submit}>Salvar item</Button>}>
+    <Modal open onClose={onClose} title={initialData ? 'Editar item de estoque' : 'Cadastrar item de estoque'} footer={<Button onClick={submit}>{initialData ? 'Salvar alterações' : 'Salvar item'}</Button>}>
       <div className="form-grid two">
         <Input label="Nome do item" value={form.produto} onChange={(e) => setForm((p) => ({ ...p, produto: e.target.value }))} />
         <label className="ui-input-wrap">
@@ -358,6 +437,7 @@ function CadastroItemModal({ setDb, onClose, hasPermission, showToast, session }
         <Input label="Validade" type="date" value={form.validade} onChange={(e) => setForm((p) => ({ ...p, validade: e.target.value }))} />
         <Input label="Fornecedor" value={form.fornecedor} onChange={(e) => setForm((p) => ({ ...p, fornecedor: e.target.value }))} />
         <Input label="Observações" value={form.obs} onChange={(e) => setForm((p) => ({ ...p, obs: e.target.value }))} />
+        {erro ? <p className="err" style={{ gridColumn: '1 / -1' }}>{erro}</p> : null}
       </div>
     </Modal>
   );
@@ -621,3 +701,4 @@ function SaidaModal({ db, setDb, selectedItem, onRegistrarSaidaEstoque, estoqueM
     </Modal>
   );
 }
+
