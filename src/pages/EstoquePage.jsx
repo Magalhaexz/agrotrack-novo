@@ -33,10 +33,54 @@ const FORM_CADASTRO_ITEM_VAZIO = {
   obs: '',
 };
 
+function parseSafeNumber(value) {
+  if (typeof value === 'number') return Number.isFinite(value) ? value : null;
+  if (typeof value !== 'string') return null;
+
+  const normalized = value.trim();
+  if (!normalized) return null;
+
+  const commaCount = (normalized.match(/,/g) || []).length;
+  const dotCount = (normalized.match(/\./g) || []).length;
+
+  let numericText = normalized.replace(/\s+/g, '');
+
+  if (commaCount > 0 && dotCount > 0) {
+    numericText = numericText.replace(/\./g, '').replace(',', '.');
+  } else if (commaCount > 0) {
+    numericText = numericText.replace(',', '.');
+  }
+
+  const parsed = Number(numericText);
+  return Number.isFinite(parsed) ? parsed : null;
+}
+
+function getCurrentItemStockBalance(item) {
+  if (!item || typeof item !== 'object') return 0;
+
+  const candidateKeys = [
+    'saldo',
+    'saldoAtual',
+    'saldo_atual',
+    'quantidade_atual',
+    'quantidadeAtual',
+    'estoque_atual',
+    'estoqueAtual',
+    'quantidade',
+  ];
+
+  for (const key of candidateKeys) {
+    const parsed = parseSafeNumber(item[key]);
+    if (parsed != null) return parsed;
+  }
+
+  return 0;
+}
+
 function getCadastroItemInicial(data) {
   if (!data) return FORM_CADASTRO_ITEM_VAZIO;
 
-  const quantidadeAtual = Number(data.quantidade_atual ?? data.quantidade ?? 0);
+  const quantidadeAtual = getCurrentItemStockBalance(data);
 
   return {
     produto: data.produto || data.nome || '',
@@ -99,11 +143,11 @@ export default function EstoquePage({ db, setDb, onRegistrarSaidaEstoque }) {
 
     return base.map((item) => {
       const hist = (db.movimentacoes_estoque || []).filter((m) => Number(m.item_estoque_id) === Number(item.id));
-      const pico = Math.max(Number(item.quantidade_atual || 0), ...hist.map((h) => Number(h.quantidade || 0)));
-      const saldo = Number(item.quantidade_atual || 0);
+      const saldo = getCurrentItemStockBalance(item);
+      const pico = Math.max(saldo, ...hist.map((h) => parseSafeNumber(h.quantidade) ?? 0));
       const ratio = pico ? (saldo / pico) * 100 : 0;
       const consumos = hist.filter((h) => ['consumo', 'saida'].includes(h.tipo));
-      const mediaConsumo = consumos.length ? consumos.reduce((s, c) => s + Number(c.quantidade || 0), 0) / Math.max(consumos.length, 1) : 0;
+      const mediaConsumo = consumos.length ? consumos.reduce((s, c) => s + (parseSafeNumber(c.quantidade) ?? 0), 0) / Math.max(consumos.length, 1) : 0;
       const diasRest = mediaConsumo > 0 ? saldo / mediaConsumo : 999;
       const status = ratio < 10 ? 'critico' : ratio < 20 ? 'baixo' : 'normal';
       return {
@@ -470,9 +514,10 @@ function EntradaModal({ db, setDb, selectedItem, estoqueMap, onOpenCadastroItem,
     }
 
     const itemAtual = (db?.estoque || []).find((entry) => entry.id === Number(form.item_id));
-    const novoSaldo = Number(itemAtual?.quantidade_atual || 0) + Number(form.qtd || 0);
+    const novoSaldo = getCurrentItemStockBalance(itemAtual) + (parseSafeNumber(form.qtd) ?? 0);
     const estoquePersist = await updateOperationalRecord('estoque', Number(form.item_id), {
       quantidade_atual: novoSaldo,
+      quantidade: novoSaldo,
       valor_unitario: Number(form.custo || itemAtual?.valor_unitario || 0),
       preco_unitario: Number(form.custo || itemAtual?.preco_unitario || 0),
       data_validade: form.validade || itemAtual?.data_validade || null,
@@ -495,7 +540,8 @@ function EntradaModal({ db, setDb, selectedItem, estoqueMap, onOpenCadastroItem,
           ? {
               ...i,
               ...(estoquePersist.data || {
-                quantidade_atual: Number(i.quantidade_atual || 0) + Number(form.qtd),
+                quantidade_atual: getCurrentItemStockBalance(i) + (parseSafeNumber(form.qtd) ?? 0),
+                quantidade: getCurrentItemStockBalance(i) + (parseSafeNumber(form.qtd) ?? 0),
                 valor_unitario: Number(form.custo || i.valor_unitario),
                 preco_unitario: Number(form.custo || i.preco_unitario),
                 data_validade: form.validade || i.data_validade,
@@ -571,7 +617,15 @@ function SaidaModal({ db, setDb, selectedItem, onRegistrarSaidaEstoque, estoqueM
   });
 
   const item = estoqueMap.get(Number(form.item_id));
-  const saldo = Number(item?.quantidade_atual || 0);
+  const saldo = getCurrentItemStockBalance(item);
+  const quantidadeInformada = parseSafeNumber(form.qtd);
+  const erroQuantidade = !String(form.qtd || '').trim()
+    ? ''
+    : quantidadeInformada == null || quantidadeInformada <= 0
+      ? 'Informe uma quantidade válida.'
+      : quantidadeInformada > saldo
+        ? `Máximo ${formatNumber(saldo, 2)}`
+        : '';
 
   function categoriaDespesa(cat) {
     const lowerCat = (cat || '').toLowerCase();
@@ -585,7 +639,7 @@ function SaidaModal({ db, setDb, selectedItem, onRegistrarSaidaEstoque, estoqueM
       showToast({ type: 'error', message: 'Você não tem permissão para executar esta ação.' });
       return;
     }
-    const qtd = Number(form.qtd || 0);
+    const qtd = quantidadeInformada ?? 0;
     if (!form.data || !form.item_id || qtd <= 0 || qtd > saldo) {
       alert('Verifique os campos e a quantidade.');
       return;
@@ -606,7 +660,7 @@ function SaidaModal({ db, setDb, selectedItem, onRegistrarSaidaEstoque, estoqueM
 
     const valor = qtd * Number(item?.valor_unitario || item?.preco_unitario || 0);
     const novoSaldo = saldo - qtd;
-    const estoquePersist = await updateOperationalRecord('estoque', Number(form.item_id), { quantidade_atual: novoSaldo }, session);
+    const estoquePersist = await updateOperationalRecord('estoque', Number(form.item_id), { quantidade_atual: novoSaldo, quantidade: novoSaldo }, session);
     const movEstoquePersist = await createOperationalRecord('movimentacoes_estoque', {
       item_estoque_id: Number(form.item_id),
       tipo: form.tipo,
@@ -630,7 +684,7 @@ function SaidaModal({ db, setDb, selectedItem, onRegistrarSaidaEstoque, estoqueM
     setDb((prev) => ({
       ...prev,
       estoque: prev.estoque.map((i) => (i.id === Number(form.item_id)
-        ? { ...i, ...(estoquePersist.data || { quantidade_atual: Number(i.quantidade_atual || 0) - qtd }) }
+        ? { ...i, ...(estoquePersist.data || { quantidade_atual: getCurrentItemStockBalance(i) - qtd, quantidade: getCurrentItemStockBalance(i) - qtd }) }
         : i)),
       movimentacoes_estoque: [
         ...(prev.movimentacoes_estoque || []),
@@ -674,7 +728,7 @@ function SaidaModal({ db, setDb, selectedItem, onRegistrarSaidaEstoque, estoqueM
           <span className="ui-input-label">Item</span>
           <select className="ui-input" value={form.item_id} onChange={(e) => setForm((p) => ({ ...p, item_id: e.target.value }))}>
             <option value="">Selecione</option>
-            {(db.estoque || []).map((i) => <option key={i.id} value={i.id}>{i.produto} (saldo {formatNumber(i.quantidade_atual, 2)})</option>)}
+            {(db.estoque || []).map((i) => <option key={i.id} value={i.id}>{i.produto} (saldo {formatNumber(getCurrentItemStockBalance(i), 2)})</option>)}
           </select>
         </label>
         <label className="ui-input-wrap">
@@ -694,7 +748,7 @@ function SaidaModal({ db, setDb, selectedItem, onRegistrarSaidaEstoque, estoqueM
             {(db.lotes || []).map((l) => <option key={l.id} value={l.id}>{l.nome}</option>)}
           </select>
         </label>
-        <Input label="Quantidade" type="number" error={Number(form.qtd || 0) > saldo ? `Máximo ${formatNumber(saldo, 2)}` : ''} value={form.qtd} onChange={(e) => setForm((p) => ({ ...p, qtd: e.target.value }))} />
+        <Input label="Quantidade" type="number" error={erroQuantidade} value={form.qtd} onChange={(e) => setForm((p) => ({ ...p, qtd: e.target.value }))} />
         <Input label="Data" type="date" value={form.data} onChange={(e) => setForm((p) => ({ ...p, data: e.target.value }))} />
         <Input label="Observações" value={form.obs} onChange={(e) => setForm((p) => ({ ...p, obs: e.target.value }))} />
       </div>
