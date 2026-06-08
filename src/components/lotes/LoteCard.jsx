@@ -10,7 +10,7 @@ function statusVariant(status) {
   return 'neutral';
 }
 
-export default function LoteCard({ lote, onOpen, onRetirada, onEncerrar, canMove = true, canEdit = true }) {
+export default function LoteCard({ lote, onOpen, onEdit, onRetirada, onEncerrar, canMove = true, canEdit = true }) {
   const risco = lote?.gmd30 < 0.3 || lote?.heads <= 0;
 
   return (
@@ -19,6 +19,13 @@ export default function LoteCard({ lote, onOpen, onRetirada, onEncerrar, canMove
         <div>
           <h3>{lote.nome}</h3>
           <p className="lote-card-subtitle">{lote.fazendaNome || 'Fazenda não vinculada'}</p>
+          <p className="lote-card-meta">
+            {lote.pastagemNome || '—'}
+            {' '}
+            • {lote.categoriaAnimal || '—'}
+            {' '}
+            • {lote.raca || '—'}
+          </p>
         </div>
         <div className="action-row lote-card-statuses">
           <Badge variant={statusVariant(lote.status)}>{lote.status}</Badge>
@@ -43,6 +50,7 @@ export default function LoteCard({ lote, onOpen, onRetirada, onEncerrar, canMove
 
       <div className="lote-actions action-row">
         <Button size="sm" variant="outline" onClick={onOpen}>Ver detalhes</Button>
+        <Button size="sm" variant="ghost" onClick={onEdit} disabled={!canEdit || lote.bloqueado}>Editar</Button>
         <Button size="sm" variant="warning" onClick={onRetirada} disabled={!canMove || lote.bloqueado}>Retirada</Button>
         <Button size="sm" variant="danger" onClick={onEncerrar} disabled={!canEdit || lote.bloqueado}>Encerrar lote</Button>
       </div>

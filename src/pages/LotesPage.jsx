@@ -73,6 +73,12 @@ function normalizeStatus(lote) {
 
 const todayIso = new Date().toISOString().slice(0, 10);
 const EMPTY_LIST = [];
+const LABEL_OR_DASH = '—';
+
+function resolvePastagemNome(pastagensMap, lote) {
+  const byId = lote?.pastagem_id ? pastagensMap.get(Number(lote.pastagem_id)) : null;
+  return byId?.nome || lote?.pastagem_nome || lote?.pastagemAtualNome || LABEL_OR_DASH;
+}
 
 export default function LotesPage({ db, setDb, onRegistrarSaidaAnimal, session }) {
   const { hasPermission } = useAuth();
@@ -84,13 +90,16 @@ export default function LotesPage({ db, setDb, onRegistrarSaidaAnimal, session }
   const [openFechamento, setOpenFechamento] = useState(false);
   const [openPesagem, setOpenPesagem] = useState(false);
   const [openNovoLote, setOpenNovoLote] = useState(false);
+  const [loteEmEdicao, setLoteEmEdicao] = useState(null);
   const lotes = Array.isArray(db?.lotes) ? db.lotes : EMPTY_LIST;
   const fazendas = Array.isArray(db?.fazendas) ? db.fazendas : EMPTY_LIST;
+  const pastagens = Array.isArray(db?.pastagens) ? db.pastagens : EMPTY_LIST;
   const pesagens = Array.isArray(db?.pesagens) ? db.pesagens : EMPTY_LIST;
   const animais = Array.isArray(db?.animais) ? db.animais : EMPTY_LIST;
   const sanitarios = Array.isArray(db?.sanitario) ? db.sanitario : EMPTY_LIST;
   const movAnimais = Array.isArray(db?.movimentacoes_animais) ? db.movimentacoes_animais : EMPTY_LIST;
   const movFinanceiros = Array.isArray(db?.movimentacoes_financeiras) ? db.movimentacoes_financeiras : EMPTY_LIST;
+  const pastagensMap = useMemo(() => new Map(pastagens.map((item) => [Number(item.id), item])), [pastagens]);
 
   const lotesEnriquecidos = useMemo(() => lotes.map((lote) => {
     const lotePesagens = pesagens.filter((item) => Number(item.lote_id) === Number(lote.id));
@@ -104,6 +113,9 @@ export default function LotesPage({ db, setDb, onRegistrarSaidaAnimal, session }
       ? ((pesoAtual - pesoInicialPlanejado) / Math.max(1, toNumber(lote.peso_alvo || pesoInicialPlanejado) - pesoInicialPlanejado)) * 100
       : 0;
     const fazendaNome = fazendas.find((f) => Number(f.id) === Number(lote.faz_id))?.nome || '—';
+    const pastagemNome = resolvePastagemNome(pastagensMap, lote);
+    const categoriaAnimal = String(lote.categoria_animal || lote.categoria || '').trim() || LABEL_OR_DASH;
+    const raca = String(lote.raca || lote.raca_animal || lote.gen || '').trim() || LABEL_OR_DASH;
     return {
       ...lote,
       status: normalizeStatus(lote),
@@ -114,9 +126,12 @@ export default function LotesPage({ db, setDb, onRegistrarSaidaAnimal, session }
       ultimaPesagem: latestPesagem?.data || null,
       gmd30: calculateGmd30(lotePesagens),
       fazendaNome,
+      pastagemNome,
+      categoriaAnimal,
+      raca,
       bloqueado: ['encerrado', 'vendido'].includes(normalizeStatus(lote)),
     };
-  }), [db, lotes, pesagens, fazendas]);
+  }), [db, lotes, pesagens, fazendas, pastagensMap]);
 
   const lotesFiltrados = useMemo(() => lotesEnriquecidos.filter((lote) => {
     if (filters.status !== 'todos' && lote.status !== filters.status) return false;
@@ -231,10 +246,11 @@ export default function LotesPage({ db, setDb, onRegistrarSaidaAnimal, session }
   async function handleNovoLote(payload) {
     if (!ensurePermission('lotes:editar')) return;
 
-    const novoLote = {
-      id: gerarNovoId(lotes),
+    const patch = {
       ...payload,
-      status: 'ativo',
+      pastagem_id: payload.pastagem_id ?? null,
+      categoria_animal: payload.categoria_animal || '',
+      raca: payload.raca || '',
       sistema: payload.sistema || 'confinamento',
       tipo: payload.tipo || 'confinamento',
       tem_recria: false,
@@ -259,6 +275,31 @@ export default function LotesPage({ db, setDb, onRegistrarSaidaAnimal, session }
       supl_rkg: toNumber(payload.supl_rkg || payload.preco_kg),
       supl_pv_pct: toNumber(payload.supl_pv_pct),
       supl_meta_dias: toNumber(payload.supl_meta_dias || payload.dias_estimados),
+    };
+
+    if (loteEmEdicao) {
+      const loteId = loteEmEdicao.id;
+      setDb((prev) => ({
+        ...prev,
+        lotes: (prev.lotes || []).map((l) => (Number(l.id) === Number(loteId) ? { ...l, ...patch } : l)),
+      }));
+
+      const persisted = await updateOperationalRecord('lotes', loteId, patch, session);
+      if (!persisted?.persisted) {
+        showToast({ type: 'warning', message: 'Lote atualizado localmente. Sincronização pendente.' });
+      } else {
+        showToast({ type: 'success', message: 'Lote atualizado com sucesso.' });
+      }
+
+      setOpenNovoLote(false);
+      setLoteEmEdicao(null);
+      return;
+    }
+
+    const novoLote = {
+      id: gerarNovoId(lotes),
+      ...patch,
+      status: 'ativo',
     };
 
     setDb((prev) => ({ ...prev, lotes: [...(prev.lotes || []), novoLote] }));
@@ -297,6 +338,10 @@ export default function LotesPage({ db, setDb, onRegistrarSaidaAnimal, session }
           canMove={hasPermission('animais:movimentar')}
           canEdit={hasPermission('lotes:editar')}
           canEditPesagem={hasPermission('pesagens:editar')}
+          onEdit={() => {
+            setLoteEmEdicao(selectedLote);
+            setOpenNovoLote(true);
+          }}
           onNovaRetirada={() => setOpenRetirada(true)}
           onNovaPesagem={() => setOpenPesagem(true)}
           onEncerrar={() => setOpenFechamento(true)}
@@ -338,7 +383,10 @@ export default function LotesPage({ db, setDb, onRegistrarSaidaAnimal, session }
     <div className="rebanho-page">
       <LotesPageHeader
         canEdit={hasPermission('lotes:editar')}
-        onNovoLote={() => setOpenNovoLote(true)}
+        onNovoLote={() => {
+          setLoteEmEdicao(null);
+          setOpenNovoLote(true);
+        }}
       />
 
       <LotesFilters
@@ -363,6 +411,10 @@ export default function LotesPage({ db, setDb, onRegistrarSaidaAnimal, session }
               setActiveTab('visao_geral');
               setSelectedLoteId(lote.id);
             }}
+            onEdit={() => {
+              setLoteEmEdicao(lote);
+              setOpenNovoLote(true);
+            }}
             onRetirada={() => {
               setActiveTab('retiradas');
               setSelectedLoteId(lote.id);
@@ -378,9 +430,13 @@ export default function LotesPage({ db, setDb, onRegistrarSaidaAnimal, session }
 
       {openNovoLote ? (
         <LoteForm
-          initialData={null}
+          initialData={loteEmEdicao}
           fazendas={fazendas}
-          onCancel={() => setOpenNovoLote(false)}
+          pastagens={pastagens}
+          onCancel={() => {
+            setOpenNovoLote(false);
+            setLoteEmEdicao(null);
+          }}
           onSave={handleNovoLote}
         />
       ) : null}

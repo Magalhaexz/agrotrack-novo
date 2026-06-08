@@ -12,6 +12,9 @@ export default function LoteOverviewTab({ lote, resumo }) {
         <p><strong>Status:</strong> {lote.status}</p>
         <p><strong>Entrada:</strong> {formatDate(lote.entrada)}</p>
         <p><strong>Saída prevista:</strong> {formatDate(lote.saida)}</p>
+        <p><strong>Pastagem atual:</strong> {lote.pastagemNome || '—'}</p>
+        <p><strong>Categoria animal:</strong> {lote.categoriaAnimal || '—'}</p>
+        <p><strong>Raça:</strong> {lote.raca || '—'}</p>
         <p><strong>Cabeças:</strong> {formatNumber(resumo.totalAnimais || lote.qtd, 0)}</p>
         <p><strong>Peso inicial médio:</strong> {formatNumber(pesoInicial, 1)} kg</p>
         <p><strong>Peso atual médio:</strong> {formatNumber(pesoAtual, 1)} kg</p>

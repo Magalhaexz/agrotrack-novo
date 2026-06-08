@@ -432,6 +432,13 @@ label textarea {
   font-size: 0.8rem;
 }
 
+.lote-card-meta {
+  margin-top: 4px;
+  color: rgba(214, 223, 219, 0.58);
+  font-size: 0.76rem;
+  line-height: 1.4;
+}
+
 .lote-card-statuses {
   justify-content: flex-end;
 }
