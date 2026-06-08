@@ -42,3 +42,17 @@ test('registros com owner_user_id diferente são ignorados quando há currentUse
   assert.equal(out.data.tarefas.length, 1);
   assert.equal(out.data.tarefas[0].titulo, 'dentro');
 });
+
+test('registros sem id continuam recebendo id ao importar backup', () => {
+  const payload = {
+    data: {
+      tarefas: [
+        { titulo: 'tarefa importada' },
+      ],
+    },
+  };
+  const out = normalizeBackupPayload(payload, { currentUserId: 'user-1' });
+  assert.equal(out.ok, true);
+  assert.equal(out.data.tarefas.length, 1);
+  assert.equal(Number.isFinite(Number(out.data.tarefas[0].id)), true);
+});

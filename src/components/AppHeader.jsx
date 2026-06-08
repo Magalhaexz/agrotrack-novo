@@ -38,7 +38,7 @@ function useDropdown(initialState = false) {
 
 export default function AppHeader({
   currentPage = 'dashboard',
-  farmName = 'Fazenda Santa Rita',
+  farmName = '',
   usuarioLogado = null,
   notifications = 0,
   alerts = [],
@@ -331,7 +331,7 @@ export default function AppHeader({
         >
           <div className="header-farm-copy">
             <small>Fazenda ativa</small>
-            <strong>{fazendaSelecionada?.nome || farmName}</strong>
+            <strong>{fazendaSelecionada?.nome || farmName || 'Nenhuma fazenda selecionada'}</strong>
           </div>
           <ChevronDown
             size={14}

@@ -1,5 +1,9 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { supabase } from '../lib/supabase.js';
+import {
+  createEmptyOperationalDb,
+  OPERATIONAL_ARRAY_COLLECTIONS,
+} from '../data/operationalTemplate.js';
 
 const OPERACIONAL_TABLES = [
   'fazendas',
@@ -40,6 +44,10 @@ const schemaWarningTables = new Set();
 const ownerScopeCapabilityByTable = new Map();
 const OPTIONAL_STRATEGIC_TABLES = new Set(['pastagens', 'cenarios']);
 const missingOptionalTables = new Set();
+
+function isPlainObject(value) {
+  return value !== null && typeof value === 'object' && !Array.isArray(value);
+}
 
 function nowMs() {
   return typeof performance !== 'undefined' ? performance.now() : Date.now();
@@ -160,6 +168,7 @@ function logSyncGuard(payload, level = 'debug') {
 }
 
 function normalizeDb(baseDb) {
+  const template = createEmptyOperationalDb();
   const dedupeFazendas = (rows = []) => {
     const map = new Map();
     const getIdentity = (row) => {
@@ -216,42 +225,44 @@ function normalizeDb(baseDb) {
     });
     return [...map.values()];
   };
-  return {
+  const normalized = {
+    ...template,
     ...baseDb,
-    alertas_resolvidos: Array.isArray(baseDb?.alertas_resolvidos) ? baseDb.alertas_resolvidos : [],
-    alertas_adiados: Array.isArray(baseDb?.alertas_adiados) ? baseDb.alertas_adiados : [],
-    funcionarios: Array.isArray(baseDb?.funcionarios) ? baseDb.funcionarios : [],
-    lotes: Array.isArray(baseDb?.lotes)
-      ? baseDb.lotes.map((lote) => ({
-          ...lote,
-          status: lote?.status || 'ativo',
-          data_encerramento: lote?.data_encerramento || null,
-          data_venda: lote?.data_venda || null,
-        }))
-      : [],
-    pastagens: Array.isArray(baseDb?.pastagens) ? baseDb.pastagens : [],
-    fazendas: Array.isArray(baseDb?.fazendas) ? dedupeFazendas(baseDb.fazendas) : [],
-    tarefas: Array.isArray(baseDb?.tarefas) ? baseDb.tarefas : [],
-    configuracoes: baseDb?.configuracoes || {
-      geral: {
-        nome_sistema: 'HERDON',
-        moeda: 'BRL',
-        formato_data: 'DD/MM/AAAA',
-        unidade_peso: 'kg',
-        rendimento_carcaca_padrao: 52,
-        preco_arroba_padrao: 290,
-      },
-      notificacoes: {
-        estoque_critico: true,
-        sanitario_vencido: true,
-        pesagem_atrasada: true,
-        lote_data_saida: true,
-        dias_antecedencia: 3,
-      },
-    },
-    usuarios: Array.isArray(baseDb?.usuarios) ? baseDb.usuarios : [],
-    cenarios: Array.isArray(baseDb?.cenarios) ? baseDb.cenarios : [],
   };
+
+  OPERATIONAL_ARRAY_COLLECTIONS.forEach((key) => {
+    if (key === 'fazendas') {
+      normalized.fazendas = Array.isArray(baseDb?.fazendas) ? dedupeFazendas(baseDb.fazendas) : [];
+      return;
+    }
+    if (key === 'lotes') {
+      normalized.lotes = Array.isArray(baseDb?.lotes)
+        ? baseDb.lotes.map((lote) => ({
+            ...lote,
+            status: lote?.status || 'ativo',
+            data_encerramento: lote?.data_encerramento || null,
+            data_venda: lote?.data_venda || null,
+          }))
+        : [];
+      return;
+    }
+    normalized[key] = Array.isArray(baseDb?.[key]) ? baseDb[key] : [];
+  });
+
+  normalized.configuracoes = {
+    ...template.configuracoes,
+    ...(isPlainObject(baseDb?.configuracoes) ? baseDb.configuracoes : {}),
+    geral: {
+      ...template.configuracoes.geral,
+      ...(isPlainObject(baseDb?.configuracoes?.geral) ? baseDb.configuracoes.geral : {}),
+    },
+    notificacoes: {
+      ...template.configuracoes.notificacoes,
+      ...(isPlainObject(baseDb?.configuracoes?.notificacoes) ? baseDb.configuracoes.notificacoes : {}),
+    },
+  };
+
+  return normalized;
 }
 
 function buildSnapshotStorageKey(userId, fazendaId = null) {
@@ -298,6 +309,14 @@ export function loadOperationalSnapshotLocal({ userId, fazendaId = null } = {}) 
 
 export function createOperationalFallbackDb(initialDb) {
   return normalizeDb(initialDb || {});
+}
+
+export function resolveOperationalBootstrapDb({ sessionUserId = null, persistedSnapshot = null } = {}) {
+  const normalizedUserId = String(sessionUserId || '').trim();
+  if (!normalizedUserId) {
+    return createOperationalFallbackDb();
+  }
+  return createOperationalFallbackDb(persistedSnapshot || {});
 }
 
 async function fetchOperationalTableWithCircuit(table, userId, shouldApply, circuitState) {
@@ -525,9 +544,9 @@ async function loadOperationalSnapshot(userId, shouldApply, generationId) {
   return request;
 }
 
-export function useOperationalData(initialDb, session, options = {}) {
+export function useOperationalData(session, options = {}) {
   const hydrationEnabled = options?.enabled !== false;
-  const [db, setDbState] = useState(() => createOperationalFallbackDb(initialDb));
+  const [db, setDbState] = useState(() => createOperationalFallbackDb());
   const [dataReady, setDataReady] = useState(true);
   const [dataSource, setDataSource] = useState('signed_out');
   const [dataError, setDataError] = useState(null);
@@ -589,8 +608,7 @@ export function useOperationalData(initialDb, session, options = {}) {
     hydratingRef.current = true;
 
     const userId = session?.user?.id || null;
-    const fallbackSeed = userId ? {} : initialDb;
-    const fallbackDb = createOperationalFallbackDb(fallbackSeed);
+    const fallbackDb = resolveOperationalBootstrapDb({ sessionUserId: userId });
     const persistedSnapshot = userId ? loadOperationalSnapshotLocal({ userId }) : null;
     const localBaselineDb = persistedSnapshot || fallbackDb;
     const syncDisabled = shouldDisableSupabaseSync();
@@ -605,7 +623,7 @@ export function useOperationalData(initialDb, session, options = {}) {
     };
 
     if (!hydrationEnabled || !userId) {
-      setDbState(fallbackDb);
+      setDbState(resolveOperationalBootstrapDb());
       setDataSource('signed_out');
       setDataError(null);
       setDataReady(true);
@@ -711,23 +729,23 @@ export function useOperationalData(initialDb, session, options = {}) {
         saveOperationalSnapshotLocal({ userId, db: normalizedSnapshot });
         if (snapshotResult?.circuitOpen) {
           setDataSource('offline_circuit_open');
-          setDataError(new Error('Sincronizacao com a nuvem instavel. O app continuara em modo local.'));
+          setDataError(new Error('O carregamento dos dados ficou instável. O app continuará com os dados locais.'));
           logSyncGuard({
             stage: 'sync_finished_circuit_open',
             action: syncTrigger,
             status: 'error',
             errorName: 'CIRCUIT_OPEN',
-            errorMessage: 'Sincronizacao com a nuvem instavel. O app continuara em modo local.',
+            errorMessage: 'O carregamento dos dados ficou instável. O app continuará com os dados locais.',
           }, 'warn');
         } else if (snapshotResult?.hadFailures) {
           setDataSource('fallback_error');
-          setDataError(new Error('A nuvem apresentou falhas nesta sincronizacao. O app segue em dados locais.'));
+          setDataError(new Error('Houve falha no carregamento dos dados. O app seguirá com os dados locais.'));
           logSyncGuard({
             stage: 'sync_finished_partial_failure',
             action: syncTrigger,
             status: 'error',
             errorName: 'PARTIAL_SYNC_FAILURE',
-            errorMessage: 'A nuvem apresentou falhas nesta sincronizacao. O app segue em dados locais.',
+            errorMessage: 'Houve falha no carregamento dos dados. O app seguirá com os dados locais.',
           }, 'warn');
         } else {
           setDataSource('supabase');
@@ -753,8 +771,8 @@ export function useOperationalData(initialDb, session, options = {}) {
         const isTimeout = errorName === 'TimeoutError' || rawMessage === 'snapshot_timeout';
         setDataSource(isTimeout ? 'fallback_timeout' : 'offline_circuit_open');
         setDataError(new Error(isTimeout
-          ? 'Sincronizacao demorou mais que o esperado. O app segue em modo local.'
-          : 'Sincronizacao instavel. Seus dados locais continuam disponiveis.'));
+          ? 'O carregamento demorou mais que o esperado. O app seguirá com os dados locais.'
+          : 'O carregamento ficou instável. Seus dados locais continuam disponíveis.'));
         logSyncGuard({
           stage: 'sync_finished_exception',
           action: syncTrigger,
@@ -785,7 +803,7 @@ export function useOperationalData(initialDb, session, options = {}) {
         hasUserId: Boolean(userId),
       });
     };
-  }, [hydrationEnabled, initialDb, manualSyncNonce, session]);
+  }, [hydrationEnabled, manualSyncNonce, session]);
 
   return {
     db,

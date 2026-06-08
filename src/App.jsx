@@ -1,5 +1,4 @@
 ﻿import { Suspense, lazy, useEffect, useMemo, useRef, useState } from 'react';
-import { initialDb } from './data/mockData';
 import { useAuth } from './auth/useAuth';
 import { permissoesPorPagina } from './auth/perfis';
 import AppHeader from './components/AppHeader';
@@ -197,7 +196,7 @@ export default function App() {
     lastSyncAt,
     manualSyncInFlight,
     syncNow,
-  } = useOperationalData(initialDb, session, {
+  } = useOperationalData(session, {
     enabled: Boolean(session?.user?.id) && !loadingAuth,
   });
   const [usuarioLogado, setUsuarioLogado] = useState(null);

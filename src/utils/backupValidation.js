@@ -1,4 +1,7 @@
-import { initialDb } from '../data/mockData.js';
+import {
+  createEmptyOperationalDb,
+  OPERATIONAL_COLLECTIONS_WITH_IDS,
+} from '../data/operationalTemplate.js';
 
 function isPlainObject(value) {
   return value !== null && typeof value === 'object' && !Array.isArray(value);
@@ -32,7 +35,7 @@ function sanitizeValue(value) {
 
 function normalizeArrayCollection({
   source,
-  template,
+  templateKey,
   currentUserId,
   counters,
 }) {
@@ -41,7 +44,7 @@ function normalizeArrayCollection({
     return [];
   }
 
-  const templateHasId = Array.isArray(template) && template.some((item) => isPlainObject(item) && Object.prototype.hasOwnProperty.call(item, 'id'));
+  const templateHasId = OPERATIONAL_COLLECTIONS_WITH_IDS.has(String(templateKey || ''));
   let nextLocalId = source.reduce((max, item) => {
     const id = Number(item?.id);
     if (Number.isFinite(id)) return Math.max(max, id);
@@ -89,7 +92,8 @@ export function normalizeBackupPayload(rawPayload, { currentUserId = null } = {}
     return { ok: false, reason: 'invalid_data' };
   }
 
-  const templateKeys = Object.keys(initialDb);
+  const templateDb = createEmptyOperationalDb();
+  const templateKeys = Object.keys(templateDb);
   if (!templateKeys.length) {
     return { ok: false, reason: 'missing_template' };
   }
@@ -104,13 +108,13 @@ export function normalizeBackupPayload(rawPayload, { currentUserId = null } = {}
 
   const normalizedData = {};
   templateKeys.forEach((key) => {
-    const templateValue = initialDb[key];
+    const templateValue = templateDb[key];
     const sourceValue = sourceData[key];
 
     if (Array.isArray(templateValue)) {
       normalizedData[key] = normalizeArrayCollection({
         source: sourceValue,
-        template: templateValue,
+        templateKey: key,
         currentUserId,
         counters,
       });
