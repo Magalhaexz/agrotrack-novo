@@ -144,7 +144,7 @@ export default function Sidebar({
           <div className="sidebar-logo-actions">
             <button
               type="button"
-              className="sidebar-collapse-btn desktop-collapse-btn sidebar-toggle"
+              className="sidebar-collapse-btn desktop-collapse-btn sidebar-toggle sidebar-desktop-toggle"
               onClick={() => {
                 setDropdownAberto(false);
                 onToggleCollapse?.();
@@ -161,7 +161,7 @@ export default function Sidebar({
 
             <button
               type="button"
-              className="sidebar-collapse-btn mobile-close-btn sidebar-toggle"
+              className="sidebar-collapse-btn mobile-close-btn sidebar-mobile-close"
               onClick={() => {
                 setDropdownAberto(false);
                 setIsMobileMenuOpen(false);
