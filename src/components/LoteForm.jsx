@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useMemo, useState } from 'react';
 import Modal from './ui/Modal';
 import Button from './ui/Button';
 import Input from './ui/Input';
@@ -212,17 +212,17 @@ function validarForm(form, planejamento) {
 }
 
 export default function LoteForm({ initialData, fazendas = [], pastagens = [], onSave, onCancel }) {
-  const [form, setForm] = useState(() => normalizarInitialData(initialData));
+  const [form, setForm] = useState(() => normalizarInitialData(initialData, pastagens));
   const [erro, setErro] = useState('');
 
-  /* eslint-disable react-hooks/set-state-in-effect */
-  useEffect(() => {
-    setForm(normalizarInitialData(initialData, pastagens));
-    setErro('');
-  }, [initialData, pastagens]);
-  /* eslint-enable react-hooks/set-state-in-effect */
-
   const planejamento = useMemo(() => calcularPlanejamento(form), [form]);
+  const pastagensCompativeis = useMemo(() => {
+    if (!form.faz_id) return pastagens;
+    return pastagens.filter((pastagem) => {
+      const fazendaId = pastagem?.fazenda_id ?? pastagem?.faz_id ?? null;
+      return !fazendaId || String(fazendaId) === String(form.faz_id);
+    });
+  }, [form.faz_id, pastagens]);
 
   function handleChange(event) {
     const { name, value } = event.target;
@@ -300,6 +300,9 @@ export default function LoteForm({ initialData, fazendas = [], pastagens = [], o
   const pastagemSelecionada = form.pastagem_id
     ? findPastagemLabel(pastagens, form.pastagem_id)
     : '';
+  const helperPastagem = form.faz_id
+    ? 'Cadastre uma pastagem em Cadastros > Pastos para vincular ao lote.'
+    : 'Selecione a fazenda para listar os pastos compatíveis.';
   const consumoLabel = form.consumo_tipo === 'percentual_pv'
     ? 'Consumo diário por animal (% PV)'
     : 'Consumo diário por animal (kg/cab/dia)';
@@ -350,7 +353,7 @@ export default function LoteForm({ initialData, fazendas = [], pastagens = [], o
         </div>
 
         <div className="grid-3">
-          {pastagens.length > 0 ? (
+          {pastagensCompativeis.length > 0 ? (
             <Input
               as="select"
               name="pastagem_id"
@@ -360,7 +363,7 @@ export default function LoteForm({ initialData, fazendas = [], pastagens = [], o
               hint="Selecione a pastagem que está vinculada ao lote."
             >
               <option value="">Selecione</option>
-              {pastagens.map((pastagem) => (
+              {pastagensCompativeis.map((pastagem) => (
                 <option key={pastagem.id} value={pastagem.id}>{pastagem.nome}</option>
               ))}
               {form.pastagem_id && !pastagemSelecionada ? (
@@ -371,7 +374,7 @@ export default function LoteForm({ initialData, fazendas = [], pastagens = [], o
             <div className="ui-input-wrap">
               <span className="ui-input-label">Pastagem atual</span>
               <div className="ui-input-shell" style={{ minHeight: 48 }}>
-                <span className="ui-input-affix">Cadastre uma pastagem para vincular ao lote.</span>
+                <span className="ui-input-affix">{helperPastagem}</span>
               </div>
             </div>
           )}
@@ -460,60 +463,33 @@ export default function LoteForm({ initialData, fazendas = [], pastagens = [], o
               className="ui-input"
               name="gmd_meta"
               type="number"
-              step="0.001"
               min={0}
+              step="0.001"
               value={form.gmd_meta}
               onChange={handleChange}
-              placeholder="Ex: 1.200"
+              placeholder="Ex: 1,45"
             />
           </label>
         </div>
 
-        <div className="grid-2">
+        <div className="grid-3">
           <label>
-            Dias estimados
-            <input
-              className="ui-input"
-              value={planejamento.diasEstimados ? String(planejamento.diasEstimados) : ''}
-              readOnly
-              placeholder="Calculado automaticamente"
-            />
-          </label>
-
-          <label>
-            Data prevista de saída
-            <input
-              className="ui-input"
-              value={planejamento.dataPrevistaSaida}
-              readOnly
-              placeholder="Calculada automaticamente"
-            />
-          </label>
-        </div>
-
-        <div className="grid-2">
-          <label>
-            Dieta/produto
+            Dieta / produto
             <input
               className="ui-input"
               name="supl_nome"
               value={form.supl_nome}
               onChange={handleChange}
-              placeholder="Ex: Dieta terminação 18%"
+              placeholder="Ex: Ração 18%"
             />
           </label>
 
-          <label>
-            Tipo de consumo
-            <select className="ui-input" name="consumo_tipo" value={form.consumo_tipo} onChange={handleChange}>
-              {TIPOS_CONSUMO.map((tipo) => (
-                <option key={tipo.value} value={tipo.value}>{tipo.label}</option>
-              ))}
-            </select>
-          </label>
-        </div>
+          <Input as="select" name="consumo_tipo" label="Modo de consumo" value={form.consumo_tipo} onChange={handleChange}>
+            {TIPOS_CONSUMO.map((tipo) => (
+              <option key={tipo.value} value={tipo.value}>{tipo.label}</option>
+            ))}
+          </Input>
 
-        <div className="grid-3">
           <label>
             {consumoLabel}
             <input
@@ -524,22 +500,14 @@ export default function LoteForm({ initialData, fazendas = [], pastagens = [], o
               step="0.001"
               value={form.consumo_por_cabeca_dia}
               onChange={handleChange}
-              placeholder={form.consumo_tipo === 'percentual_pv' ? 'Ex: 2.20' : 'Ex: 8.500'}
+              placeholder={form.consumo_tipo === 'percentual_pv' ? 'Ex: 2,20' : 'Ex: 8,500'}
             />
           </label>
+        </div>
 
+        <div className="grid-3">
           <label>
-            Consumo total estimado (kg)
-            <input
-              className="ui-input"
-              value={planejamento.consumoTotalEstimado ? formatNumber(planejamento.consumoTotalEstimado, 2) : ''}
-              readOnly
-              placeholder="Calculado automaticamente"
-            />
-          </label>
-
-          <label>
-            Preço por kg (R$/kg)
+            Preço do suplemento (R$/kg)
             <input
               className="ui-input"
               name="supl_rkg"
@@ -548,24 +516,12 @@ export default function LoteForm({ initialData, fazendas = [], pastagens = [], o
               step="0.01"
               value={form.supl_rkg}
               onChange={handleChange}
-              placeholder="Ex: 1.95"
-            />
-          </label>
-        </div>
-
-        <div className="grid-3">
-          <label>
-            Custo estimado total (R$)
-            <input
-              className="ui-input"
-              value={planejamento.custoEstimadoTotal ? formatNumber(planejamento.custoEstimadoTotal, 2) : ''}
-              readOnly
-              placeholder="Calculado automaticamente"
+              placeholder="Ex: 2,85"
             />
           </label>
 
           <label>
-            Valor manual da arroba (R$/@)
+            Preço da arroba (R$)
             <input
               className="ui-input"
               name="preco_arroba"
@@ -574,27 +530,10 @@ export default function LoteForm({ initialData, fazendas = [], pastagens = [], o
               step="0.01"
               value={form.preco_arroba}
               onChange={handleChange}
-              placeholder="Ex: 290"
+              placeholder="Ex: 250,00"
             />
           </label>
 
-          <label>
-            Rendimento de carcaça (%)
-            <input
-              className="ui-input"
-              name="rendimento_carcaca"
-              type="number"
-              min={0}
-              max={100}
-              step="0.1"
-              value={form.rendimento_carcaca}
-              onChange={handleChange}
-              placeholder="Ex: 52"
-            />
-          </label>
-        </div>
-
-        <div className="grid-2">
           <label>
             Investimento inicial (R$)
             <input
@@ -605,10 +544,12 @@ export default function LoteForm({ initialData, fazendas = [], pastagens = [], o
               step="0.01"
               value={form.investimento}
               onChange={handleChange}
-              placeholder="0,00"
+              placeholder="Ex: 150000"
             />
           </label>
+        </div>
 
+        <div className="grid-3">
           <label>
             Custo fixo mensal (R$)
             <input
@@ -619,16 +560,64 @@ export default function LoteForm({ initialData, fazendas = [], pastagens = [], o
               step="0.01"
               value={form.custo_fixo_mensal}
               onChange={handleChange}
-              placeholder="0,00"
+              placeholder="Ex: 4500"
+            />
+          </label>
+
+          <label>
+            Rendimento de carcaça (%)
+            <input
+              className="ui-input"
+              name="rendimento_carcaca"
+              type="number"
+              min={0}
+              step="0.01"
+              value={form.rendimento_carcaca}
+              onChange={handleChange}
+              placeholder="Ex: 52"
+            />
+          </label>
+
+          <label>
+            Dias estimados
+            <input
+              className="ui-input"
+              value={planejamento.diasEstimados ? `${planejamento.diasEstimados} dias` : '—'}
+              readOnly
             />
           </label>
         </div>
 
-        {erro ? (
-          <p style={{ margin: 0, color: 'var(--color-danger)', fontSize: '0.85rem' }}>
-            {erro}
-          </p>
-        ) : null}
+        <div className="grid-3">
+          <label>
+            Saída prevista
+            <input
+              className="ui-input"
+              value={planejamento.dataPrevistaSaida ? formatDateBr(planejamento.dataPrevistaSaida) : '—'}
+              readOnly
+            />
+          </label>
+
+          <label>
+            Consumo total estimado (kg)
+            <input
+              className="ui-input"
+              value={formatNumber(planejamento.consumoTotalEstimado, 2)}
+              readOnly
+            />
+          </label>
+
+          <label>
+            Custo estimado do suplemento (R$)
+            <input
+              className="ui-input"
+              value={formatNumber(planejamento.custoEstimadoTotal, 2)}
+              readOnly
+            />
+          </label>
+        </div>
+
+        {erro ? <p className="err">{erro}</p> : null}
       </form>
     </Modal>
   );
