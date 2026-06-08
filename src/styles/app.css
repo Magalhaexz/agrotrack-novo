@@ -9687,7 +9687,15 @@ html, body, #root, .app, .main, .main-content, .page { max-width: 100%; }
 
   .app-shell.app-shell--sidebar-collapsed .sidebar-logo-actions {
     top: 24px;
-    right: 14px;
+    right: 50%;
+    transform: translateX(50%);
+    width: 38px;
+    justify-content: center;
+    pointer-events: none;
+  }
+
+  .app-shell.app-shell--sidebar-collapsed .sidebar-desktop-toggle {
+    pointer-events: auto;
     transform: none;
   }
 
@@ -9719,13 +9727,46 @@ html, body, #root, .app, .main, .main-content, .page { max-width: 100%; }
   .app-shell.app-shell--sidebar-collapsed .sidebar-link {
     width: 44px;
     min-width: 44px;
+    max-width: 44px;
     min-height: 44px;
     height: 44px;
     padding: 0;
     justify-content: center;
     gap: 0;
-    margin: 0 auto;
+    margin-inline: auto;
     border-radius: 14px;
+    overflow: hidden;
+    flex: 0 0 44px;
+  }
+
+  .app-shell.app-shell--sidebar-collapsed .sidebar-link.active,
+  .app-shell.app-shell--sidebar-collapsed .sidebar-link.on,
+  .app-shell.app-shell--sidebar-collapsed .sidebar-item.nav.subnav.active,
+  .app-shell.app-shell--sidebar-collapsed .sidebar-item.nav.subnav.on,
+  .app-shell.app-shell--sidebar-collapsed .sidebar--collapsed .sidebar-link.active,
+  .app-shell.app-shell--sidebar-collapsed .sidebar--collapsed .sidebar-link.on {
+    width: 44px !important;
+    min-width: 44px !important;
+    max-width: 44px !important;
+    height: 44px !important;
+    min-height: 44px !important;
+    padding: 0 !important;
+    margin-inline: auto !important;
+    justify-content: center !important;
+    gap: 0 !important;
+    overflow: hidden !important;
+    border-radius: 14px !important;
+    box-shadow:
+      inset 0 0 0 1px rgba(102, 196, 132, 0.5),
+      0 0 0 1px rgba(102, 196, 132, 0.1),
+      0 12px 24px rgba(34, 84, 52, 0.18) !important;
+  }
+
+  .app-shell.app-shell--sidebar-collapsed .sidebar-link .nav-icon,
+  .app-shell.app-shell--sidebar-collapsed .sidebar-link.active .nav-icon,
+  .app-shell.app-shell--sidebar-collapsed .sidebar-link.on .nav-icon {
+    margin: 0 !important;
+    flex: 0 0 16px;
   }
 
   .app-shell.app-shell--sidebar-collapsed .sidebar-logo-mark {
@@ -9733,6 +9774,10 @@ html, body, #root, .app, .main, .main-content, .page { max-width: 100%; }
     height: 42px;
     flex: 0 0 42px;
     margin: 0 auto;
+  }
+
+  .app-shell.app-shell--sidebar-collapsed .sidebar-logo {
+    overflow: hidden;
   }
 
   .app-shell.app-shell--sidebar-collapsed .sidebar-user-wrap {
