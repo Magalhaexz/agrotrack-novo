@@ -57,8 +57,10 @@ export default function Sidebar({
   useEffect(() => {
     const onResize = () => window.innerWidth > 900 && setIsMobileMenuOpen(false);
     const onOpenDrawer = () => setIsMobileMenuOpen(true);
+
     window.addEventListener('resize', onResize);
     window.addEventListener('agrotrack-open-drawer', onOpenDrawer);
+
     return () => {
       window.removeEventListener('resize', onResize);
       window.removeEventListener('agrotrack-open-drawer', onOpenDrawer);
@@ -87,7 +89,10 @@ export default function Sidebar({
         <button
           type="button"
           className="mobile-menu-btn"
-          onClick={() => setIsMobileMenuOpen(true)}
+          onClick={() => {
+            setDropdownAberto(false);
+            setIsMobileMenuOpen(true);
+          }}
           aria-label="Abrir menu de navegação"
         >
           <Menu size={18} aria-hidden="true" />
@@ -117,14 +122,17 @@ export default function Sidebar({
         <div className="mobile-overlay" onClick={() => setIsMobileMenuOpen(false)} aria-hidden="true" />
       ) : null}
 
-      <aside className={`sidebar sb ${isMobileMenuOpen ? 'mobile-open' : ''} ${isDesktopCollapsed ? 'is-collapsed' : ''}`} aria-label="Navegação principal">
-        <div className="sidebar-logo">
-          <div className="sidebar-logo-content">
+      <aside
+        className={`sidebar sb ${isMobileMenuOpen ? 'mobile-open' : ''} ${isDesktopCollapsed ? 'is-collapsed sidebar--collapsed' : ''}`}
+        aria-label="Navegação principal"
+      >
+        <div className="sidebar-logo sidebar-header">
+          <div className="sidebar-logo-content sidebar-brand">
             <div className="shell-logo-mark sidebar-logo-mark">
               <img src={herdonLogo} alt="HERDON" className="shell-logo-image" />
             </div>
             <div className="sidebar-logo-copy">
-              <div className="sidebar-logo-text">
+              <div className="sidebar-logo-text sidebar-brand-text">
                 <span className="sidebar-brand-word">
                   <span className="sidebar-brand-initial">H</span>
                   <span className="sidebar-brand-rest">ERDON</span>
@@ -136,8 +144,11 @@ export default function Sidebar({
           <div className="sidebar-logo-actions">
             <button
               type="button"
-              className="sidebar-collapse-btn desktop-collapse-btn"
-              onClick={() => onToggleCollapse?.()}
+              className="sidebar-collapse-btn desktop-collapse-btn sidebar-toggle"
+              onClick={() => {
+                setDropdownAberto(false);
+                onToggleCollapse?.();
+              }}
               aria-label={isDesktopCollapsed ? 'Expandir menu lateral' : 'Recolher menu lateral'}
               aria-pressed={isDesktopCollapsed}
             >
@@ -150,8 +161,11 @@ export default function Sidebar({
 
             <button
               type="button"
-              className="sidebar-collapse-btn mobile-close-btn"
-              onClick={() => setIsMobileMenuOpen(false)}
+              className="sidebar-collapse-btn mobile-close-btn sidebar-toggle"
+              onClick={() => {
+                setDropdownAberto(false);
+                setIsMobileMenuOpen(false);
+              }}
               aria-label="Fechar menu de navegação"
             >
               <X size={14} aria-hidden="true" />
@@ -159,13 +173,13 @@ export default function Sidebar({
           </div>
         </div>
 
-        <div className="sidebar-content sb-sec">
+        <div className="sidebar-content sidebar-nav sb-sec">
           {sections.map((section) => (
             <div key={section.id} className="sidebar-section">
               {!isDesktopCollapsed && section.title ? (
                 <button
                   type="button"
-                  className="sidebar-group-label nav-group-toggle"
+                  className="sidebar-group-label sidebar-section-title nav-group-toggle"
                   onClick={() => setOpenSections((prev) => ({ ...prev, [section.id]: !prev[section.id] }))}
                   aria-expanded={section.isOpen}
                   aria-controls={`nav-section-${section.id}`}
@@ -192,7 +206,7 @@ export default function Sidebar({
                       <button
                         key={item.id}
                         type="button"
-                        className={`sidebar-item nav subnav ${isActive ? 'active on' : ''}`}
+                        className={`sidebar-item sidebar-link nav subnav ${isActive ? 'active on' : ''}`}
                         onClick={() => {
                           onNavigate(item.id);
                           setIsMobileMenuOpen(false);
@@ -203,7 +217,7 @@ export default function Sidebar({
                       >
                         <ItemIcon size={16} className="nav-icon" aria-hidden="true" />
                         <div className="sidebar-item-copy">
-                          <span className="sidebar-item-label">{item.label}</span>
+                          <span className="sidebar-item-label sidebar-link-label">{item.label}</span>
                         </div>
                         {item.id === 'dashboard' && alertCount > 0 ? <span className="sidebar-badge nav-badge">{alertCount}</span> : null}
                         <span className="sidebar-item-glow" aria-hidden="true" />
@@ -218,7 +232,7 @@ export default function Sidebar({
 
         <div className="sidebar-user-wrap" ref={dropdownRef}>
           <div
-            className="sidebar-user sb-foot"
+            className="sidebar-user sidebar-user-card sb-foot"
             onClick={() => setDropdownAberto((prev) => !prev)}
             aria-haspopup="menu"
             aria-expanded={dropdownAberto}
@@ -231,6 +245,7 @@ export default function Sidebar({
               <p className="sidebar-user-role">{perfilExibicao}</p>
             </div>
             <ChevronDown
+              className="sidebar-user-caret"
               size={16}
               style={{
                 color: 'var(--color-text-muted)',
@@ -241,7 +256,7 @@ export default function Sidebar({
             />
           </div>
 
-          {dropdownAberto ? (
+          {dropdownAberto && !isDesktopCollapsed && !isMobileMenuOpen ? (
             <div className="user-dropdown" role="menu">
               <div className="user-dropdown-header">
                 <UserAvatar usuario={usuarioLogado} size={44} />
