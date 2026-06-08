@@ -2158,6 +2158,18 @@ a:hover {
   display: none;
 }
 
+.desktop-collapse-btn {
+  display: none;
+}
+
+.sidebar-logo-actions {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  margin-left: auto;
+  flex-shrink: 0;
+}
+
 .mobile-nav-modal {
   display: grid;
   gap: 18px;
@@ -5859,15 +5871,23 @@ body,
 }
 
 .action-btn {
-  min-height: 32px;
-  padding: 0 12px;
-  border-radius: 999px;
+  min-height: 40px;
+  padding: 0 14px;
+  border-radius: 12px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  min-width: 0;
   border: 1px solid rgba(255, 255, 255, 0.08);
   background: rgba(255, 255, 255, 0.035);
   color: rgba(230, 238, 234, 0.88);
-  font-size: 0.76rem;
+  font-size: 0.8rem;
   font-weight: 700;
-  letter-spacing: 0.03em;
+  letter-spacing: 0.01em;
+  line-height: 1;
+  white-space: nowrap;
+  flex-shrink: 0;
   transition: border-color 0.18s ease, background 0.18s ease, color 0.18s ease, transform 0.18s ease;
 }
 
@@ -5882,6 +5902,12 @@ body,
   border-color: rgba(239, 68, 68, 0.32);
   background: rgba(239, 68, 68, 0.11);
   color: #fff0f0;
+}
+
+.action-btn:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+  transform: none;
 }
 
 .badge {
@@ -9090,5 +9116,125 @@ html, body, #root, .app, .main, .main-content, .page { max-width: 100%; }
 
   .page--sanitario .sanitario-table-actions {
     justify-content: flex-start;
+  }
+}
+
+/* Sprint 15A - collapsible sidebar and consistent top-level button sizing */
+:root {
+  --sidebar-width-expanded: 260px;
+  --sidebar-width-collapsed: 88px;
+}
+
+.app-shell {
+  --sidebar-width: var(--sidebar-width-expanded);
+}
+
+.app-shell--sidebar-collapsed {
+  --sidebar-width: var(--sidebar-width-collapsed);
+}
+
+@media (min-width: 901px) {
+  .sidebar-logo-actions {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    margin-left: auto;
+    flex-shrink: 0;
+  }
+
+  .sidebar-collapse-btn {
+    width: 38px;
+    height: 38px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 12px;
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    background: rgba(255, 255, 255, 0.035);
+    color: rgba(230, 238, 234, 0.9);
+    flex-shrink: 0;
+    transition: border-color 0.18s ease, background 0.18s ease, color 0.18s ease, transform 0.18s ease;
+  }
+
+  .sidebar-collapse-btn:hover {
+    transform: translateY(-1px);
+    border-color: color-mix(in srgb, var(--color-primary) 30%, rgba(255, 255, 255, 0.08));
+    background: rgba(34, 197, 94, 0.1);
+    color: #f3fff7;
+  }
+
+  .mobile-close-btn {
+    display: none;
+  }
+
+  .desktop-collapse-btn {
+    display: inline-flex;
+  }
+
+  .app-shell--sidebar-collapsed .sidebar {
+    width: var(--sidebar-width-collapsed);
+    min-width: var(--sidebar-width-collapsed);
+    max-width: var(--sidebar-width-collapsed);
+  }
+
+  .app-shell--sidebar-collapsed .sidebar-logo {
+    justify-content: center;
+    padding-inline: 10px;
+  }
+
+  .app-shell--sidebar-collapsed .sidebar-logo-content {
+    justify-content: center;
+  }
+
+  .app-shell--sidebar-collapsed .sidebar-logo-copy,
+  .app-shell--sidebar-collapsed .sidebar-group-copy,
+  .app-shell--sidebar-collapsed .sidebar-item-copy,
+  .app-shell--sidebar-collapsed .sidebar-user-info,
+  .app-shell--sidebar-collapsed .sidebar-badge,
+  .app-shell--sidebar-collapsed .nav-group-arrow {
+    display: none;
+  }
+
+  .app-shell--sidebar-collapsed .sidebar-logo-actions {
+    justify-content: center;
+    width: 100%;
+  }
+
+  .app-shell--sidebar-collapsed .desktop-collapse-btn {
+    margin-left: auto;
+  }
+
+  .app-shell--sidebar-collapsed .sidebar-content {
+    padding-inline: 8px;
+  }
+
+  .app-shell--sidebar-collapsed .sidebar-section {
+    gap: 6px;
+  }
+
+  .app-shell--sidebar-collapsed .sidebar-group-label {
+    padding-left: 0;
+    padding-right: 0;
+    justify-content: center;
+  }
+
+  .app-shell--sidebar-collapsed .nav-sublist {
+    gap: 6px;
+  }
+
+  .app-shell--sidebar-collapsed .sidebar-item.nav.subnav {
+    justify-content: center;
+    padding-inline: 0;
+    min-height: 48px;
+    gap: 0;
+  }
+
+  .app-shell--sidebar-collapsed .sidebar-item .nav-icon {
+    margin: 0;
+  }
+
+  .app-shell--sidebar-collapsed .sidebar-user {
+    justify-content: center;
+    padding-inline: 0;
   }
 }

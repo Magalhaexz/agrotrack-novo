@@ -1,5 +1,5 @@
 ﻿import { useMemo, useState } from 'react';
-import { AlertTriangle, ArrowDownCircle, ArrowUpCircle, FileText } from 'lucide-react';
+import { AlertTriangle, ArrowDownCircle, ArrowUpCircle, FileText, Plus } from 'lucide-react';
 import Card from '../components/ui/Card';
 import Badge from '../components/ui/Badge';
 import Button from '../components/ui/Button';
@@ -140,14 +140,14 @@ export default function EstoquePage({ db, setDb, onRegistrarSaidaEstoque }) {
             <option value="nutricao">Nutrição / suplementação</option>
             <option value="todos">Todos os itens</option>
           </select>
-          <Button disabled={!hasPermission('estoque:editar')} onClick={() => {
+          <Button icon={<Plus size={14} />} disabled={!hasPermission('estoque:editar')} onClick={() => {
             if (!hasPermission('estoque:editar')) {
               showToast({ type: 'error', message: mensagemSemPermissao });
               return;
             }
             setOpenCadastroItem(true);
           }}>
-            Cadastrar item
+            Novo item
           </Button>
           <Button icon={<ArrowUpCircle size={14} />} disabled={!hasPermission('estoque:editar')} onClick={() => {
             if (!hasPermission('estoque:editar')) {
@@ -186,7 +186,7 @@ export default function EstoquePage({ db, setDb, onRegistrarSaidaEstoque }) {
           <div className="empty-box">
             <strong>{showOnlyCrit ? 'Nenhum item crítico.' : 'Nenhum item cadastrado.'}</strong>
             <span>{showOnlyCrit ? 'Todos os itens estão em nível normal.' : 'Cadastre o primeiro item para controlar entradas e saídas.'}</span>
-            {!showOnlyCrit ? <Button onClick={() => setOpenCadastroItem(true)}>Cadastrar item</Button> : null}
+            {!showOnlyCrit ? <Button icon={<Plus size={14} />} onClick={() => setOpenCadastroItem(true)}>Novo item</Button> : null}
           </div>
         ) : (
           itensView.map((item) => {
@@ -452,7 +452,7 @@ function EntradaModal({ db, setDb, selectedItem, estoqueMap, onOpenCadastroItem,
           <strong>Cadastre um item antes de registrar entrada.</strong>
           <span>Entrada de estoque adiciona quantidade em item já cadastrado.</span>
           <div className="lote-actions">
-            <Button type="button" onClick={() => { onClose(); onOpenCadastroItem?.(); }}>+ Cadastrar novo item</Button>
+            <Button type="button" icon={<Plus size={14} />} onClick={() => { onClose(); onOpenCadastroItem?.(); }}>Novo item</Button>
           </div>
         </div>
       ) : (

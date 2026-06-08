@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { ChevronDown, LogOut, Menu, Settings, User, X } from 'lucide-react';
+import { ChevronDown, ChevronRight, LogOut, Menu, Settings, User, X } from 'lucide-react';
 import { obterLabelPerfil, obterPerfilDoUsuario, permissoesPorPagina } from '../auth/perfis';
 import herdonLogo from '../assets/logo_app1.png';
 import { getNavLabel, navSections } from '../navigation/navConfig';
@@ -12,6 +12,8 @@ export default function Sidebar({
   user = null,
   hasPermission = () => true,
   onSignOut,
+  isCollapsed = false,
+  onToggleCollapse = null,
 }) {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [openSections, setOpenSections] = useState(() => {
@@ -32,6 +34,7 @@ export default function Sidebar({
     foto_url: user?.foto_url || user?.user_metadata?.avatar_url || null,
   };
   const perfilExibicao = obterLabelPerfil(usuarioLogado?.perfil);
+  const isDesktopCollapsed = Boolean(isCollapsed);
 
   const sections = useMemo(
     () =>
@@ -46,9 +49,9 @@ export default function Sidebar({
         .filter((section) => section.items.length > 0)
         .map((section) => ({
           ...section,
-          isOpen: openSections[section.id] ?? true,
+          isOpen: isDesktopCollapsed ? true : (openSections[section.id] ?? true),
         })),
-    [hasPermission, openSections]
+    [hasPermission, openSections, isDesktopCollapsed]
   );
 
   useEffect(() => {
@@ -114,7 +117,7 @@ export default function Sidebar({
         <div className="mobile-overlay" onClick={() => setIsMobileMenuOpen(false)} aria-hidden="true" />
       ) : null}
 
-      <aside className={`sidebar sb ${isMobileMenuOpen ? 'mobile-open' : ''}`} aria-label="Navegação principal">
+      <aside className={`sidebar sb ${isMobileMenuOpen ? 'mobile-open' : ''} ${isDesktopCollapsed ? 'is-collapsed' : ''}`} aria-label="Navegação principal">
         <div className="sidebar-logo">
           <div className="sidebar-logo-content">
             <div className="shell-logo-mark sidebar-logo-mark">
@@ -130,20 +133,36 @@ export default function Sidebar({
             </div>
           </div>
 
-          <button
-            type="button"
-            className="sidebar-collapse-btn mobile-close-btn"
-            onClick={() => setIsMobileMenuOpen(false)}
-            aria-label="Fechar menu de navegação"
-          >
-            <X size={14} aria-hidden="true" />
-          </button>
+          <div className="sidebar-logo-actions">
+            <button
+              type="button"
+              className="sidebar-collapse-btn desktop-collapse-btn"
+              onClick={() => onToggleCollapse?.()}
+              aria-label={isDesktopCollapsed ? 'Expandir menu lateral' : 'Recolher menu lateral'}
+              aria-pressed={isDesktopCollapsed}
+            >
+              <ChevronRight
+                size={14}
+                aria-hidden="true"
+                style={{ transform: isDesktopCollapsed ? 'rotate(0deg)' : 'rotate(180deg)' }}
+              />
+            </button>
+
+            <button
+              type="button"
+              className="sidebar-collapse-btn mobile-close-btn"
+              onClick={() => setIsMobileMenuOpen(false)}
+              aria-label="Fechar menu de navegação"
+            >
+              <X size={14} aria-hidden="true" />
+            </button>
+          </div>
         </div>
 
         <div className="sidebar-content sb-sec">
           {sections.map((section) => (
             <div key={section.id} className="sidebar-section">
-              {section.title ? (
+              {!isDesktopCollapsed && section.title ? (
                 <button
                   type="button"
                   className="sidebar-group-label nav-group-toggle"
@@ -161,7 +180,7 @@ export default function Sidebar({
               {section.isOpen ? (
                 <div
                   id={`nav-section-${section.id}`}
-                  className="nav-sublist"
+                  className={`nav-sublist ${isDesktopCollapsed ? 'is-collapsed' : ''}`}
                   style={{ borderTop: section.title ? undefined : 'none', marginTop: 0, paddingTop: 0 }}
                 >
                   {section.items.map((item) => {
@@ -179,6 +198,7 @@ export default function Sidebar({
                         }}
                         aria-current={isActive ? 'page' : undefined}
                         aria-label={item.label}
+                        title={item.label}
                       >
                         <ItemIcon size={16} className="nav-icon" aria-hidden="true" />
                         <div className="sidebar-item-copy">
@@ -202,6 +222,7 @@ export default function Sidebar({
             aria-haspopup="menu"
             aria-expanded={dropdownAberto}
             aria-label="Menu do usuário"
+            title={usuarioLogado?.nome}
           >
             <UserAvatar usuario={usuarioLogado} size={40} />
             <div className="sidebar-user-info">

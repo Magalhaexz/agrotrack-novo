@@ -1,4 +1,5 @@
 import { useMemo, useState } from 'react';
+import { Plus } from 'lucide-react';
 import Button from '../components/ui/Button';
 import Card from '../components/ui/Card';
 import Input from '../components/ui/Input';
@@ -239,8 +240,8 @@ export default function PastagensPage({ db, setDb, session, onConfirmAction }) {
           />
         </div>
         <div className="action-row" style={{ marginTop: 12 }}>
-          <Button onClick={salvarPastagem} disabled={!hasPermission('pastagens:editar')}>
-            {editando ? 'Salvar alterações' : 'Cadastrar pastagem'}
+          <Button icon={editando ? null : <Plus size={14} />} onClick={salvarPastagem} disabled={!hasPermission('pastagens:editar')}>
+            {editando ? 'Salvar alterações' : 'Nova pastagem'}
           </Button>
           {editando ? (
             <Button variant="ghost" onClick={resetForm}>Cancelar edição</Button>

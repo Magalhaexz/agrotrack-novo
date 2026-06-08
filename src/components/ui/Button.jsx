@@ -15,16 +15,26 @@ export default function Button({
   ...props
 }) {
   const safeVariant = variants.includes(variant) ? variant : 'primary';
+  const buttonLabel = loading && loadingLabel ? loadingLabel : children;
 
   return (
     <button
       type="button"
       className={`ui-button ui-button--${safeVariant} ui-button--${size} ${fullWidth ? 'ui-button--full' : ''} ${className}`.trim()}
       disabled={disabled || loading}
+      aria-busy={loading ? 'true' : undefined}
       {...props}
     >
-      {loading ? <Loader2 size={16} className="ui-spin" /> : icon}
-      <span>{loading && loadingLabel ? loadingLabel : children}</span>
+      {loading ? (
+        <span className="ui-button__icon ui-button__icon--loading" aria-hidden="true">
+          <Loader2 size={16} className="ui-spin" />
+        </span>
+      ) : icon ? (
+        <span className="ui-button__icon" aria-hidden="true">
+          {icon}
+        </span>
+      ) : null}
+      <span className="ui-button__label">{buttonLabel}</span>
     </button>
   );
 }
