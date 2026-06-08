@@ -1,4 +1,5 @@
-﻿import Button from '../ui/Button';
+import { Plus } from 'lucide-react';
+import Button from '../ui/Button';
 
 export default function LotesPageHeader({ onNovoLote, canEdit }) {
   return (
@@ -8,7 +9,7 @@ export default function LotesPageHeader({ onNovoLote, canEdit }) {
         <p>Acompanhe lotes, desempenho, retiradas e status operacional em um só painel.</p>
       </div>
       <div className="page-actions action-row">
-        <Button onClick={onNovoLote} disabled={!canEdit}>
+        <Button icon={<Plus size={14} />} onClick={onNovoLote} disabled={!canEdit}>
           Novo lote
         </Button>
       </div>

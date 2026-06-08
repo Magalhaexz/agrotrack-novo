@@ -73,6 +73,7 @@ const TODAY_BOOT_ISO = new Date().toISOString().slice(0, 10);
 const MENSAGEM_SEM_PERMISSAO = 'Você não tem permissão para executar esta ação.';
 const ALERTAS_RESOLVIDOS_STORAGE_KEY = 'herdon-alertas-resolvidos';
 const ALERTAS_ADIADOS_STORAGE_KEY = 'herdon-alertas-adiados';
+const SIDEBAR_COLLAPSED_STORAGE_KEY = 'herdon-sidebar-collapsed';
 
 function getAlertAckKey(alert) {
   if (alert?.ackKey) return String(alert.ackKey);
@@ -139,6 +140,14 @@ function normalizeSnoozedAlertEntries(entries = []) {
     .filter(Boolean);
 }
 
+function readSidebarCollapsedState() {
+  try {
+    return localStorage.getItem(SIDEBAR_COLLAPSED_STORAGE_KEY) === 'true';
+  } catch {
+    return false;
+  }
+}
+
 const pageMap = {
   dashboard: DashboardPage,
   fazendas: FazendasPage,
@@ -193,6 +202,7 @@ export default function App() {
   });
   const [usuarioLogado, setUsuarioLogado] = useState(null);
   const [menuExtraAberto, setMenuExtraAberto] = useState(false);
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(() => readSidebarCollapsedState());
   const [tabAtiva, setTabAtiva] = useState('geral');
   const [fazendaSelecionada, setFazendaSelecionada] = useState(null);
   const [forcarTelaLogin, setForcarTelaLogin] = useState(false);
@@ -215,6 +225,14 @@ export default function App() {
       return false;
     }
   }, []);
+
+  useEffect(() => {
+    try {
+      localStorage.setItem(SIDEBAR_COLLAPSED_STORAGE_KEY, String(sidebarCollapsed));
+    } catch {
+      // Preferimos manter a UI funcionando mesmo se o storage falhar.
+    }
+  }, [sidebarCollapsed]);
 
   if (import.meta.env.DEV) {
     console.debug('[HERDON_AUTH_BOOT]', {
@@ -764,7 +782,7 @@ export default function App() {
   }
 
   return (
-    <div className="app">
+    <div className={`app app-shell ${sidebarCollapsed ? 'app-shell--sidebar-collapsed' : ''}`}>
       {showAuthDebug && session ? (
         <div
           style={{
@@ -792,6 +810,8 @@ export default function App() {
         user={usuarioLogado}
         hasPermission={hasPermission}
         onSignOut={handleLogout}
+        isCollapsed={sidebarCollapsed}
+        onToggleCollapse={() => setSidebarCollapsed((prev) => !prev)}
       />
 
       <main className="main">

@@ -8,6 +8,7 @@ import {
   CheckCircle2,
   DollarSign,
   Package,
+  Plus,
   Tractor,
   Users,
 } from 'lucide-react';
@@ -263,7 +264,7 @@ export default function DashboardPage({
         </div>
 
         <div className="dashboard-toolbar-actions page-actions">
-          <Button variant="outline" onClick={() => onNavigate?.('lotes')}>
+          <Button variant="outline" icon={<Plus size={14} />} onClick={() => onNavigate?.('lotes')}>
             Novo lote
           </Button>
           <Button variant="outline" onClick={() => onNavigate?.('pesagens', { action: 'novo' })}>

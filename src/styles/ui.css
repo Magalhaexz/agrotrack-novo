@@ -5,6 +5,7 @@
   justify-content: center;
   gap: 8px;
   min-height: 44px;
+  min-width: 0;
   border-radius: 999px;
   padding-inline: 18px;
   font-family: "Inter Tight", "Segoe UI", sans-serif;
@@ -20,6 +21,9 @@
   cursor: pointer;
   text-decoration: none;
   white-space: nowrap;
+  flex-shrink: 0;
+  line-height: 1;
+  text-align: center;
 }
 
 .ui-button:hover {
@@ -55,6 +59,24 @@ textarea.ui-input:focus {
 
 .ui-button--full {
   width: 100%;
+}
+
+.ui-button__icon,
+.ui-button__label {
+  min-width: 0;
+}
+
+.ui-button__icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  line-height: 0;
+}
+
+.ui-button__label {
+  display: inline-flex;
+  align-items: center;
 }
 
 .ui-button--primary {
