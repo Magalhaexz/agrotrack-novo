@@ -19,7 +19,7 @@ import {
 } from '../domain/unidadeAnimal';
 
 function toNumber(value) {
-  const parsed = Number(value);
+  const parsed = Number(String(value ?? '').replace(',', '.'));
   return Number.isFinite(parsed) ? parsed : 0;
 }
 
@@ -32,13 +32,11 @@ function formatNumber(value, digits = 2) {
 
 function emptyForm() {
   return {
+    fazenda_id: '',
     nome: '',
     area_ha: '',
     capacidade_suporte_ua_ha: '',
-    custo_pasto_r_cab_mes: '',
-    arrendamento_ativo: 'nao',
-    area_arrendada_ha: '',
-    custo_arrendamento_mes: '',
+    status: 'ativo',
     observacoes: '',
   };
 }
@@ -50,8 +48,14 @@ export default function PastagensPage({ db, setDb, session, onConfirmAction }) {
   const [editando, setEditando] = useState(null);
 
   const mensagemSemPermissao = 'Você não tem permissão para executar esta ação.';
+  const pastagens = useMemo(() => (Array.isArray(db?.pastagens) ? db.pastagens : []), [db]);
+  const fazendas = useMemo(() => (Array.isArray(db?.fazendas) ? db.fazendas : []), [db]);
+  const fazendasMap = useMemo(
+    () => new Map(fazendas.map((item) => [Number(item.id), item])),
+    [fazendas]
+  );
+
   const indicadores = useMemo(() => {
-    const pastagens = Array.isArray(db?.pastagens) ? db.pastagens : [];
     const animais = Array.isArray(db?.animais) ? db.animais : [];
     const areaTotalPastagem = pastagens.reduce((sum, item) => sum + toNumber(item.area_ha), 0);
     const capacidadeTotalUa = calcularCapacidadeTotalUa(pastagens);
@@ -75,21 +79,21 @@ export default function PastagensPage({ db, setDb, session, onConfirmAction }) {
       lotacaoCabecaHa,
       superlotacao,
       pastoAArrendarHa,
-      cabecasTotais,
       saldoCapacidadeUa,
       statusCapacidade,
     };
-  }, [db]);
+  }, [db, pastagens]);
 
-  const uaPorLote = useMemo(() => (
-    (Array.isArray(db?.lotes) ? db.lotes : []).map((lote) => ({
-      id: lote.id,
-      nome: lote.nome || `Lote ${lote.id}`,
-      ua: calcularUaPorLote(Array.isArray(db?.animais) ? db.animais : [], lote.id),
-    }))
-  ), [db]);
-
-  const pastagens = Array.isArray(db?.pastagens) ? db.pastagens : [];
+  const uaPorLote = useMemo(
+    () => (
+      (Array.isArray(db?.lotes) ? db.lotes : []).map((lote) => ({
+        id: lote.id,
+        nome: lote.nome || `Lote ${lote.id}`,
+        ua: calcularUaPorLote(Array.isArray(db?.animais) ? db.animais : [], lote.id),
+      }))
+    ),
+    [db]
+  );
 
   function resetForm() {
     setForm(emptyForm());
@@ -98,14 +102,12 @@ export default function PastagensPage({ db, setDb, session, onConfirmAction }) {
 
   function preencherForm(item) {
     setForm({
+      fazenda_id: String(item?.fazenda_id ?? item?.faz_id ?? ''),
       nome: item?.nome || '',
       area_ha: String(item?.area_ha ?? ''),
       capacidade_suporte_ua_ha: String(item?.capacidade_suporte_ua_ha ?? ''),
-      custo_pasto_r_cab_mes: String(item?.custo_pasto_r_cab_mes ?? ''),
-      arrendamento_ativo: item?.arrendamento_ativo ? 'sim' : 'nao',
-      area_arrendada_ha: String(item?.area_arrendada_ha ?? ''),
-      custo_arrendamento_mes: String(item?.custo_arrendamento_mes ?? ''),
-      observacoes: item?.observacoes || '',
+      status: String(item?.status || 'ativo'),
+      observacoes: item?.observacoes || item?.obs || '',
     });
     setEditando(item);
   }
@@ -115,20 +117,24 @@ export default function PastagensPage({ db, setDb, session, onConfirmAction }) {
       showToast({ type: 'error', message: mensagemSemPermissao });
       return;
     }
+    if (!String(form.fazenda_id || '').trim()) {
+      showToast({ type: 'warning', message: 'Selecione a fazenda vinculada.' });
+      return;
+    }
     if (!String(form.nome || '').trim()) {
       showToast({ type: 'warning', message: 'Informe o nome da pastagem.' });
       return;
     }
 
     const payload = {
+      fazenda_id: Number(form.fazenda_id),
+      faz_id: Number(form.fazenda_id),
       nome: String(form.nome || '').trim(),
       area_ha: toNumber(form.area_ha),
       capacidade_suporte_ua_ha: toNumber(form.capacidade_suporte_ua_ha),
-      custo_pasto_r_cab_mes: toNumber(form.custo_pasto_r_cab_mes),
-      arrendamento_ativo: form.arrendamento_ativo === 'sim',
-      area_arrendada_ha: toNumber(form.area_arrendada_ha),
-      custo_arrendamento_mes: toNumber(form.custo_arrendamento_mes),
+      status: String(form.status || 'ativo'),
       observacoes: String(form.observacoes || '').trim(),
+      obs: String(form.observacoes || '').trim(),
     };
 
     if (editando) {
@@ -180,57 +186,49 @@ export default function PastagensPage({ db, setDb, session, onConfirmAction }) {
   return (
     <div className="page">
       <PageHeader
-        title="Pastagens"
-        subtitle="Gestão de capacidade de suporte e lotação da fazenda."
+        title="Pastos"
+        subtitle="Cadastre pastagens vinculadas às fazendas para usar em lotes e planejamento."
       />
 
-      <Card title={editando ? 'Editar pastagem' : 'Cadastrar pastagem'}>
+      <Card title={editando ? 'Editar pasto' : 'Cadastrar pasto'}>
         <div className="form-grid two">
           <Input
-            className="full"
-            label="Nome da pastagem"
+            as="select"
+            label="Fazenda vinculada"
+            value={form.fazenda_id}
+            onChange={(e) => setForm((prev) => ({ ...prev, fazenda_id: e.target.value }))}
+          >
+            <option value="">Selecione</option>
+            {fazendas.map((fazenda) => (
+              <option key={fazenda.id} value={fazenda.id}>{fazenda.nome}</option>
+            ))}
+          </Input>
+          <Input
+            label="Nome do pasto"
             value={form.nome}
             onChange={(e) => setForm((prev) => ({ ...prev, nome: e.target.value }))}
           />
           <Input
-            label="Área, ha"
+            label="Área em hectares"
             type="number"
             value={form.area_ha}
             onChange={(e) => setForm((prev) => ({ ...prev, area_ha: e.target.value }))}
           />
           <Input
-            label="Capacidade de suporte, UA/ha"
+            label="Capacidade suporte UA/ha"
             type="number"
             value={form.capacidade_suporte_ua_ha}
             onChange={(e) => setForm((prev) => ({ ...prev, capacidade_suporte_ua_ha: e.target.value }))}
           />
           <Input
-            label="Custo do pasto, R$/cab/mês"
-            type="number"
-            value={form.custo_pasto_r_cab_mes}
-            onChange={(e) => setForm((prev) => ({ ...prev, custo_pasto_r_cab_mes: e.target.value }))}
-          />
-          <Input
             as="select"
-            label="Arrendamento ativo"
-            value={form.arrendamento_ativo}
-            onChange={(e) => setForm((prev) => ({ ...prev, arrendamento_ativo: e.target.value }))}
+            label="Status"
+            value={form.status}
+            onChange={(e) => setForm((prev) => ({ ...prev, status: e.target.value }))}
           >
-            <option value="nao">Não</option>
-            <option value="sim">Sim</option>
+            <option value="ativo">Ativo</option>
+            <option value="inativo">Inativo</option>
           </Input>
-          <Input
-            label="Área arrendada, ha"
-            type="number"
-            value={form.area_arrendada_ha}
-            onChange={(e) => setForm((prev) => ({ ...prev, area_arrendada_ha: e.target.value }))}
-          />
-          <Input
-            label="Custo do arrendamento, R$/mês"
-            type="number"
-            value={form.custo_arrendamento_mes}
-            onChange={(e) => setForm((prev) => ({ ...prev, custo_arrendamento_mes: e.target.value }))}
-          />
           <Input
             className="full"
             as="textarea"
@@ -241,7 +239,7 @@ export default function PastagensPage({ db, setDb, session, onConfirmAction }) {
         </div>
         <div className="action-row" style={{ marginTop: 12 }}>
           <Button icon={editando ? null : <Plus size={14} />} onClick={salvarPastagem} disabled={!hasPermission('pastagens:editar')}>
-            {editando ? 'Salvar alterações' : 'Nova pastagem'}
+            {editando ? 'Salvar alterações' : 'Novo pasto'}
           </Button>
           {editando ? (
             <Button variant="ghost" onClick={resetForm}>Cancelar edição</Button>
@@ -301,17 +299,17 @@ export default function PastagensPage({ db, setDb, session, onConfirmAction }) {
         </div>
       </Card>
 
-      <Card title="Pastagens cadastradas">
+      <Card title="Pastos cadastrados">
         <div className="table-responsive">
           <table className="data-table">
             <thead>
               <tr>
+                <th>Fazenda</th>
                 <th>Nome</th>
                 <th>Área (ha)</th>
                 <th>Suporte (UA/ha)</th>
                 <th>Capacidade (UA)</th>
-                <th>Custo pasto</th>
-                <th>Arrendamento</th>
+                <th>Status</th>
                 <th>Ações</th>
               </tr>
             </thead>
@@ -322,12 +320,12 @@ export default function PastagensPage({ db, setDb, session, onConfirmAction }) {
                 </tr>
               ) : pastagens.map((item) => (
                 <tr key={item.id}>
+                  <td>{fazendasMap.get(Number(item.fazenda_id ?? item.faz_id))?.nome || '—'}</td>
                   <td>{item.nome}</td>
                   <td>{formatNumber(item.area_ha, 2)}</td>
                   <td>{formatNumber(item.capacidade_suporte_ua_ha, 2)}</td>
                   <td>{formatNumber(toNumber(item.area_ha) * toNumber(item.capacidade_suporte_ua_ha), 2)}</td>
-                  <td>R$ {formatNumber(item.custo_pasto_r_cab_mes, 2)}</td>
-                  <td>{item.arrendamento_ativo ? 'Ativo' : 'Não'}</td>
+                  <td>{String(item.status || 'ativo').toLowerCase() === 'inativo' ? 'Inativo' : 'Ativo'}</td>
                   <td>
                     <div className="row-actions action-row">
                       <button className="action-btn" type="button" onClick={() => preencherForm(item)}>Editar</button>
@@ -343,4 +341,3 @@ export default function PastagensPage({ db, setDb, session, onConfirmAction }) {
     </div>
   );
 }
-

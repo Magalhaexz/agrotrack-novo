@@ -27,6 +27,7 @@ export const navSections = [
     title: 'Cadastros',
     items: [
       { id: 'fazendas', label: 'Fazendas', icon: MapPin },
+      { id: 'pastagens', label: 'Pastos', icon: MapPin },
       { id: 'lotes', label: 'Lotes', icon: Beef },
       { id: 'animais', label: 'Animais', icon: ClipboardList },
       { id: 'funcionarios', label: 'Funcionários', icon: Users },

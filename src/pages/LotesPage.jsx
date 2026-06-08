@@ -430,6 +430,7 @@ export default function LotesPage({ db, setDb, onRegistrarSaidaAnimal, session }
 
       {openNovoLote ? (
         <LoteForm
+          key={loteEmEdicao?.id ?? 'novo-lote'}
           initialData={loteEmEdicao}
           fazendas={fazendas}
           pastagens={pastagens}
