@@ -33,6 +33,12 @@ function formatOrInsufficient(value, formatter) {
   return formatter(number);
 }
 
+function metricTone(value) {
+  if (value === 'Sem dados suficientes') return '';
+  if (typeof value === 'string' && (value.includes('-') || value.startsWith('R$ -'))) return ' metric-tile--warning';
+  return '';
+}
+
 export default function IndicadoresPage({ db }) {
   const [tipoPeriodo, setTipoPeriodo] = useState('mes');
   const [mesRef, setMesRef] = useState(nowDate().slice(0, 7));
@@ -51,28 +57,79 @@ export default function IndicadoresPage({ db }) {
   );
 
   const tecnicosCards = [
-    { label: 'Taxa de desfrute', value: formatOrInsufficient(indicadores.tecnicos.desfrutePct, formatPercent) },
-    { label: 'Taxa de abate', value: formatOrInsufficient(indicadores.tecnicos.taxaAbatePct, formatPercent) },
-    { label: 'Crescimento do rebanho', value: formatOrInsufficient(indicadores.tecnicos.taxaCrescimentoPct, formatPercent) },
-    { label: 'Kg vivo/ha', value: formatOrInsufficient(indicadores.tecnicos.kgVivoHa, (v) => formatNumber(v, 2, ' kg/ha')) },
+    {
+      label: 'Taxa de desfrute',
+      value: formatOrInsufficient(indicadores.tecnicos.desfrutePct, formatPercent),
+      meta: 'Mostra a participação das saídas produtivas em relação ao rebanho monitorado.',
+    },
+    {
+      label: 'Taxa de abate',
+      value: formatOrInsufficient(indicadores.tecnicos.taxaAbatePct, formatPercent),
+      meta: 'Acompanha o percentual do rebanho destinado ao abate no período selecionado.',
+    },
+    {
+      label: 'Crescimento do rebanho',
+      value: formatOrInsufficient(indicadores.tecnicos.taxaCrescimentoPct, formatPercent),
+      meta: 'Comparativo entre evolução do estoque e movimentações registradas.',
+    },
+    {
+      label: 'Kg vivo/ha',
+      value: formatOrInsufficient(indicadores.tecnicos.kgVivoHa, (v) => formatNumber(v, 2, ' kg/ha')),
+      meta: 'Indicador de intensidade produtiva por área de pastagem.',
+    },
     {
       label: 'Arrobas vendidas',
       value: formatOrInsufficient(indicadores.tecnicos.arrobasVendidas, (v) => formatNumber(v, 2, ' @')),
+      meta: 'Volume total comercializado nas movimentações do período.',
     },
   ];
 
   const economicosCards = [
-    { label: 'Receita total', value: formatCurrency(indicadores.economicos.receitaTotal) },
-    { label: 'Custos totais', value: formatCurrency(indicadores.economicos.custosTotais) },
-    { label: 'Margem bruta', value: formatCurrency(indicadores.economicos.margemBruta) },
-    { label: 'Margem por hectare', value: formatOrInsufficient(indicadores.economicos.margemPorHa, formatCurrency) },
-    { label: 'Margem por cabeça', value: formatOrInsufficient(indicadores.economicos.margemPorCabeca, formatCurrency) },
+    {
+      label: 'Receita total',
+      value: formatCurrency(indicadores.economicos.receitaTotal),
+      meta: 'Receitas consolidadas das operações registradas no período.',
+    },
+    {
+      label: 'Custos totais',
+      value: formatCurrency(indicadores.economicos.custosTotais),
+      meta: 'Soma de despesas, consumo e custos lançados na operação.',
+    },
+    {
+      label: 'Margem bruta',
+      value: formatCurrency(indicadores.economicos.margemBruta),
+      meta: 'Diferença entre receita operacional e custos apurados.',
+    },
+    {
+      label: 'Margem por hectare',
+      value: formatOrInsufficient(indicadores.economicos.margemPorHa, formatCurrency),
+      meta: 'Leitura econômica por área produtiva no intervalo selecionado.',
+    },
+    {
+      label: 'Margem por cabeça',
+      value: formatOrInsufficient(indicadores.economicos.margemPorCabeca, formatCurrency),
+      meta: 'Indicador de rentabilidade média por animal monitorado.',
+    },
   ];
 
   const lotacaoCards = [
-    { label: 'Capacidade total UA', value: formatNumber(indicadores.pastagem.capacidadeTotalUa, 2) },
-    { label: 'UA demandada', value: formatNumber(indicadores.unidadeAnimal.uaTotalFazenda, 2) },
-    { label: 'Saldo UA', value: formatNumber(indicadores.pastagem.saldoUa, 2) },
+    {
+      label: 'Capacidade total UA',
+      value: formatNumber(indicadores.pastagem.capacidadeTotalUa, 2),
+      meta: 'Capacidade consolidada das pastagens cadastradas.',
+    },
+    {
+      label: 'UA demandada',
+      value: formatNumber(indicadores.unidadeAnimal.uaTotalFazenda, 2),
+      meta: 'Demanda do rebanho em unidades animais.',
+    },
+    {
+      label: 'Saldo UA',
+      value: formatNumber(indicadores.pastagem.saldoUa, 2),
+      meta: indicadores.pastagem.statusLotacao === 'superlotado'
+        ? 'Saldo negativo indica pressão acima da capacidade atual.'
+        : 'Saldo positivo indica folga de capacidade nas pastagens.',
+    },
   ];
 
   return (
@@ -101,32 +158,44 @@ export default function IndicadoresPage({ db }) {
         </div>
       </Card>
 
-      <Card title="Resumo de lotação" subtitle={`Status: ${indicadores.pastagem.statusLotacao === 'superlotado' ? 'Superlotado' : 'Dentro da capacidade'}`}>
-        <div className="dashboard-grid dashboard-grid--kpi-main">
+      <Card
+        title="Resumo de lotação"
+        subtitle={`Status: ${indicadores.pastagem.statusLotacao === 'superlotado' ? 'Superlotado' : 'Dentro da capacidade'}`}
+      >
+        <div className="report-kpi-grid">
           {lotacaoCards.map((card) => (
-            <Card key={card.label} title={card.label}>
-              <strong>{card.value}</strong>
-            </Card>
+            <article
+              key={card.label}
+              className={`metric-tile${card.label === 'Saldo UA' && indicadores.pastagem.statusLotacao === 'superlotado' ? ' metric-tile--warning' : ''}`}
+            >
+              <span className="metric-tile__label">{card.label}</span>
+              <strong className="metric-tile__value">{card.value}</strong>
+              <span className="metric-tile__meta">{card.meta}</span>
+            </article>
           ))}
         </div>
       </Card>
 
-      <Card title="Indicadores técnicos">
-        <div className="dashboard-grid dashboard-grid--kpi-main">
+      <Card title="Indicadores técnicos" subtitle="Leitura produtiva e zootécnica consolidada no período selecionado.">
+        <div className="report-kpi-grid">
           {tecnicosCards.map((card) => (
-            <Card key={card.label} title={card.label}>
-              <strong>{card.value}</strong>
-            </Card>
+            <article key={card.label} className={`metric-tile${metricTone(card.value)}`}>
+              <span className="metric-tile__label">{card.label}</span>
+              <strong className="metric-tile__value">{card.value}</strong>
+              <span className="metric-tile__meta">{card.meta}</span>
+            </article>
           ))}
         </div>
       </Card>
 
-      <Card title="Indicadores econômicos">
-        <div className="dashboard-grid dashboard-grid--kpi-main">
+      <Card title="Indicadores econômicos" subtitle="Hierarquia mais clara para receitas, custos e margem operacional.">
+        <div className="report-kpi-grid">
           {economicosCards.map((card) => (
-            <Card key={card.label} title={card.label}>
-              <strong>{card.value}</strong>
-            </Card>
+            <article key={card.label} className={`metric-tile${metricTone(card.value)}`}>
+              <span className="metric-tile__label">{card.label}</span>
+              <strong className="metric-tile__value">{card.value}</strong>
+              <span className="metric-tile__meta">{card.meta}</span>
+            </article>
           ))}
         </div>
       </Card>
@@ -167,4 +236,3 @@ export default function IndicadoresPage({ db }) {
     </div>
   );
 }
-

@@ -41,6 +41,24 @@ function emptyForm() {
   };
 }
 
+function getCapacityPresentation(indicadores) {
+  if (indicadores.superlotacao) {
+    return {
+      label: 'Superlotado',
+      badgeClass: 'summary-badge summary-badge--danger',
+      rowClass: 'summary-row summary-row--alert',
+      helper: 'A demanda animal está acima da capacidade das pastagens cadastradas.',
+    };
+  }
+
+  return {
+    label: 'Dentro da capacidade',
+    badgeClass: 'summary-badge summary-badge--success',
+    rowClass: 'summary-row summary-row--success',
+    helper: 'A capacidade instalada atende a demanda atual da fazenda.',
+  };
+}
+
 export default function PastagensPage({ db, setDb, session, onConfirmAction }) {
   const { hasPermission } = useAuth();
   const { showToast } = useToast();
@@ -94,6 +112,8 @@ export default function PastagensPage({ db, setDb, session, onConfirmAction }) {
     ),
     [db]
   );
+
+  const capacityPresentation = getCapacityPresentation(indicadores);
 
   function resetForm() {
     setForm(emptyForm());
@@ -247,96 +267,159 @@ export default function PastagensPage({ db, setDb, session, onConfirmAction }) {
         </div>
       </Card>
 
-      <div className="dashboard-grid dashboard-grid--kpi-main">
-        <Card title="Capacidade total, UA">
-          <strong>{formatNumber(indicadores.capacidadeTotalUa, 2)}</strong>
+      {!pastagens.length ? (
+        <Card title="Capacidade das pastagens">
+          <div className="empty-state">
+            <strong>Nenhuma pastagem cadastrada.</strong>
+            <span>Cadastre uma pastagem para calcular capacidade, lotação e necessidade de arrendamento.</span>
+          </div>
         </Card>
-        <Card title="UA total da fazenda">
-          <strong>{formatNumber(indicadores.uaTotalFazenda, 2)}</strong>
-        </Card>
-        <Card title="Taxa de lotação, UA/ha">
-          <strong>{formatNumber(indicadores.taxaLotacaoUaHa, 3)}</strong>
-        </Card>
-        <Card title="Lotação em cabeças/ha">
-          <strong>{formatNumber(indicadores.lotacaoCabecaHa, 3)}</strong>
-        </Card>
-      </div>
+      ) : (
+        <div className="report-stack">
+          <div className="report-kpi-grid">
+            <article className="metric-tile metric-tile--success">
+              <span className="metric-tile__label">Capacidade total</span>
+              <strong className="metric-tile__value">{formatNumber(indicadores.capacidadeTotalUa, 2)} UA</strong>
+              <span className="metric-tile__meta">Soma da capacidade instalada nas pastagens cadastradas.</span>
+            </article>
+            <article className="metric-tile">
+              <span className="metric-tile__label">UA da fazenda</span>
+              <strong className="metric-tile__value">{formatNumber(indicadores.uaTotalFazenda, 2)} UA</strong>
+              <span className="metric-tile__meta">Demanda animal estimada com base no rebanho atualmente registrado.</span>
+            </article>
+            <article className="metric-tile">
+              <span className="metric-tile__label">Taxa de lotação</span>
+              <strong className="metric-tile__value">{formatNumber(indicadores.taxaLotacaoUaHa, 3)} UA/ha</strong>
+              <span className="metric-tile__meta">Leitura consolidada da pressão de uso sobre a área de pastagem disponível.</span>
+            </article>
+            <article className={`metric-tile ${indicadores.superlotacao ? 'metric-tile--warning' : 'metric-tile--success'}`}>
+              <span className="metric-tile__label">Pasto a arrendar</span>
+              <strong className="metric-tile__value">{formatNumber(indicadores.pastoAArrendarHa, 2)} ha</strong>
+              <span className="metric-tile__meta">
+                {indicadores.superlotacao
+                  ? 'Área estimada necessária para reequilibrar a capacidade da fazenda.'
+                  : 'Sem necessidade de arrendamento no cenário atual.'}
+              </span>
+            </article>
+          </div>
 
-      <Card title="Diagnóstico de capacidade">
-        <div className="metrics-2col">
-          <p>Área total de pastagem: <strong>{formatNumber(indicadores.areaTotalPastagem, 2)} ha</strong></p>
-          <p>Capacidade total: <strong>{formatNumber(indicadores.capacidadeTotalUa, 2)} UA</strong></p>
-          <p>UA da fazenda: <strong>{formatNumber(indicadores.uaTotalFazenda, 2)} UA</strong></p>
-          <p>Saldo entre capacidade e demanda: <strong>{formatNumber(indicadores.saldoCapacidadeUa, 2)} UA</strong></p>
-          <p>Status: <strong>{indicadores.statusCapacidade === 'superlotado' ? 'Superlotado' : 'Dentro da capacidade'}</strong></p>
-          <p>Alerta de superlotação: <strong>{indicadores.superlotacao ? 'Sim' : 'Não'}</strong></p>
-          <p>Pasto a arrendar, ha: <strong>{formatNumber(indicadores.pastoAArrendarHa, 2)}</strong></p>
+          <Card
+            title="Diagnóstico de capacidade"
+            subtitle="Leitura operacional da área, capacidade instalada e pressão do rebanho sobre as pastagens."
+          >
+            <div className="summary-panel">
+              <div className="summary-list">
+                <div className="summary-row">
+                  <span className="summary-row__label">Área total de pastagem</span>
+                  <strong className="summary-row__value">{formatNumber(indicadores.areaTotalPastagem, 2)} ha</strong>
+                </div>
+                <div className="summary-row">
+                  <span className="summary-row__label">Capacidade total</span>
+                  <strong className="summary-row__value">{formatNumber(indicadores.capacidadeTotalUa, 2)} UA</strong>
+                </div>
+                <div className="summary-row">
+                  <span className="summary-row__label">UA da fazenda</span>
+                  <strong className="summary-row__value">{formatNumber(indicadores.uaTotalFazenda, 2)} UA</strong>
+                </div>
+                <div className="summary-row">
+                  <span className="summary-row__label">Saldo entre capacidade e demanda</span>
+                  <strong className="summary-row__value">{formatNumber(indicadores.saldoCapacidadeUa, 2)} UA</strong>
+                </div>
+                <div className={capacityPresentation.rowClass}>
+                  <span className="summary-row__label">Status de capacidade</span>
+                  <span className={capacityPresentation.badgeClass}>{capacityPresentation.label}</span>
+                </div>
+                <div className="summary-row">
+                  <span className="summary-row__label">Alerta de superlotação</span>
+                  <strong className="summary-row__value">{indicadores.superlotacao ? 'Sim' : 'Não'}</strong>
+                </div>
+              </div>
+              <div className={capacityPresentation.rowClass}>
+                <span className="summary-row__label">Leitura recomendada</span>
+                <strong className="summary-row__value">{capacityPresentation.helper}</strong>
+              </div>
+            </div>
+          </Card>
         </div>
-      </Card>
+      )}
 
       <Card title="UA por lote">
-        <div className="table-responsive">
-          <table className="data-table">
-            <thead>
-              <tr>
-                <th>Lote</th>
-                <th>UA estimada</th>
-              </tr>
-            </thead>
-            <tbody>
-              {!uaPorLote.length ? (
+        {!uaPorLote.length ? (
+          <div className="empty-state">
+            <strong>Nenhum lote cadastrado.</strong>
+            <span>Cadastre um lote para visualizar a estimativa de UA vinculada às pastagens.</span>
+          </div>
+        ) : (
+          <div className="table-responsive">
+            <table className="data-table">
+              <thead>
                 <tr>
-                  <td colSpan="2" className="empty-state-td">Nenhum lote cadastrado.</td>
+                  <th>Lote</th>
+                  <th>UA estimada</th>
                 </tr>
-              ) : uaPorLote.map((item) => (
-                <tr key={item.id}>
-                  <td>{item.nome}</td>
-                  <td>{formatNumber(item.ua, 2)}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
+              </thead>
+              <tbody>
+                {uaPorLote.map((item) => (
+                  <tr key={item.id}>
+                    <td>{item.nome}</td>
+                    <td>{formatNumber(item.ua, 2)}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
       </Card>
 
       <Card title="Pastos cadastrados">
-        <div className="table-responsive">
-          <table className="data-table">
-            <thead>
-              <tr>
-                <th>Fazenda</th>
-                <th>Nome</th>
-                <th>Área (ha)</th>
-                <th>Suporte (UA/ha)</th>
-                <th>Capacidade (UA)</th>
-                <th>Status</th>
-                <th>Ações</th>
-              </tr>
-            </thead>
-            <tbody>
-              {!pastagens.length ? (
+        {!pastagens.length ? (
+          <div className="empty-state">
+            <strong>Nenhuma pastagem cadastrada.</strong>
+            <span>Cadastre uma pastagem vinculada à fazenda para liberar o vínculo com lotes e os indicadores de capacidade.</span>
+          </div>
+        ) : (
+          <div className="table-responsive">
+            <table className="data-table">
+              <thead>
                 <tr>
-                  <td colSpan="7" className="empty-state-td">Nenhuma pastagem cadastrada.</td>
+                  <th>Fazenda</th>
+                  <th>Nome</th>
+                  <th>Área (ha)</th>
+                  <th>Suporte (UA/ha)</th>
+                  <th>Capacidade (UA)</th>
+                  <th>Status</th>
+                  <th>Ações</th>
                 </tr>
-              ) : pastagens.map((item) => (
-                <tr key={item.id}>
-                  <td>{fazendasMap.get(Number(item.fazenda_id ?? item.faz_id))?.nome || '—'}</td>
-                  <td>{item.nome}</td>
-                  <td>{formatNumber(item.area_ha, 2)}</td>
-                  <td>{formatNumber(item.capacidade_suporte_ua_ha, 2)}</td>
-                  <td>{formatNumber(toNumber(item.area_ha) * toNumber(item.capacidade_suporte_ua_ha), 2)}</td>
-                  <td>{String(item.status || 'ativo').toLowerCase() === 'inativo' ? 'Inativo' : 'Ativo'}</td>
-                  <td>
-                    <div className="row-actions action-row">
-                      <button className="action-btn" type="button" onClick={() => preencherForm(item)}>Editar</button>
-                      <button className="action-btn action-btn-danger" type="button" onClick={() => excluirPastagem(item)}>Excluir</button>
-                    </div>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
+              </thead>
+              <tbody>
+                {pastagens.map((item) => {
+                  const statusAtivo = String(item.status || 'ativo').toLowerCase() !== 'inativo';
+
+                  return (
+                    <tr key={item.id}>
+                      <td>{fazendasMap.get(Number(item.fazenda_id ?? item.faz_id))?.nome || '—'}</td>
+                      <td>{item.nome}</td>
+                      <td>{formatNumber(item.area_ha, 2)}</td>
+                      <td>{formatNumber(item.capacidade_suporte_ua_ha, 2)}</td>
+                      <td>{formatNumber(toNumber(item.area_ha) * toNumber(item.capacidade_suporte_ua_ha), 2)}</td>
+                      <td>
+                        <span className={`summary-badge ${statusAtivo ? 'summary-badge--success' : 'summary-badge--warning'}`}>
+                          {statusAtivo ? 'Ativo' : 'Inativo'}
+                        </span>
+                      </td>
+                      <td>
+                        <div className="row-actions action-row">
+                          <button className="action-btn" type="button" onClick={() => preencherForm(item)}>Editar</button>
+                          <button className="action-btn action-btn-danger" type="button" onClick={() => excluirPastagem(item)}>Excluir</button>
+                        </div>
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        )}
       </Card>
     </div>
   );
