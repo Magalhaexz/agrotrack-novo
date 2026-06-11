@@ -12,6 +12,7 @@ export function createEmptyOperationalDb() {
     tarefas: [],
     estoque: [],
     suplementacao: [],
+    consumo_suplementacao: [],
     pesagens: [],
     sanitario: [],
     movimentacoes_animais: [],
@@ -21,6 +22,9 @@ export function createEmptyOperationalDb() {
     usuarios: [],
     auditoria: [],
     configuracoes: {
+      id: null,
+      owner_user_id: null,
+      fazendaSelecionadaId: null,
       geral: {
         nome_sistema: 'HERDON',
         moeda: 'BRL',
@@ -53,6 +57,7 @@ export const OPERATIONAL_ARRAY_COLLECTIONS = new Set([
   'tarefas',
   'estoque',
   'suplementacao',
+  'consumo_suplementacao',
   'pesagens',
   'sanitario',
   'movimentacoes_animais',
@@ -76,6 +81,7 @@ export const OPERATIONAL_COLLECTIONS_WITH_IDS = new Set([
   'tarefas',
   'estoque',
   'suplementacao',
+  'consumo_suplementacao',
   'pesagens',
   'sanitario',
   'movimentacoes_animais',

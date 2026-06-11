@@ -452,18 +452,27 @@ export function getPendingSyncQueueSnapshot(sessionOrUserId = null) {
 const EXPECTED_SCHEMA_TABLES = Object.freeze([
   'fazendas',
   'lotes',
+  'pastagens',
   'animais',
   'pesagens',
   'movimentacoes_animais',
   'movimentacoes_financeiras',
+  'movimentacoes_estoque',
   'estoque',
   'sanitario',
+  'custos',
   'tarefas',
   'funcionarios',
+  'rotinas',
+  'usuarios',
+  'auditoria',
+  'consumo_suplementacao',
   'profiles',
   'invites',
   'alertas_resolvidos',
   'alertas_adiados',
+  'configuracoes',
+  'cenarios',
 ]);
 
 function registerSchemaDebugHelpers() {

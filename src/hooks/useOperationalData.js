@@ -23,6 +23,8 @@ const OPERACIONAL_TABLES = [
   'alertas_resolvidos',
   'alertas_adiados',
   'usuarios',
+  'auditoria',
+  'consumo_suplementacao',
   'configuracoes',
   'cenarios',
 ];
@@ -169,6 +171,30 @@ function logSyncGuard(payload, level = 'debug') {
 
 function normalizeDb(baseDb) {
   const template = createEmptyOperationalDb();
+  const normalizeConfiguracoes = (value) => {
+    if (!isPlainObject(value)) {
+      return {
+        ...template.configuracoes,
+      };
+    }
+    const fazendaSelecionadaId = value?.fazendaSelecionadaId
+      ?? value?.fazenda_selecionada_id
+      ?? value?.fazenda_selecionada
+      ?? null;
+    return {
+      ...template.configuracoes,
+      ...value,
+      fazendaSelecionadaId,
+      geral: {
+        ...template.configuracoes.geral,
+        ...(isPlainObject(value?.geral) ? value.geral : {}),
+      },
+      notificacoes: {
+        ...template.configuracoes.notificacoes,
+        ...(isPlainObject(value?.notificacoes) ? value.notificacoes : {}),
+      },
+    };
+  };
   const dedupeFazendas = (rows = []) => {
     const map = new Map();
     const getIdentity = (row) => {
@@ -246,21 +272,14 @@ function normalizeDb(baseDb) {
         : [];
       return;
     }
+    if (key === 'consumo_suplementacao') {
+      normalized.consumo_suplementacao = Array.isArray(baseDb?.consumo_suplementacao) ? baseDb.consumo_suplementacao : [];
+      return;
+    }
     normalized[key] = Array.isArray(baseDb?.[key]) ? baseDb[key] : [];
   });
 
-  normalized.configuracoes = {
-    ...template.configuracoes,
-    ...(isPlainObject(baseDb?.configuracoes) ? baseDb.configuracoes : {}),
-    geral: {
-      ...template.configuracoes.geral,
-      ...(isPlainObject(baseDb?.configuracoes?.geral) ? baseDb.configuracoes.geral : {}),
-    },
-    notificacoes: {
-      ...template.configuracoes.notificacoes,
-      ...(isPlainObject(baseDb?.configuracoes?.notificacoes) ? baseDb.configuracoes.notificacoes : {}),
-    },
-  };
+  normalized.configuracoes = normalizeConfiguracoes(baseDb?.configuracoes);
 
   return normalized;
 }
@@ -380,6 +399,9 @@ async function fetchOperationalTableWithCircuit(table, userId, shouldApply, circ
           durationMs,
           rows: Array.isArray(data) ? data.length : 0,
         });
+      }
+      if (table === 'configuracoes') {
+        return [table, Array.isArray(data) ? (data[0] || null) : (data || null)];
       }
       return [table, Array.isArray(data) ? data : []];
     } catch (error) {
