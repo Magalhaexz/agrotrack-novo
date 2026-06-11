@@ -1,4 +1,5 @@
-﻿import { createClient } from '@supabase/supabase-js';
+import { createClient } from '@supabase/supabase-js';
+import { PERFIS } from '../auth/perfis.js';
 
 function normalizeEnvValue(value) {
   if (value === undefined || value === null) return '';
@@ -44,6 +45,11 @@ export function buildSupabaseSignUpOptions({ nome = '', redirectTo = null } = {}
     data: {
       nome: normalizeEnvValue(nome),
       name: normalizeEnvValue(nome),
+      perfil: PERFIS.PROPRIETARIO,
+      role: PERFIS.PROPRIETARIO,
+      cargo: PERFIS.PROPRIETARIO,
+      owner_account: 'true',
+      account_kind: 'self_service',
     },
   };
 }

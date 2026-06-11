@@ -170,7 +170,7 @@ export default function MinhaAssinaturaPage({
       const redirectUrl = resolveAsaasPaymentUrl(result) || result?.paymentUrl || result?.checkoutUrl || null;
       if (redirectUrl) {
         setPendingPaymentUrl(redirectUrl);
-        showToast({ type: 'success', message: 'Abrindo checkout seguro...' });
+        showToast({ type: 'success', message: 'Abrindo pagamento seguro...' });
         const opened = openPaymentUrl(redirectUrl);
         if (!opened) {
           showToast({
@@ -212,7 +212,7 @@ export default function MinhaAssinaturaPage({
       type: 'info',
       message: checkoutReady
         ? 'O gerenciamento da assinatura estará disponível em breve.'
-        : 'Checkout em preparação. Fale com a equipe para ajustar seu plano.',
+        : 'Pagamento em preparação. Tente novamente em alguns instantes.',
     });
   }
 

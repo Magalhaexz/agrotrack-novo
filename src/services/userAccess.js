@@ -31,6 +31,21 @@ function isBootstrapOwnerEmail(user) {
   return getBootstrapAdminEmails().includes(userEmail);
 }
 
+function getOwnerAccountMarkerRaw(user) {
+  return (
+    user?.user_metadata?.owner_account
+    ?? user?.user_metadata?.account_kind
+    ?? user?.raw_user_meta_data?.owner_account
+    ?? user?.raw_user_meta_data?.account_kind
+    ?? null
+  );
+}
+
+function isOwnerAccountMetadata(user) {
+  const marker = String(getOwnerAccountMarkerRaw(user) || '').trim().toLowerCase();
+  return marker === 'true' || marker === '1' || marker === 'yes' || marker === 'self_service' || marker === 'owner';
+}
+
 function isMissingTableError(error) {
   const message = String(error?.message || '').toLowerCase();
   return error?.code === '42P01' || message.includes('relation') || message.includes('does not exist');
@@ -79,8 +94,8 @@ export function resolveUserRoleFromAuthAndCache(user, profile) {
   if (metadataExplicitRole) {
     return { perfil: metadataPerfil, source: 'auth_metadata' };
   }
-  if (isBootstrapOwnerEmail(user)) {
-    return { perfil: PERFIS.PROPRIETARIO, source: 'bootstrap_owner_email' };
+  if (isBootstrapOwnerEmail(user) || isOwnerAccountMetadata(user) || metadataPerfil === PERFIS.PROPRIETARIO) {
+    return { perfil: PERFIS.PROPRIETARIO, source: isOwnerAccountMetadata(user) ? 'self_service_signup' : 'bootstrap_owner_email' };
   }
   if (hasProfilePerfil) {
     return { perfil: profilePerfil, source: 'cached_profile' };
@@ -110,7 +125,7 @@ export function mapProfileRowToUser(user, profile) {
 
   return {
     ...user,
-    owner_user_id: profile?.owner_user_id ?? user?.owner_user_id ?? null,
+    owner_user_id: profile?.owner_user_id ?? user?.owner_user_id ?? (resolved.perfil === PERFIS.PROPRIETARIO ? user?.id ?? null : null),
     nome: profile?.nome || nomeFallback,
     email: profile?.email || user?.email || '',
     perfil,

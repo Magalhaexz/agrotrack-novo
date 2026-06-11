@@ -884,8 +884,8 @@ export async function handleCreateSubscriptionRequest(req, { client = getSupabas
     message: checkoutUrl
       ? (persistenceIssue
         ? 'O pagamento foi preparado. Se a abertura não acontecer agora, use o botão Abrir pagamento.'
-        : 'Abrindo checkout seguro...')
-      : 'Pagamento em preparação. Tente novamente em alguns instantes.',
+        : 'Abrindo pagamento seguro...')
+      : 'O pagamento foi criado, mas o link ainda nao foi retornado. Tente novamente em alguns instantes.',
   });
 }
 

@@ -62,6 +62,7 @@ function buildFallbackProfile(userAtual, cachedProfile = null) {
       || 'Usuario',
     perfil: resolvedRole.perfil,
     roleSource: resolvedRole.source,
+    owner_user_id: cachedProfile?.owner_user_id ?? (resolvedRole.perfil === 'proprietario' ? userAtual.id : null),
     foto_url: cachedProfile?.foto_url ?? userAtual?.user_metadata?.avatar_url ?? null,
     telefone: cachedProfile?.telefone ?? userAtual?.user_metadata?.telefone ?? '',
     cargo: cachedProfile?.cargo ?? userAtual?.user_metadata?.cargo ?? '',

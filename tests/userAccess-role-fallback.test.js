@@ -47,3 +47,16 @@ test('admin can manage access', () => {
   assert.equal(perfilPodeGerenciarAcessos('admin'), true);
   assert.equal(perfilPodeGerenciarAcessos('PROPRIETARIO'), true);
 });
+
+test('self-service signup resolves proprietario and owner_user_id', () => {
+  const user = {
+    id: 'owner-signup-1',
+    email: 'owner@herdon.app',
+    user_metadata: { perfil: 'proprietario', owner_account: 'true' },
+  };
+
+  const mapped = mapProfileRowToUser(user, null);
+  assert.equal(mapped.perfil, 'proprietario');
+  assert.equal(mapped.owner_user_id, 'owner-signup-1');
+  assert.equal(mapped.roleSource, 'auth_metadata');
+});

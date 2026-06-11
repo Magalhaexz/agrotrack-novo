@@ -62,6 +62,11 @@ test('signup helper includes the email redirect and profile data', async () => {
     assert.deepEqual(options.data, {
       nome: 'Maria Silva',
       name: 'Maria Silva',
+      perfil: 'proprietario',
+      role: 'proprietario',
+      cargo: 'proprietario',
+      owner_account: 'true',
+      account_kind: 'self_service',
     });
   } finally {
     restoreEnv(snapshot);

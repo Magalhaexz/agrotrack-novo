@@ -223,6 +223,18 @@ test('provider payment url resolution prefers the best available redirect target
   assert.equal(url, 'https://sandbox.example/checkout');
 });
 
+test('provider payment url resolution falls back to invoice and payment link targets', () => {
+  const invoiceUrl = resolveAsaasPaymentUrl({
+    invoiceUrl: 'https://sandbox.example/invoice',
+  });
+  const paymentLinkUrl = resolveAsaasPaymentUrl({
+    paymentLink: { url: 'https://sandbox.example/payment-link' },
+  });
+
+  assert.equal(invoiceUrl, 'https://sandbox.example/invoice');
+  assert.equal(paymentLinkUrl, 'https://sandbox.example/payment-link');
+});
+
 test('recent pending checkout sessions can be reused for the same plan', async () => {
   const client = createCheckoutSessionsClient([
     {
