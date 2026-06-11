@@ -10,7 +10,17 @@ function statusVariant(status) {
   return 'neutral';
 }
 
-export default function LoteCard({ lote, onOpen, onEdit, onRetirada, onEncerrar, canMove = true, canEdit = true }) {
+export default function LoteCard({
+  lote,
+  onOpen,
+  onEdit,
+  onRegistrarVendaParcial,
+  onRegistrarMorte,
+  onRegistrarSaida,
+  onEncerrar,
+  canMove = true,
+  canEdit = true,
+}) {
   const risco = lote?.gmd30 < 0.3 || lote?.heads <= 0;
 
   return (
@@ -51,7 +61,9 @@ export default function LoteCard({ lote, onOpen, onEdit, onRetirada, onEncerrar,
       <div className="lote-actions action-row">
         <Button size="sm" variant="outline" onClick={onOpen}>Ver detalhes</Button>
         <Button size="sm" variant="ghost" onClick={onEdit} disabled={!canEdit || lote.bloqueado}>Editar</Button>
-        <Button size="sm" variant="warning" onClick={onRetirada} disabled={!canMove || lote.bloqueado}>Retirada</Button>
+        <Button size="sm" variant="warning" onClick={onRegistrarVendaParcial} disabled={!canMove || lote.bloqueado}>Venda parcial</Button>
+        <Button size="sm" variant="warning" onClick={onRegistrarMorte} disabled={!canMove || lote.bloqueado}>Morte/perda</Button>
+        <Button size="sm" variant="warning" onClick={onRegistrarSaida} disabled={!canMove || lote.bloqueado}>Saída do lote</Button>
         <Button size="sm" variant="danger" onClick={onEncerrar} disabled={!canEdit || lote.bloqueado}>Encerrar lote</Button>
       </div>
     </Card>

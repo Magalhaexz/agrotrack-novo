@@ -16,7 +16,7 @@ export default function LoteRetiradasTab({ retiradas, onNovaRetirada, canMove })
     <Card
       title="Retiradas"
       subtitle="Saídas de animais por venda, abate, transferência e demais motivos"
-      action={<Button size="sm" onClick={onNovaRetirada} disabled={!canMove}>Registrar retirada</Button>}
+      action={<Button size="sm" onClick={onNovaRetirada} disabled={!canMove}>Registrar venda parcial</Button>}
     >
       <div className="lote-table-wrap">
         <table className="ui-table">

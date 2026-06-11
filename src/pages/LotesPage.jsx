@@ -87,6 +87,7 @@ export default function LotesPage({ db, setDb, onRegistrarSaidaAnimal, session }
   const [selectedLoteId, setSelectedLoteId] = useState(null);
   const [activeTab, setActiveTab] = useState('visao_geral');
   const [openRetirada, setOpenRetirada] = useState(false);
+  const [retiradaModo, setRetiradaModo] = useState('sale_partial');
   const [openFechamento, setOpenFechamento] = useState(false);
   const [openPesagem, setOpenPesagem] = useState(false);
   const [openNovoLote, setOpenNovoLote] = useState(false);
@@ -161,6 +162,11 @@ export default function LotesPage({ db, setDb, onRegistrarSaidaAnimal, session }
     return false;
   }
 
+  function abrirRetirada(modo) {
+    setRetiradaModo(modo);
+    setOpenRetirada(true);
+  }
+
   function handleRetirada(payload) {
     if (!ensurePermission('animais:movimentar')) return;
     if (!selectedLote) return;
@@ -172,9 +178,15 @@ export default function LotesPage({ db, setDb, onRegistrarSaidaAnimal, session }
     try {
       onRegistrarSaidaAnimal(payload);
       setOpenRetirada(false);
-      showToast({ type: 'success', message: 'Retirada registrada com sucesso.' });
+      setRetiradaModo('sale_partial');
+      const mensagens = {
+        sale_partial: 'Venda parcial registrada com sucesso.',
+        death_loss: 'Morte/perda registrada com sucesso.',
+        exit: 'Saída do lote registrada com sucesso.',
+      };
+      showToast({ type: 'success', message: mensagens[retiradaModo] || 'Retirada registrada com sucesso.' });
     } catch (error) {
-      showToast({ type: 'error', message: error?.message || 'Falha ao registrar retirada.' });
+      showToast({ type: 'error', message: error?.message || 'Falha ao registrar movimentação do lote.' });
     }
   }
 
@@ -334,17 +346,19 @@ export default function LotesPage({ db, setDb, onRegistrarSaidaAnimal, session }
           resumo={selectedLote.resumo}
           activeTab={activeTab}
           onChangeTab={setActiveTab}
-          onBack={() => setSelectedLoteId(null)}
-          canMove={hasPermission('animais:movimentar')}
-          canEdit={hasPermission('lotes:editar')}
-          canEditPesagem={hasPermission('pesagens:editar')}
-          onEdit={() => {
-            setLoteEmEdicao(selectedLote);
-            setOpenNovoLote(true);
-          }}
-          onNovaRetirada={() => setOpenRetirada(true)}
-          onNovaPesagem={() => setOpenPesagem(true)}
-          onEncerrar={() => setOpenFechamento(true)}
+      onBack={() => setSelectedLoteId(null)}
+      canMove={hasPermission('animais:movimentar')}
+      canEdit={hasPermission('lotes:editar')}
+      canEditPesagem={hasPermission('pesagens:editar')}
+      onEdit={() => {
+        setLoteEmEdicao(selectedLote);
+        setOpenNovoLote(true);
+      }}
+      onRegistrarVendaParcial={() => abrirRetirada('sale_partial')}
+      onRegistrarMorte={() => abrirRetirada('death_loss')}
+      onRegistrarSaida={() => abrirRetirada('exit')}
+      onNovaPesagem={() => setOpenPesagem(true)}
+      onEncerrar={() => setOpenFechamento(true)}
           animais={loteAnimais}
           pesagens={lotePesagens}
           retiradas={loteRetiradas}
@@ -355,10 +369,15 @@ export default function LotesPage({ db, setDb, onRegistrarSaidaAnimal, session }
         />
 
         <RetiradaAnimaisModal
+          key={`${selectedLote?.id ?? 'lote'}-${retiradaModo}`}
           open={openRetirada}
           lote={selectedLote}
           maxCabecas={selectedLote.heads}
-          onClose={() => setOpenRetirada(false)}
+          modo={retiradaModo}
+          onClose={() => {
+            setOpenRetirada(false);
+            setRetiradaModo('sale_partial');
+          }}
           onSubmit={handleRetirada}
         />
 
@@ -415,10 +434,20 @@ export default function LotesPage({ db, setDb, onRegistrarSaidaAnimal, session }
               setLoteEmEdicao(lote);
               setOpenNovoLote(true);
             }}
-            onRetirada={() => {
+            onRegistrarVendaParcial={() => {
               setActiveTab('retiradas');
               setSelectedLoteId(lote.id);
-              setOpenRetirada(true);
+              abrirRetirada('sale_partial');
+            }}
+            onRegistrarMorte={() => {
+              setActiveTab('retiradas');
+              setSelectedLoteId(lote.id);
+              abrirRetirada('death_loss');
+            }}
+            onRegistrarSaida={() => {
+              setActiveTab('retiradas');
+              setSelectedLoteId(lote.id);
+              abrirRetirada('exit');
             }}
             onEncerrar={() => {
               setSelectedLoteId(lote.id);

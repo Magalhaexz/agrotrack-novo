@@ -443,6 +443,7 @@ export default function AnimaisPage({ db, setDb, onConfirmAction }) {
                         {animal.tipoRegistro === 'individual' ? (
                           <>
                             <button className="action-btn" onClick={() => abrirOperacao(animal, 'sale')} disabled={!animal.ativo}>Registrar venda</button>
+                            <button className="action-btn" onClick={() => abrirOperacao(animal, 'death')} disabled={!animal.ativo}>Registrar morte</button>
                             <button className="action-btn" onClick={() => abrirOperacao(animal, 'exit')} disabled={!animal.ativo}>Registrar saída</button>
                           </>
                         ) : null}

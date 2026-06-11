@@ -19,7 +19,9 @@ export default function LoteDetailsPanel({
   canEdit,
   canEditPesagem,
   onEdit,
-  onNovaRetirada,
+  onRegistrarVendaParcial,
+  onRegistrarMorte,
+  onRegistrarSaida,
   onNovaPesagem,
   onEncerrar,
   animais,
@@ -51,7 +53,9 @@ export default function LoteDetailsPanel({
           <Button variant="ghost" onClick={onBack}>Voltar para lotes</Button>
           <Button variant="outline" onClick={onEdit} disabled={!canEdit || lote.bloqueado}>Editar lote</Button>
           <Button variant="outline" onClick={onNovaPesagem} disabled={!canEditPesagem || lote.bloqueado}>Nova pesagem</Button>
-          <Button variant="warning" onClick={onNovaRetirada} disabled={!canMove || lote.bloqueado}>Retirada</Button>
+          <Button variant="warning" onClick={onRegistrarVendaParcial} disabled={!canMove || lote.bloqueado}>Venda parcial</Button>
+          <Button variant="warning" onClick={onRegistrarMorte} disabled={!canMove || lote.bloqueado}>Morte/perda</Button>
+          <Button variant="warning" onClick={onRegistrarSaida} disabled={!canMove || lote.bloqueado}>Saída do lote</Button>
           <Button variant="danger" onClick={onEncerrar} disabled={!canEdit || lote.bloqueado}>Encerrar lote</Button>
         </div>
       </div>
@@ -72,7 +76,7 @@ export default function LoteDetailsPanel({
       {activeTab === 'visao_geral' ? <LoteOverviewTab lote={lote} resumo={resumo} /> : null}
       {activeTab === 'animais' ? <LoteAnimaisTab animais={animais} /> : null}
       {activeTab === 'pesagens' ? <LotePesagensTab pesagens={pesagens} onNovaPesagem={onNovaPesagem} canEditPesagem={canEditPesagem && !lote.bloqueado} /> : null}
-      {activeTab === 'retiradas' ? <LoteRetiradasTab retiradas={retiradas} onNovaRetirada={onNovaRetirada} canMove={canMove && !lote.bloqueado} /> : null}
+      {activeTab === 'retiradas' ? <LoteRetiradasTab retiradas={retiradas} onNovaRetirada={onRegistrarVendaParcial} canMove={canMove && !lote.bloqueado} /> : null}
       {activeTab === 'nutricao' ? <LoteNutricaoTab lote={lote} consumo={consumoNutricao} /> : null}
       {activeTab === 'sanitario' ? <LoteSanitarioTab itens={sanitarios} /> : null}
       {activeTab === 'financeiro' ? <LoteFinanceiroTab movimentos={financeiros} resumo={resumo} /> : null}
