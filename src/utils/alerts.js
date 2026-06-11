@@ -1,3 +1,5 @@
+import { daysBetween, toDateKey, toNumber } from '../domain/calcHelpers.js';
+
 const NIVEL_ORDEM = {
   critical: 0,
   warning: 1,
@@ -9,10 +11,6 @@ const NIVEL_ORDEM = {
  * @param {*} value - O valor a ser convertido.
  * @returns {number} O valor numérico.
  */
-function toNumber(value) {
-  return Number(value || 0);
-}
-
 /**
  * Analisa uma string de data ISO (YYYY-MM-DD) e retorna um objeto Date.
  * Garante que o mês e o dia sejam válidos, caso contrário, usa 1.
@@ -20,11 +18,10 @@ function toNumber(value) {
  * @returns {Date} O objeto Date correspondente.
  */
 function parseISODate(valor) {
-  if (!valor) return zerarHora(new Date());
-
-  const [ano, mes, dia] = String(valor).split('-').map(Number);
-  // Date constructor uses 0-indexed month, so subtract 1 from 'mes'
-  return new Date(ano, (mes || 1) - 1, dia || 1);
+  const dateKey = toDateKey(valor);
+  if (!dateKey) return zerarHora(new Date());
+  const [ano, mes, dia] = dateKey.split('-').map(Number);
+  return new Date(Date.UTC(ano, (mes || 1) - 1, dia || 1));
 }
 
 /**
@@ -45,9 +42,10 @@ function zerarHora(data) {
  * @returns {number} A diferença em dias (dataA - dataB).
  */
 function diferencaEmDias(dataA, dataB) {
-  const msPorDia = 1000 * 60 * 60 * 24;
-  // Zera a hora de ambas as datas para garantir que a diferença seja apenas em dias completos
-  return Math.round((zerarHora(dataA).getTime() - zerarHora(dataB).getTime()) / msPorDia);
+  return daysBetween(
+    zerarHora(dataB).toISOString().slice(0, 10),
+    zerarHora(dataA).toISOString().slice(0, 10)
+  );
 }
 
 /**

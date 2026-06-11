@@ -5,13 +5,14 @@ import Modal from './ui/Modal';
 import { getResumoLote } from '../domain/resumoLote';
 import { gerarNovoId } from '../utils/id';
 import { formatNumber } from '../utils/calculations';
+import { toNumber } from '../domain/calcHelpers.js';
 
 function getTodayIso() {
   return new Date().toISOString().slice(0, 10);
 }
 
 function toNumberSafe(value, fallback = 0) {
-  const parsed = Number(String(value ?? '').replace(',', '.'));
+  const parsed = toNumber(value);
   return Number.isFinite(parsed) ? parsed : fallback;
 }
 
@@ -73,8 +74,8 @@ function normalizeConsumptionMode(record = null) {
   if (raw === 'total_manual' || raw === 'manual_total' || raw === 'total_lote') return 'manual_total';
   if (raw === 'percentual_peso' || raw === 'percentual_peso_vivo' || raw === '%_peso_vivo') return 'percentual_peso';
   if (raw === 'por_cabeca' || raw === 'kg_cabeca' || raw === 'kg_cabeça_dia' || raw === 'kg/cab/dia') return 'por_cabeca';
-  if (Number(record?.consumo_por_cabeca_dia || 0) > 0) return 'por_cabeca';
-  if (Number(record?.percentual_peso_vivo || 0) > 0 || Number(record?.percentual_pv || 0) > 0 || Number(record?.supl_pv_pct || 0) > 0) return 'percentual_peso';
+  if (toNumber(record?.consumo_por_cabeca_dia) > 0) return 'por_cabeca';
+  if (toNumber(record?.percentual_peso_vivo) > 0 || toNumber(record?.percentual_pv) > 0 || toNumber(record?.supl_pv_pct) > 0) return 'percentual_peso';
   return 'manual_total';
 }
 
@@ -114,7 +115,7 @@ function calculateTotal({ mode, heads, pesoMedio, manualTotal, perHead, percentu
 }
 
 function getConsumptionCost(quantity, produto) {
-  return Number(quantity || 0) * Number(produto?.valor_unitario || produto?.custo_unitario || produto?.preco_unitario || 0);
+  return toNumber(quantity) * toNumber(produto?.valor_unitario || produto?.custo_unitario || produto?.preco_unitario);
 }
 
 function buildInitialData(db, record = null) {

@@ -4,28 +4,14 @@ import {
   calcularUaPorAnimal,
 } from './unidadeAnimal.js';
 import { computeEvolucaoRebanho } from './evolucaoRebanho.js';
-
-function toNumber(value) {
-  const parsed = Number(value);
-  return Number.isFinite(parsed) ? parsed : 0;
-}
-
-function safeDivide(value, divisor) {
-  const n = toNumber(value);
-  const d = toNumber(divisor);
-  if (!d) return null;
-  const result = n / d;
-  return Number.isFinite(result) ? result : null;
-}
-
-function toDateKey(value) {
-  return String(value || '').slice(0, 10);
-}
+import { safeDivide, toDateKey, toNonNegativeNumber, toNumber } from './calcHelpers.js';
 
 function isDateInPeriod(value, start, end) {
   const date = toDateKey(value);
-  if (!date) return false;
-  return date >= start && date <= end;
+  const safeStart = toDateKey(start);
+  const safeEnd = toDateKey(end);
+  if (!date || !safeStart || !safeEnd) return false;
+  return date >= safeStart && date <= safeEnd;
 }
 
 function isAnimalAtivo(animal) {
@@ -43,8 +29,9 @@ function getLatestLotePesoMap(db) {
   const map = new Map();
   const pesagens = Array.isArray(db?.pesagens) ? db.pesagens : [];
   pesagens
-    .filter((item) => (item?.tipo || 'lote') !== 'animal')
-    .sort((a, b) => new Date(b?.data || 0) - new Date(a?.data || 0))
+    .map((item) => ({ ...item, data: toDateKey(item?.data) }))
+    .filter((item) => (item?.tipo || 'lote') !== 'animal' && item.data)
+    .sort((a, b) => b.data.localeCompare(a.data))
     .forEach((item) => {
       const loteId = Number(item?.lote_id);
       if (!loteId || map.has(loteId)) return;
@@ -63,8 +50,9 @@ function getLatestAnimalPesoMap(db) {
   const map = new Map();
   const pesagens = Array.isArray(db?.pesagens) ? db.pesagens : [];
   pesagens
-    .filter((item) => String(item?.tipo || '').toLowerCase() === 'animal')
-    .sort((a, b) => new Date(b?.data || 0) - new Date(a?.data || 0))
+    .map((item) => ({ ...item, data: toDateKey(item?.data) }))
+    .filter((item) => String(item?.tipo || '').toLowerCase() === 'animal' && item.data)
+    .sort((a, b) => b.data.localeCompare(a.data))
     .forEach((item) => {
       const animalId = String(item?.animal_id || '').trim();
       if (!animalId || map.has(animalId)) return;
@@ -86,7 +74,7 @@ function calculateUaLayer(db) {
 
   animais.forEach((animal) => {
     const loteId = Number(animal?.lote_id);
-    const qtd = Math.max(0, toNumber(animal?.qtd || 1));
+    const qtd = toNonNegativeNumber(animal?.qtd || 1);
     const animalId = String(animal?.id || '').trim();
 
     const pesoPesagemAnimal = animalId ? animalPesoMap.get(animalId) : null;
@@ -120,7 +108,7 @@ function calculateUaLayer(db) {
 
 function calculatePastagemLotacao(db, uaTotalFazenda) {
   const pastagens = Array.isArray(db?.pastagens) ? db.pastagens : [];
-  const areaTotalPastagem = pastagens.reduce((sum, p) => sum + toNumber(p?.area_ha), 0);
+  const areaTotalPastagem = pastagens.reduce((sum, p) => sum + toNonNegativeNumber(p?.area_ha), 0);
   const capacidadeTotalUa = calcularCapacidadeTotalUa(pastagens);
   const taxaLotacaoUaHa = safeDivide(uaTotalFazenda, areaTotalPastagem);
   const saldoUa = capacidadeTotalUa - uaTotalFazenda;
@@ -261,11 +249,14 @@ export function resolveIndicadoresPeriod({ tipoPeriodo, mesRef, anoRef, customIn
   }
   const month = String(mesRef || new Date().toISOString().slice(0, 7));
   const [yearStr, monthStr] = month.split('-');
-  const year = Number(yearStr);
+  const year = Number(yearStr) || Number(new Date().toISOString().slice(0, 4));
   const monthIndex = Math.max(1, Number(monthStr || 1));
   const start = new Date(year, monthIndex - 1, 1);
   const end = new Date(year, monthIndex, 0);
-  return { start: toDateKey(start.toISOString()), end: toDateKey(end.toISOString()) };
+  return {
+    start: toDateKey(start.toISOString()) || `${year}-01-01`,
+    end: toDateKey(end.toISOString()) || `${year}-12-31`,
+  };
 }
 
 export function computeIndicadoresEstrategicos(db, periodStart, periodEnd) {
@@ -298,4 +289,3 @@ export function computeIndicadoresEstrategicos(db, periodStart, periodEnd) {
     loteResumo,
   };
 }
-

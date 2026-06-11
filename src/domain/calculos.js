@@ -1,18 +1,4 @@
-/**
- * Converte um valor para número, usando 0 como fallback para valores nulos ou indefinidos.
- * @param {*} value - O valor a ser convertido.
- * @returns {number} O valor numérico.
- */
-function toNumber(value) {
-  const parsed = Number(value);
-  return Number.isFinite(parsed) ? parsed : 0;
-}
-
-function safeDivide(value, divisor) {
-  if (!Number.isFinite(divisor) || divisor === 0) return 0;
-  const result = value / divisor;
-  return Number.isFinite(result) ? result : 0;
-}
+import { safeDivide, toNonNegativeNumber, toNumber } from './calcHelpers.js';
 
 /**
  * Verifica se um item pertence a um lote específico.
@@ -132,10 +118,10 @@ export function calcularResultadoLote(db, loteId) {
 
   const animais = Array.isArray(db?.animais) ? db.animais : [];
   const animaisLote = animais.filter((item) => pertenceAoLote(item, loteId));
-  const qtdCabecas = animaisLote.reduce((acc, item) => acc + toNumber(item.qtd), 0);
+  const qtdCabecas = animaisLote.reduce((acc, item) => acc + toNonNegativeNumber(item.qtd), 0);
   const pesoMedioAtual = qtdCabecas
     ? safeDivide(
-        animaisLote.reduce((acc, item) => acc + toNumber(item.p_at) * toNumber(item.qtd), 0),
+        animaisLote.reduce((acc, item) => acc + toNumber(item.p_at) * toNonNegativeNumber(item.qtd), 0),
         qtdCabecas
       )
     : 0;

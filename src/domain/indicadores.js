@@ -1,12 +1,4 @@
-/**
- * Converte um valor para número, usando 0 como fallback para valores nulos ou indefinidos.
- * Assumindo que esta função está disponível globalmente ou importada.
- * @param {*} value - O valor a ser convertido.
- * @returns {number} O valor numérico.
- */
-function toNumber(value) {
-  return Number(value || 0);
-}
+import { toNonNegativeNumber, toNumber } from './calcHelpers.js';
 
 /**
  * Calcula o Ganho Médio Diário (GMD) em gramas/dia.
@@ -28,7 +20,7 @@ export function calcularGMD(pesoInicial, pesoFinal, diasTrato) {
  * @returns {number} A quantidade de arrobas produzidas.
  */
 export function calcularArrobasProduzidas(pesoInicial, pesoFinal, qtdCabecas) {
-  return ((toNumber(pesoFinal) - toNumber(pesoInicial)) * toNumber(qtdCabecas)) / 15;
+  return ((toNumber(pesoFinal) - toNumber(pesoInicial)) * toNonNegativeNumber(qtdCabecas)) / 15;
 }
 
 /**

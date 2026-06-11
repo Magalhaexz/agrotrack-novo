@@ -15,36 +15,40 @@ import LotesFilters from '../components/lotes/LotesFilters';
 import LotesPageHeader from '../components/lotes/LotesPageHeader';
 import RetiradaAnimaisModal from '../components/lotes/RetiradaAnimaisModal';
 import FechamentoLoteModal from '../components/lotes/FechamentoLoteModal';
+import {
+  addDaysToDate,
+  calculateDailyConsumptionKg,
+  daysBetween,
+  toDateKey,
+  toNumber,
+} from '../domain/calcHelpers.js';
 import '../styles/rebanho.css';
 
-function toNumber(value) {
-  const parsed = Number(value);
-  return Number.isFinite(parsed) ? parsed : 0;
-}
-
 function daysFrom(dateValue) {
-  if (!dateValue) return 0;
-  const ms = Date.now() - new Date(dateValue).getTime();
-  return Math.max(0, Math.floor(ms / 86400000));
+  const key = toDateKey(dateValue);
+  if (!key) return 0;
+  return Math.max(0, daysBetween(key, new Date().toISOString().slice(0, 10)));
 }
 
 function calculateGmd30(pesagens = []) {
-  const sorted = [...pesagens].sort((a, b) => new Date(a.data) - new Date(b.data));
+  const sorted = [...pesagens]
+    .map((item) => ({ ...item, data: toDateKey(item?.data) }))
+    .filter((item) => item.data)
+    .sort((a, b) => a.data.localeCompare(b.data));
   if (sorted.length < 2) return 0;
   const last = sorted[sorted.length - 1];
-  const targetDate = new Date(last.data);
-  targetDate.setDate(targetDate.getDate() - 30);
+  const targetDate = addDaysToDate(last.data, -30);
 
   let start = sorted[0];
   for (let i = sorted.length - 1; i >= 0; i -= 1) {
-    if (new Date(sorted[i].data) <= targetDate) {
+    if (sorted[i].data <= targetDate) {
       start = sorted[i];
       break;
     }
   }
 
   const gain = toNumber(last.peso_medio) - toNumber(start.peso_medio);
-  const days = Math.max(1, Math.round((new Date(last.data) - new Date(start.data)) / 86400000));
+  const days = Math.max(1, daysBetween(start.data, last.data));
   return gain / days;
 }
 
@@ -60,10 +64,14 @@ function calculateDailyPlannedConsumption(lote, heads, pesoAtual) {
     return toNumber(lote.consumo_total_estimado) / toNumber(lote.dias_estimados);
   }
 
-  const percentualPv = consumoTipo === 'percentual_pv'
-    ? consumoInformado
-    : toNumber(lote?.supl_pv_pct);
-  return heads * (pesoAtual * (percentualPv / 100));
+  return calculateDailyConsumptionKg({
+    mode: consumoTipo,
+    heads,
+    pesoInicial: toNumber(lote?.p_ini || pesoAtual),
+    pesoFinal: pesoAtual,
+    percentualPv: consumoTipo === 'percentual_pv' ? consumoInformado : toNumber(lote?.supl_pv_pct),
+    kgPorCabeca: consumoInformado,
+  });
 }
 
 function normalizeStatus(lote) {
@@ -104,7 +112,10 @@ export default function LotesPage({ db, setDb, onRegistrarSaidaAnimal, session }
 
   const lotesEnriquecidos = useMemo(() => lotes.map((lote) => {
     const lotePesagens = pesagens.filter((item) => Number(item.lote_id) === Number(lote.id));
-    const latestPesagem = [...lotePesagens].sort((a, b) => new Date(b.data) - new Date(a.data))[0];
+    const latestPesagem = [...lotePesagens]
+      .map((item) => ({ ...item, data: toDateKey(item?.data) }))
+      .filter((item) => item.data)
+      .sort((a, b) => b.data.localeCompare(a.data))[0];
     const resumo = getResumoLote(db, lote.id);
     const indicators = calcLote(db, lote.id);
     const pesoInicialPlanejado = toNumber(lote.p_ini || indicators.pesoInicialMedio);
@@ -331,7 +342,9 @@ export default function LotesPage({ db, setDb, onRegistrarSaidaAnimal, session }
     const historico = [
       ...lotePesagens.map((item) => ({ ...item, key: `pesagem-${item.id}`, tipo: 'pesagem' })),
       ...movAnimais.filter((item) => Number(item.lote_id) === Number(selectedLote.id)).map((item) => ({ ...item, key: `mov-${item.id}` })),
-    ].sort((a, b) => new Date(b.data) - new Date(a.data));
+    ]
+      .map((item) => ({ ...item, data: toDateKey(item?.data) }))
+      .sort((a, b) => String(b.data || '').localeCompare(String(a.data || '')));
 
     const consumoNutricao = calculateDailyPlannedConsumption(selectedLote, selectedLote.heads, selectedLote.pesoAtual);
 

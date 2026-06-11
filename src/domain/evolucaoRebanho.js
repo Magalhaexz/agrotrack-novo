@@ -1,7 +1,4 @@
-function toNumber(value) {
-  const parsed = Number(value);
-  return Number.isFinite(parsed) ? parsed : 0;
-}
+import { toDateKey, toNonNegativeNumber } from './calcHelpers.js';
 
 function isAtivo(animal) {
   const status = String(animal?.status || 'ativo').toLowerCase();
@@ -31,18 +28,15 @@ function getDeltaEstoque(tipo, qtd) {
   return 0;
 }
 
-function formatDateKey(value) {
-  if (!value) return '';
-  return String(value).slice(0, 10);
-}
-
 export function computeEvolucaoRebanho(db, periodStart, periodEnd) {
   const animais = Array.isArray(db?.animais) ? db.animais : [];
   const movimentos = Array.isArray(db?.movimentacoes_animais) ? db.movimentacoes_animais : [];
-  const start = formatDateKey(periodStart);
-  const end = formatDateKey(periodEnd);
+  const startKey = toDateKey(periodStart) || '0000-01-01';
+  const endKey = toDateKey(periodEnd) || '9999-12-31';
+  const start = startKey <= endKey ? startKey : endKey;
+  const end = startKey <= endKey ? endKey : startKey;
 
-  const estoqueAtual = animais.reduce((sum, animal) => sum + (isAtivo(animal) ? toNumber(animal?.qtd || 1) : 0), 0);
+  const estoqueAtual = animais.reduce((sum, animal) => sum + (isAtivo(animal) ? toNonNegativeNumber(animal?.qtd || 1) : 0), 0);
 
   const resumo = {
     estoque_inicial: 0,
@@ -61,10 +55,10 @@ export function computeEvolucaoRebanho(db, periodStart, periodEnd) {
   let netWithin = 0;
 
   movimentos.forEach((mov) => {
-    const data = formatDateKey(mov?.data);
+    const data = toDateKey(mov?.data);
     if (!data) return;
     const tipo = normalizeTipo(mov?.tipo);
-    const qtd = Math.max(0, toNumber(mov?.qtd));
+    const qtd = toNonNegativeNumber(mov?.qtd);
     if (!qtd) return;
 
     const delta = getDeltaEstoque(tipo, qtd);
@@ -102,4 +96,3 @@ export function computeEvolucaoRebanho(db, periodStart, periodEnd) {
     movimentosPeriodo: rows.sort((a, b) => String(a.data).localeCompare(String(b.data))),
   };
 }
-

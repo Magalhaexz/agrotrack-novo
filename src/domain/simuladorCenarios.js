@@ -1,9 +1,5 @@
 import { computeIndicadoresEstrategicos } from './indicadoresEstrategicos.js';
-
-function toNumber(value) {
-  const parsed = Number(value);
-  return Number.isFinite(parsed) ? parsed : 0;
-}
+import { toNonNegativeNumber, toNumber } from './calcHelpers.js';
 
 function round2(value) {
   const safe = toNumber(value);
@@ -17,12 +13,12 @@ function getPesoMedioAtual(db) {
     return !['vendido', 'morte', 'descarte', 'transferencia', 'perda', 'inativo'].includes(status);
   });
 
-  const totalCabecas = ativos.reduce((sum, animal) => sum + toNumber(animal?.qtd || 1), 0);
+  const totalCabecas = ativos.reduce((sum, animal) => sum + toNonNegativeNumber(animal?.qtd || 1), 0);
   if (!totalCabecas) return null;
 
   const pesoTotal = ativos.reduce((sum, animal) => {
-    const qtd = toNumber(animal?.qtd || 1);
-    const peso = toNumber(animal?.p_at || animal?.peso_vivo_kg || animal?.p_ini);
+    const qtd = toNonNegativeNumber(animal?.qtd || 1);
+    const peso = toNonNegativeNumber(animal?.p_at || animal?.peso_vivo_kg || animal?.p_ini);
     return sum + (qtd * peso);
   }, 0);
   return totalCabecas > 0 ? (pesoTotal / totalCabecas) : null;
@@ -36,12 +32,12 @@ export function calcularProjecaoCenario(db, periodoInicio, periodoFim, scenario 
   const uaAtual = toNumber(base?.unidadeAnimal?.uaTotalFazenda);
   const pesoMedioAtual = getPesoMedioAtual(db);
 
-  const comprasSimuladas = Math.max(0, toNumber(scenario?.compras_simuladas));
-  const vendasSimuladas = Math.max(0, toNumber(scenario?.vendas_simuladas));
-  const mortalidadePct = Math.max(0, toNumber(scenario?.mortalidade_pct));
-  const natalidadePct = Math.max(0, toNumber(scenario?.natalidade_pct));
-  const valorMedioVenda = Math.max(0, toNumber(scenario?.valor_medio_venda));
-  const custoMedioCompra = Math.max(0, toNumber(scenario?.custo_medio_compra));
+  const comprasSimuladas = toNonNegativeNumber(scenario?.compras_simuladas);
+  const vendasSimuladas = toNonNegativeNumber(scenario?.vendas_simuladas);
+  const mortalidadePct = toNonNegativeNumber(scenario?.mortalidade_pct);
+  const natalidadePct = toNonNegativeNumber(scenario?.natalidade_pct);
+  const valorMedioVenda = toNonNegativeNumber(scenario?.valor_medio_venda);
+  const custoMedioCompra = toNonNegativeNumber(scenario?.custo_medio_compra);
 
   const mortesSimuladas = round2(estoqueAtual * (mortalidadePct / 100));
   const nascimentosSimulados = round2(estoqueAtual * (natalidadePct / 100));
@@ -62,8 +58,8 @@ export function calcularProjecaoCenario(db, periodoInicio, periodoFim, scenario 
   const custoProjetado = round2(custoAtual + valorComprasSimuladas);
   const margemBrutaProjetada = round2(receitaProjetada - custoProjetado);
 
-  const capacidadeSuporteUa = toNumber(scenario?.capacidade_suporte_ua);
-  const areaPastagemHa = toNumber(scenario?.area_pastagem_ha);
+  const capacidadeSuporteUa = toNonNegativeNumber(scenario?.capacidade_suporte_ua);
+  const areaPastagemHa = toNonNegativeNumber(scenario?.area_pastagem_ha);
   const capacidadeTotalUa = capacidadeSuporteUa > 0
     ? capacidadeSuporteUa
     : round2(areaPastagemHa * toNumber(base?.pastagem?.capacidadeMediaUaHa));
@@ -110,4 +106,3 @@ export function calcularProjecaoCenario(db, periodoInicio, periodoFim, scenario 
     },
   };
 }
-

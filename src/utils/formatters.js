@@ -31,7 +31,7 @@ export const parseNumeroEntrada = (valor) => {
 };
 
 export const formatarMoeda = (valor) =>
-  new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(valor || 0);
+  new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(parseNumeroEntrada(valor) || 0);
 
 export const formatarNumero = (valor, casas = 2) => {
   const numero = parseNumeroEntrada(valor);
@@ -40,7 +40,9 @@ export const formatarNumero = (valor, casas = 2) => {
 
 export const formatarData = (data) => {
   if (!data) return '-';
-  return new Date(`${data}T00:00:00`).toLocaleDateString('pt-BR');
+  const date = new Date(`${String(data).slice(0, 10)}T00:00:00`);
+  if (Number.isNaN(date.getTime())) return '-';
+  return date.toLocaleDateString('pt-BR');
 };
 
 export const formatarArroba = (valor) => {

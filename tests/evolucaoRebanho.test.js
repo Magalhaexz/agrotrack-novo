@@ -4,14 +4,15 @@ import { computeEvolucaoRebanho } from '../src/domain/evolucaoRebanho.js';
 
 test('computeEvolucaoRebanho calcula estoque inicial/final e variacao sem NaN', () => {
   const db = {
-    animais: [{ qtd: 100, status: 'ativo' }],
+    animais: [{ qtd: '100', status: 'ativo' }],
     movimentacoes_animais: [
-      { id: 1, data: '2026-01-10', tipo: 'compra', qtd: 10 },
-      { id: 2, data: '2026-01-12', tipo: 'venda', qtd: 5 },
-      { id: 3, data: '2026-01-15', tipo: 'morte', qtd: 2 },
-      { id: 4, data: '2026-01-18', tipo: 'nascimento', qtd: 3 },
-      { id: 5, data: '2026-01-20', tipo: 'transferencia_entrada', qtd: 4 },
-      { id: 6, data: '2026-01-22', tipo: 'transferencia_saida', qtd: 1 },
+      { id: 1, data: '2026-01-10', tipo: 'compra', qtd: '10' },
+      { id: 2, data: '2026-01-12', tipo: 'venda', qtd: '5' },
+      { id: 3, data: '2026-01-15', tipo: 'morte', qtd: '2' },
+      { id: 4, data: '2026-01-18', tipo: 'nascimento', qtd: '3' },
+      { id: 5, data: '2026-01-20', tipo: 'transferencia_entrada', qtd: '4' },
+      { id: 6, data: '2026-01-22', tipo: 'transferencia_saida', qtd: '1' },
+      { id: 7, data: 'data-invalida', tipo: 'compra', qtd: '999' },
     ],
   };
 
@@ -32,3 +33,13 @@ test('computeEvolucaoRebanho calcula estoque inicial/final e variacao sem NaN', 
   );
 });
 
+test('computeEvolucaoRebanho ignora datas invalidas sem quebrar os acumulados', () => {
+  const db = {
+    animais: [{ qtd: 50, status: 'ativo' }],
+    movimentacoes_animais: [{ id: 1, data: 'not-a-date', tipo: 'compra', qtd: 10 }],
+  };
+
+  const { resumo } = computeEvolucaoRebanho(db, '2026-01-01', '2026-01-31');
+  assert.equal(resumo.compras, 0);
+  assert.equal(resumo.estoque_final, 50);
+});

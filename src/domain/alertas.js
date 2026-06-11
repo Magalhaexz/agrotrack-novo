@@ -1,7 +1,7 @@
+import { daysBetween, toDateKey } from './calcHelpers.js';
 import { formatDate } from '../utils/calculations'; // Assuming this function is robust
 
 // Constants for clarity and easy modification
-const MS_PER_DAY = 86400000;
 const CRITICAL_STOCK_THRESHOLD_PERCENT = 0.2; // 20% of peak
 const CALENDAR_ALERT_DAYS_THRESHOLD = 7; // Alert for events within 7 days (including overdue)
 const PESAGEM_NO_ALERT_DAYS_THRESHOLD = 30; // No alert if last weighing was within 30 days
@@ -9,10 +9,9 @@ const PESAGEM_VENCIDO_DAYS_THRESHOLD = 45; // Weighing overdue if more than 45 d
 const LOTE_SAIDA_ALERT_DAYS_THRESHOLD = 7; // Alert for lot exit within 7 days (including overdue)
 
 function daysUntil(dateStr) {
-  if (!dateStr) return Infinity;
-  const now = new Date(); now.setHours(0, 0, 0, 0);
-  const dt = new Date(dateStr); dt.setHours(0, 0, 0, 0);
-  return Math.round((dt - now) / MS_PER_DAY);
+  const target = toDateKey(dateStr);
+  if (!target) return Infinity;
+  return daysBetween(new Date().toISOString().slice(0, 10), target);
 }
 
 function urgenciaFromDays(days) {
@@ -90,7 +89,7 @@ export function gerarAlertasPesagem(db) {
   const pesagens = db.pesagens || [];
   // Pre-process pesagens to find the latest for each lot
   const latestPesagensByLoteId = new Map();
-  pesagens.sort((a, b) => new Date(b.data) - new Date(a.data)); // Sort once descending
+    pesagens.sort((a, b) => toDateKey(b.data).localeCompare(toDateKey(a.data))); // Sort once descending
   pesagens.forEach(p => {
     if (!latestPesagensByLoteId.has(p.lote_id)) {
       latestPesagensByLoteId.set(p.lote_id, p);

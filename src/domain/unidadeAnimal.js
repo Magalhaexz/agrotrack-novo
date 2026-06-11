@@ -1,10 +1,7 @@
-function toNumber(value) {
-  const parsed = Number(value);
-  return Number.isFinite(parsed) ? parsed : 0;
-}
+import { toNumber, toNonNegativeNumber } from './calcHelpers.js';
 
 export function calcularUaPorAnimal(pesoVivoKg) {
-  return toNumber(pesoVivoKg) / 450;
+  return toNonNegativeNumber(pesoVivoKg) / 450;
 }
 
 export function calcularUaPorLote(animais = [], loteId) {
@@ -12,7 +9,7 @@ export function calcularUaPorLote(animais = [], loteId) {
     .filter((animal) => Number(animal?.lote_id) === Number(loteId))
     .reduce((sum, animal) => {
       const pesoVivo = toNumber(animal?.p_at || animal?.peso_vivo_kg || animal?.p_ini);
-      const qtd = toNumber(animal?.qtd);
+      const qtd = toNonNegativeNumber(animal?.qtd);
       return sum + (calcularUaPorAnimal(pesoVivo) * qtd);
     }, 0);
 }
@@ -20,14 +17,14 @@ export function calcularUaPorLote(animais = [], loteId) {
 export function calcularUaTotalFazenda(animais = []) {
   return (Array.isArray(animais) ? animais : []).reduce((sum, animal) => {
     const pesoVivo = toNumber(animal?.p_at || animal?.peso_vivo_kg || animal?.p_ini);
-    const qtd = toNumber(animal?.qtd);
+    const qtd = toNonNegativeNumber(animal?.qtd);
     return sum + (calcularUaPorAnimal(pesoVivo) * qtd);
   }, 0);
 }
 
 export function calcularCapacidadeTotalUa(pastagens = []) {
   return (Array.isArray(pastagens) ? pastagens : []).reduce((sum, pastagem) => {
-    return sum + (toNumber(pastagem?.area_ha) * toNumber(pastagem?.capacidade_suporte_ua_ha));
+    return sum + (toNonNegativeNumber(pastagem?.area_ha) * toNonNegativeNumber(pastagem?.capacidade_suporte_ua_ha));
   }, 0);
 }
 
@@ -44,4 +41,3 @@ export function calcularDiagnosticoCapacidade({ animais = [], pastagens = [] } =
     superlotado: statusCapacidade === 'superlotado',
   };
 }
-

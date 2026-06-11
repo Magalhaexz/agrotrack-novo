@@ -1,14 +1,13 @@
 
 import React from 'react';
+import { daysBetween, toDateKey } from '../domain/calcHelpers.js';
 
 // Funções auxiliares (manter fora do componente para evitar recriação desnecessária)
 function calcularDias(dataInicial, dataFinal) {
-  if (!dataInicial || !dataFinal) return 0;
-  const inicio = new Date(dataInicial);
-  const fim = new Date(dataFinal);
-  const diferencaMs = fim - inicio;
-  const dias = Math.round(diferencaMs / (1000 * 60 * 60 * 24));
-  return dias > 0 ? dias : 0;
+  const inicio = toDateKey(dataInicial);
+  const fim = toDateKey(dataFinal);
+  if (!inicio || !fim) return 0;
+  return Math.max(0, daysBetween(inicio, fim));
 }
 
 function criarTicks(min, max, quantidade) {
@@ -25,8 +24,9 @@ function formatarTick(valor) {
 }
 
 function formatarDataCurta(data) {
-  if (!data) return '—';
-  const [, mes, dia] = data.split('-');
+  const dateKey = toDateKey(data);
+  if (!dateKey) return '—';
+  const [, mes, dia] = dateKey.split('-');
   return `${dia}/${mes}`;
 }
 
@@ -76,7 +76,7 @@ export default function PesoChart({ data = [], metaGmd = 0 }) {
   const paddingBottom = 72;
 
   // Calcula dados com peso esperado
-  const primeiraData = data[0]?.data;
+  const primeiraData = toDateKey(data[0]?.data);
   const primeiroPeso = Number(data[0]?.peso_medio || 0);
 
   const dataComEsperado = data.map((item) => {

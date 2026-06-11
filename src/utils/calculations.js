@@ -1,3 +1,11 @@
+import {
+  daysBetween,
+  safeDivide,
+  toDateKey,
+  toNonNegativeNumber,
+  toNumber,
+} from '../domain/calcHelpers.js';
+
 /**
  * Formata um número para exibição com um número específico de casas decimais, usando o locale pt-BR.
  * Retorna '-' para valores indefinidos, nulos ou não numéricos.
@@ -36,8 +44,9 @@ export const formatCurrency = (value) => {
  * @returns {string} A data formatada ou '—'.
  */
 export const formatDate = (value) => {
-  if (!value) return '-';
-  const [y, m, d] = value.split('-');
+  const dateKey = toDateKey(value);
+  if (!dateKey) return '-';
+  const [y, m, d] = dateKey.split('-');
   return `${d}/${m}/${y}`;
 };
 
@@ -48,24 +57,15 @@ export const formatDate = (value) => {
  * @returns {number} A diferença em dias.
  */
 export const daysDiff = (dateStr) => {
-  if (!dateStr) return 999; // Consider returning null or throwing an error for clearer handling
-  const today = new Date();
-  today.setHours(0, 0, 0, 0); // Zera a hora para comparação de dias
-  const target = new Date(dateStr);
-  target.setHours(0, 0, 0, 0); // Zera a hora para comparação de dias
-  return Math.round((target.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
+  const target = toDateKey(dateStr);
+  if (!target) return 999;
+  const today = new Date().toISOString().slice(0, 10);
+  return daysBetween(today, target);
 };
 
 // Compatibilidade com import legado
 export const calcularDias = daysDiff;
 
-
-/**
- * Converte um valor para número, tratando valores nulos/indefinidos como 0.
- * @param {*} value - O valor a ser convertido.
- * @returns {number} O valor numérico.
- */
-const toNumber = (value) => Number(value || 0);
 
 /**
  * Calcula diversos indicadores financeiros e de desempenho para um lote específico.
@@ -119,7 +119,7 @@ export const calcLote = (db, loteId) => {
   const animaisDoLote = animais.filter((item) => toNumber(item.lote_id) === toNumber(loteId));
   const custosDoLote = custos.filter((item) => toNumber(item.lote_id) === toNumber(loteId));
 
-  const totalAnimais = animaisDoLote.reduce((sum, item) => sum + toNumber(item.qtd), 0);
+  const totalAnimais = animaisDoLote.reduce((sum, item) => sum + toNonNegativeNumber(item.qtd), 0);
   const totalCustos = custosDoLote.reduce((sum, item) => sum + toNumber(item.val), 0);
   const machos = animaisDoLote.filter((item) => item.sexo === 'macho');
   const femeas = animaisDoLote.filter((item) => item.sexo === 'fêmea');
@@ -143,9 +143,14 @@ export const calcLote = (db, loteId) => {
     return totalGainPerDay / quantity;
   };
 
-  const gainTotal = animaisDoLote.reduce((sum, item) => sum + (toNumber(item.p_at) - toNumber(item.p_ini)) * toNumber(item.qtd), 0);
+  const gainTotal = animaisDoLote.reduce((sum, item) => sum + (toNumber(item.p_at) - toNumber(item.p_ini)) * toNonNegativeNumber(item.qtd), 0);
   const arrobasProduzidas = gainTotal / 15; // 1 arroba = 15 kg
-  const dias = toNumber(animaisDoLote[0]?.dias || 0); // Assume que 'dias' é o mesmo para todos os animais no lote
+  const dias = totalAnimais
+    ? safeDivide(
+        animaisDoLote.reduce((sum, item) => sum + toNumber(item.dias) * toNonNegativeNumber(item.qtd), 0),
+        totalAnimais
+      )
+    : 0;
 
   const pesoInicialMedio = totalAnimais
     ? animaisDoLote.reduce((sum, item) => sum + toNumber(item.p_ini) * toNumber(item.qtd), 0) / totalAnimais

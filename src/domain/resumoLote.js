@@ -1,16 +1,6 @@
 import { calcularResultadoLote } from './calculos.js';
 import { calcLote } from '../utils/calculations.js';
-
-function toNumber(value) {
-  const parsed = Number(value);
-  return Number.isFinite(parsed) ? parsed : 0;
-}
-
-function safeDivide(value, divisor) {
-  if (!Number.isFinite(divisor) || divisor === 0) return 0;
-  const result = value / divisor;
-  return Number.isFinite(result) ? result : 0;
-}
+import { safeDivide, toNumber } from './calcHelpers.js';
 
 function buildInsights({ lote, totalAnimais, lucroTotal, gmdKgDia, custoPorArroba, margemPct }) {
   const insights = [];

@@ -6,6 +6,7 @@ import { formatarNumero, formatarData } from '../utils/formatters';
 import { gerarNovoId } from '../utils/id';
 import { useToast } from '../hooks/useToast';
 import { useAuth } from '../auth/useAuth';
+import { daysBetween, toDateKey } from '../domain/calcHelpers.js';
 import {
   createOperationalRecord,
   deleteOperationalRecord,
@@ -116,11 +117,10 @@ function resolveTipoPesagem(item) {
 
 function resolveLatestPesagem(pesagens) {
   return [...(pesagens || [])]
+    .map((item) => ({ ...item, data: toDateKey(item?.data) }))
     .filter((item) => item?.data)
     .sort((a, b) => {
-      const timeA = new Date(a.data).getTime();
-      const timeB = new Date(b.data).getTime();
-      if (timeA !== timeB) return timeB - timeA;
+      if (a.data !== b.data) return b.data.localeCompare(a.data);
       return toFiniteNumber(b.id) - toFiniteNumber(a.id);
     })[0] || null;
 }
@@ -139,14 +139,15 @@ function calculateAverageGmdByLote(pesagens = []) {
   const gmdValues = [];
   pesagensPorLote.forEach((lotePesagens) => {
     const sorted = [...lotePesagens]
+      .map((item) => ({ ...item, data: toDateKey(item?.data) }))
       .filter((item) => item?.data && Number.isFinite(Number(item?.peso_medio)))
-      .sort((a, b) => new Date(a.data) - new Date(b.data));
+      .sort((a, b) => a.data.localeCompare(b.data));
 
     if (sorted.length < 2) return;
 
     const primeira = sorted[0];
     const ultima = sorted[sorted.length - 1];
-    const dias = Math.round((new Date(ultima.data) - new Date(primeira.data)) / 86400000);
+    const dias = daysBetween(primeira.data, ultima.data);
     if (!Number.isFinite(dias) || dias <= 0) return;
 
     const ganho = Number(ultima.peso_medio) - Number(primeira.peso_medio);
@@ -252,7 +253,7 @@ export default function PesagensPage({ db, setDb, onConfirmAction, navigationInt
 
     const variacaoPorPesagem = new Map();
     pesagensPorLote.forEach((lotePesagens) => {
-      lotePesagens.sort((a, b) => new Date(a.data) - new Date(b.data));
+      lotePesagens.sort((a, b) => toDateKey(a.data).localeCompare(toDateKey(b.data)));
       for (let i = 0; i < lotePesagens.length; i += 1) {
         const atual = lotePesagens[i];
         const anterior = i > 0 ? lotePesagens[i - 1] : null;
@@ -262,6 +263,8 @@ export default function PesagensPage({ db, setDb, onConfirmAction, navigationInt
     });
 
     return [...(pesagens || [])]
+      .map((pesagem) => ({ ...pesagem, data: toDateKey(pesagem?.data) }))
+      .filter((pesagem) => pesagem.data)
       .map((pesagem) => {
         const tipo = resolveTipoPesagem(pesagem);
         const animalId = normalizeIdKey(pesagem?.animal_id);
@@ -287,7 +290,7 @@ export default function PesagensPage({ db, setDb, onConfirmAction, navigationInt
           variacao: tipo === 'lote' ? variacaoPorPesagem.get(pesagem.id) ?? null : null,
         };
       })
-      .sort((a, b) => new Date(b.data) - new Date(a.data));
+      .sort((a, b) => b.data.localeCompare(a.data));
   }, [pesagens, lotesMap, animaisMap]);
 
   const resumo = useMemo(() => {
@@ -303,7 +306,7 @@ export default function PesagensPage({ db, setDb, onConfirmAction, navigationInt
       lotesComPesagem.add(pesagem.lote_id);
       totalPesoMedio += Number(pesagem.peso_medio || 0);
       if (resolveTipoPesagem(pesagem) === 'animal') totalPesagensAnimal += 1;
-      const currentTimestamp = new Date(pesagem.data).getTime();
+      const currentTimestamp = new Date(`${toDateKey(pesagem.data)}T00:00:00`).getTime();
       if (currentTimestamp > latestTimestamp) {
         latestTimestamp = currentTimestamp;
         ultimaData = pesagem.data;
@@ -811,9 +814,9 @@ export default function PesagensPage({ db, setDb, onConfirmAction, navigationInt
     const hoje = new Date();
     const diasSemPesagem = 30;
     const lotesSemPesagem = (lotes || []).filter((lote) => {
-      const data = lote?.ultima_pesagem;
+      const data = toDateKey(lote?.ultima_pesagem);
       if (!data) return true;
-      return (hoje - new Date(data)) / (1000 * 60 * 60 * 24) > diasSemPesagem;
+      return daysBetween(data, hoje.toISOString().slice(0, 10)) > diasSemPesagem;
     });
     const animaisSemPesagem = (animais || []).filter((animal) => !dadosTabela.some((p) => (
       p.tipo === 'animal' && idsMatch(p.animal_id, animal.id)

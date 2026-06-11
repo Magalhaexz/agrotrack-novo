@@ -6,6 +6,7 @@ import { createOperationalRecord, updateOperationalRecord } from '../services/op
 import { formatarNumero, formatarData } from '../utils/formatters';
 import { calcularDias } from '../utils/calculations';
 import { gerarNovoId } from '../utils/id';
+import { toDateKey } from '../domain/calcHelpers.js';
 
 function toNumber(value, fallback = 0) {
   const n = Number(value);
@@ -123,7 +124,9 @@ export default function AcompanhamentoPesoPage({ db, setDb }) {
   const pesagensLote = useMemo(() => {
     return pesagens
       .filter((item) => String(item?.lote_id) === String(loteSelecionado))
-      .sort((a, b) => new Date(a.data).getTime() - new Date(b.data).getTime());
+      .map((item) => ({ ...item, data: toDateKey(item?.data) }))
+      .filter((item) => item.data)
+      .sort((a, b) => a.data.localeCompare(b.data));
   }, [pesagens, loteSelecionado]);
   const pesagensLoteTipoLote = useMemo(
     () => pesagensLote.filter((item) => String(item?.tipo || '') !== 'animal'),
@@ -150,7 +153,7 @@ export default function AcompanhamentoPesoPage({ db, setDb }) {
         if (!map.has(key)) map.set(key, []);
         map.get(key).push(item);
       });
-    map.forEach((list) => list.sort((a, b) => new Date(a.data).getTime() - new Date(b.data).getTime()));
+    map.forEach((list) => list.sort((a, b) => toDateKey(a.data).localeCompare(toDateKey(b.data))));
     return map;
   }, [pesagens, loteSelecionado]);
 

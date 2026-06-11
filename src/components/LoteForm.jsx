@@ -2,6 +2,14 @@ import { useMemo, useState } from 'react';
 import Modal from './ui/Modal';
 import Button from './ui/Button';
 import Input from './ui/Input';
+import {
+  addDaysToDate,
+  calculateDailyConsumptionKg,
+  calculateConsumptionCost,
+  calculateEstimatedDays,
+  toDateKey,
+  toNumber,
+} from '../domain/calcHelpers.js';
 
 const TIPOS_OPERACAO = ['recria', 'engorda', 'recria+engorda', 'confinamento'];
 const SISTEMAS = ['confinamento', 'semi-confinamento', 'pasto'];
@@ -45,32 +53,22 @@ const FORM_VAZIO = {
   supl_meta_dias: 30,
 };
 
-function toNumber(value) {
-  if (value === '' || value === null || value === undefined) return 0;
-  const parsed = Number(String(value).replace(',', '.'));
-  return Number.isFinite(parsed) ? parsed : 0;
-}
-
 function formatNumber(value, fractionDigits = 2) {
   return new Intl.NumberFormat('pt-BR', {
     minimumFractionDigits: fractionDigits,
     maximumFractionDigits: fractionDigits,
-  }).format(Number.isFinite(Number(value)) ? Number(value) : 0);
+  }).format(toNumber(value));
 }
 
 function formatDateBr(value) {
-  if (!value) return '';
-  const [year, month, day] = String(value).split('-');
-  if (!year || !month || !day) return value;
+  const dateKey = toDateKey(value);
+  if (!dateKey) return '';
+  const [year, month, day] = dateKey.split('-');
   return `${day}/${month}/${year}`;
 }
 
 function addDays(dateValue, days) {
-  if (!dateValue || !Number.isFinite(days) || days <= 0) return '';
-  const date = new Date(`${dateValue}T00:00:00`);
-  if (Number.isNaN(date.getTime())) return '';
-  date.setDate(date.getDate() + days);
-  return date.toISOString().slice(0, 10);
+  return addDaysToDate(dateValue, days);
 }
 
 function stripPlanningSummary(text) {
@@ -106,8 +104,8 @@ function getConsumoTipoLabel(tipo) {
 
 function getInitialConsumoTipo(data) {
   if (data?.consumo_tipo) return data.consumo_tipo;
-  if (Number(data?.consumo_por_cabeca_dia || 0) > 0) return 'kg_cab_dia';
-  if (Number(data?.supl_pv_pct || 0) > 0) return 'percentual_pv';
+  if (toNumber(data?.consumo_por_cabeca_dia) > 0) return 'kg_cab_dia';
+  if (toNumber(data?.supl_pv_pct) > 0) return 'percentual_pv';
   return 'percentual_pv';
 }
 
@@ -167,23 +165,20 @@ function calcularPlanejamento(form) {
   const gmdEsperado = toNumber(form.gmd_meta);
   const consumoInformado = toNumber(form.consumo_por_cabeca_dia);
   const precoKg = toNumber(form.supl_rkg);
-  const ganhoPlanejado = pesoAlvo - pesoInicial;
-  const diasEstimados = ganhoPlanejado > 0 && gmdEsperado > 0
-    ? Math.ceil(ganhoPlanejado / gmdEsperado)
-    : 0;
-  const pesoReferencia = pesoInicial > 0 && pesoAlvo > 0
-    ? (pesoInicial + pesoAlvo) / 2
-    : Math.max(pesoInicial, pesoAlvo, 0);
-  const consumoKgDiaPorAnimal = form.consumo_tipo === 'percentual_pv'
-    ? (pesoReferencia * consumoInformado) / 100
-    : consumoInformado;
-  const consumoTotalEstimado = consumoKgDiaPorAnimal > 0 && quantidade > 0 && diasEstimados > 0
+  const diasEstimados = calculateEstimatedDays(pesoInicial, pesoAlvo, gmdEsperado);
+  const consumoKgDiaPorAnimal = calculateDailyConsumptionKg({
+    mode: form.consumo_tipo,
+    heads: 1,
+    pesoInicial,
+    pesoFinal: pesoAlvo,
+    percentualPv: consumoInformado,
+    kgPorCabeca: consumoInformado,
+  });
+  const consumoTotalEstimado = quantidade > 0 && diasEstimados > 0
     ? consumoKgDiaPorAnimal * quantidade * diasEstimados
     : 0;
-  const custoEstimadoTotal = consumoTotalEstimado > 0 && precoKg > 0
-    ? consumoTotalEstimado * precoKg
-    : 0;
-  const dataPrevistaSaida = addDays(form.entrada, diasEstimados);
+  const custoEstimadoTotal = calculateConsumptionCost(consumoTotalEstimado, precoKg);
+  const dataPrevistaSaida = addDays(form.entrada, Math.round(diasEstimados));
 
   return {
     diasEstimados,

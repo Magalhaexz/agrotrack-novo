@@ -10,6 +10,7 @@ import GraficoGmd from '../components/comparativo/GraficoGmd';
 import RankingLotes from '../components/comparativo/RankingLotes';
 import SeletorLotes from '../components/comparativo/SeletorLotes';
 import TabelaComparativa from '../components/comparativo/TabelaComparativa';
+import { calculateEstimatedDays } from '../domain/calcHelpers.js';
 import '../styles/comparativo.css';
 
 const coresLotes = ['#22C55E', '#3B82F6', '#F59E0B', '#EF4444', '#8B5CF6', '#EC4899'];
@@ -100,9 +101,7 @@ export default function ComparativoPage({ db, onNavigate }) {
       .map(m => {
         // Calcula métricas derivadas que dependem de metaPeso ou outras
         const pctMeta = m.metaPeso ? (m.pesoAtual / m.metaPeso) * 100 : 0;
-        const diasSaida = m.gmd > 0 && m.metaPeso > m.pesoAtual
-          ? Math.ceil((m.metaPeso - m.pesoAtual) / m.gmd)
-          : 0;
+        const diasSaida = calculateEstimatedDays(m.pesoAtual, m.metaPeso, m.gmd);
         return { ...m, pctMeta, diasSaida };
       });
   }, [allActiveLoteMetrics, lotesSelecionadosIds]); // Recalcula quando as métricas de todos os lotes ou os IDs selecionados mudam
