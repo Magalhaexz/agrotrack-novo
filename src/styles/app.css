@@ -9834,6 +9834,122 @@ html, body, #root, .app, .main, .main-content, .page { max-width: 100%; }
   }
 }
 
+/* Sprint 22B - sidebar polish and mobile UI cleanup */
+@media (min-width: 901px) {
+  .app-shell .sidebar-logo-actions {
+    top: 16px;
+    right: 14px;
+  }
+
+  .app-shell .sidebar-header {
+    padding-top: 48px;
+  }
+
+  .app-shell.app-shell--sidebar-collapsed .sidebar-logo-actions {
+    top: 12px;
+    right: 50%;
+  }
+
+  .app-shell.app-shell--sidebar-collapsed .sidebar-nav {
+    overflow-x: hidden;
+    overflow-y: auto;
+    padding-right: 8px;
+  }
+
+  .app-shell.app-shell--sidebar-collapsed .sidebar-nav::-webkit-scrollbar {
+    width: 8px;
+    height: 0;
+  }
+}
+
+@media (max-width: 900px) {
+  .page-shell,
+  .reports-page,
+  .rebanho-page,
+  .dashboard-page,
+  .page {
+    gap: 14px;
+  }
+
+  .page-header,
+  .dashboard-toolbar,
+  .rebanho-header {
+    gap: 8px;
+  }
+
+  .page-header h1,
+  .dashboard-toolbar-copy h1,
+  .rebanho-header h1 {
+    font-size: 1.45rem;
+    line-height: 1.15;
+  }
+
+  .page-header p,
+  .dashboard-toolbar-copy p,
+  .rebanho-header p,
+  .financeiro-subtitle {
+    line-height: 1.55;
+  }
+
+  .ui-card,
+  .section-card,
+  .kpi-card,
+  .reports-card {
+    border-radius: 20px;
+  }
+
+  .ui-card-header {
+    margin-bottom: 16px;
+    gap: 12px;
+    flex-wrap: wrap;
+  }
+
+  .ui-card-title {
+    font-size: 1.02rem;
+  }
+
+  .page-actions,
+  .reports-page-actions,
+  .action-row {
+    width: 100%;
+    flex-wrap: wrap;
+  }
+
+  .page-actions > *,
+  .reports-page-actions > *,
+  .action-row > * {
+    flex: 1 1 180px;
+  }
+
+  .dashboard-grid,
+  .report-kpi-grid,
+  .metrics-2col,
+  .form-grid.two,
+  .form-grid.three,
+  .form-grid.four {
+    grid-template-columns: 1fr;
+  }
+
+  .table-responsive {
+    border-radius: 18px;
+  }
+
+  .data-table th,
+  .data-table td {
+    padding: 12px 14px;
+  }
+
+  .empty-state {
+    padding: 18px 16px;
+    gap: 10px;
+  }
+
+  .summary-panel,
+  .summary-list {
+    gap: 12px;
+  }
+}
+
 /* Sprint 17B - shared visual polish */
 .page-shell,
 .reports-page,
