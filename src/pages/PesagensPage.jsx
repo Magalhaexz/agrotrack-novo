@@ -360,17 +360,10 @@ export default function PesagensPage({ db, setDb, onConfirmAction, navigationInt
 
     const pesagemAlvo = (pesagens || []).find((item) => item.id === id) || null;
     const persistedDelete = await deleteOperationalRecord('pesagens', id, session);
-
-    setDb((prev) => {
-      const pesagensAtuais = Array.isArray(prev?.pesagens) ? prev.pesagens : [];
-      const pesagemRemovida = pesagensAtuais.find((item) => item.id === id);
-      const pesagensRestantes = pesagensAtuais.filter((item) => item.id !== id);
-
-      if (!shouldUpdateLote(pesagemRemovida)) {
-        return { ...prev, pesagens: pesagensRestantes };
-      }
-      return recalculateLoteFromPesagens(prev, pesagemRemovida.lote_id, pesagensRestantes);
-    });
+    if (!persistedDelete.persisted) {
+      showToast({ type: 'warning', message: persistedDelete.error || 'Não foi possível confirmar a exclusão agora.' });
+      return;
+    }
 
     if (shouldUpdateLote(pesagemAlvo)) {
       const novoLote = recalculateLoteFromPesagens(
@@ -386,11 +379,23 @@ export default function PesagensPage({ db, setDb, onConfirmAction, navigationInt
           peso_medio_atual: novoLote.peso_medio_atual,
           ultima_pesagem: novoLote.ultima_pesagem,
         }, session);
-        if (!persistedDelete.persisted || !lotePersist.persisted) {
-          showToast({ type: 'warning', message: 'Exclusão salva parcialmente.' });
+        if (!lotePersist.persisted) {
+          showToast({ type: 'warning', message: lotePersist.error || 'Não foi possível confirmar a exclusão agora.' });
+          return;
         }
       }
     }
+
+    setDb((prev) => {
+      const pesagensAtuais = Array.isArray(prev?.pesagens) ? prev.pesagens : [];
+      const pesagemRemovida = pesagensAtuais.find((item) => item.id === id);
+      const pesagensRestantes = pesagensAtuais.filter((item) => item.id !== id);
+
+      if (!shouldUpdateLote(pesagemRemovida)) {
+        return { ...prev, pesagens: pesagensRestantes };
+      }
+      return recalculateLoteFromPesagens(prev, pesagemRemovida.lote_id, pesagensRestantes);
+    });
 
     showToast({ type: 'success', message: 'Pesagem excluida com sucesso!' });
   }
@@ -457,6 +462,12 @@ export default function PesagensPage({ db, setDb, onConfirmAction, navigationInt
         criados.push(result.data || { id: gerarNovoId([...(animaisAtuais || []), ...criados]), ...payload });
       }
 
+      const batch = await persistCollectionMutation(persisted.map((item) => Promise.resolve(item)));
+      if (!batch.persisted) {
+        showToast({ type: 'warning', message: 'Não foi possível confirmar todos os cadastros agora.' });
+        return;
+      }
+
       if (criados.length) {
         setDb((prev) => ({
           ...prev,
@@ -464,12 +475,7 @@ export default function PesagensPage({ db, setDb, onConfirmAction, navigationInt
         }));
       }
 
-      const batch = await persistCollectionMutation(persisted.map((item) => Promise.resolve(item)));
-      if (!batch.persisted) {
-        showToast({ type: 'warning', message: 'Animais gerados com sucesso.' });
-      } else {
-        showToast({ type: 'success', message: 'Animais do lote gerados com sucesso.' });
-      }
+      showToast({ type: 'success', message: 'Animais do lote gerados com sucesso.' });
       return;
     }
 
@@ -689,6 +695,15 @@ export default function PesagensPage({ db, setDb, onConfirmAction, navigationInt
         }
       }
 
+      const persistedBatch = await persistCollectionMutation(resultados.map((item) => Promise.resolve(item)));
+      const totalFalhas = failedRecords.length;
+      const totalSucessos = normalizedRegistros.length - totalFalhas;
+      if (totalFalhas || !persistedBatch.persisted) {
+        setUltimoResumoBatch({ failedRecords, totalSucessos, totalFalhas });
+        showToast({ type: 'warning', message: 'Não foi possível confirmar a pesagem agora.' });
+        return null;
+      }
+
       setDb((prev) => ({
         ...prev,
         animais: [
@@ -698,19 +713,8 @@ export default function PesagensPage({ db, setDb, onConfirmAction, navigationInt
         pesagens: nextPesagens,
       }));
 
-      const persistedBatch = await persistCollectionMutation(resultados.map((item) => Promise.resolve(item)));
-      const totalFalhas = failedRecords.length;
-      const totalSucessos = normalizedRegistros.length - totalFalhas;
-      setUltimoResumoBatch(totalFalhas ? { failedRecords, totalSucessos, totalFalhas } : null);
-      if (totalFalhas && totalSucessos > 0) {
-        showToast({ type: 'warning', message: `Pesagem concluída parcialmente: ${totalSucessos} registro(s) salvo(s) e ${totalFalhas} com pendência.` });
-      } else if (totalFalhas) {
-        showToast({ type: 'error', message: `Nenhuma pesagem foi concluída sem pendência. ${totalFalhas} registro(s) exigem revisão.` });
-      } else if (!persistedBatch.persisted) {
-        showToast({ type: 'warning', message: 'Pesagem salva com sucesso.' });
-      } else {
-        showToast({ type: 'success', message: 'Pesagem salva com sucesso.' });
-      }
+      setUltimoResumoBatch(null);
+      showToast({ type: 'success', message: 'Pesagem salva com sucesso.' });
 
       setAbrirForm(false);
       setPesagemEditando(null);
@@ -761,19 +765,13 @@ export default function PesagensPage({ db, setDb, onConfirmAction, navigationInt
 
       const persistedBatch = await persistCollectionMutation(promises);
       if (!persistedBatch.persisted) {
-        showToast({ type: 'warning', message: 'Alteração salva parcialmente.' });
+        showToast({ type: 'warning', message: 'Não foi possível confirmar a alteração agora.' });
+        return;
       }
       showToast({ type: 'success', message: 'Pesagem atualizada com sucesso!' });
     } else {
       const pesagemPersistida = await createOperationalRecord('pesagens', dados, session);
       const novaPesagem = pesagemPersistida.data || { id: gerarNovoId(pesagens || []), ...dados };
-
-      setDb((prev) => {
-        const pesagensAtuais = Array.isArray(prev?.pesagens) ? prev.pesagens : [];
-        const pesagensAtualizadas = [...pesagensAtuais, novaPesagem];
-        if (!shouldUpdateLote(novaPesagem)) return { ...prev, pesagens: pesagensAtualizadas };
-        return recalculateLoteFromPesagens(prev, novaPesagem.lote_id, pesagensAtualizadas);
-      });
 
       const promises = [Promise.resolve(pesagemPersistida)];
       if (shouldUpdateLote(novaPesagem)) {
@@ -791,8 +789,15 @@ export default function PesagensPage({ db, setDb, onConfirmAction, navigationInt
 
       const persistedBatch = await persistCollectionMutation(promises);
       if (!persistedBatch.persisted) {
-        showToast({ type: 'warning', message: 'Cadastro salvo parcialmente.' });
+        showToast({ type: 'warning', message: 'Não foi possível confirmar a pesagem agora.' });
+        return;
       }
+      setDb((prev) => {
+        const pesagensAtuais = Array.isArray(prev?.pesagens) ? prev.pesagens : [];
+        const pesagensAtualizadas = [...pesagensAtuais, novaPesagem];
+        if (!shouldUpdateLote(novaPesagem)) return { ...prev, pesagens: pesagensAtualizadas };
+        return recalculateLoteFromPesagens(prev, novaPesagem.lote_id, pesagensAtualizadas);
+      });
       showToast({ type: 'success', message: 'Pesagem registrada com sucesso!' });
     }
 

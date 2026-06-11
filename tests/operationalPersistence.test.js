@@ -152,6 +152,12 @@ test('friendly persistence error messages stay neutral in Portuguese', () => {
   assert.doesNotMatch(message.toLowerCase(), /sync|sync|cloud|fallback|schema|supabase|postgrest|fila|pendente|modo local/);
 });
 
+test('friendly persistence error message remains neutral for network failures', () => {
+  const message = getFriendlySaveFailureMessage({ readinessCode: 'NETWORK_ERROR' });
+  assert.match(message, /Não foi possível confirmar o salvamento agora/i);
+  assert.doesNotMatch(message.toLowerCase(), /sync|cloud|fallback|schema|supabase|postgrest|fila|pendente|modo local/);
+});
+
 test('strict write policy can be forced for production-like checks', () => {
   assert.equal(canUseLocalRecoveryForWrite(makeSession(), { forceStrictWrite: true }), false);
   assert.equal(canUseLocalRecoveryForWrite(null, { forceStrictWrite: true }), false);

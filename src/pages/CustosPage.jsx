@@ -156,6 +156,11 @@ export default function CustosPage({ db, setDb, onConfirmAction }) {
       movPersist = await deleteOperationalRecord('movimentacoes_financeiras', movFinanceira.id, session);
     }
 
+    if (!custoPersist.persisted || !movPersist.persisted) {
+      showToast({ type: 'warning', message: 'Não foi possível confirmar a exclusão agora.' });
+      return;
+    }
+
     setDb((prev) => ({
       ...prev,
       custos: prev.custos.filter((c) => c.id !== id),
@@ -163,9 +168,6 @@ export default function CustosPage({ db, setDb, onConfirmAction }) {
         (mov) => !(mov?.origem === 'custo' && Number(mov?.origem_id) === Number(id))
       ),
     }));
-    if (!custoPersist.persisted || !movPersist.persisted) {
-      showToast({ type: 'warning', message: 'Não foi possível confirmar a exclusão agora.' });
-    }
   }
 
   /**
@@ -179,6 +181,10 @@ export default function CustosPage({ db, setDb, onConfirmAction }) {
     }
     if (custoEditando) {
       const custoPersist = await updateOperationalRecord('custos', custoEditando.id, dados, session);
+      if (!custoPersist.persisted) {
+        showToast({ type: 'warning', message: 'Não foi possível confirmar a alteração agora.' });
+        return;
+      }
       const custoFinal = { ...custoEditando, ...(custoPersist.data || dados) };
       const ledgerPayload = upsertMovimentacaoFinanceiraDeCusto(
         db?.movimentacoes_financeiras,
@@ -192,6 +198,10 @@ export default function CustosPage({ db, setDb, onConfirmAction }) {
         ledgerPersist = existente?.id
           ? await updateOperationalRecord('movimentacoes_financeiras', existente.id, ledgerPayload, session)
           : await createOperationalRecord('movimentacoes_financeiras', ledgerPayload, session);
+      }
+      if (ledgerPayload && !ledgerPersist.persisted) {
+        showToast({ type: 'warning', message: 'Não foi possível confirmar a alteração agora.' });
+        return;
       }
       setDb((prev) => ({
         ...prev,
@@ -212,32 +222,40 @@ export default function CustosPage({ db, setDb, onConfirmAction }) {
       }));
       if (!custoPersist.persisted || !ledgerPersist.persisted) {
         showToast({ type: 'warning', message: 'Não foi possível confirmar a alteração agora.' });
+        return;
       }
     } else {
       const custoPersist = await createOperationalRecord('custos', dados, session);
-      setDb((prev) => {
-        const novoCusto = {
-          id: custoPersist.data?.id || gerarNovoId(prev.custos), // Usa a função gerarNovoId
-          ...(custoPersist.data || dados),
-        };
-        const movsUpsert = upsertMovimentacaoFinanceiraDeCusto(
-          prev.movimentacoes_financeiras,
-          novoCusto
-        );
-        const movDoCusto = movsUpsert.find((mov) => mov?.origem === 'custo' && Number(mov?.origem_id) === Number(novoCusto.id));
-        if (movDoCusto) {
-          void createOperationalRecord('movimentacoes_financeiras', movDoCusto, session);
-        }
-
-        return {
-          ...prev,
-          custos: [...prev.custos, novoCusto],
-          movimentacoes_financeiras: movsUpsert,
-        };
-      });
       if (!custoPersist.persisted) {
         showToast({ type: 'warning', message: 'Não foi possível confirmar o cadastro agora.' });
+        return;
       }
+      const novoCusto = {
+        id: custoPersist.data?.id || gerarNovoId(db.custos),
+        ...(custoPersist.data || dados),
+      };
+      const movsUpsert = upsertMovimentacaoFinanceiraDeCusto(
+        db.movimentacoes_financeiras,
+        novoCusto
+      );
+      const movDoCusto = movsUpsert.find((mov) => mov?.origem === 'custo' && Number(mov?.origem_id) === Number(novoCusto.id));
+      let ledgerPersist = { persisted: true, data: null };
+      if (movDoCusto) {
+        ledgerPersist = await createOperationalRecord('movimentacoes_financeiras', movDoCusto, session);
+      }
+      if (movDoCusto && !ledgerPersist.persisted) {
+        showToast({ type: 'warning', message: 'Não foi possível confirmar o cadastro agora.' });
+        return;
+      }
+      setDb((prev) => ({
+        ...prev,
+        custos: [...prev.custos, novoCusto],
+        movimentacoes_financeiras: movsUpsert.map((mov) => (
+          mov?.origem === 'custo' && Number(mov?.origem_id) === Number(novoCusto.id)
+            ? (ledgerPersist.data || mov)
+            : mov
+        )),
+      }));
     }
 
     setAbrirForm(false);

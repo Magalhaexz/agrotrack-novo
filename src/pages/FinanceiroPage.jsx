@@ -161,6 +161,10 @@ export default function FinanceiroPage({ db, setDb }) {
     };
 
     const persisted = await createOperationalRecord('movimentacoes_financeiras', payload, session);
+    if (!persisted.persisted) {
+      showToast({ type: 'warning', message: persisted.error || 'Não foi possível confirmar o lançamento agora.' });
+      return;
+    }
     setDb((prev) => ({
       ...prev,
       movimentacoes_financeiras: [...(prev.movimentacoes_financeiras || []), persisted.data || { id: gerarNovoId(prev.movimentacoes_financeiras || []), ...payload }],
@@ -173,6 +177,10 @@ export default function FinanceiroPage({ db, setDb }) {
     if (!podeEditarFinanceiro()) return;
     const patch = { pago: !item?.pago };
     const persisted = await updateOperationalRecord('movimentacoes_financeiras', item.id, patch, session);
+    if (!persisted.persisted) {
+      showToast({ type: 'warning', message: persisted.error || 'Não foi possível confirmar a alteração agora.' });
+      return;
+    }
     setDb((prev) => ({
       ...prev,
       movimentacoes_financeiras: (prev.movimentacoes_financeiras || []).map((row) => row.id === item.id ? { ...row, ...(persisted.data || patch) } : row),
@@ -545,6 +553,11 @@ function NovoLancamentoModal({ db, setDb, onClose, hasPermission, showToast, ses
       novos.map((item) => createOperationalRecord('movimentacoes_financeiras', item, session))
     );
 
+    if (persistedRows.some((item) => !item.persisted)) {
+      showToast({ type: 'warning', message: 'Não foi possível confirmar o lançamento agora.' });
+      return;
+    }
+
     setDb((prev) => ({
       ...prev,
       movimentacoes_financeiras: [
@@ -552,10 +565,6 @@ function NovoLancamentoModal({ db, setDb, onClose, hasPermission, showToast, ses
         ...persistedRows.map((item, index) => item.data || novos[index]),
       ],
     }));
-    if (persistedRows.some((item) => !item.persisted)) {
-      showToast({ type: 'warning', message: 'Não foi possível confirmar o lançamento agora.' });
-    }
-
     onClose();
   }
 

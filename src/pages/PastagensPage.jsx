@@ -159,44 +159,42 @@ export default function PastagensPage({ db, setDb, session, onConfirmAction }) {
 
     if (editando) {
       const persisted = await updateOperationalRecord('pastagens', editando.id, payload, session);
-      const merged = {
-        ...editando,
-        ...payload,
-        ...(persisted.data || {}),
-        id: persisted.data?.id ?? editando.id,
-      };
-      setDb((prev) => ({
-        ...prev,
-        pastagens: (prev.pastagens || []).map((item) => (
-          item.id === editando.id ? merged : item
-        )),
-      }));
       if (persisted.persisted) {
+        const merged = {
+          ...editando,
+          ...payload,
+          ...(persisted.data || {}),
+          id: persisted.data?.id ?? editando.id,
+        };
+        setDb((prev) => ({
+          ...prev,
+          pastagens: (prev.pastagens || []).map((item) => (
+            item.id === editando.id ? merged : item
+          )),
+        }));
         showToast({ type: 'success', message: 'Pastagem atualizada com sucesso.' });
-      } else if (persisted.data) {
-        showToast({ type: 'warning', message: 'Pastagem atualizada com sucesso.' });
       } else {
         showToast({ type: 'error', message: persisted.error || 'Não foi possível atualizar a pastagem.' });
+        return;
       }
     } else {
       const persisted = await createOperationalRecord('pastagens', payload, session);
-      setDb((prev) => ({
-        ...prev,
-        pastagens: [
-          ...(prev.pastagens || []),
-          {
-            ...payload,
-            ...(persisted.data || {}),
-            id: persisted.data?.id ?? gerarNovoId(prev.pastagens || []),
-          },
-        ],
-      }));
       if (persisted.persisted) {
+        setDb((prev) => ({
+          ...prev,
+          pastagens: [
+            ...(prev.pastagens || []),
+            {
+              ...payload,
+              ...(persisted.data || {}),
+              id: persisted.data?.id ?? gerarNovoId(prev.pastagens || []),
+            },
+          ],
+        }));
         showToast({ type: 'success', message: 'Pastagem cadastrada com sucesso.' });
-      } else if (persisted.data) {
-        showToast({ type: 'warning', message: 'Pastagem cadastrada com sucesso.' });
       } else {
         showToast({ type: 'error', message: persisted.error || 'Não foi possível cadastrar a pastagem.' });
+        return;
       }
     }
 
@@ -217,7 +215,11 @@ export default function PastagensPage({ db, setDb, session, onConfirmAction }) {
       : window.confirm(`Deseja excluir "${item.nome}"?`);
     if (!confirmado) return;
 
-    await deleteOperationalRecord('pastagens', item.id, session);
+    const persisted = await deleteOperationalRecord('pastagens', item.id, session);
+    if (!persisted.persisted) {
+      showToast({ type: 'warning', message: persisted.error || 'Não foi possível confirmar a exclusão agora.' });
+      return;
+    }
     setDb((prev) => ({
       ...prev,
       pastagens: (prev.pastagens || []).filter((row) => row.id !== item.id),

@@ -202,18 +202,17 @@ export default function LotesPage({ db, setDb, onRegistrarSaidaAnimal, session }
       motivo_encerramento: motivo,
     };
 
+    const persisted = await updateOperationalRecord('lotes', loteId, patch, session);
+    if (!persisted?.persisted) {
+      showToast({ type: 'warning', message: persisted?.error || 'Não foi possível confirmar o encerramento agora.' });
+      return;
+    }
+
     setDb((prev) => ({
       ...prev,
       lotes: (prev.lotes || []).map((l) => (Number(l.id) === Number(loteId) ? { ...l, ...patch } : l)),
     }));
-
-    const persisted = await updateOperationalRecord('lotes', loteId, patch, session);
-    if (!persisted?.persisted) {
-      showToast({ type: 'warning', message: 'Lote encerrado com sucesso.' });
-    } else {
-      showToast({ type: 'success', message: 'Lote encerrado com sucesso.' });
-    }
-
+    showToast({ type: 'success', message: 'Lote encerrado com sucesso.' });
     setOpenFechamento(false);
   }
 
@@ -233,6 +232,14 @@ export default function LotesPage({ db, setDb, onRegistrarSaidaAnimal, session }
       observacao: observacao || '',
     };
 
+    const pesagemCloud = await createOperationalRecord('pesagens', { ...novoRegistro, id: undefined }, session);
+    const loteCloud = await updateOperationalRecord('lotes', selectedLote.id, { p_at: Number(pesoMedio), ultima_pesagem: data }, session);
+
+    if (!pesagemCloud?.persisted || !loteCloud?.persisted) {
+      showToast({ type: 'warning', message: 'Não foi possível confirmar a pesagem agora.' });
+      return;
+    }
+
     setDb((prev) => ({
       ...prev,
       pesagens: [...(prev.pesagens || []), novoRegistro],
@@ -242,16 +249,7 @@ export default function LotesPage({ db, setDb, onRegistrarSaidaAnimal, session }
           : l
       )),
     }));
-
-    const pesagemCloud = await createOperationalRecord('pesagens', { ...novoRegistro, id: undefined }, session);
-    await updateOperationalRecord('lotes', selectedLote.id, { p_at: Number(pesoMedio), ultima_pesagem: data }, session);
-
-    if (!pesagemCloud?.persisted) {
-      showToast({ type: 'warning', message: 'Pesagem salva com sucesso.' });
-    } else {
-      showToast({ type: 'success', message: 'Pesagem registrada com sucesso.' });
-    }
-
+    showToast({ type: 'success', message: 'Pesagem registrada com sucesso.' });
     setOpenPesagem(false);
   }
 
@@ -291,18 +289,17 @@ export default function LotesPage({ db, setDb, onRegistrarSaidaAnimal, session }
 
     if (loteEmEdicao) {
       const loteId = loteEmEdicao.id;
+      const persisted = await updateOperationalRecord('lotes', loteId, patch, session);
+      if (!persisted?.persisted) {
+        showToast({ type: 'warning', message: persisted?.error || 'Não foi possível confirmar a alteração agora.' });
+        return;
+      }
+
       setDb((prev) => ({
         ...prev,
         lotes: (prev.lotes || []).map((l) => (Number(l.id) === Number(loteId) ? { ...l, ...patch } : l)),
       }));
-
-      const persisted = await updateOperationalRecord('lotes', loteId, patch, session);
-      if (!persisted?.persisted) {
-        showToast({ type: 'warning', message: 'Lote atualizado com sucesso.' });
-      } else {
-        showToast({ type: 'success', message: 'Lote atualizado com sucesso.' });
-      }
-
+      showToast({ type: 'success', message: 'Lote atualizado com sucesso.' });
       setOpenNovoLote(false);
       setLoteEmEdicao(null);
       return;
@@ -314,15 +311,14 @@ export default function LotesPage({ db, setDb, onRegistrarSaidaAnimal, session }
       status: 'ativo',
     };
 
-    setDb((prev) => ({ ...prev, lotes: [...(prev.lotes || []), novoLote] }));
     const persisted = await createOperationalRecord('lotes', { ...novoLote, id: undefined }, session);
-
     if (!persisted?.persisted) {
-      showToast({ type: 'warning', message: 'Lote criado com sucesso.' });
-    } else {
-      showToast({ type: 'success', message: 'Lote criado com sucesso.' });
+      showToast({ type: 'warning', message: persisted?.error || 'Não foi possível confirmar o cadastro agora.' });
+      return;
     }
 
+    setDb((prev) => ({ ...prev, lotes: [...(prev.lotes || []), novoLote] }));
+    showToast({ type: 'success', message: 'Lote criado com sucesso.' });
     setOpenNovoLote(false);
   }
 

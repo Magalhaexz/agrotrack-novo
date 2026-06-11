@@ -12,13 +12,12 @@ function persistirComAviso(mutations, context = {}) {
     session = null,
     onWarning,
     onError,
-    source = 'movimentacoes',
   } = context || {};
   if (!persist || !session?.user?.id) return;
 
   void persistCollectionMutation(mutations).then((result) => {
     if (!result?.persisted && typeof onWarning === 'function') {
-      onWarning(`Parte da operação (${source}) foi salva apenas localmente.`);
+      onWarning('Alguns registros precisam de revisão.');
     }
   }).catch((error) => {
     if (typeof onError === 'function') {
@@ -26,7 +25,7 @@ function persistirComAviso(mutations, context = {}) {
       return;
     }
     if (typeof onWarning === 'function') {
-      onWarning(error?.message || `Falha ao persistir operação (${source}) no servidor.`);
+      onWarning(error?.message || 'Não foi possível concluir a operação agora.');
     }
   });
 }

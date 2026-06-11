@@ -121,6 +121,11 @@ export default function SanitarioPage({ db, setDb, onConfirmAction }) {
       mutations.push(deleteOperationalRecord('rotinas', current.rotina_automatica_id, session));
     }
     const persistedBatch = await persistCollectionMutation(mutations);
+    if (!persistedBatch.persisted) {
+      showToast({ type: 'warning', message: 'Não foi possível confirmar a exclusão agora.' });
+      return;
+    }
+
     setDb((prev) => {
       const item = prev.sanitario.find((s) => s.id === id);
 
@@ -137,9 +142,6 @@ export default function SanitarioPage({ db, setDb, onConfirmAction }) {
         rotinas: novasRotinas,
       };
     });
-    if (!persistedBatch.persisted) {
-      showToast({ type: 'warning', message: 'Não foi possível confirmar a exclusão agora.' });
-    }
     showToast({ type: 'success', message: 'Manejo sanitário excluído com sucesso!' });
   }, [db?.sanitario, hasPermission, onConfirmAction, session, setDb, showToast]);
 
@@ -148,81 +150,29 @@ export default function SanitarioPage({ db, setDb, onConfirmAction }) {
       showToast({ type: 'error', message: mensagemSemPermissao });
       return;
     }
+
     const rotinasAtuais = Array.isArray(db?.rotinas) ? db.rotinas : [];
     const sanitariosAtuais = Array.isArray(db?.sanitario) ? db.sanitario : [];
     const shouldManageAutomaticRoutine = dados.proxima && dados.funcionario_responsavel_id;
     const mutations = [];
-
-    setDb((prev) => {
-      const currentRotinas = prev.rotinas || [];
-      let novasRotinas = [...currentRotinas];
-      let rotinaAutomaticaId = null;
-
-      if (itemEditando) {
-        // Editando item existente
-        rotinaAutomaticaId = itemEditando.rotina_automatica_id || null;
-
-        if (shouldManageAutomaticRoutine) {
-          const tarefaAutomatica = montarTarefaAutomatica(dados, itemEditando.id);
-          if (rotinaAutomaticaId) {
-            // Atualiza a rotina existente
-            novasRotinas = novasRotinas.map((r) =>
-              r.id === rotinaAutomaticaId ? { ...r, ...tarefaAutomatica } : r
-            );
-          } else {
-            // Cria uma nova rotina se não existia
-            const novoIdRotina = gerarNovoId(novasRotinas);
-            tarefaAutomatica.id = novoIdRotina;
-            novasRotinas.push(tarefaAutomatica);
-            rotinaAutomaticaId = novoIdRotina;
-          }
-        } else if (rotinaAutomaticaId) {
-          // Remove a rotina se não há mais data/responsável
-          novasRotinas = novasRotinas.filter((r) => r.id !== rotinaAutomaticaId);
-          rotinaAutomaticaId = null;
-        }
-
-        return {
-          ...prev,
-          sanitario: prev.sanitario.map((s) =>
-            s.id === itemEditando.id
-              ? { ...s, ...dados, rotina_automatica_id: rotinaAutomaticaId }
-              : s
-          ),
-          rotinas: novasRotinas,
-        };
-      } else {
-        // Novo item sanitário
-        const novoIdSanitario = gerarNovoId(prev.sanitario);
-
-        if (shouldManageAutomaticRoutine) {
-          const tarefaAutomatica = montarTarefaAutomatica(dados, novoIdSanitario);
-          const novoIdRotina = gerarNovoId(novasRotinas);
-          tarefaAutomatica.id = novoIdRotina;
-          novasRotinas.push(tarefaAutomatica);
-          rotinaAutomaticaId = novoIdRotina;
-        }
-
-        return {
-          ...prev,
-          sanitario: [
-            ...prev.sanitario,
-            { ...dados, id: novoIdSanitario, rotina_automatica_id: rotinaAutomaticaId },
-          ],
-          rotinas: novasRotinas,
-        };
-      }
-    });
+    let rotinaAutomaticaIdFinal = itemEditando?.rotina_automatica_id || null;
+    let novoIdSanitario = itemEditando?.id || null;
+    let tarefaAutomaticaFinal = null;
 
     if (itemEditando) {
       const rotinaAutomaticaIdAtual = itemEditando.rotina_automatica_id || null;
-      let rotinaAutomaticaIdFinal = rotinaAutomaticaIdAtual;
+      rotinaAutomaticaIdFinal = rotinaAutomaticaIdAtual;
+
       if (shouldManageAutomaticRoutine) {
-        const tarefaAutomatica = montarTarefaAutomatica(dados, itemEditando.id);
+        tarefaAutomaticaFinal = montarTarefaAutomatica(dados, itemEditando.id);
         if (rotinaAutomaticaIdAtual) {
-          mutations.push(updateOperationalRecord('rotinas', rotinaAutomaticaIdAtual, tarefaAutomatica, session));
+          mutations.push(updateOperationalRecord('rotinas', rotinaAutomaticaIdAtual, tarefaAutomaticaFinal, session));
         } else {
-          const createdRotina = await createOperationalRecord('rotinas', tarefaAutomatica, session);
+          const createdRotina = await createOperationalRecord('rotinas', tarefaAutomaticaFinal, session);
+          if (!createdRotina.persisted) {
+            showToast({ type: 'warning', message: 'Não foi possível confirmar o salvamento agora.' });
+            return;
+          }
           rotinaAutomaticaIdFinal = createdRotina.data?.id ?? gerarNovoId(rotinasAtuais);
           mutations.push(Promise.resolve(createdRotina));
         }
@@ -230,27 +180,83 @@ export default function SanitarioPage({ db, setDb, onConfirmAction }) {
         mutations.push(deleteOperationalRecord('rotinas', rotinaAutomaticaIdAtual, session));
         rotinaAutomaticaIdFinal = null;
       }
+
       mutations.push(updateOperationalRecord('sanitario', itemEditando.id, {
         ...dados,
         rotina_automatica_id: rotinaAutomaticaIdFinal,
       }, session));
     } else {
       const createdSanitario = await createOperationalRecord('sanitario', dados, session);
-      const novoIdSanitario = createdSanitario.data?.id ?? gerarNovoId(sanitariosAtuais);
+      if (!createdSanitario.persisted) {
+        showToast({ type: 'warning', message: 'Não foi possível confirmar o salvamento agora.' });
+        return;
+      }
+      novoIdSanitario = createdSanitario.data?.id ?? gerarNovoId(sanitariosAtuais);
       mutations.push(Promise.resolve(createdSanitario));
+
       if (shouldManageAutomaticRoutine) {
-        const rotinaPayload = montarTarefaAutomatica(dados, novoIdSanitario);
-        const createdRotina = await createOperationalRecord('rotinas', rotinaPayload, session);
-        const rotinaAutomaticaId = createdRotina.data?.id ?? gerarNovoId(rotinasAtuais);
+        tarefaAutomaticaFinal = montarTarefaAutomatica(dados, novoIdSanitario);
+        const createdRotina = await createOperationalRecord('rotinas', tarefaAutomaticaFinal, session);
+        if (!createdRotina.persisted) {
+          showToast({ type: 'warning', message: 'Não foi possível confirmar o salvamento agora.' });
+          return;
+        }
+        rotinaAutomaticaIdFinal = createdRotina.data?.id ?? gerarNovoId(rotinasAtuais);
         mutations.push(Promise.resolve(createdRotina));
-        mutations.push(updateOperationalRecord('sanitario', novoIdSanitario, { rotina_automatica_id: rotinaAutomaticaId }, session));
+        mutations.push(updateOperationalRecord('sanitario', novoIdSanitario, { rotina_automatica_id: rotinaAutomaticaIdFinal }, session));
       }
     }
 
     const persistedBatch = await persistCollectionMutation(mutations);
     if (!persistedBatch.persisted) {
       showToast({ type: 'warning', message: 'Não foi possível confirmar o salvamento agora.' });
+      return;
     }
+
+    setDb((prev) => {
+      const currentRotinas = prev.rotinas || [];
+      const currentSanitario = prev.sanitario || [];
+      let novasRotinas = [...currentRotinas];
+
+      if (itemEditando) {
+        if (shouldManageAutomaticRoutine) {
+          const tarefaAutomatica = tarefaAutomaticaFinal || montarTarefaAutomatica(dados, itemEditando.id);
+          if (itemEditando.rotina_automatica_id) {
+            novasRotinas = novasRotinas.map((r) => (
+              r.id === itemEditando.rotina_automatica_id ? { ...r, ...tarefaAutomatica } : r
+            ));
+          } else {
+            novasRotinas.push({ ...tarefaAutomatica, id: rotinaAutomaticaIdFinal });
+          }
+        } else if (itemEditando.rotina_automatica_id) {
+          novasRotinas = novasRotinas.filter((r) => r.id !== itemEditando.rotina_automatica_id);
+        }
+
+        return {
+          ...prev,
+          sanitario: currentSanitario.map((s) => (
+            s.id === itemEditando.id
+              ? { ...s, ...dados, rotina_automatica_id: rotinaAutomaticaIdFinal }
+              : s
+          )),
+          rotinas: novasRotinas,
+        };
+      }
+
+      if (shouldManageAutomaticRoutine) {
+        const tarefaAutomatica = tarefaAutomaticaFinal || montarTarefaAutomatica(dados, novoIdSanitario);
+        novasRotinas.push({ ...tarefaAutomatica, id: rotinaAutomaticaIdFinal });
+      }
+
+      return {
+        ...prev,
+        sanitario: [
+          ...currentSanitario,
+          { ...dados, id: novoIdSanitario, rotina_automatica_id: rotinaAutomaticaIdFinal },
+        ],
+        rotinas: novasRotinas,
+      };
+    });
 
     showToast({ type: 'success', message: `Manejo sanitário ${itemEditando ? 'atualizado' : 'criado'} com sucesso!` });
     setAbrirForm(false);

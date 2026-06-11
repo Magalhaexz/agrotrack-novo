@@ -232,20 +232,21 @@ export default function AcompanhamentoPesoPage({ db, setDb }) {
     }
 
     const results = await Promise.all(payloads.map((payload) => createOperationalRecord('animais', payload, session)));
-    let fallbackId = gerarNovoId(animais);
-    const created = results.map((result, index) => result?.data || { id: fallbackId + index, ...payloads[index] });
+    const hasFailure = results.some((item) => !item?.persisted);
+    if (hasFailure) {
+      showToast({ type: 'warning', message: 'Não foi possível confirmar todos os cadastros agora.' });
+      return;
+    }
+
+    const created = results.map((result) => result?.data).filter(Boolean);
+    if (!created.length) return;
 
     setDb((prev) => ({
       ...prev,
       animais: [...(Array.isArray(prev?.animais) ? prev.animais : []), ...created],
     }));
 
-    const hasFailure = results.some((item) => !item?.persisted);
-    if (hasFailure) {
-      showToast({ type: 'warning', message: 'Animais gerados com sucesso.' });
-    } else {
-      showToast({ type: 'success', message: 'Animais do lote gerados com sucesso.' });
-    }
+    showToast({ type: 'success', message: 'Animais do lote gerados com sucesso.' });
   }
 
   function updateDraftPeso(animalId, value) {
@@ -410,6 +411,15 @@ export default function AcompanhamentoPesoPage({ db, setDb }) {
       return [...Array.from(dedupeAnimalMap.values()), ...Array.from(loteMap.values())];
     })();
 
+    const hasFailure = results.some((item) => !item?.persisted)
+      || !loteResult?.persisted
+      || (extraLotePesagem ? !extraLotePesagem?.persisted : false);
+    if (hasFailure) {
+      showToast({ type: 'warning', message: 'Não foi possível confirmar a pesagem agora.' });
+      setSaving(false);
+      return null;
+    }
+
     setDb((prev) => ({
       ...prev,
       animais: nextAnimais,
@@ -419,14 +429,7 @@ export default function AcompanhamentoPesoPage({ db, setDb }) {
       pesagens: nextPesagens,
     }));
 
-    const hasFailure = results.some((item) => !item?.persisted)
-      || !loteResult?.persisted
-      || (extraLotePesagem ? !extraLotePesagem?.persisted : false);
-    if (hasFailure) {
-      showToast({ type: 'warning', message: 'Pesagem salva com sucesso.' });
-    } else {
-      showToast({ type: 'success', message: 'Pesagem salva com sucesso.' });
-    }
+    showToast({ type: 'success', message: 'Pesagem salva com sucesso.' });
 
     setSaving(false);
     return { nextAnimais, nextPesagens, loteAtualizado, pesos };

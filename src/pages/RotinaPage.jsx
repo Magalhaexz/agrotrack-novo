@@ -139,31 +139,37 @@ export default function RotinaPage({ db, setDb, onConfirmAction }) {
     if (!confirmado) return;
 
     const persisted = await deleteOperationalRecord('rotinas', id, session);
+    if (!persisted.persisted) {
+      showToast({ type: 'warning', message: persisted.error || 'Não foi possível confirmar a exclusão agora.' });
+      return;
+    }
     setDb((prev) => ({
       ...prev,
       rotinas: prev.rotinas.filter((r) => r.id !== id),
     }));
-    if (!persisted.persisted) {
-      showToast({ type: 'warning', message: 'Não foi possível confirmar a exclusão agora.' });
-    }
     showToast({ type: 'success', message: 'Tarefa excluída com sucesso!' });
   }, [onConfirmAction, session, setDb, showToast]);
 
   const salvarItem = useCallback(async (dados) => {
     if (itemEditando) {
       const persisted = await updateOperationalRecord('rotinas', itemEditando.id, dados, session);
+      if (!persisted.persisted) {
+        showToast({ type: 'warning', message: persisted.error || 'Não foi possível confirmar a alteração agora.' });
+        return;
+      }
       setDb((prev) => ({
         ...prev,
         rotinas: prev.rotinas.map((r) =>
           r.id === itemEditando.id ? { ...r, ...(persisted.data || dados) } : r
         ),
       }));
-      if (!persisted.persisted) {
-        showToast({ type: 'warning', message: 'Não foi possível confirmar a alteração agora.' });
-      }
       showToast({ type: 'success', message: 'Tarefa atualizada com sucesso!' });
     } else {
       const persisted = await createOperationalRecord('rotinas', dados, session);
+      if (!persisted.persisted) {
+        showToast({ type: 'warning', message: persisted.error || 'Não foi possível confirmar o cadastro agora.' });
+        return;
+      }
       setDb((prev) => ({
         ...prev,
         rotinas: [
@@ -175,9 +181,6 @@ export default function RotinaPage({ db, setDb, onConfirmAction }) {
           },
         ],
       }));
-      if (!persisted.persisted) {
-        showToast({ type: 'warning', message: 'Não foi possível confirmar o cadastro agora.' });
-      }
       showToast({ type: 'success', message: 'Tarefa criada com sucesso!' });
     }
 
@@ -197,6 +200,10 @@ export default function RotinaPage({ db, setDb, onConfirmAction }) {
       }
       const patch = { concluido_datas: Array.from(concluidoDatas) };
       const persisted = await updateOperationalRecord('rotinas', item.id_base, patch, session);
+      if (!persisted.persisted) {
+        showToast({ type: 'warning', message: persisted.error || 'Não foi possível confirmar a alteração agora.' });
+        return;
+      }
       setDb((prev) => ({
         ...prev,
         rotinas: prev.rotinas.map((r) => {
@@ -206,22 +213,20 @@ export default function RotinaPage({ db, setDb, onConfirmAction }) {
           return r;
         }),
       }));
-      if (!persisted.persisted) {
-        showToast({ type: 'warning', message: 'Não foi possível confirmar a alteração agora.' });
-      }
       showToast({ type: 'success', message: `Tarefa ${concluir ? 'concluída' : 'reaberta'} com sucesso!` });
     } else {
       const patch = { status: concluir ? 'concluido' : 'pendente' };
       const persisted = await updateOperationalRecord('rotinas', item.id, patch, session);
+      if (!persisted.persisted) {
+        showToast({ type: 'warning', message: persisted.error || 'Não foi possível confirmar a alteração agora.' });
+        return;
+      }
       setDb((prev) => ({
         ...prev,
         rotinas: prev.rotinas.map((r) =>
           r.id === item.id ? { ...r, ...(persisted.data || patch) } : r
         ),
       }));
-      if (!persisted.persisted) {
-        showToast({ type: 'warning', message: 'Não foi possível confirmar a alteração agora.' });
-      }
       showToast({ type: 'success', message: `Tarefa ${concluir ? 'concluída' : 'reaberta'} com sucesso!` });
     }
   }, [rotinas, session, setDb, showToast]);

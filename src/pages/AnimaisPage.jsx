@@ -229,8 +229,13 @@ export default function AnimaisPage({ db, setDb, onConfirmAction }) {
         })
       : window.confirm('Deseja excluir este registro de animais?');
     if (!confirmado) return;
-    await deleteOperationalRecord('animais', id, session);
+    const persistedDelete = await deleteOperationalRecord('animais', id, session);
+    if (!persistedDelete.persisted) {
+      showToast({ type: 'warning', message: persistedDelete.error || 'Não foi possível confirmar a exclusão agora.' });
+      return;
+    }
     setDb((prev) => ({ ...prev, animais: (prev.animais || []).filter((animal) => animal.id !== id) }));
+    showToast({ type: 'success', message: 'Animal excluído com sucesso.' });
   }
 
   async function salvarAnimal(dados) {
@@ -242,38 +247,36 @@ export default function AnimaisPage({ db, setDb, onConfirmAction }) {
         ...(persisted.data || {}),
         id: persisted.data?.id ?? animalEditando.id,
       };
-      setDb((prev) => ({
-        ...prev,
-        animais: (prev.animais || []).map((animal) => (
-          animal.id === animalEditando.id ? mergedAnimal : animal
-        )),
-      }));
       if (persisted.persisted) {
+        setDb((prev) => ({
+          ...prev,
+          animais: (prev.animais || []).map((animal) => (
+            animal.id === animalEditando.id ? mergedAnimal : animal
+          )),
+        }));
         showToast({ type: 'success', message: 'Animal atualizado com sucesso.' });
-      } else if (persisted.data) {
-        showToast({ type: 'warning', message: 'Animal atualizado com sucesso.' });
       } else {
         showToast({ type: 'error', message: persisted.error || 'Não foi possível atualizar o animal.' });
+        return;
       }
     } else {
       const persisted = await createOperationalRecord('animais', dados, session);
-      setDb((prev) => ({
-        ...prev,
-        animais: [
-          ...(prev.animais || []),
-          {
-            ...dados,
-            ...(persisted.data || {}),
-            id: persisted.data?.id ?? gerarNovoId(prev.animais || []),
-          },
-        ],
-      }));
       if (persisted.persisted) {
+        setDb((prev) => ({
+          ...prev,
+          animais: [
+            ...(prev.animais || []),
+            {
+              ...dados,
+              ...(persisted.data || {}),
+              id: persisted.data?.id ?? gerarNovoId(prev.animais || []),
+            },
+          ],
+        }));
         showToast({ type: 'success', message: 'Animal cadastrado com sucesso.' });
-      } else if (persisted.data) {
-        showToast({ type: 'warning', message: 'Animal cadastrado com sucesso.' });
       } else {
         showToast({ type: 'error', message: persisted.error || 'Não foi possível cadastrar o animal.' });
+        return;
       }
     }
     setAbrirForm(false);
@@ -344,6 +347,24 @@ export default function AnimaisPage({ db, setDb, onConfirmAction }) {
       },
     };
 
+    const mutations = [
+      updateOperationalRecord('animais', animal.id, animalPatch, session),
+      createOperationalRecord('movimentacoes_animais', { ...movementPayload, id: undefined }, session),
+    ];
+    if (financePayload) {
+      mutations.push(createOperationalRecord('movimentacoes_financeiras', { ...financePayload, id: undefined }, session));
+    }
+
+    const persisted = await persistCollectionMutation(mutations);
+    const successMessage = mode === 'sale' ? 'Venda registrada com sucesso.' : 'Saída registrada com sucesso.';
+    const errorMessage = mode === 'sale' ? 'Não foi possível registrar a venda.' : 'Não foi possível registrar a saída.';
+
+    if (!persisted.persisted) {
+      showToast({ type: 'warning', message: errorMessage });
+      setAnimalOperacao(null);
+      return;
+    }
+
     setDb((prev) => ({
       ...prev,
       animais: (prev.animais || []).map((item) => (
@@ -357,27 +378,7 @@ export default function AnimaisPage({ db, setDb, onConfirmAction }) {
         ? [...(prev.movimentacoes_financeiras || []), financePayload]
         : (prev.movimentacoes_financeiras || []),
     }));
-
-    const mutations = [
-      updateOperationalRecord('animais', animal.id, animalPatch, session),
-      createOperationalRecord('movimentacoes_animais', { ...movementPayload, id: undefined }, session),
-    ];
-    if (financePayload) {
-      mutations.push(createOperationalRecord('movimentacoes_financeiras', { ...financePayload, id: undefined }, session));
-    }
-
-    const persisted = await persistCollectionMutation(mutations);
-    const successMessage = mode === 'sale' ? 'Venda registrada com sucesso.' : 'Saída registrada com sucesso.';
-    const errorMessage = mode === 'sale' ? 'Não foi possível registrar a venda.' : 'Não foi possível registrar a saída.';
-
-    if (persisted.results.some((item) => item?.persisted)) {
-      showToast({
-        type: persisted.persisted ? 'success' : 'warning',
-        message: persisted.persisted ? successMessage : `${successMessage} Alguns registros exigem revisão.`,
-      });
-    } else {
-      showToast({ type: 'error', message: errorMessage });
-    }
+    showToast({ type: 'success', message: successMessage });
 
     setAnimalOperacao(null);
   }
