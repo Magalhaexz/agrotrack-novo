@@ -159,23 +159,45 @@ export default function PastagensPage({ db, setDb, session, onConfirmAction }) {
 
     if (editando) {
       const persisted = await updateOperationalRecord('pastagens', editando.id, payload, session);
+      const merged = {
+        ...editando,
+        ...payload,
+        ...(persisted.data || {}),
+        id: persisted.data?.id ?? editando.id,
+      };
       setDb((prev) => ({
         ...prev,
         pastagens: (prev.pastagens || []).map((item) => (
-          item.id === editando.id ? { ...item, ...(persisted.data || payload) } : item
+          item.id === editando.id ? merged : item
         )),
       }));
-      showToast({ type: 'success', message: 'Pastagem atualizada.' });
+      if (persisted.persisted) {
+        showToast({ type: 'success', message: 'Pastagem atualizada com sucesso.' });
+      } else if (persisted.data) {
+        showToast({ type: 'warning', message: 'Pastagem atualizada localmente. Sincronização pendente.' });
+      } else {
+        showToast({ type: 'error', message: persisted.error || 'Não foi possível atualizar a pastagem.' });
+      }
     } else {
       const persisted = await createOperationalRecord('pastagens', payload, session);
       setDb((prev) => ({
         ...prev,
         pastagens: [
           ...(prev.pastagens || []),
-          persisted.data || { id: gerarNovoId(prev.pastagens || []), ...payload },
+          {
+            ...payload,
+            ...(persisted.data || {}),
+            id: persisted.data?.id ?? gerarNovoId(prev.pastagens || []),
+          },
         ],
       }));
-      showToast({ type: 'success', message: 'Pastagem cadastrada.' });
+      if (persisted.persisted) {
+        showToast({ type: 'success', message: 'Pastagem cadastrada com sucesso.' });
+      } else if (persisted.data) {
+        showToast({ type: 'warning', message: 'Pastagem cadastrada localmente. Sincronização pendente.' });
+      } else {
+        showToast({ type: 'error', message: persisted.error || 'Não foi possível cadastrar a pastagem.' });
+      }
     }
 
     resetForm();
