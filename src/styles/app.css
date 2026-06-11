@@ -9708,13 +9708,14 @@ html, body, #root, .app, .main, .main-content, .page { max-width: 100%; }
 
   .app-shell.app-shell--sidebar-collapsed .sidebar-nav {
     padding: 12px 10px 8px;
-    overflow: hidden;
-    scrollbar-width: none;
+    overflow-x: hidden;
+    overflow-y: auto;
+    scrollbar-width: thin;
   }
 
   .app-shell.app-shell--sidebar-collapsed .sidebar-nav::-webkit-scrollbar {
-    width: 0;
-    height: 0;
+    width: 6px;
+    height: 6px;
   }
 
   .app-shell.app-shell--sidebar-collapsed .nav-sublist {

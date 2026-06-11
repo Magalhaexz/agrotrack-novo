@@ -27,6 +27,15 @@
   align-content: start; /* Align content to the start vertically */
 }
 
+.perfil-avatar-helper {
+  max-width: 22ch;
+  margin: 0;
+  text-align: center;
+  color: var(--color-text-muted);
+  font-size: 0.8rem;
+  line-height: 1.45;
+}
+
 .perfil-avatar-img,
 .perfil-avatar-fallback {
   width: 110px;
