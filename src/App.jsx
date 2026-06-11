@@ -27,6 +27,7 @@ import {
   signOutLocalSafely,
 } from './lib/supabase';
 import { secondaryNavItems, navSections } from './navigation/navConfig';
+import { getPageFromPathname, getRouteForPage } from './navigation/routes';
 import {
   registrarEntradaAnimal,
   registrarEntradaEstoque,
@@ -66,6 +67,7 @@ const RotinaPage = lazy(() => import('./pages/RotinaPage'));
 const FuncionariosPage = lazy(() => import('./pages/FuncionariosPage'));
 const TarefasPage = lazy(() => import('./pages/TarefasPage'));
 const PerfilPage = lazy(() => import('./pages/PerfilPage'));
+const MinhaAssinaturaPage = lazy(() => import('./pages/MinhaAssinaturaPage'));
 const ConfiguracoesPage = lazy(() => import('./pages/ConfiguracoesPage'));
 const PastagensPage = lazy(() => import('./pages/PastagensPage'));
 const EvolucaoRebanhoPage = lazy(() => import('./pages/EvolucaoRebanhoPage'));
@@ -164,6 +166,7 @@ const pageMap = {
   rotina: RotinaPage,
   tarefas: TarefasPage,
   perfil: PerfilPage,
+  minhaAssinatura: MinhaAssinaturaPage,
   configuracoes: ConfiguracoesPage,
   animais: AnimaisPage,
   suplementacao: SuplementacaoPage,
@@ -184,7 +187,7 @@ const pageMap = {
 };
 
 export default function App() {
-  const [currentPage, setCurrentPage] = useState('dashboard');
+  const [currentPage, setCurrentPage] = useState(() => getPageFromPathname(window.location.pathname));
   const [navigationIntent, setNavigationIntent] = useState(null);
   const { toasts, showToast, removeToast } = useToast();
   const {
@@ -256,6 +259,16 @@ export default function App() {
       // Preferimos manter a UI funcionando mesmo se o storage falhar.
     }
   }, [sidebarCollapsed]);
+
+  useEffect(() => {
+    const handlePopState = () => {
+      setCurrentPage(getPageFromPathname(window.location.pathname));
+      setNavigationIntent(null);
+    };
+
+    window.addEventListener('popstate', handlePopState);
+    return () => window.removeEventListener('popstate', handlePopState);
+  }, []);
 
   if (import.meta.env.DEV) {
     console.debug('[HERDON_AUTH_BOOT]', {
@@ -696,6 +709,10 @@ export default function App() {
       }
       setCurrentPage(pagina);
       setNavigationIntent(intent ? { ...intent, page: pagina, at: Date.now() } : null);
+      const nextRoute = getRouteForPage(pagina);
+      if (nextRoute && window.location.pathname !== nextRoute) {
+        window.history.pushState({}, '', nextRoute);
+      }
       return true;
     }
 
@@ -874,7 +891,7 @@ export default function App() {
               Regularize sua assinatura para continuar usando o HERDON.
             </p>
             <div style={{ display: 'flex', flexWrap: 'wrap', gap: 10 }}>
-              <Button type="button" variant="outline" size="sm" onClick={() => navigateWithPermission('perfil')}>
+              <Button type="button" variant="outline" size="sm" onClick={() => navigateWithPermission('minhaAssinatura')}>
                 Ver minha assinatura
               </Button>
               <Button type="button" variant="ghost" size="sm" onClick={handleLogout}>

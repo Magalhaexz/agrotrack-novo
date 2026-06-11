@@ -4,6 +4,7 @@ import {
   CheckSquare,
   ClipboardList,
   DollarSign,
+  FileText,
   LayoutDashboard,
   MapPin,
   Package,
@@ -83,6 +84,7 @@ export const navSections = [
     id: 'configuracoes',
     title: 'Configurações',
     items: [
+      { id: 'minhaAssinatura', label: 'Minha Assinatura', icon: FileText },
       { id: 'configuracoes', label: 'Configurações', icon: Settings },
     ],
   },
@@ -90,6 +92,7 @@ export const navSections = [
 
 export const secondaryNavItems = [
   { id: 'perfil', label: 'Meu Perfil', icon: User },
+  { id: 'minhaAssinatura', label: 'Minha Assinatura', icon: FileText },
   { id: 'configuracoes', label: 'Configurações', icon: Settings },
 ];
 

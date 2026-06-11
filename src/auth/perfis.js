@@ -159,6 +159,7 @@ export const permissoesPorPagina = {
   financeiro: 'financeiro:ver',
   tarefas: 'tarefas:ver',
   perfil: 'perfil:ver',
+  minhaAssinatura: 'perfil:ver',
   configuracoes: 'configuracoes:ver',
   pastagens: 'pastagens:ver',
   evolucaoRebanho: 'evolucao_rebanho:ver',

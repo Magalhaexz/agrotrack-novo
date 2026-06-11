@@ -174,6 +174,19 @@ function formatPriceLabel(priceCents, currencyCode = 'BRL', billingInterval = 'm
   }
 }
 
+export function getBillingIntervalLabel(interval) {
+  if (normalizePlanCode(interval) === 'month') return 'Mensal';
+  return 'Sob consulta';
+}
+
+export function getAvailablePlans() {
+  return Object.values(PLAN_CATALOG).map((plan) => ({
+    ...plan,
+    priceLabel: formatPriceLabel(plan.priceCents, plan.currencyCode, plan.billingInterval),
+    billingIntervalLabel: getBillingIntervalLabel(plan.billingInterval),
+  }));
+}
+
 export function getPlanLimits(planCode) {
   const normalized = normalizePlanCode(planCode);
   const plan = PLAN_CATALOG[normalized];
@@ -182,6 +195,7 @@ export function getPlanLimits(planCode) {
   return {
     ...plan,
     priceLabel: formatPriceLabel(plan.priceCents, plan.currencyCode, plan.billingInterval),
+    billingIntervalLabel: getBillingIntervalLabel(plan.billingInterval),
   };
 }
 
@@ -225,7 +239,7 @@ export function getSubscriptionDisplayCopy(subscription, options = {}) {
   const plan = normalized?.plan || getPlanLimits(normalized?.plan_code);
 
   let message = 'Sua assinatura está em preparação.';
-  let primaryLabel = 'Ver planos';
+  let primaryLabel = 'Escolher plano';
   let secondaryLabel = 'Falar com o suporte';
   let helperText = checkoutReady ? null : 'Checkout em preparação';
 
@@ -296,6 +310,7 @@ export function normalizeSubscription(subscription) {
       priceLabel: plan.priceLabel,
       currencyCode: plan.currencyCode,
       billingInterval: plan.billingInterval,
+      billingIntervalLabel: plan.billingIntervalLabel,
       description: plan.description,
       launchOffer: Boolean(plan.launchOffer),
       easyToDisable: Boolean(plan.easyToDisable),

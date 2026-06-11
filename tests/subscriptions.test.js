@@ -6,6 +6,8 @@ import {
   canCreateAnimal,
   canCreateFarm,
   canInviteUser,
+  getAvailablePlans,
+  getBillingIntervalLabel,
   getCurrentSubscription,
   getPlanLimits,
   getSubscriptionDisplayCopy,
@@ -132,4 +134,29 @@ test('active and internal_test subscriptions do not surface regularize CTA', () 
   assert.equal(pastDue.primaryLabel, 'Regularizar assinatura');
   assert.equal(canceled.primaryLabel, 'Regularizar assinatura');
   assert.equal(blocked.primaryLabel, 'Regularizar assinatura');
+});
+
+test('missing subscription surfaces choose-plan state with preparation helper', () => {
+  const copy = getSubscriptionDisplayCopy(null);
+
+  assert.equal(copy.primaryLabel, 'Escolher plano');
+  assert.equal(copy.helperText, 'Checkout em preparação');
+  assert.equal(copy.message, 'Sua assinatura está em preparação.');
+});
+
+test('plan prices and billing labels are formatted for the customer surface', () => {
+  const plans = getAvailablePlans();
+  const fundador = plans.find((plan) => plan.planCode === 'fundador');
+  const essencial = plans.find((plan) => plan.planCode === 'essencial');
+  const pro = plans.find((plan) => plan.planCode === 'pro');
+  const premium = plans.find((plan) => plan.planCode === 'premium');
+  const enterprise = plans.find((plan) => plan.planCode === 'enterprise');
+
+  assert.equal(fundador.priceLabel, 'R$ 297,00/mês');
+  assert.equal(essencial.priceLabel, 'R$ 197,00/mês');
+  assert.equal(pro.priceLabel, 'R$ 397,00/mês');
+  assert.equal(premium.priceLabel, 'R$ 697,00/mês');
+  assert.equal(enterprise.priceLabel, 'Sob consulta');
+  assert.equal(getBillingIntervalLabel('month'), 'Mensal');
+  assert.equal(getBillingIntervalLabel('custom'), 'Sob consulta');
 });
