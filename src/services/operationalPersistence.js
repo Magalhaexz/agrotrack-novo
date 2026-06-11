@@ -835,6 +835,24 @@ function buildOperationalCreatePayload(table, record, userId) {
     delete payload.id;
     return Object.fromEntries(Object.entries(payload).filter(([, value]) => value !== undefined));
   }
+  if (normalizedTable === 'configuracoes') {
+    const safe = sanitizeRecord(record);
+    const configId = toNullableNumber(safe?.id);
+    const payload = {
+      owner_user_id: normalizeOwnerUserId(safe?.owner_user_id ?? userId),
+      fazenda_selecionada_id: toNullableNumber(
+        safe?.fazenda_selecionada_id
+        ?? safe?.fazendaSelecionadaId
+        ?? safe?.fazenda_selecionada
+      ),
+      geral: isObject(safe?.geral) ? safe.geral : {},
+      notificacoes: isObject(safe?.notificacoes) ? safe.notificacoes : {},
+    };
+    if (configId !== null) {
+      payload.id = configId;
+    }
+    return Object.fromEntries(Object.entries(payload).filter(([, value]) => value !== undefined));
+  }
   const safe = sanitizeRecord(record);
   if (tableSupportsOwnerScope(normalizedTable)) {
     return {
