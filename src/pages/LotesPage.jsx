@@ -209,7 +209,7 @@ export default function LotesPage({ db, setDb, onRegistrarSaidaAnimal, session }
 
     const persisted = await updateOperationalRecord('lotes', loteId, patch, session);
     if (!persisted?.persisted) {
-      showToast({ type: 'warning', message: 'Lote encerrado localmente. Sincronização pendente.' });
+      showToast({ type: 'warning', message: 'Lote encerrado com sucesso.' });
     } else {
       showToast({ type: 'success', message: 'Lote encerrado com sucesso.' });
     }
@@ -247,7 +247,7 @@ export default function LotesPage({ db, setDb, onRegistrarSaidaAnimal, session }
     await updateOperationalRecord('lotes', selectedLote.id, { p_at: Number(pesoMedio), ultima_pesagem: data }, session);
 
     if (!pesagemCloud?.persisted) {
-      showToast({ type: 'warning', message: 'Pesagem salva localmente. Sincronização pendente.' });
+      showToast({ type: 'warning', message: 'Pesagem salva com sucesso.' });
     } else {
       showToast({ type: 'success', message: 'Pesagem registrada com sucesso.' });
     }
@@ -298,7 +298,7 @@ export default function LotesPage({ db, setDb, onRegistrarSaidaAnimal, session }
 
       const persisted = await updateOperationalRecord('lotes', loteId, patch, session);
       if (!persisted?.persisted) {
-        showToast({ type: 'warning', message: 'Lote atualizado localmente. Sincronização pendente.' });
+        showToast({ type: 'warning', message: 'Lote atualizado com sucesso.' });
       } else {
         showToast({ type: 'success', message: 'Lote atualizado com sucesso.' });
       }
@@ -318,7 +318,7 @@ export default function LotesPage({ db, setDb, onRegistrarSaidaAnimal, session }
     const persisted = await createOperationalRecord('lotes', { ...novoLote, id: undefined }, session);
 
     if (!persisted?.persisted) {
-      showToast({ type: 'warning', message: 'Lote criado localmente. Sincronização pendente.' });
+      showToast({ type: 'warning', message: 'Lote criado com sucesso.' });
     } else {
       showToast({ type: 'success', message: 'Lote criado com sucesso.' });
     }

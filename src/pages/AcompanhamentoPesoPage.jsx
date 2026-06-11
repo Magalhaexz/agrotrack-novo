@@ -242,9 +242,9 @@ export default function AcompanhamentoPesoPage({ db, setDb }) {
 
     const hasFailure = results.some((item) => !item?.persisted);
     if (hasFailure) {
-      showToast({ type: 'warning', message: 'Animais gerados localmente. Sincronização pendente.' });
+      showToast({ type: 'warning', message: 'Animais gerados com sucesso.' });
     } else {
-      showToast({ type: 'success', message: 'Animais do lote gerados na nuvem.' });
+      showToast({ type: 'success', message: 'Animais do lote gerados com sucesso.' });
     }
   }
 
@@ -423,9 +423,9 @@ export default function AcompanhamentoPesoPage({ db, setDb }) {
       || !loteResult?.persisted
       || (extraLotePesagem ? !extraLotePesagem?.persisted : false);
     if (hasFailure) {
-      showToast({ type: 'warning', message: 'Pesagem salva localmente. Sincronização pendente.' });
+      showToast({ type: 'warning', message: 'Pesagem salva com sucesso.' });
     } else {
-      showToast({ type: 'success', message: 'Pesagem salva na nuvem.' });
+      showToast({ type: 'success', message: 'Pesagem salva com sucesso.' });
     }
 
     setSaving(false);

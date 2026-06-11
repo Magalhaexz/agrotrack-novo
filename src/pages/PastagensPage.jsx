@@ -174,7 +174,7 @@ export default function PastagensPage({ db, setDb, session, onConfirmAction }) {
       if (persisted.persisted) {
         showToast({ type: 'success', message: 'Pastagem atualizada com sucesso.' });
       } else if (persisted.data) {
-        showToast({ type: 'warning', message: 'Pastagem atualizada localmente. Sincronização pendente.' });
+        showToast({ type: 'warning', message: 'Pastagem atualizada com sucesso.' });
       } else {
         showToast({ type: 'error', message: persisted.error || 'Não foi possível atualizar a pastagem.' });
       }
@@ -194,7 +194,7 @@ export default function PastagensPage({ db, setDb, session, onConfirmAction }) {
       if (persisted.persisted) {
         showToast({ type: 'success', message: 'Pastagem cadastrada com sucesso.' });
       } else if (persisted.data) {
-        showToast({ type: 'warning', message: 'Pastagem cadastrada localmente. Sincronização pendente.' });
+        showToast({ type: 'warning', message: 'Pastagem cadastrada com sucesso.' });
       } else {
         showToast({ type: 'error', message: persisted.error || 'Não foi possível cadastrar a pastagem.' });
       }

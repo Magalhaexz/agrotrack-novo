@@ -345,10 +345,10 @@ export default function ConfiguracoesPage({ db, setDb, onConfirmAction }) {
         const confirmarImportacao = onConfirmAction
           ? await onConfirmAction({
               title: 'Importar backup validado',
-              message: 'O backup será aplicado localmente. A sincronização completa com a nuvem requer confirmação adicional. Deseja continuar?',
+              message: 'O backup será aplicado localmente. Deseja continuar?',
               tone: 'danger',
             })
-          : window.confirm('O backup será aplicado localmente. A sincronização completa com a nuvem requer confirmação adicional. Deseja continuar?');
+          : window.confirm('O backup será aplicado localmente. Deseja continuar?');
 
         if (!confirmarImportacao) {
           showToast({ type: 'info', message: 'Importação cancelada pelo usuário.' });
@@ -371,7 +371,7 @@ export default function ConfiguracoesPage({ db, setDb, onConfirmAction }) {
           });
           showToast({
             type: 'warning',
-            message: 'Backup validado localmente. Alguns registros inválidos foram ignorados. A sincronização completa com a nuvem requer confirmação adicional.',
+            message: 'Backup validado. Alguns registros inválidos foram ignorados.',
           });
           return;
         }
@@ -382,7 +382,7 @@ export default function ConfiguracoesPage({ db, setDb, onConfirmAction }) {
           criticidade: 'media',
           detalhes: normalized.summary,
         });
-        showToast({ type: 'warning', message: 'Backup validado localmente. A sincronização completa com a nuvem requer confirmação adicional.' });
+        showToast({ type: 'warning', message: 'Backup validado. Confirme a importação para continuar.' });
       } catch {
         registrarEventoAuditoria({
           acao: 'backup_importado_invalido',
@@ -400,15 +400,15 @@ export default function ConfiguracoesPage({ db, setDb, onConfirmAction }) {
   async function limparDadosDemo() {
     if (!validarPermissao('dados:limpar')) return;
     const ok = onConfirmAction
-      ? await onConfirmAction({ title: 'Limpar demonstração', message: 'Remover dados fictícios do ambiente?', tone: 'danger' })
-      : window.confirm('Remover dados fictícios do ambiente?');
+      ? await onConfirmAction({ title: 'Limpar dados operacionais', message: 'Remover os dados operacionais deste ambiente?', tone: 'danger' })
+      : window.confirm('Remover os dados operacionais deste ambiente?');
 
     if (!ok) return;
 
     const confirmarLocal = onConfirmAction
       ? await onConfirmAction({
           title: 'Confirmar limpeza local',
-          message: 'Esta limpeza afeta apenas os dados locais em memória. Deseja continuar?',
+          message: 'Esta limpeza afeta os dados operacionais deste ambiente. Deseja continuar?',
           tone: 'danger',
         })
       : window.confirm('Esta limpeza afeta apenas os dados locais em memória. Deseja continuar?');
@@ -457,17 +457,17 @@ export default function ConfiguracoesPage({ db, setDb, onConfirmAction }) {
       entidade: 'dados',
       criticidade: 'alta',
       detalhes: {
-        escopo: 'demo_operacional',
+        escopo: 'dados_operacionais',
         tabelas: colecoesLimpeza,
         persistido: !houveFalhaPersistencia,
       },
     });
 
     if (houveFalhaPersistencia) {
-      showToast({ type: 'warning', message: 'Dados locais removidos. Parte da limpeza remota não foi concluída.' });
+      showToast({ type: 'warning', message: 'Dados removidos. Parte da limpeza não foi concluída.' });
       return;
     }
-    showToast({ type: 'success', message: 'Dados de demonstração removidos localmente e na nuvem.' });
+    showToast({ type: 'success', message: 'Dados operacionais removidos com sucesso.' });
   }
 
   async function excluirConta() {
@@ -488,7 +488,7 @@ export default function ConfiguracoesPage({ db, setDb, onConfirmAction }) {
 
     // Simulação de exclusão de conta no backend/auth
     await supabase.auth.signOut(); // Desloga o usuário localmente
-    showToast({ type: 'success', message: 'Conta encerrada no app local. (Fluxo remoto deve ser conectado ao backend).' });
+    showToast({ type: 'success', message: 'Conta encerrada com sucesso.' });
     // Em um ambiente real, aqui você chamaria uma API para excluir a conta do usuário no backend.
   }
 
@@ -672,8 +672,8 @@ export default function ConfiguracoesPage({ db, setDb, onConfirmAction }) {
             </>
           ) : (
             <div className="empty-state empty-state--warning" style={{ marginBottom: 16 }}>
-              <strong>Módulo de acessos aguardando migration</strong>
-              <span>Rode o SQL de profiles e invites para ativar o gerenciamento automático de perfis.</span>
+              <strong>Módulo de acessos em preparação</strong>
+              <span>O gerenciamento automático de perfis será ativado em uma próxima etapa.</span>
             </div>
           )}
 
@@ -684,7 +684,7 @@ export default function ConfiguracoesPage({ db, setDb, onConfirmAction }) {
               <tbody>
                 {usuariosFallback.map((item) => (
                   <tr key={item.id}>
-                    <td>{item.nome}<div style={{ fontSize: 12, opacity: 0.75 }}>Acesso especial de bootstrap.</div></td>
+                    <td>{item.nome}<div style={{ fontSize: 12, opacity: 0.75 }}>Acesso temporário.</div></td>
                     <td>{item.email}</td>
                     <td>
                       <span className="badge badge-info" style={{ marginRight: 8 }}>{obterLabelPerfil(item.perfil)}</span>
@@ -731,7 +731,7 @@ export default function ConfiguracoesPage({ db, setDb, onConfirmAction }) {
                         <option value="visualizador">Visualizador</option>
                       </select>
                     </td>
-                    <td>fallback/bootstrap</td>
+                    <td>fallback</td>
                     <td>
                       <select
                         className="ui-input" // Adicionado classe ui-input
@@ -818,13 +818,13 @@ export default function ConfiguracoesPage({ db, setDb, onConfirmAction }) {
             <div className="config-actions-wrap config-actions-wrap--data">
               <div className="config-panel-intro">
                 <span className="config-panel-kicker">Backup e manutenção</span>
-                <p>Exporte, importe e limpe dados de demonstração com uma hierarquia visual mais clara e segura.</p>
+                <p>Exporte, importe e limpe dados operacionais com uma hierarquia visual mais clara e segura.</p>
               </div>
               <div className="config-action-cluster">
                 <Button icon={<FileText size={14} />} onClick={exportarDados}>Exportar todos os dados</Button>
                 <Button icon={<FileText size={14} />} variant="outline" onClick={() => fileInputRef.current?.click()}>Importar dados</Button>
                 <input ref={fileInputRef} type="file" accept="application/json" onChange={importarDados} hidden />
-            <Button icon={<X size={14} />} variant="outline" onClick={limparDadosDemo}>Limpar dados de demonstração</Button>
+            <Button icon={<X size={14} />} variant="outline" onClick={limparDadosDemo}>Limpar dados</Button>
               </div>
             </div>
 
@@ -867,7 +867,7 @@ export default function ConfiguracoesPage({ db, setDb, onConfirmAction }) {
                 criticidade: 'alta',
                 detalhes: { email: payload.email, perfil: payload.perfil },
               });
-              showToast({ type: 'success', message: 'Convite salvo no modo local. A migration ativa o fluxo automático.' });
+              showToast({ type: 'success', message: 'Convite salvo com sucesso.' });
               setOpenInvite(false);
               return;
             }

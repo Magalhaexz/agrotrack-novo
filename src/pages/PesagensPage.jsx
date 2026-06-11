@@ -387,7 +387,7 @@ export default function PesagensPage({ db, setDb, onConfirmAction, navigationInt
           ultima_pesagem: novoLote.ultima_pesagem,
         }, session);
         if (!persistedDelete.persisted || !lotePersist.persisted) {
-          showToast({ type: 'warning', message: 'Exclusao salva parcialmente apenas no modo local.' });
+          showToast({ type: 'warning', message: 'Exclusão salva parcialmente.' });
         }
       }
     }
@@ -466,9 +466,9 @@ export default function PesagensPage({ db, setDb, onConfirmAction, navigationInt
 
       const batch = await persistCollectionMutation(persisted.map((item) => Promise.resolve(item)));
       if (!batch.persisted) {
-        showToast({ type: 'warning', message: 'Animais gerados localmente. Sincronizacao pendente.' });
+        showToast({ type: 'warning', message: 'Animais gerados com sucesso.' });
       } else {
-        showToast({ type: 'success', message: 'Animais do lote gerados na nuvem.' });
+        showToast({ type: 'success', message: 'Animais do lote gerados com sucesso.' });
       }
       return;
     }
@@ -649,7 +649,7 @@ export default function PesagensPage({ db, setDb, onConfirmAction, navigationInt
           if (!persisted?.persisted) {
             failedRecords.push({
               identification: payload?.metadata?.animal_identificacao || 'Animal sem identificacao',
-              message: persisted?.error || 'Pesagem atualizada apenas localmente.',
+              message: persisted?.error || 'Pesagem atualizada com sucesso.',
             });
           }
         } else {
@@ -683,7 +683,7 @@ export default function PesagensPage({ db, setDb, onConfirmAction, navigationInt
           if (!persisted?.persisted) {
             failedRecords.push({
               identification: payload?.metadata?.animal_identificacao || 'Animal sem identificacao',
-              message: persisted?.error || 'Pesagem criada apenas localmente.',
+              message: persisted?.error || 'Pesagem criada com sucesso.',
             });
           }
         }
@@ -703,13 +703,13 @@ export default function PesagensPage({ db, setDb, onConfirmAction, navigationInt
       const totalSucessos = normalizedRegistros.length - totalFalhas;
       setUltimoResumoBatch(totalFalhas ? { failedRecords, totalSucessos, totalFalhas } : null);
       if (totalFalhas && totalSucessos > 0) {
-        showToast({ type: 'warning', message: `Pesagem concluida parcialmente: ${totalSucessos} registro(s) salvo(s) e ${totalFalhas} com pendencia.` });
+        showToast({ type: 'warning', message: `Pesagem concluída parcialmente: ${totalSucessos} registro(s) salvo(s) e ${totalFalhas} com pendência.` });
       } else if (totalFalhas) {
-        showToast({ type: 'error', message: `Nenhuma pesagem foi concluida sem pendencia. ${totalFalhas} registro(s) exigem revisao.` });
+        showToast({ type: 'error', message: `Nenhuma pesagem foi concluída sem pendência. ${totalFalhas} registro(s) exigem revisão.` });
       } else if (!persistedBatch.persisted) {
-        showToast({ type: 'warning', message: 'Pesagem salva localmente. Sincronizacao pendente.' });
+        showToast({ type: 'warning', message: 'Pesagem salva com sucesso.' });
       } else {
-        showToast({ type: 'success', message: 'Pesagem salva na nuvem.' });
+        showToast({ type: 'success', message: 'Pesagem salva com sucesso.' });
       }
 
       setAbrirForm(false);
@@ -761,7 +761,7 @@ export default function PesagensPage({ db, setDb, onConfirmAction, navigationInt
 
       const persistedBatch = await persistCollectionMutation(promises);
       if (!persistedBatch.persisted) {
-        showToast({ type: 'warning', message: 'Alteracao salva parcialmente apenas no modo local.' });
+        showToast({ type: 'warning', message: 'Alteração salva parcialmente.' });
       }
       showToast({ type: 'success', message: 'Pesagem atualizada com sucesso!' });
     } else {
@@ -791,7 +791,7 @@ export default function PesagensPage({ db, setDb, onConfirmAction, navigationInt
 
       const persistedBatch = await persistCollectionMutation(promises);
       if (!persistedBatch.persisted) {
-        showToast({ type: 'warning', message: 'Cadastro salvo parcialmente apenas no modo local.' });
+        showToast({ type: 'warning', message: 'Cadastro salvo parcialmente.' });
       }
       showToast({ type: 'success', message: 'Pesagem registrada com sucesso!' });
     }

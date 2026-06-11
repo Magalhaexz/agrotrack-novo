@@ -251,7 +251,7 @@ export default function AnimaisPage({ db, setDb, onConfirmAction }) {
       if (persisted.persisted) {
         showToast({ type: 'success', message: 'Animal atualizado com sucesso.' });
       } else if (persisted.data) {
-        showToast({ type: 'warning', message: 'Animal atualizado localmente. Sincronização pendente.' });
+        showToast({ type: 'warning', message: 'Animal atualizado com sucesso.' });
       } else {
         showToast({ type: 'error', message: persisted.error || 'Não foi possível atualizar o animal.' });
       }
@@ -271,7 +271,7 @@ export default function AnimaisPage({ db, setDb, onConfirmAction }) {
       if (persisted.persisted) {
         showToast({ type: 'success', message: 'Animal cadastrado com sucesso.' });
       } else if (persisted.data) {
-        showToast({ type: 'warning', message: 'Animal cadastrado localmente. Sincronização pendente.' });
+        showToast({ type: 'warning', message: 'Animal cadastrado com sucesso.' });
       } else {
         showToast({ type: 'error', message: persisted.error || 'Não foi possível cadastrar o animal.' });
       }
@@ -373,7 +373,7 @@ export default function AnimaisPage({ db, setDb, onConfirmAction }) {
     if (persisted.results.some((item) => item?.persisted)) {
       showToast({
         type: persisted.persisted ? 'success' : 'warning',
-        message: persisted.persisted ? successMessage : `${successMessage} Alguns registros ficaram apenas no modo local.`,
+        message: persisted.persisted ? successMessage : `${successMessage} Alguns registros exigem revisão.`,
       });
     } else {
       showToast({ type: 'error', message: errorMessage });

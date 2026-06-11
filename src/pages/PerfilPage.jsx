@@ -126,7 +126,7 @@ export default function PerfilPage({ db, usuarioLogado, atualizarUsuario, onConf
     });
 
     if (profileError) {
-      showToast({ type: 'warning', message: 'Dados salvos no login, mas o profile do banco ainda precisa da migration.' });
+      showToast({ type: 'warning', message: 'Alguns dados do perfil precisam de revisão.' });
     }
 
     atualizarUsuario?.({
@@ -249,7 +249,7 @@ export default function PerfilPage({ db, usuarioLogado, atualizarUsuario, onConf
               <label
                 htmlFor="foto-upload"
                 className="avatar-upload-button" // Usar classe CSS
-                style={avatarUploadButtonStyle} // Manter inline para demonstração, mas idealmente mover para CSS
+                style={avatarUploadButtonStyle}
               >
                 <FileText size={14} />
               </label>

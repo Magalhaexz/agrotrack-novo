@@ -452,9 +452,9 @@ function CadastroItemModal({ setDb, initialData = null, onClose, hasPermission, 
     }));
 
     if (persisted?.syncStatus === 'cloud_success') {
-      showToast({ type: 'success', message: isEdit ? 'Item atualizado na nuvem.' : 'Registro salvo na nuvem.' });
+      showToast({ type: 'success', message: isEdit ? 'Item atualizado com sucesso.' : 'Registro salvo com sucesso.' });
     } else if (persisted?.syncStatus === 'pending_sync' || persisted?.syncStatus === 'local_only') {
-      showToast({ type: 'warning', message: `Registro salvo localmente. Sincronização pendente.${import.meta.env.DEV ? ` Motivo: ${persisted.error || persisted.code || 'unknown'}.` : ''}` });
+      showToast({ type: 'warning', message: `Registro salvo. ${import.meta.env.DEV ? `Motivo: ${persisted.error || persisted.code || 'unknown'}.` : 'Revise a conexão e tente novamente.'}` });
     } else if (!persisted?.persisted) {
       showToast({ type: 'error', message: persisted?.error || 'Não foi possível salvar o item.' });
       return;
@@ -716,7 +716,7 @@ function SaidaModal({ db, setDb, selectedItem, onRegistrarSaidaEstoque, estoqueM
     }));
 
     if (!estoquePersist.persisted || !movEstoquePersist.persisted || !movFinancePersist.persisted) {
-      showToast({ type: 'warning', message: 'Saída salva parcialmente apenas no modo local.' });
+      showToast({ type: 'warning', message: 'Saída salva parcialmente.' });
     }
     onClose();
   }

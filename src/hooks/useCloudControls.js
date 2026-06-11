@@ -16,10 +16,10 @@ export function useCloudControls({ db, setDb, session, hasPermission, showToast,
     setDiagnosticandoNuvem(true);
     try {
       const result = await runMinimalCloudDiagnostic({ session, table: 'lotes', timeoutMs: 8000 });
-      showToast({ type: result?.ok ? 'success' : 'warning', message: result?.conclusionMessage || 'NÃ£o foi possÃ­vel verificar a conexÃ£o. Verifique a configuraÃ§Ã£o.' });
+      showToast({ type: result?.ok ? 'success' : 'warning', message: result?.conclusionMessage || 'Não foi possível verificar o status. Verifique a configuração.' });
       window.dispatchEvent(new CustomEvent('herdon-cloud-diagnostic-state', { detail: { verified: Boolean(result?.ok), message: result?.conclusionMessage || null, checkedAt: Date.now() } }));
     } catch {
-      showToast({ type: 'warning', message: 'NÃ£o foi possÃ­vel verificar a conexÃ£o. Verifique a configuraÃ§Ã£o.' });
+      showToast({ type: 'warning', message: 'Não foi possível verificar o status. Verifique a configuração.' });
     } finally {
       setDiagnosticandoNuvem(false);
     }
@@ -32,10 +32,10 @@ export function useCloudControls({ db, setDb, session, hasPermission, showToast,
     try {
       resetSupabaseAuthLocally();
       forceLocalSignOut?.();
-      showToast({ type: 'info', message: 'SessÃ£o local limpa. Entre novamente para continuar.' });
+      showToast({ type: 'info', message: 'Sessão limpa. Entre novamente para continuar.' });
     } catch {
       forceLocalSignOut?.();
-      showToast({ type: 'warning', message: 'SessÃ£o local limpa. Entre novamente para continuar.' });
+      showToast({ type: 'warning', message: 'Sessão limpa. Entre novamente para continuar.' });
     } finally { setReconectandoNuvem(false); }
   }
 
@@ -45,9 +45,9 @@ export function useCloudControls({ db, setDb, session, hasPermission, showToast,
     if (sincronizandoNuvem || manualSyncRef.current.inFlight) return;
     if (now - manualSyncRef.current.lastStartAt < 1200) return;
     manualSyncRef.current = { inFlight: true, lastStartAt: now };
-    if (!session?.user?.id) { showToast({ type: 'warning', message: 'FaÃ§a login para continuar.' }); manualSyncRef.current.inFlight = false; return; }
+    if (!session?.user?.id) { showToast({ type: 'warning', message: 'Faça login para continuar.' }); manualSyncRef.current.inFlight = false; return; }
     const sessionValidation = await validateSupabaseSessionForCloud();
-    if (!sessionValidation?.ok) { showToast({ type: 'warning', message: 'SessÃ£o expirada. Entre novamente.' }); manualSyncRef.current.inFlight = false; return; }
+    if (!sessionValidation?.ok) { showToast({ type: 'warning', message: 'Sessão expirada. Entre novamente.' }); manualSyncRef.current.inFlight = false; return; }
 
     setSincronizandoNuvem(true);
     loadingToastRef.current = showToast({ id: 'global-cloud-sync-loading', type: 'info', message: 'Atualizando...', persist: true });
@@ -55,15 +55,15 @@ export function useCloudControls({ db, setDb, session, hasPermission, showToast,
       const sessionResult = await supabase.auth.getSession();
       const accessToken = sessionResult?.data?.session?.access_token || null;
       const tokenLooksJwt = typeof accessToken === 'string' && accessToken.split('.').length === 3;
-      if (!accessToken || !tokenLooksJwt) { showToast({ type: 'warning', message: 'SessÃ£o invÃ¡lida. Entre novamente.' }); return; }
+      if (!accessToken || !tokenLooksJwt) { showToast({ type: 'warning', message: 'Sessão inválida. Entre novamente.' }); return; }
       const response = await fetch('/api/cloud-sync', { method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${accessToken}` }, body: JSON.stringify({ fazendas: db?.fazendas || [], lotes: db?.lotes || [] }) });
       const payload = await response.json().catch(() => null);
-      if (!response.ok || !payload) { showToast({ type: 'warning', message: 'Falha na atualizaÃ§Ã£o. O modo local continua ativo.' }); return; }
+      if (!response.ok || !payload) { showToast({ type: 'warning', message: 'Falha na atualização. Tente novamente.' }); return; }
       const fazendasData = Array.isArray(payload?.fazendas?.data) ? payload.fazendas.data : null;
       const lotesData = Array.isArray(payload?.lotes?.data) ? payload.lotes.data : null;
       if (fazendasData || lotesData) setDb((prev) => ({ ...prev, fazendas: fazendasData || prev.fazendas, lotes: lotesData || prev.lotes }));
       if (payload?.fazendas?.status === 'success' && payload?.lotes?.status === 'success') showToast({ type: 'success', message: 'Fazendas e lotes atualizados com sucesso.' });
-      else showToast({ type: 'warning', message: 'Falha na atualizaÃ§Ã£o. O modo local continua ativo.' });
+      else showToast({ type: 'warning', message: 'Falha na atualização. Tente novamente.' });
       const queueResult = await processPendingSyncQueue(session, { maxItems: 40, manual: true });
       if ((queueResult?.pendingCount || 0) === 0) {
         showToast({ type: 'success', message: 'Pendências atualizadas com sucesso.' });
