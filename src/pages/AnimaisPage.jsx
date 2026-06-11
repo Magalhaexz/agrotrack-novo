@@ -106,6 +106,41 @@ function getMovementStatusPatch(reason) {
   return 'inativo';
 }
 
+function prepareAnimalForForm(animal, lotesMap) {
+  const lote = lotesMap.get(Number(animal?.lote_id)) || null;
+  const metadata = animal?.metadata || {};
+  const fazendaId = animal?.fazenda_id ?? metadata?.fazenda_id ?? lote?.faz_id ?? lote?.fazenda_id ?? '';
+
+  return {
+    ...animal,
+    fazenda_id: fazendaId || '',
+    lote_id: animal?.lote_id ?? '',
+    data_referencia: animal?.data_referencia || animal?.data_entrada || metadata?.data_referencia || '',
+    data_nascimento: animal?.data_nascimento || metadata?.data_nascimento || '',
+    identificacao: animal?.identificacao || animal?.nome || metadata?.identificacao || '',
+    categoria: animal?.categoria || animal?.categoria_animal || metadata?.categoria || '',
+    raca: animal?.raca || animal?.gen || metadata?.raca || '',
+    sexo: animal?.sexo || metadata?.sexo || 'macho',
+    origem: animal?.origem || metadata?.origem || '',
+    observacao: animal?.observacao || animal?.obs || metadata?.observacao || '',
+    qtd: animal?.qtd ?? '',
+    p_ini: animal?.p_ini ?? '',
+    p_at: animal?.p_at ?? '',
+    dias: animal?.dias ?? '',
+    consumo: animal?.consumo ?? '',
+    rendimento_carcaca: animal?.rendimento_carcaca ?? '',
+    preco_arroba: animal?.preco_arroba ?? '',
+    status: animal?.status || 'ativo',
+  };
+}
+
+function resolveAnimalFazendaNome(animal, fazendasMap, lotesMap) {
+  const lote = lotesMap.get(Number(animal?.lote_id)) || null;
+  const metadata = animal?.metadata || {};
+  const fazendaId = animal?.fazenda_id ?? metadata?.fazenda_id ?? lote?.faz_id ?? lote?.fazenda_id ?? null;
+  return fazendasMap.get(Number(fazendaId))?.nome || lote?.fazendaNome || '-';
+}
+
 export default function AnimaisPage({ db, setDb, onConfirmAction }) {
   const { hasPermission, session } = useAuth();
   const { showToast } = useToast();
@@ -116,21 +151,24 @@ export default function AnimaisPage({ db, setDb, onConfirmAction }) {
   const [animalOperacao, setAnimalOperacao] = useState(null);
 
   const lotes = useMemo(() => (Array.isArray(db?.lotes) ? db.lotes : []), [db]);
+  const fazendas = useMemo(() => (Array.isArray(db?.fazendas) ? db.fazendas : []), [db]);
   const animais = useMemo(() => (Array.isArray(db?.animais) ? db.animais : []), [db]);
   const movimentacoes = useMemo(() => (Array.isArray(db?.movimentacoes_animais) ? db.movimentacoes_animais : []), [db]);
   const movimentacoesFinanceiras = useMemo(() => (Array.isArray(db?.movimentacoes_financeiras) ? db.movimentacoes_financeiras : []), [db]);
   const lotesMap = useMemo(() => new Map(lotes.map((lote) => [Number(lote.id), lote])), [lotes]);
+  const fazendasMap = useMemo(() => new Map(fazendas.map((item) => [Number(item.id), item])), [fazendas]);
 
   const dadosTabela = useMemo(
     () => animais.map((animal) => ({
       ...animal,
       loteNome: lotesMap.get(Number(animal.lote_id))?.nome || '-',
+      fazendaNome: resolveAnimalFazendaNome(animal, fazendasMap, lotesMap),
       tipoRegistro: isIndividualAnimalRecord(animal) ? 'individual' : 'grupo',
       identificacao: animal.identificacao || animal?.metadata?.animal_identificacao || 'Animal',
       status: animal.status || 'ativo',
       ativo: isAnimalActive(animal),
     })),
-    [animais, lotesMap]
+    [animais, lotesMap, fazendasMap]
   );
 
   const grupos = useMemo(() => dadosTabela.filter((item) => item.tipoRegistro !== 'individual'), [dadosTabela]);
@@ -159,13 +197,13 @@ export default function AnimaisPage({ db, setDb, onConfirmAction }) {
 
   function abrirNovoPorModo(modo) {
     setMostrarCadastro(false);
-    setAnimalEditando({ tipo_registro: modo });
+    setAnimalEditando({ tipo_registro: modo, fazenda_id: String(fazendas[0]?.id || ''), qtd: modo === 'individual' ? '1' : '' });
     setAbrirForm(true);
   }
 
   function editarAnimal(animal) {
     if (!hasPermission('animais:editar')) return;
-    setAnimalEditando(animal);
+    setAnimalEditando(prepareAnimalForForm(animal, lotesMap));
     setAbrirForm(true);
   }
 
@@ -198,21 +236,45 @@ export default function AnimaisPage({ db, setDb, onConfirmAction }) {
   async function salvarAnimal(dados) {
     if (animalEditando) {
       const persisted = await updateOperationalRecord('animais', animalEditando.id, dados, session);
+      const mergedAnimal = {
+        ...animalEditando,
+        ...dados,
+        ...(persisted.data || {}),
+        id: persisted.data?.id ?? animalEditando.id,
+      };
       setDb((prev) => ({
         ...prev,
         animais: (prev.animais || []).map((animal) => (
-          animal.id === animalEditando.id ? { ...animal, ...(persisted.data || dados) } : animal
+          animal.id === animalEditando.id ? mergedAnimal : animal
         )),
       }));
+      if (persisted.persisted) {
+        showToast({ type: 'success', message: 'Animal atualizado com sucesso.' });
+      } else if (persisted.data) {
+        showToast({ type: 'warning', message: 'Animal atualizado localmente. Sincronização pendente.' });
+      } else {
+        showToast({ type: 'error', message: persisted.error || 'Não foi possível atualizar o animal.' });
+      }
     } else {
       const persisted = await createOperationalRecord('animais', dados, session);
       setDb((prev) => ({
         ...prev,
         animais: [
           ...(prev.animais || []),
-          persisted.data || { id: gerarNovoId(prev.animais || []), ...dados },
+          {
+            ...dados,
+            ...(persisted.data || {}),
+            id: persisted.data?.id ?? gerarNovoId(prev.animais || []),
+          },
         ],
       }));
+      if (persisted.persisted) {
+        showToast({ type: 'success', message: 'Animal cadastrado com sucesso.' });
+      } else if (persisted.data) {
+        showToast({ type: 'warning', message: 'Animal cadastrado localmente. Sincronização pendente.' });
+      } else {
+        showToast({ type: 'error', message: persisted.error || 'Não foi possível cadastrar o animal.' });
+      }
     }
     setAbrirForm(false);
     setAnimalEditando(null);
@@ -366,7 +428,7 @@ export default function AnimaisPage({ db, setDb, onConfirmAction }) {
                 {listaAtiva.map((animal) => (
                   <tr key={animal.id}>
                     <td>{animal.identificacao} / {animal.loteNome}</td>
-                    <td>{lotesMap.get(Number(animal.lote_id))?.fazenda || '-'} / {animal.loteNome}</td>
+                    <td>{animal.fazendaNome} / {animal.loteNome}</td>
                     <td className="is-number">{animal.qtd}</td>
                     <td className="is-number">{formatarNumero(animal.p_ini)} kg</td>
                     <td className="is-number">{formatarNumero(animal.p_at)} kg</td>
@@ -462,6 +524,7 @@ export default function AnimaisPage({ db, setDb, onConfirmAction }) {
         <AnimalForm
           initialData={animalEditando}
           lotes={lotes}
+          fazendas={fazendas}
           onSave={salvarAnimal}
           onCancel={() => {
             setAbrirForm(false);
