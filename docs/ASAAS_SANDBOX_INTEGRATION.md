@@ -46,9 +46,9 @@ Important:
    - CPF/CNPJ
    - Telefone/WhatsApp
 4. When checkout starts, the frontend calls `POST /api/asaas-create-subscription`.
-5. The server creates or reuses the Asaas customer and then creates the subscription/payment flow in the sandbox.
-6. HERDON persists the checkout session and provider references.
-7. If Asaas returns a usable URL, HERDON redirects the customer to the best available payment URL.
+5. The server creates or reuses the Asaas customer and then creates a recurring hosted payment link in the sandbox.
+6. HERDON persists the checkout session and provider references, including the hosted payment link id when available.
+7. If Asaas returns a usable URL, HERDON redirects the customer to the hosted payment URL returned by the provider.
 8. Webhook calls are received by `POST /api/asaas-webhook`.
 9. Webhook events are mapped to `customer_subscriptions` and stored in `billing_events` with idempotency.
 
@@ -98,7 +98,8 @@ When Asaas returns a response, HERDON looks for the best usable browser target i
 4. `bankSlipUrl`
 5. `transactionReceiptUrl`
 6. `paymentLink.url`
-7. nested payment or invoice URLs returned by the provider
+7. top-level `url`
+8. nested payment or invoice URLs returned by the provider
 
 The customer is redirected to the first usable URL found.
 
@@ -115,6 +116,17 @@ If browser navigation does not happen automatically, the page shows a button lab
 7. Click the same plan again while the checkout is still recent and confirm HERDON reuses the pending checkout instead of creating a new charge.
 8. Send a test webhook to `/api/asaas-webhook`.
 9. Confirm the subscription status and billing history update correctly.
+
+## Chosen hosted payment approach
+
+HERDON now uses the Asaas hosted payment link flow for sandbox checkout because it reliably returns a browser-ready URL.
+
+- Endpoint: `POST /v3/paymentLinks`
+- Recurring charge type: `RECURRENT`
+- Recurrence: `MONTHLY`
+- The URL returned by Asaas is stored and used for redirect/open behavior.
+- If a recent pending checkout already exists for the same user and plan, HERDON reuses it instead of creating another provider record.
+- If the provider response does not include a usable URL, HERDON shows a clear Portuguese error and does not claim success.
 
 ## Notes
 

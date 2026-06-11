@@ -230,9 +230,13 @@ test('provider payment url resolution falls back to invoice and payment link tar
   const paymentLinkUrl = resolveAsaasPaymentUrl({
     paymentLink: { url: 'https://sandbox.example/payment-link' },
   });
+  const directUrl = resolveAsaasPaymentUrl({
+    url: 'https://sandbox.example/direct',
+  });
 
   assert.equal(invoiceUrl, 'https://sandbox.example/invoice');
   assert.equal(paymentLinkUrl, 'https://sandbox.example/payment-link');
+  assert.equal(directUrl, 'https://sandbox.example/direct');
 });
 
 test('recent pending checkout sessions can be reused for the same plan', async () => {
@@ -289,6 +293,33 @@ test('frontend checkout request uses the server route and Authorization header',
     const body = JSON.parse(calls[0].init.body);
     assert.equal(body.planCode, 'pro');
     assert.equal(body.customer.name, 'Cliente Teste');
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
+
+test('frontend checkout request reports a friendly failure when the provider does not return a url', async () => {
+  const originalFetch = globalThis.fetch;
+
+  globalThis.fetch = async () => ({
+      ok: true,
+      json: async () => ({
+        ok: false,
+        code: 'CHECKOUT_URL_MISSING',
+        message: 'Não foi possível abrir o pagamento agora. Tente novamente em alguns instantes ou fale com o suporte.',
+      }),
+    });
+
+  try {
+    const result = await requestAsaasSandboxCheckout({
+      session: { access_token: 'jwt.token.value' },
+      planCode: 'pro',
+      customer: { name: 'Cliente Teste', email: 'cliente@teste.com' },
+    });
+
+    assert.equal(result.ok, false);
+    assert.equal(result.code, 'CHECKOUT_URL_MISSING');
+    assert.equal(result.message, 'Não foi possível abrir o pagamento agora. Tente novamente em alguns instantes ou fale com o suporte.');
   } finally {
     globalThis.fetch = originalFetch;
   }

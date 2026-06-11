@@ -175,7 +175,7 @@ export default function MinhaAssinaturaPage({
         if (!opened) {
           showToast({
             type: 'warning',
-            message: 'O pagamento ficou pronto para abrir. Use o botão abaixo se a abertura automática não acontecer.',
+            message: 'Não foi possível abrir o pagamento agora. Use o botão Abrir pagamento abaixo.',
           });
         }
         return;
@@ -194,9 +194,12 @@ export default function MinhaAssinaturaPage({
         return;
       }
 
-      showToast({ type: 'warning', message: result.message || 'O pagamento ficou pronto, mas ainda não foi possível abrir a tela automaticamente.' });
+      showToast({
+        type: 'warning',
+        message: result.message || 'Não foi possível abrir o pagamento agora. Tente novamente em alguns instantes ou fale com o suporte.',
+      });
     } catch {
-      showToast({ type: 'warning', message: 'Não foi possível confirmar o salvamento agora. Tente novamente em alguns instantes.' });
+      showToast({ type: 'warning', message: 'Não foi possível abrir o pagamento agora. Tente novamente em alguns instantes ou fale com o suporte.' });
     } finally {
       setCheckoutBusy(false);
     }

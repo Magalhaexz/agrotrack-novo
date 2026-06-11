@@ -102,6 +102,7 @@ function extractProviderCheckoutData(payload = {}) {
     payload.hosted_checkout_url,
     payload.paymentLink?.url,
     payload.payment_link?.url,
+    payload.url,
     payload.payment?.checkoutUrl,
     payload.payment?.checkout_url,
   ].map(extractString).find(Boolean) || null;
@@ -147,7 +148,36 @@ function extractProviderCheckoutData(payload = {}) {
     invoiceUrl,
     bankSlipUrl,
     transactionReceiptUrl,
+    paymentLinkId: [
+      payload.paymentLink?.id,
+      payload.payment_link?.id,
+      payload.paymentLinkId,
+      payload.payment_link_id,
+      payload.id,
+    ].map(extractString).find(Boolean) || null,
   };
+}
+
+function extractProviderSubscriptionId(payload = {}, body = {}) {
+  return [
+    payload.subscription?.id,
+    payload.subscriptionId,
+    payload.subscription_id,
+    payload.provider_subscription_id,
+    body.providerSubscriptionId,
+    body.asaasSubscriptionId,
+  ].map(extractString).find(Boolean) || null;
+}
+
+function extractProviderPaymentId(payload = {}, body = {}) {
+  return [
+    payload.payment?.id,
+    payload.paymentId,
+    payload.payment_id,
+    payload.provider_payment_id,
+    body.providerPaymentId,
+    body.asaasPaymentId,
+  ].map(extractString).find(Boolean) || null;
 }
 
 function getUserProfileSeed(user, profile = null, body = {}) {
@@ -504,17 +534,17 @@ async function createCustomerOnAsaas({ user, profile, body }) {
   });
 }
 
-async function createMonthlySubscriptionOnAsaas({ customerId, plan, externalReference, body }) {
+async function createRecurringPaymentLinkOnAsaas({ customerId, plan, externalReference, body }) {
   const valueCents = Number(plan?.priceCents || 0);
   const value = Number.isFinite(valueCents) ? Number((valueCents / 100).toFixed(2)) : null;
-  const nextDueDate = normalizeText(body?.nextDueDate || body?.dueDate || new Date().toISOString().slice(0, 10));
   const payload = {
     customer: customerId,
-    billingType: normalizeText(body?.billingType || 'CREDIT_CARD') || 'CREDIT_CARD',
-    cycle: 'MONTHLY',
-    value,
-    nextDueDate,
+    name: `HERDON - ${plan?.planName || 'Plano'}`,
     description: `HERDON - ${plan?.planName || 'Plano'}`,
+    billingType: normalizeText(body?.billingType || 'UNDEFINED') || 'UNDEFINED',
+    chargeType: 'RECURRENT',
+    subscriptionCycle: 'MONTHLY',
+    value,
     externalReference: externalReference || null,
     notificationDisabled: false,
   };
@@ -522,7 +552,7 @@ async function createMonthlySubscriptionOnAsaas({ customerId, plan, externalRefe
   if (body?.endDate) payload.endDate = body.endDate;
   if (body?.maxPayments) payload.maxPayments = body.maxPayments;
 
-  return asaasRequest('/subscriptions', {
+  return asaasRequest('/paymentLinks', {
     method: 'POST',
     body: payload,
   });
@@ -534,6 +564,8 @@ function buildCustomerSubscriptionPatch({ userId, plan, customer, subscription, 
   const currentPeriodStart = subscription?.currentPeriodStart || subscription?.billingDate || body?.currentPeriodStart || now;
   const currentPeriodEnd = subscription?.nextDueDate || subscription?.dueDate || body?.currentPeriodEnd || null;
   const rawPayload = isObject(subscription) ? subscription : {};
+  const providerSubscriptionId = extractProviderSubscriptionId(subscription, body);
+  const providerPaymentId = extractProviderPaymentId(subscription, body);
 
   return {
     owner_user_id: userId,
@@ -543,11 +575,11 @@ function buildCustomerSubscriptionPatch({ userId, plan, customer, subscription, 
     status,
     billing_provider: 'asaas',
     provider_customer_id: normalizeText(customer?.id || body?.providerCustomerId || customer?.providerCustomerId) || null,
-    provider_subscription_id: normalizeText(subscription?.id || body?.providerSubscriptionId) || null,
-    provider_payment_id: normalizeText(subscription?.payment?.id || body?.providerPaymentId || subscription?.latestInvoice?.payment?.id) || null,
+    provider_subscription_id: providerSubscriptionId,
+    provider_payment_id: providerPaymentId || normalizeText(subscription?.latestInvoice?.payment?.id) || null,
     asaas_customer_id: normalizeText(customer?.id || body?.asaasCustomerId || null) || null,
-    asaas_subscription_id: normalizeText(subscription?.id || body?.asaasSubscriptionId || null) || null,
-    asaas_payment_id: normalizeText(subscription?.payment?.id || body?.asaasPaymentId || subscription?.latestInvoice?.payment?.id || null) || null,
+    asaas_subscription_id: providerSubscriptionId,
+    asaas_payment_id: providerPaymentId || normalizeText(subscription?.latestInvoice?.payment?.id || null) || null,
     provider_reference: providerReference || body?.providerReference || null,
     external_reference: externalReference || body?.externalReference || null,
     checkout_url: checkoutData?.checkoutUrl || null,
@@ -555,6 +587,8 @@ function buildCustomerSubscriptionPatch({ userId, plan, customer, subscription, 
     invoice_url: checkoutData?.invoiceUrl || null,
     bank_slip_url: checkoutData?.bankSlipUrl || null,
     transaction_receipt_url: checkoutData?.transactionReceiptUrl || null,
+    provider_payment_link_id: checkoutData?.paymentLinkId || body?.providerPaymentLinkId || null,
+    asaas_payment_link_id: checkoutData?.paymentLinkId || body?.asaasPaymentLinkId || null,
     current_period_start: currentPeriodStart,
     current_period_end: currentPeriodEnd,
     trial_ends_at: subscription?.trialEndsAt || body?.trialEndsAt || null,
@@ -577,6 +611,8 @@ function buildCheckoutSessionPatch({
   existingSession = null,
 }) {
   const now = new Date().toISOString();
+  const providerSubscriptionId = extractProviderSubscriptionId(subscription, body);
+  const providerPaymentId = extractProviderPaymentId(subscription, body);
   return {
     owner_user_id: userId,
     user_id: userId,
@@ -586,9 +622,11 @@ function buildCheckoutSessionPatch({
     provider_reference: providerReference || existingSession?.provider_reference || null,
     external_reference: externalReference || existingSession?.external_reference || null,
     asaas_customer_id: normalizeText(customer?.id || existingSession?.asaas_customer_id || null) || null,
-    asaas_subscription_id: normalizeText(subscription?.id || existingSession?.asaas_subscription_id || null) || null,
-    asaas_payment_id: normalizeText(subscription?.payment?.id || existingSession?.asaas_payment_id || null) || null,
-    provider_checkout_session_id: normalizeText(subscription?.id || existingSession?.provider_checkout_session_id || providerReference || null) || null,
+    asaas_subscription_id: providerSubscriptionId || existingSession?.asaas_subscription_id || null,
+    asaas_payment_id: providerPaymentId || existingSession?.asaas_payment_id || null,
+    provider_payment_link_id: checkoutData?.paymentLinkId || existingSession?.provider_payment_link_id || null,
+    asaas_payment_link_id: checkoutData?.paymentLinkId || existingSession?.asaas_payment_link_id || null,
+    provider_checkout_session_id: normalizeText(checkoutData?.paymentLinkId || providerSubscriptionId || existingSession?.provider_checkout_session_id || providerReference || null) || null,
     checkout_url: checkoutData?.checkoutUrl || existingSession?.checkout_url || null,
     payment_url: checkoutData?.paymentUrl || existingSession?.payment_url || null,
     invoice_url: checkoutData?.invoiceUrl || existingSession?.invoice_url || null,
@@ -746,6 +784,33 @@ export async function handleCreateSubscriptionRequest(req, { client = getSupabas
     || null;
 
   if (recentCheckoutSession && isRecentDate(recentCheckoutSession.updated_at || recentCheckoutSession.created_at, 30)) {
+    if (!recentCheckoutUrl) {
+      const noUrlMessage = 'Não foi possível abrir o pagamento agora. Tente novamente em alguns instantes ou fale com o suporte.';
+      console.warn('[asaas-create-subscription] reused checkout without usable url', {
+        id: recentCheckoutSession.id || null,
+        providerReference,
+        externalReference,
+        status: recentCheckoutSession.status || null,
+      });
+
+      return json(502, {
+        ok: false,
+        code: 'CHECKOUT_URL_MISSING',
+        reused: true,
+        manual: false,
+        checkoutUrl: null,
+        paymentUrl: null,
+        invoiceUrl: recentCheckoutSession.invoice_url || null,
+        bankSlipUrl: recentCheckoutSession.bank_slip_url || null,
+        transactionReceiptUrl: recentCheckoutSession.transaction_receipt_url || null,
+        paymentLinkId: recentCheckoutSession.provider_payment_link_id || recentCheckoutSession.asaas_payment_link_id || null,
+        customer: recentCheckoutSession.raw_payload?.customer || null,
+        subscription: recentCheckoutSession.raw_payload || null,
+        checkoutSession: recentCheckoutSession,
+        message: noUrlMessage,
+      });
+    }
+
     return json(200, {
       ok: true,
       reused: true,
@@ -755,6 +820,7 @@ export async function handleCreateSubscriptionRequest(req, { client = getSupabas
       invoiceUrl: recentCheckoutSession.invoice_url || null,
       bankSlipUrl: recentCheckoutSession.bank_slip_url || null,
       transactionReceiptUrl: recentCheckoutSession.transaction_receipt_url || null,
+      paymentLinkId: recentCheckoutSession.provider_payment_link_id || recentCheckoutSession.asaas_payment_link_id || null,
       customer: recentCheckoutSession.raw_payload?.customer || null,
       subscription: recentCheckoutSession.raw_payload || null,
       checkoutSession: recentCheckoutSession,
@@ -786,6 +852,8 @@ export async function handleCreateSubscriptionRequest(req, { client = getSupabas
       asaas_customer_id: null,
       asaas_subscription_id: null,
       asaas_payment_id: null,
+      provider_payment_link_id: null,
+      asaas_payment_link_id: null,
     }).catch(() => null);
   }
 
@@ -802,26 +870,40 @@ export async function handleCreateSubscriptionRequest(req, { client = getSupabas
     providerCustomer = await createCustomerOnAsaas({ user, profile, body });
   }
 
-  const subscription = await createMonthlySubscriptionOnAsaas({
+  const providerCheckout = await createRecurringPaymentLinkOnAsaas({
     customerId: providerCustomer.id,
     plan: availablePlan,
     externalReference: providerReference,
     body,
   });
 
-  const checkoutData = extractProviderCheckoutData(subscription);
+  const checkoutData = extractProviderCheckoutData(providerCheckout);
   const checkoutUrl = checkoutData.paymentUrl || checkoutData.checkoutUrl || checkoutData.invoiceUrl || checkoutData.bankSlipUrl || checkoutData.transactionReceiptUrl || null;
+  const noCheckoutUrlMessage = 'Não foi possível abrir o pagamento agora. Tente novamente em alguns instantes ou fale com o suporte.';
+
+  if (!checkoutUrl) {
+    const sanitizedResponse = {
+      id: checkoutData.paymentLinkId || null,
+      keys: isObject(providerCheckout) ? Object.keys(providerCheckout).slice(0, 10) : [],
+      hasUrl: false,
+      status: providerCheckout?.status || null,
+      providerReference,
+      externalReference,
+    };
+    console.warn('[asaas-create-subscription] hosted payment url missing', sanitizedResponse);
+  }
+
   const mappedStatus = mapAsaasEventToSubscriptionStatus({
     eventName: body.eventName || 'subscription.created',
-    paymentStatus: subscription?.status || 'trialing',
-    subscriptionStatus: subscription?.status || 'trialing',
+    paymentStatus: providerCheckout?.status || 'trialing',
+    subscriptionStatus: providerCheckout?.status || 'trialing',
   });
 
   const subscriptionRow = await upsertCustomerSubscription(client, buildCustomerSubscriptionPatch({
     userId: user.id,
     plan: availablePlan,
     customer: providerCustomer,
-    subscription,
+    subscription: providerCheckout,
     body,
     checkoutData,
     providerReference,
@@ -834,7 +916,7 @@ export async function handleCreateSubscriptionRequest(req, { client = getSupabas
     providerReference,
     externalReference,
     customer: providerCustomer,
-    subscription,
+    subscription: providerCheckout,
     checkoutData,
     body,
     status: checkoutUrl ? 'completed' : 'pending',
@@ -847,23 +929,46 @@ export async function handleCreateSubscriptionRequest(req, { client = getSupabas
     userId: user.id,
     subscriptionRow,
     eventIdentity: buildAsaasEventIdentity({
-      id: subscription?.id,
-      event: 'subscription.created',
-      subscription,
+      id: checkoutData.paymentLinkId || providerCheckout?.id,
+      event: 'payment_link.created',
+      subscription: providerCheckout,
       customer: providerCustomer,
     }),
-    eventName: 'subscription.created',
+    eventName: 'payment_link.created',
     mapped: mappedStatus,
     event: {
-      id: subscription?.id || null,
-      event: 'subscription.created',
-      subscription,
+      id: checkoutData.paymentLinkId || providerCheckout?.id || null,
+      event: 'payment_link.created',
+      subscription: providerCheckout,
       customer: providerCustomer,
     },
     providerCustomerId: providerCustomer?.id || null,
-    providerSubscriptionId: subscription?.id || null,
-    providerPaymentId: subscription?.payment?.id || null,
+    providerSubscriptionId: extractProviderSubscriptionId(providerCheckout, body),
+    providerPaymentId: extractProviderPaymentId(providerCheckout, body),
   })).catch(() => null);
+
+  if (!checkoutUrl) {
+    return json(502, {
+      ok: false,
+      code: 'CHECKOUT_URL_MISSING',
+      manual: false,
+      persisted: Boolean(subscriptionRow && checkoutSession),
+      persistenceWarning: !subscriptionRow || !checkoutSession,
+      checkoutUrl: null,
+      paymentUrl: null,
+      invoiceUrl: checkoutData.invoiceUrl || null,
+      bankSlipUrl: checkoutData.bankSlipUrl || null,
+      transactionReceiptUrl: checkoutData.transactionReceiptUrl || null,
+      paymentLinkId: checkoutData.paymentLinkId || null,
+      customer: providerCustomer,
+      subscription: providerCheckout,
+      checkoutSession,
+      billingEvent,
+      providerReference,
+      externalReference,
+      message: noCheckoutUrlMessage,
+    });
+  }
 
   return json(200, {
     ok: true,
@@ -874,9 +979,10 @@ export async function handleCreateSubscriptionRequest(req, { client = getSupabas
     invoiceUrl: checkoutData.invoiceUrl || null,
     bankSlipUrl: checkoutData.bankSlipUrl || null,
     transactionReceiptUrl: checkoutData.transactionReceiptUrl || null,
+    paymentLinkId: checkoutData.paymentLinkId || null,
     manual: false,
     customer: providerCustomer,
-    subscription,
+    subscription: providerCheckout,
     checkoutSession,
     billingEvent,
     providerReference,

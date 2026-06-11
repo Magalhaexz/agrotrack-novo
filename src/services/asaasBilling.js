@@ -98,7 +98,7 @@ export async function requestAsaasSandboxCheckout({ session = null, planCode, cu
     return {
       ok: false,
       code: 'SESSION_MISSING',
-      message: 'Nao foi possivel confirmar o acesso agora. Entre novamente e tente outra vez.',
+      message: 'Não foi possível confirmar o acesso agora. Entre novamente e tente outra vez.',
     };
   }
 
@@ -120,13 +120,43 @@ export async function requestAsaasSandboxCheckout({ session = null, planCode, cu
       ok: false,
       code: payload?.code || null,
       missingFields: Array.isArray(payload?.missingFields) ? payload.missingFields : [],
-      message: payload?.message || 'Nao foi possivel confirmar o salvamento agora. Tente novamente em alguns instantes.',
+      message: payload?.message || 'Não foi possível confirmar o salvamento agora. Tente novamente em alguns instantes.',
+    };
+  }
+
+  const resolvedPaymentUrl = resolveAsaasPaymentUrl(payload);
+
+  if (payload.ok === false) {
+    return {
+      ok: false,
+      code: payload?.code || null,
+      missingFields: Array.isArray(payload?.missingFields) ? payload.missingFields : [],
+      reused: Boolean(payload?.reused),
+      manual: Boolean(payload?.manual),
+      checkoutUrl: resolvedPaymentUrl,
+      paymentUrl: resolvedPaymentUrl,
+      message: payload?.message || 'Não foi possível abrir o pagamento agora. Tente novamente em alguns instantes ou fale com o suporte.',
+      ...payload,
+    };
+  }
+
+  if (!resolvedPaymentUrl && !payload.manual) {
+    return {
+      ok: false,
+      code: payload?.code || 'CHECKOUT_URL_MISSING',
+      missingFields: Array.isArray(payload?.missingFields) ? payload.missingFields : [],
+      reused: Boolean(payload?.reused),
+      manual: Boolean(payload?.manual),
+      checkoutUrl: null,
+      paymentUrl: null,
+      message: payload?.message || 'Não foi possível abrir o pagamento agora. Tente novamente em alguns instantes ou fale com o suporte.',
+      ...payload,
     };
   }
 
   return {
     ok: true,
-    paymentUrl: resolveAsaasPaymentUrl(payload),
+    paymentUrl: resolvedPaymentUrl,
     ...payload,
   };
 }
