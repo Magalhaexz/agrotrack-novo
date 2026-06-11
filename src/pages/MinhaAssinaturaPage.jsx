@@ -1,15 +1,21 @@
-import { useMemo } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { CheckCircle2, FileText } from 'lucide-react';
 import SubscriptionSummary from '../components/subscription/SubscriptionSummary';
 import Badge from '../components/ui/Badge';
 import Button from '../components/ui/Button';
 import Card from '../components/ui/Card';
+import Input from '../components/ui/Input';
+import Modal from '../components/ui/Modal';
 import { useToast } from '../hooks/useToast';
 import {
   getAvailablePlans,
   getSubscriptionDisplayCopy,
   hasSubscriptionBillingReady,
 } from '../services/subscriptions';
+import {
+  isSandboxCheckoutAllowed,
+  requestAsaasSandboxCheckout,
+} from '../services/asaasBilling';
 import '../styles/subscription.css';
 
 function formatLimit(value) {
@@ -28,28 +34,132 @@ function resolveSnapshotValue(value, fallback = 'Em preparação') {
   return value;
 }
 
-export default function MinhaAssinaturaPage({ subscription = null, subscriptionUsage = {} }) {
+function getSafeCustomerSeed({ usuarioLogado = null, session = null } = {}) {
+  return {
+    name:
+      usuarioLogado?.nome
+      || session?.user?.user_metadata?.nome
+      || session?.user?.user_metadata?.name
+      || session?.user?.email?.split('@')[0]
+      || '',
+    email:
+      usuarioLogado?.email
+      || session?.user?.email
+      || '',
+    cpfCnpj:
+      usuarioLogado?.cpfCnpj
+      || usuarioLogado?.cpf_cnpj
+      || session?.user?.user_metadata?.cpfCnpj
+      || session?.user?.user_metadata?.cpf_cnpj
+      || '',
+    mobilePhone:
+      usuarioLogado?.mobilePhone
+      || usuarioLogado?.mobile_phone
+      || usuarioLogado?.telefone
+      || session?.user?.user_metadata?.mobilePhone
+      || session?.user?.user_metadata?.mobile_phone
+      || session?.user?.user_metadata?.telefone
+      || '',
+  };
+}
+
+export default function MinhaAssinaturaPage({
+  subscription = null,
+  subscriptionUsage = {},
+  session = null,
+  usuarioLogado = null,
+}) {
   const { showToast } = useToast();
   const plans = useMemo(() => getAvailablePlans(), []);
   const actionCopy = useMemo(() => getSubscriptionDisplayCopy(subscription), [subscription]);
+  const selectedPlanFallback = subscription?.plan_code || plans.find((plan) => plan.planCode !== 'enterprise')?.planCode || 'essencial';
+  const [selectedPlanCode, setSelectedPlanCode] = useState(selectedPlanFallback);
+  const [checkoutBusy, setCheckoutBusy] = useState(false);
+  const [customerModalOpen, setCustomerModalOpen] = useState(false);
+  const [customerSeed, setCustomerSeed] = useState(() => getSafeCustomerSeed({ usuarioLogado, session }));
+  const [missingFields, setMissingFields] = useState([]);
+
   const normalizedPlanCode = String(subscription?.plan_code || subscription?.plan?.planCode || '').toLowerCase();
   const checkoutReady = hasSubscriptionBillingReady(subscription);
+  const canStartCheckout = isSandboxCheckoutAllowed(subscription);
   const statusTone = buildStatusTone(actionCopy.status);
 
-  function handlePrimaryAction() {
-    if (actionCopy.primaryLabel === 'Regularizar assinatura') {
-      showToast({
-        type: 'warning',
-        message: 'Ainda estamos preparando a liberação do checkout. Fale com o suporte para regularizar sua assinatura.',
-      });
+  useEffect(() => {
+    setCustomerSeed(getSafeCustomerSeed({ usuarioLogado, session }));
+  }, [usuarioLogado, session]);
+
+  useEffect(() => {
+    if (!selectedPlanCode) {
+      setSelectedPlanCode(selectedPlanFallback);
+    }
+  }, [selectedPlanCode, selectedPlanFallback]);
+
+  async function iniciarCheckout(planCode = selectedPlanCode, customerOverride = null) {
+    if (checkoutBusy) {
       return;
     }
 
-    if (actionCopy.primaryLabel === 'Escolher plano') {
-      showToast({
-        type: 'info',
-        message: 'Checkout em preparação. Fale com o suporte para escolher o melhor plano.',
+    const plan = plans.find((item) => item.planCode === planCode);
+    if (!plan) {
+      showToast({ type: 'warning', message: 'Escolha um plano disponível para continuar.' });
+      return;
+    }
+
+    if (plan.planCode === 'enterprise') {
+      showToast({ type: 'info', message: 'Plano sob consulta. Fale com a equipe para seguir com o atendimento.' });
+      return;
+    }
+
+    if (!canStartCheckout) {
+      showToast({ type: 'info', message: 'Este plano já está em uso. Se quiser revisar a assinatura, verifique os detalhes abaixo.' });
+      return;
+    }
+
+    setCheckoutBusy(true);
+    try {
+      const result = await requestAsaasSandboxCheckout({
+        session,
+        planCode: plan.planCode,
+        customer: customerOverride || customerSeed,
       });
+
+      if (result?.code === 'MISSING_CUSTOMER_FIELDS') {
+        setMissingFields(Array.isArray(result.missingFields) ? result.missingFields : []);
+        setCustomerModalOpen(true);
+        showToast({ type: 'warning', message: result.message || 'Precisamos conferir alguns dados antes de continuar.' });
+        return;
+      }
+
+      if (!result?.ok) {
+        showToast({
+          type: 'warning',
+          message: result?.message || 'Não foi possível confirmar o salvamento agora. Tente novamente em alguns instantes.',
+        });
+        return;
+      }
+
+      if (result.manual) {
+        showToast({ type: 'info', message: result.message || 'Plano sob atendimento. Fale com a equipe para continuar.' });
+        return;
+      }
+
+      if (result.checkoutUrl) {
+        showToast({ type: 'success', message: 'Checkout do sandbox preparado.' });
+        window.location.assign(result.checkoutUrl);
+        return;
+      }
+
+      showToast({ type: 'warning', message: result.message || 'Checkout em preparação. Tente novamente em alguns instantes.' });
+    } catch {
+      showToast({ type: 'warning', message: 'Não foi possível confirmar o salvamento agora. Tente novamente em alguns instantes.' });
+    } finally {
+      setCheckoutBusy(false);
+    }
+  }
+
+  function handlePrimaryAction() {
+    if (actionCopy.primaryLabel === 'Regularizar assinatura' || actionCopy.primaryLabel === 'Escolher plano') {
+      void iniciarCheckout(selectedPlanCode);
       return;
     }
 
@@ -57,7 +167,7 @@ export default function MinhaAssinaturaPage({ subscription = null, subscriptionU
       type: 'info',
       message: checkoutReady
         ? 'O gerenciamento da assinatura estará disponível em breve.'
-        : 'Checkout em preparação. Fale com o suporte para ajustar seu plano.',
+        : 'Checkout em preparação. Fale com a equipe para ajustar seu plano.',
     });
   }
 
@@ -66,6 +176,11 @@ export default function MinhaAssinaturaPage({ subscription = null, subscriptionU
       type: 'info',
       message: 'Nossa equipe pode ajudar você a revisar o plano ideal para sua operação.',
     });
+  }
+
+  function handleChoosePlan(planCode) {
+    setSelectedPlanCode(planCode);
+    void iniciarCheckout(planCode);
   }
 
   return (
@@ -121,6 +236,10 @@ export default function MinhaAssinaturaPage({ subscription = null, subscriptionU
               <span className="summary-row__label">Usuários</span>
               <strong className="summary-row__value">{resolveSnapshotValue(subscription?.plan ? formatLimit(subscription?.plan?.limits?.users) : null)}</strong>
             </div>
+            <div className="summary-row">
+              <span className="summary-row__label">Checkout</span>
+              <strong className="summary-row__value">{checkoutReady ? 'Preparado' : 'Em preparação'}</strong>
+            </div>
           </div>
         </Card>
       </div>
@@ -129,7 +248,14 @@ export default function MinhaAssinaturaPage({ subscription = null, subscriptionU
         <div className="subscription-page__plans">
           {plans.map((plan) => {
             const isCurrent = normalizedPlanCode && normalizedPlanCode === String(plan.planCode || '').toLowerCase();
-            const actionLabel = isCurrent ? 'Plano atual' : 'Ver detalhes';
+            const isEnterprise = plan.planCode === 'enterprise';
+            const actionLabel = isEnterprise
+              ? 'Falar com atendimento'
+              : isCurrent
+                ? 'Plano atual'
+                : canStartCheckout
+                  ? (actionCopy.primaryLabel === 'Regularizar assinatura' ? 'Regularizar assinatura' : 'Escolher plano')
+                  : 'Ver detalhes';
 
             return (
               <article key={plan.planCode} className={`subscription-plan-card ${isCurrent ? 'is-current' : ''}`}>
@@ -147,9 +273,28 @@ export default function MinhaAssinaturaPage({ subscription = null, subscriptionU
                 </div>
                 <Button
                   type="button"
-                  variant={isCurrent ? 'ghost' : 'outline'}
-                  onClick={handleSecondaryAction}
-                  icon={!isCurrent ? <FileText size={14} aria-hidden="true" /> : undefined}
+                  variant={isEnterprise || isCurrent ? 'ghost' : 'outline'}
+                  loading={checkoutBusy && selectedPlanCode === plan.planCode}
+                  disabled={checkoutBusy}
+                  onClick={() => {
+                    if (isEnterprise) {
+                      handleSecondaryAction();
+                      return;
+                    }
+
+                    if (isCurrent) {
+                      showToast({ type: 'info', message: 'Este já é o plano em uso.' });
+                      return;
+                    }
+
+                    if (!canStartCheckout) {
+                      showToast({ type: 'info', message: 'Confira os detalhes do plano abaixo.' });
+                      return;
+                    }
+
+                    handleChoosePlan(plan.planCode);
+                  }}
+                  icon={!isCurrent && !isEnterprise ? <FileText size={14} aria-hidden="true" /> : undefined}
                 >
                   {actionLabel}
                 </Button>
@@ -158,6 +303,59 @@ export default function MinhaAssinaturaPage({ subscription = null, subscriptionU
           })}
         </div>
       </Card>
+
+      <Modal
+        open={customerModalOpen}
+        onClose={() => setCustomerModalOpen(false)}
+        title="Complete seus dados"
+        subtitle="Precisamos confirmar algumas informações antes de preparar o checkout."
+        size="md"
+        footer={(
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 10, justifyContent: 'flex-end' }}>
+            <Button type="button" variant="ghost" onClick={() => setCustomerModalOpen(false)}>
+              Agora não
+            </Button>
+            <Button
+              type="button"
+              loading={checkoutBusy}
+              onClick={() => {
+                setCustomerModalOpen(false);
+                void iniciarCheckout(selectedPlanCode, customerSeed);
+              }}
+            >
+              Confirmar e continuar
+            </Button>
+          </div>
+        )}
+      >
+        <div style={{ display: 'grid', gap: 14 }}>
+          <Input
+            label="Nome"
+            value={customerSeed.name}
+            onChange={(event) => setCustomerSeed((prev) => ({ ...prev, name: event.target.value }))}
+          />
+          <Input
+            label="E-mail"
+            value={customerSeed.email}
+            onChange={(event) => setCustomerSeed((prev) => ({ ...prev, email: event.target.value }))}
+          />
+          <Input
+            label="CPF ou CNPJ"
+            value={customerSeed.cpfCnpj}
+            onChange={(event) => setCustomerSeed((prev) => ({ ...prev, cpfCnpj: event.target.value }))}
+          />
+          <Input
+            label="Celular"
+            value={customerSeed.mobilePhone}
+            onChange={(event) => setCustomerSeed((prev) => ({ ...prev, mobilePhone: event.target.value }))}
+          />
+          {missingFields.length ? (
+            <p style={{ margin: 0, color: 'var(--color-text-secondary)' }}>
+              Campos pendentes: {missingFields.join(', ')}.
+            </p>
+          ) : null}
+        </div>
+      </Modal>
     </div>
   );
 }

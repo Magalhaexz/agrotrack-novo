@@ -138,8 +138,19 @@ function isPlainObject(value) {
 
 function readSubscriptionCandidates(context = {}) {
   const subscriptionCollection = Array.isArray(context.db?.customer_subscriptions)
-    ? context.db.customer_subscriptions.find((item) => !BLOCKED_STATUSES.has(normalizePlanCode(item?.status)))
-      || context.db.customer_subscriptions[0]
+    ? [...context.db.customer_subscriptions].sort((a, b) => {
+      const aLinked = Boolean(a?.provider_customer_id || a?.provider_subscription_id || a?.provider_payment_id);
+      const bLinked = Boolean(b?.provider_customer_id || b?.provider_subscription_id || b?.provider_payment_id);
+      if (aLinked !== bLinked) return aLinked ? -1 : 1;
+
+      const aInternal = normalizePlanCode(a?.status) === SUBSCRIPTION_STATUSES.INTERNAL_TEST;
+      const bInternal = normalizePlanCode(b?.status) === SUBSCRIPTION_STATUSES.INTERNAL_TEST;
+      if (aInternal !== bInternal) return aInternal ? 1 : -1;
+
+      const aUpdated = Number(new Date(a?.updated_at || a?.created_at || 0).getTime()) || 0;
+      const bUpdated = Number(new Date(b?.updated_at || b?.created_at || 0).getTime()) || 0;
+      return bUpdated - aUpdated;
+    })[0] || null
     : null;
 
   return [

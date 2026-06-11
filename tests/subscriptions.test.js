@@ -160,3 +160,32 @@ test('plan prices and billing labels are formatted for the customer surface', ()
   assert.equal(getBillingIntervalLabel('month'), 'Mensal');
   assert.equal(getBillingIntervalLabel('custom'), 'Sob consulta');
 });
+
+test('linked provider subscription is preferred over internal_test placeholder', () => {
+  const current = getCurrentSubscription({
+    db: {
+      customer_subscriptions: [
+        {
+          id: 1,
+          status: 'internal_test',
+          plan_code: 'premium',
+          created_at: '2026-01-01T10:00:00Z',
+          updated_at: '2026-01-01T10:00:00Z',
+        },
+        {
+          id: 2,
+          status: 'active',
+          plan_code: 'pro',
+          provider_customer_id: 'cus_123',
+          provider_subscription_id: 'sub_123',
+          created_at: '2026-01-02T10:00:00Z',
+          updated_at: '2026-01-02T10:00:00Z',
+        },
+      ],
+    },
+  });
+
+  assert.equal(current.plan_code, 'pro');
+  assert.equal(current.status, 'active');
+  assert.equal(current.provider_subscription_id, 'sub_123');
+});

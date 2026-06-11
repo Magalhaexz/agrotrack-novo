@@ -317,6 +317,7 @@ create table if not exists public.billing_events (
 create index if not exists billing_events_owner_user_id_idx on public.billing_events (owner_user_id);
 create index if not exists billing_events_subscription_id_idx on public.billing_events (subscription_id);
 create index if not exists billing_events_event_type_idx on public.billing_events (event_type);
+create unique index if not exists billing_events_provider_event_id_unique_idx on public.billing_events (provider_event_id) where provider_event_id is not null;
 create index if not exists billing_events_created_at_idx on public.billing_events (created_at desc);
 create index if not exists billing_events_updated_at_idx on public.billing_events (updated_at desc);
 

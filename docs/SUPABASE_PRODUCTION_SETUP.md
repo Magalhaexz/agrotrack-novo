@@ -39,6 +39,10 @@ Runtime tables provisioned:
 - `alertas_adiados`
 - `consumo_suplementacao`
 
+Idempotency note:
+
+- `billing_events.provider_event_id` is indexed uniquely so repeated webhook deliveries stay safe.
+
 Local-only or not provisioned by this bundle:
 
 - `suplementacao`
