@@ -39,7 +39,7 @@ create table if not exists public.profiles (
   owner_user_id uuid references auth.users (id) on delete set null,
   email citext not null,
   nome text,
-  perfil public.app_profile not null default 'visualizador',
+  perfil public.app_profile not null default 'proprietario',
   telefone text,
   cargo text,
   foto_url text,

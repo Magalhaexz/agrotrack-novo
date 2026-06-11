@@ -15,7 +15,7 @@ test('bootstrap owner email resolves proprietario', () => {
   assert.equal(mapped.roleSource, 'bootstrap_owner_email');
 });
 
-test('non-owner email without metadata resolves visualizador', () => {
+test('new account without invite or explicit limited role resolves proprietario', () => {
   const user = {
     id: 'u4',
     email: 'unknown@herdon.app',
@@ -23,7 +23,22 @@ test('non-owner email without metadata resolves visualizador', () => {
   };
 
   const mapped = mapProfileRowToUser(user, null);
+  assert.equal(mapped.perfil, 'proprietario');
+  assert.equal(mapped.owner_user_id, 'u4');
+  assert.equal(mapped.roleSource, 'fallback_owner_default');
+});
+
+test('invited visualizador profile remains visualizador', () => {
+  const user = {
+    id: 'u5',
+    email: 'invitee@herdon.app',
+    user_metadata: {},
+  };
+  const profile = { perfil: 'visualizador', owner_user_id: 'owner-2', nome: 'Convidado' };
+
+  const mapped = mapProfileRowToUser(user, profile);
   assert.equal(mapped.perfil, 'visualizador');
+  assert.equal(mapped.owner_user_id, 'owner-2');
 });
 
 test('metadata admin still resolves proprietario', () => {

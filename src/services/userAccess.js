@@ -1,4 +1,4 @@
-import { obterLabelPerfil, obterPerfilDoUsuario, PERFIS, normalizarPerfil, perfilEhAdministrador } from '../auth/perfis.js';
+import { obterLabelPerfil, PERFIS, normalizarPerfil, perfilEhAdministrador } from '../auth/perfis.js';
 import { supabase } from '../lib/supabase.js';
 
 const PROFILE_COLUMNS = 'id, owner_user_id, email, nome, perfil, telefone, cargo, foto_url, created_at, updated_at';
@@ -94,13 +94,16 @@ export function resolveUserRoleFromAuthAndCache(user, profile) {
   if (metadataExplicitRole) {
     return { perfil: metadataPerfil, source: 'auth_metadata' };
   }
-  if (isBootstrapOwnerEmail(user) || isOwnerAccountMetadata(user) || metadataPerfil === PERFIS.PROPRIETARIO) {
-    return { perfil: PERFIS.PROPRIETARIO, source: isOwnerAccountMetadata(user) ? 'self_service_signup' : 'bootstrap_owner_email' };
-  }
   if (hasProfilePerfil) {
     return { perfil: profilePerfil, source: 'cached_profile' };
   }
-  return { perfil: obterPerfilDoUsuario(user), source: 'fallback' };
+  if (isBootstrapOwnerEmail(user) || isOwnerAccountMetadata(user) || metadataPerfil === PERFIS.PROPRIETARIO) {
+    return { perfil: PERFIS.PROPRIETARIO, source: isOwnerAccountMetadata(user) ? 'self_service_signup' : 'bootstrap_owner_email' };
+  }
+  if (metadataRawHasValue) {
+    return { perfil: metadataPerfil, source: 'auth_metadata' };
+  }
+  return { perfil: PERFIS.PROPRIETARIO, source: 'fallback_owner_default' };
 }
 
 export function mapProfileRowToUser(user, profile) {

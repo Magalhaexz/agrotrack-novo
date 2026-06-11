@@ -107,6 +107,7 @@ Recommended flow:
 4. If there is no matching invite, that first user becomes:
    - `owner_user_id = auth.uid()`
    - `perfil = proprietario`
+5. If there is a matching invite, the invited role from `invites.perfil` is preserved.
 
 Optional verification query:
 

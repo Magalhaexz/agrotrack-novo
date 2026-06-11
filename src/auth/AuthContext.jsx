@@ -17,24 +17,12 @@ import { obterPerfilDoUsuario, usuarioTemPermissao } from './perfis';
 
 const AuthContext = createContext(null);
 const PROFILE_FAILURE_COOLDOWN_MS = 120000;
-const HERDON_ENABLE_PROFILE_SYNC = 'HERDON_ENABLE_PROFILE_SYNC';
 const profileBootLogs = new Set();
 
 function getErrorMessage(error) {
   if (!error) return '';
   if (typeof error === 'string') return error;
   return error.message || error.details || error.hint || error.name || String(error);
-}
-
-function shouldEnableProfileSync() {
-  try {
-    const raw = localStorage.getItem(HERDON_ENABLE_PROFILE_SYNC);
-    if (!raw) return false;
-    const normalized = String(raw).toLowerCase();
-    return normalized === '1' || normalized === 'true' || normalized === 'yes' || normalized === 'on';
-  } catch {
-    return false;
-  }
 }
 
 function logProfileBootOnce(stage, payload = {}, level = 'debug') {
@@ -82,8 +70,6 @@ export function AuthProvider({ children }) {
   const activeUserIdRef = useRef(null);
   const profileFailureAtRef = useRef(new Map());
   const profileInFlightRef = useRef(new Map());
-  const profileSyncEnabledRef = useRef(shouldEnableProfileSync());
-
   const resetAuthState = useCallback(() => {
     setSession(null);
     setProfile(null);
@@ -168,9 +154,7 @@ export function AuthProvider({ children }) {
 
     if (authUser) {
       aplicarProfileFallback(authUser, generationId);
-      if (shouldEnableProfileSync()) {
-        void options?.deferProfileSync?.(authUser, generationId);
-      }
+      void options?.deferProfileSync?.(authUser, generationId);
       return;
     }
 
@@ -195,19 +179,7 @@ export function AuthProvider({ children }) {
         return;
       }
 
-      profileSyncEnabledRef.current = shouldEnableProfileSync();
-      if (!profileSyncEnabledRef.current) {
-        logProfileBootOnce('profile_auto_sync_disabled', {
-          userId,
-          generationId,
-        });
-        if (ativo && authGenerationRef.current === generationId) {
-          aplicarProfileFallback(userAtual, generationId);
-        }
-        return;
-      }
-
-      logProfileBootOnce('profile_sync_opt_in_enabled', {
+      logProfileBootOnce('profile_bootstrap_fetch', {
         userId,
         generationId,
       });
@@ -354,21 +326,11 @@ export function AuthProvider({ children }) {
       return null;
     }
 
-    profileSyncEnabledRef.current = shouldEnableProfileSync();
     const existingProfileRequest = profileInFlightRef.current.get(userAtual.id);
     if (existingProfileRequest) {
       await existingProfileRequest;
     }
     const generationId = authGenerationRef.current;
-
-    if (!profileSyncEnabledRef.current) {
-      aplicarProfileFallback(userAtual, generationId);
-      logProfileBootOnce('profile_auto_sync_disabled', {
-        userId: userAtual.id,
-        generationId,
-      });
-      return null;
-    }
 
     const lastFailure = profileFailureAtRef.current.get(userAtual.id) || 0;
     if (Date.now() - lastFailure < PROFILE_FAILURE_COOLDOWN_MS) {
