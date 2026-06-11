@@ -232,6 +232,61 @@ create table if not exists public.customer_subscriptions (
   constraint customer_subscriptions_status_check check (status in ('trialing', 'active', 'past_due', 'canceled', 'blocked', 'internal_test'))
 );
 
+-- Compatibility migration for existing Supabase projects
+alter table if exists public.customer_subscriptions
+  add column if not exists user_id uuid;
+
+alter table if exists public.customer_subscriptions
+  add column if not exists farm_id bigint;
+
+alter table if exists public.customer_subscriptions
+  add column if not exists fazenda_id bigint;
+
+alter table if exists public.customer_subscriptions
+  add column if not exists plan_code text;
+
+alter table if exists public.customer_subscriptions
+  add column if not exists plan_name text;
+
+alter table if exists public.customer_subscriptions
+  add column if not exists status text;
+
+alter table if exists public.customer_subscriptions
+  add column if not exists billing_provider text;
+
+alter table if exists public.customer_subscriptions
+  add column if not exists provider_customer_id text;
+
+alter table if exists public.customer_subscriptions
+  add column if not exists provider_subscription_id text;
+
+alter table if exists public.customer_subscriptions
+  add column if not exists provider_payment_id text;
+
+alter table if exists public.customer_subscriptions
+  add column if not exists current_period_start timestamptz;
+
+alter table if exists public.customer_subscriptions
+  add column if not exists current_period_end timestamptz;
+
+alter table if exists public.customer_subscriptions
+  add column if not exists trial_ends_at timestamptz;
+
+alter table if exists public.customer_subscriptions
+  add column if not exists canceled_at timestamptz;
+
+alter table if exists public.customer_subscriptions
+  add column if not exists blocked_at timestamptz;
+
+alter table if exists public.customer_subscriptions
+  add column if not exists raw_payload jsonb not null default '{}'::jsonb;
+
+alter table if exists public.customer_subscriptions
+  add column if not exists created_at timestamptz not null default timezone('utc', now());
+
+alter table if exists public.customer_subscriptions
+  add column if not exists updated_at timestamptz not null default timezone('utc', now());
+
 create unique index if not exists customer_subscriptions_provider_subscription_id_unique_idx on public.customer_subscriptions (provider_subscription_id) where provider_subscription_id is not null;
 create index if not exists customer_subscriptions_owner_user_id_idx on public.customer_subscriptions (owner_user_id);
 create index if not exists customer_subscriptions_user_id_idx on public.customer_subscriptions (user_id);
@@ -341,6 +396,39 @@ create table if not exists public.pastagens (
   updated_at timestamptz not null default timezone('utc', now())
 );
 
+alter table if exists public.pastagens
+  add column if not exists fazenda_id bigint;
+
+alter table if exists public.pastagens
+  add column if not exists faz_id bigint;
+
+alter table if exists public.pastagens
+  add column if not exists nome text;
+
+alter table if exists public.pastagens
+  add column if not exists area_ha numeric(14, 2);
+
+alter table if exists public.pastagens
+  add column if not exists capacidade_suporte_ua_ha numeric(14, 4);
+
+alter table if exists public.pastagens
+  add column if not exists status text;
+
+alter table if exists public.pastagens
+  add column if not exists observacoes text;
+
+alter table if exists public.pastagens
+  add column if not exists obs text;
+
+alter table if exists public.pastagens
+  add column if not exists metadata jsonb not null default '{}'::jsonb;
+
+alter table if exists public.pastagens
+  add column if not exists created_at timestamptz not null default timezone('utc', now());
+
+alter table if exists public.pastagens
+  add column if not exists updated_at timestamptz not null default timezone('utc', now());
+
 create index if not exists pastagens_owner_user_id_idx on public.pastagens (owner_user_id);
 create index if not exists pastagens_fazenda_id_idx on public.pastagens (fazenda_id);
 create index if not exists pastagens_faz_id_idx on public.pastagens (faz_id);
@@ -393,6 +481,129 @@ create table if not exists public.lotes (
   updated_at timestamptz not null default timezone('utc', now())
 );
 
+alter table if exists public.lotes
+  add column if not exists cloud_id uuid;
+
+alter table if exists public.lotes
+  add column if not exists nome text;
+
+alter table if exists public.lotes
+  add column if not exists faz_id bigint;
+
+alter table if exists public.lotes
+  add column if not exists pastagem_id bigint;
+
+alter table if exists public.lotes
+  add column if not exists entrada date;
+
+alter table if exists public.lotes
+  add column if not exists saida date;
+
+alter table if exists public.lotes
+  add column if not exists status text;
+
+alter table if exists public.lotes
+  add column if not exists tipo text;
+
+alter table if exists public.lotes
+  add column if not exists sistema text;
+
+alter table if exists public.lotes
+  add column if not exists categoria_animal text;
+
+alter table if exists public.lotes
+  add column if not exists categoria text;
+
+alter table if exists public.lotes
+  add column if not exists raca text;
+
+alter table if exists public.lotes
+  add column if not exists sexo text;
+
+alter table if exists public.lotes
+  add column if not exists qtd numeric(14, 2);
+
+alter table if exists public.lotes
+  add column if not exists p_ini numeric(14, 3);
+
+alter table if exists public.lotes
+  add column if not exists p_at numeric(14, 3);
+
+alter table if exists public.lotes
+  add column if not exists peso_alvo numeric(14, 3);
+
+alter table if exists public.lotes
+  add column if not exists gmd_meta numeric(14, 4);
+
+alter table if exists public.lotes
+  add column if not exists investimento numeric(14, 2);
+
+alter table if exists public.lotes
+  add column if not exists custo_fixo_mensal numeric(14, 2);
+
+alter table if exists public.lotes
+  add column if not exists preco_arroba numeric(14, 2);
+
+alter table if exists public.lotes
+  add column if not exists rendimento_carcaca numeric(8, 3);
+
+alter table if exists public.lotes
+  add column if not exists dias_estimados numeric(14, 2);
+
+alter table if exists public.lotes
+  add column if not exists consumo_tipo text;
+
+alter table if exists public.lotes
+  add column if not exists consumo_por_cabeca_dia numeric(14, 4);
+
+alter table if exists public.lotes
+  add column if not exists consumo_total_estimado numeric(14, 4);
+
+alter table if exists public.lotes
+  add column if not exists custo_total_estimado numeric(14, 2);
+
+alter table if exists public.lotes
+  add column if not exists preco_kg numeric(14, 4);
+
+alter table if exists public.lotes
+  add column if not exists supl_nome text;
+
+alter table if exists public.lotes
+  add column if not exists supl_rkg numeric(14, 4);
+
+alter table if exists public.lotes
+  add column if not exists supl_pv_pct numeric(14, 4);
+
+alter table if exists public.lotes
+  add column if not exists supl_meta_dias numeric(14, 2);
+
+alter table if exists public.lotes
+  add column if not exists ultima_pesagem date;
+
+alter table if exists public.lotes
+  add column if not exists data_saida date;
+
+alter table if exists public.lotes
+  add column if not exists data_venda date;
+
+alter table if exists public.lotes
+  add column if not exists data_encerramento date;
+
+alter table if exists public.lotes
+  add column if not exists fechamento jsonb;
+
+alter table if exists public.lotes
+  add column if not exists obs text;
+
+alter table if exists public.lotes
+  add column if not exists metadata jsonb not null default '{}'::jsonb;
+
+alter table if exists public.lotes
+  add column if not exists created_at timestamptz not null default timezone('utc', now());
+
+alter table if exists public.lotes
+  add column if not exists updated_at timestamptz not null default timezone('utc', now());
+
 create unique index if not exists lotes_cloud_id_unique_idx on public.lotes (cloud_id) where cloud_id is not null;
 create index if not exists lotes_owner_user_id_idx on public.lotes (owner_user_id);
 create index if not exists lotes_faz_id_idx on public.lotes (faz_id);
@@ -433,6 +644,87 @@ create table if not exists public.animais (
   updated_at timestamptz not null default timezone('utc', now())
 );
 
+alter table if exists public.animais
+  add column if not exists cloud_id uuid;
+
+alter table if exists public.animais
+  add column if not exists fazenda_id bigint;
+
+alter table if exists public.animais
+  add column if not exists lote_id bigint;
+
+alter table if exists public.animais
+  add column if not exists identificacao text;
+
+alter table if exists public.animais
+  add column if not exists nome text;
+
+alter table if exists public.animais
+  add column if not exists tipo_registro text;
+
+alter table if exists public.animais
+  add column if not exists categoria text;
+
+alter table if exists public.animais
+  add column if not exists categoria_animal text;
+
+alter table if exists public.animais
+  add column if not exists raca text;
+
+alter table if exists public.animais
+  add column if not exists sexo text;
+
+alter table if exists public.animais
+  add column if not exists origem text;
+
+alter table if exists public.animais
+  add column if not exists qtd numeric(14, 2);
+
+alter table if exists public.animais
+  add column if not exists p_ini numeric(14, 3);
+
+alter table if exists public.animais
+  add column if not exists p_at numeric(14, 3);
+
+alter table if exists public.animais
+  add column if not exists dias numeric(14, 2);
+
+alter table if exists public.animais
+  add column if not exists consumo numeric(14, 4);
+
+alter table if exists public.animais
+  add column if not exists status text;
+
+alter table if exists public.animais
+  add column if not exists data_referencia date;
+
+alter table if exists public.animais
+  add column if not exists data_nascimento date;
+
+alter table if exists public.animais
+  add column if not exists data_saida date;
+
+alter table if exists public.animais
+  add column if not exists data_venda date;
+
+alter table if exists public.animais
+  add column if not exists observacao text;
+
+alter table if exists public.animais
+  add column if not exists rendimento_carcaca numeric(8, 3);
+
+alter table if exists public.animais
+  add column if not exists preco_arroba numeric(14, 2);
+
+alter table if exists public.animais
+  add column if not exists metadata jsonb not null default '{}'::jsonb;
+
+alter table if exists public.animais
+  add column if not exists created_at timestamptz not null default timezone('utc', now());
+
+alter table if exists public.animais
+  add column if not exists updated_at timestamptz not null default timezone('utc', now());
+
 create unique index if not exists animais_cloud_id_unique_idx on public.animais (cloud_id) where cloud_id is not null;
 create index if not exists animais_owner_user_id_idx on public.animais (owner_user_id);
 create index if not exists animais_fazenda_id_idx on public.animais (fazenda_id);
@@ -459,6 +751,45 @@ create table if not exists public.pesagens (
   updated_at timestamptz not null default timezone('utc', now())
 );
 
+alter table if exists public.pesagens
+  add column if not exists cloud_id uuid;
+
+alter table if exists public.pesagens
+  add column if not exists lote_id bigint;
+
+alter table if exists public.pesagens
+  add column if not exists animal_id bigint;
+
+alter table if exists public.pesagens
+  add column if not exists data date;
+
+alter table if exists public.pesagens
+  add column if not exists peso_medio numeric(14, 3);
+
+alter table if exists public.pesagens
+  add column if not exists tipo text;
+
+alter table if exists public.pesagens
+  add column if not exists origem text;
+
+alter table if exists public.pesagens
+  add column if not exists rendimento_carcaca numeric(8, 3);
+
+alter table if exists public.pesagens
+  add column if not exists preco_arroba numeric(14, 2);
+
+alter table if exists public.pesagens
+  add column if not exists observacao text;
+
+alter table if exists public.pesagens
+  add column if not exists metadata jsonb not null default '{}'::jsonb;
+
+alter table if exists public.pesagens
+  add column if not exists created_at timestamptz not null default timezone('utc', now());
+
+alter table if exists public.pesagens
+  add column if not exists updated_at timestamptz not null default timezone('utc', now());
+
 create unique index if not exists pesagens_cloud_id_unique_idx on public.pesagens (cloud_id) where cloud_id is not null;
 create index if not exists pesagens_owner_user_id_idx on public.pesagens (owner_user_id);
 create index if not exists pesagens_lote_id_idx on public.pesagens (lote_id);
@@ -474,7 +805,7 @@ create table if not exists public.sanitario (
   lote_id bigint references public.lotes (id) on delete set null,
   tipo text,
   nome text,
-  desc text,
+  "desc" text,
   data_aplic date,
   proxima date,
   alerta_dias_antes integer,
@@ -487,6 +818,54 @@ create table if not exists public.sanitario (
   created_at timestamptz not null default timezone('utc', now()),
   updated_at timestamptz not null default timezone('utc', now())
 );
+
+alter table if exists public.sanitario
+  add column if not exists fazenda_id bigint;
+
+alter table if exists public.sanitario
+  add column if not exists lote_id bigint;
+
+alter table if exists public.sanitario
+  add column if not exists tipo text;
+
+alter table if exists public.sanitario
+  add column if not exists nome text;
+
+alter table if exists public.sanitario
+  add column if not exists "desc" text;
+
+alter table if exists public.sanitario
+  add column if not exists data_aplic date;
+
+alter table if exists public.sanitario
+  add column if not exists proxima date;
+
+alter table if exists public.sanitario
+  add column if not exists alerta_dias_antes integer;
+
+alter table if exists public.sanitario
+  add column if not exists qtd numeric(14, 2);
+
+alter table if exists public.sanitario
+  add column if not exists obs text;
+
+alter table if exists public.sanitario
+  add column if not exists funcionario_responsavel_id bigint;
+
+alter table if exists public.sanitario
+  add column if not exists rotina_automatica_id bigint;
+
+alter table if exists public.sanitario
+  add column if not exists status text;
+
+alter table if exists public.sanitario
+  add column if not exists metadata jsonb not null default '{}'::jsonb;
+
+alter table if exists public.sanitario
+  add column if not exists created_at timestamptz not null default timezone('utc', now());
+
+alter table if exists public.sanitario
+  add column if not exists updated_at timestamptz not null default timezone('utc', now());
 
 create index if not exists sanitario_owner_user_id_idx on public.sanitario (owner_user_id);
 create index if not exists sanitario_fazenda_id_idx on public.sanitario (fazenda_id);
@@ -524,6 +903,72 @@ create table if not exists public.estoque (
   updated_at timestamptz not null default timezone('utc', now())
 );
 
+alter table if exists public.estoque
+  add column if not exists fazenda_id bigint;
+
+alter table if exists public.estoque
+  add column if not exists nome text;
+
+alter table if exists public.estoque
+  add column if not exists produto text;
+
+alter table if exists public.estoque
+  add column if not exists categoria text;
+
+alter table if exists public.estoque
+  add column if not exists subcategoria text;
+
+alter table if exists public.estoque
+  add column if not exists unidade text;
+
+alter table if exists public.estoque
+  add column if not exists unidade_medida text;
+
+alter table if exists public.estoque
+  add column if not exists quantidade numeric(14, 4);
+
+alter table if exists public.estoque
+  add column if not exists quantidade_atual numeric(14, 4);
+
+alter table if exists public.estoque
+  add column if not exists quantidade_minima numeric(14, 4);
+
+alter table if exists public.estoque
+  add column if not exists custo_unitario numeric(14, 4);
+
+alter table if exists public.estoque
+  add column if not exists valor_unitario numeric(14, 4);
+
+alter table if exists public.estoque
+  add column if not exists preco_unitario numeric(14, 4);
+
+alter table if exists public.estoque
+  add column if not exists valor_total numeric(14, 2);
+
+alter table if exists public.estoque
+  add column if not exists validade date;
+
+alter table if exists public.estoque
+  add column if not exists data_validade date;
+
+alter table if exists public.estoque
+  add column if not exists fornecedor text;
+
+alter table if exists public.estoque
+  add column if not exists observacoes text;
+
+alter table if exists public.estoque
+  add column if not exists obs text;
+
+alter table if exists public.estoque
+  add column if not exists metadata jsonb not null default '{}'::jsonb;
+
+alter table if exists public.estoque
+  add column if not exists created_at timestamptz not null default timezone('utc', now());
+
+alter table if exists public.estoque
+  add column if not exists updated_at timestamptz not null default timezone('utc', now());
+
 create index if not exists estoque_owner_user_id_idx on public.estoque (owner_user_id);
 create index if not exists estoque_fazenda_id_idx on public.estoque (fazenda_id);
 create index if not exists estoque_categoria_idx on public.estoque (categoria);
@@ -549,6 +994,51 @@ create table if not exists public.movimentacoes_estoque (
   created_at timestamptz not null default timezone('utc', now()),
   updated_at timestamptz not null default timezone('utc', now())
 );
+
+alter table if exists public.movimentacoes_estoque
+  add column if not exists item_estoque_id bigint;
+
+alter table if exists public.movimentacoes_estoque
+  add column if not exists lote_id bigint;
+
+alter table if exists public.movimentacoes_estoque
+  add column if not exists tipo text;
+
+alter table if exists public.movimentacoes_estoque
+  add column if not exists quantidade numeric(14, 4);
+
+alter table if exists public.movimentacoes_estoque
+  add column if not exists data date;
+
+alter table if exists public.movimentacoes_estoque
+  add column if not exists valor_total numeric(14, 2);
+
+alter table if exists public.movimentacoes_estoque
+  add column if not exists fornecedor text;
+
+alter table if exists public.movimentacoes_estoque
+  add column if not exists numero_nf text;
+
+alter table if exists public.movimentacoes_estoque
+  add column if not exists obs text;
+
+alter table if exists public.movimentacoes_estoque
+  add column if not exists origem text;
+
+alter table if exists public.movimentacoes_estoque
+  add column if not exists origem_tipo text;
+
+alter table if exists public.movimentacoes_estoque
+  add column if not exists origem_id bigint;
+
+alter table if exists public.movimentacoes_estoque
+  add column if not exists metadata jsonb not null default '{}'::jsonb;
+
+alter table if exists public.movimentacoes_estoque
+  add column if not exists created_at timestamptz not null default timezone('utc', now());
+
+alter table if exists public.movimentacoes_estoque
+  add column if not exists updated_at timestamptz not null default timezone('utc', now());
 
 create index if not exists movimentacoes_estoque_owner_user_id_idx on public.movimentacoes_estoque (owner_user_id);
 create index if not exists movimentacoes_estoque_item_idx on public.movimentacoes_estoque (item_estoque_id);
@@ -582,12 +1072,87 @@ create table if not exists public.movimentacoes_financeiras (
   updated_at timestamptz not null default timezone('utc', now())
 );
 
+alter table if exists public.movimentacoes_financeiras
+  add column if not exists fazenda_id bigint;
+
+alter table if exists public.movimentacoes_financeiras
+  add column if not exists lote_id bigint;
+
+alter table if exists public.movimentacoes_financeiras
+  add column if not exists data date;
+
+alter table if exists public.movimentacoes_financeiras
+  add column if not exists created_at timestamptz not null default timezone('utc', now());
+
+alter table if exists public.movimentacoes_financeiras
+  add column if not exists updated_at timestamptz not null default timezone('utc', now());
+
 create index if not exists movimentacoes_financeiras_owner_user_id_idx on public.movimentacoes_financeiras (owner_user_id);
 create index if not exists movimentacoes_financeiras_fazenda_id_idx on public.movimentacoes_financeiras (fazenda_id);
 create index if not exists movimentacoes_financeiras_lote_id_idx on public.movimentacoes_financeiras (lote_id);
 create index if not exists movimentacoes_financeiras_data_idx on public.movimentacoes_financeiras (data desc);
 create index if not exists movimentacoes_financeiras_created_at_idx on public.movimentacoes_financeiras (created_at desc);
 create index if not exists movimentacoes_financeiras_updated_at_idx on public.movimentacoes_financeiras (updated_at desc);
+
+alter table if exists public.movimentacoes_financeiras
+  add column if not exists fazenda_id bigint;
+
+alter table if exists public.movimentacoes_financeiras
+  add column if not exists lote_id bigint;
+
+alter table if exists public.movimentacoes_financeiras
+  add column if not exists tipo text;
+
+alter table if exists public.movimentacoes_financeiras
+  add column if not exists categoria text;
+
+alter table if exists public.movimentacoes_financeiras
+  add column if not exists subcategoria text;
+
+alter table if exists public.movimentacoes_financeiras
+  add column if not exists descricao text;
+
+alter table if exists public.movimentacoes_financeiras
+  add column if not exists valor numeric(14, 2);
+
+alter table if exists public.movimentacoes_financeiras
+  add column if not exists data date;
+
+alter table if exists public.movimentacoes_financeiras
+  add column if not exists data_vencimento date;
+
+alter table if exists public.movimentacoes_financeiras
+  add column if not exists metodo_pagamento text;
+
+alter table if exists public.movimentacoes_financeiras
+  add column if not exists pago boolean;
+
+alter table if exists public.movimentacoes_financeiras
+  add column if not exists comprador text;
+
+alter table if exists public.movimentacoes_financeiras
+  add column if not exists fornecedor text;
+
+alter table if exists public.movimentacoes_financeiras
+  add column if not exists observacao text;
+
+alter table if exists public.movimentacoes_financeiras
+  add column if not exists origem text;
+
+alter table if exists public.movimentacoes_financeiras
+  add column if not exists origem_tipo text;
+
+alter table if exists public.movimentacoes_financeiras
+  add column if not exists origem_id bigint;
+
+alter table if exists public.movimentacoes_financeiras
+  add column if not exists metadata jsonb not null default '{}'::jsonb;
+
+alter table if exists public.movimentacoes_financeiras
+  add column if not exists created_at timestamptz not null default timezone('utc', now());
+
+alter table if exists public.movimentacoes_financeiras
+  add column if not exists updated_at timestamptz not null default timezone('utc', now());
 
 create table if not exists public.movimentacoes_animais (
   id bigint generated by default as identity primary key,
@@ -611,6 +1176,24 @@ create table if not exists public.movimentacoes_animais (
   updated_at timestamptz not null default timezone('utc', now())
 );
 
+alter table if exists public.movimentacoes_animais
+  add column if not exists lote_id bigint;
+
+alter table if exists public.movimentacoes_animais
+  add column if not exists destino_lote_id bigint;
+
+alter table if exists public.movimentacoes_animais
+  add column if not exists animal_id bigint;
+
+alter table if exists public.movimentacoes_animais
+  add column if not exists data date;
+
+alter table if exists public.movimentacoes_animais
+  add column if not exists created_at timestamptz not null default timezone('utc', now());
+
+alter table if exists public.movimentacoes_animais
+  add column if not exists updated_at timestamptz not null default timezone('utc', now());
+
 create index if not exists movimentacoes_animais_owner_user_id_idx on public.movimentacoes_animais (owner_user_id);
 create index if not exists movimentacoes_animais_lote_id_idx on public.movimentacoes_animais (lote_id);
 create index if not exists movimentacoes_animais_destino_lote_id_idx on public.movimentacoes_animais (destino_lote_id);
@@ -618,6 +1201,57 @@ create index if not exists movimentacoes_animais_animal_id_idx on public.movimen
 create index if not exists movimentacoes_animais_data_idx on public.movimentacoes_animais (data desc);
 create index if not exists movimentacoes_animais_created_at_idx on public.movimentacoes_animais (created_at desc);
 create index if not exists movimentacoes_animais_updated_at_idx on public.movimentacoes_animais (updated_at desc);
+
+alter table if exists public.movimentacoes_animais
+  add column if not exists lote_id bigint;
+
+alter table if exists public.movimentacoes_animais
+  add column if not exists destino_lote_id bigint;
+
+alter table if exists public.movimentacoes_animais
+  add column if not exists animal_id bigint;
+
+alter table if exists public.movimentacoes_animais
+  add column if not exists tipo text;
+
+alter table if exists public.movimentacoes_animais
+  add column if not exists qtd numeric(14, 2);
+
+alter table if exists public.movimentacoes_animais
+  add column if not exists peso_medio numeric(14, 3);
+
+alter table if exists public.movimentacoes_animais
+  add column if not exists valor_total numeric(14, 2);
+
+alter table if exists public.movimentacoes_animais
+  add column if not exists custo_por_cabeca numeric(14, 4);
+
+alter table if exists public.movimentacoes_animais
+  add column if not exists comprador_fornecedor text;
+
+alter table if exists public.movimentacoes_animais
+  add column if not exists data date;
+
+alter table if exists public.movimentacoes_animais
+  add column if not exists obs text;
+
+alter table if exists public.movimentacoes_animais
+  add column if not exists origem text;
+
+alter table if exists public.movimentacoes_animais
+  add column if not exists origem_tipo text;
+
+alter table if exists public.movimentacoes_animais
+  add column if not exists origem_id bigint;
+
+alter table if exists public.movimentacoes_animais
+  add column if not exists metadata jsonb not null default '{}'::jsonb;
+
+alter table if exists public.movimentacoes_animais
+  add column if not exists created_at timestamptz not null default timezone('utc', now());
+
+alter table if exists public.movimentacoes_animais
+  add column if not exists updated_at timestamptz not null default timezone('utc', now());
 
 create table if not exists public.custos (
   id bigint generated by default as identity primary key,
@@ -627,7 +1261,7 @@ create table if not exists public.custos (
   cat text,
   val numeric(14, 2),
   data date,
-  desc text,
+  "desc" text,
   observacao text,
   origem text,
   origem_id bigint,
@@ -636,12 +1270,63 @@ create table if not exists public.custos (
   updated_at timestamptz not null default timezone('utc', now())
 );
 
+alter table if exists public.custos
+  add column if not exists fazenda_id bigint;
+
+alter table if exists public.custos
+  add column if not exists lote_id bigint;
+
+alter table if exists public.custos
+  add column if not exists data date;
+
+alter table if exists public.custos
+  add column if not exists created_at timestamptz not null default timezone('utc', now());
+
+alter table if exists public.custos
+  add column if not exists updated_at timestamptz not null default timezone('utc', now());
+
 create index if not exists custos_owner_user_id_idx on public.custos (owner_user_id);
 create index if not exists custos_fazenda_id_idx on public.custos (fazenda_id);
 create index if not exists custos_lote_id_idx on public.custos (lote_id);
 create index if not exists custos_data_idx on public.custos (data desc);
 create index if not exists custos_created_at_idx on public.custos (created_at desc);
 create index if not exists custos_updated_at_idx on public.custos (updated_at desc);
+
+alter table if exists public.custos
+  add column if not exists fazenda_id bigint;
+
+alter table if exists public.custos
+  add column if not exists lote_id bigint;
+
+alter table if exists public.custos
+  add column if not exists cat text;
+
+alter table if exists public.custos
+  add column if not exists val numeric(14, 2);
+
+alter table if exists public.custos
+  add column if not exists data date;
+
+alter table if exists public.custos
+  add column if not exists "desc" text;
+
+alter table if exists public.custos
+  add column if not exists observacao text;
+
+alter table if exists public.custos
+  add column if not exists origem text;
+
+alter table if exists public.custos
+  add column if not exists origem_id bigint;
+
+alter table if exists public.custos
+  add column if not exists metadata jsonb not null default '{}'::jsonb;
+
+alter table if exists public.custos
+  add column if not exists created_at timestamptz not null default timezone('utc', now());
+
+alter table if exists public.custos
+  add column if not exists updated_at timestamptz not null default timezone('utc', now());
 
 create table if not exists public.funcionarios (
   id bigint generated by default as identity primary key,
@@ -659,11 +1344,56 @@ create table if not exists public.funcionarios (
   updated_at timestamptz not null default timezone('utc', now())
 );
 
+alter table if exists public.funcionarios
+  add column if not exists fazenda_id bigint;
+
+alter table if exists public.funcionarios
+  add column if not exists status text;
+
+alter table if exists public.funcionarios
+  add column if not exists created_at timestamptz not null default timezone('utc', now());
+
+alter table if exists public.funcionarios
+  add column if not exists updated_at timestamptz not null default timezone('utc', now());
+
 create index if not exists funcionarios_owner_user_id_idx on public.funcionarios (owner_user_id);
 create index if not exists funcionarios_fazenda_id_idx on public.funcionarios (fazenda_id);
 create index if not exists funcionarios_status_idx on public.funcionarios (status);
 create index if not exists funcionarios_created_at_idx on public.funcionarios (created_at desc);
 create index if not exists funcionarios_updated_at_idx on public.funcionarios (updated_at desc);
+
+alter table if exists public.funcionarios
+  add column if not exists fazenda_id bigint;
+
+alter table if exists public.funcionarios
+  add column if not exists nome text;
+
+alter table if exists public.funcionarios
+  add column if not exists cargo text;
+
+alter table if exists public.funcionarios
+  add column if not exists funcao text;
+
+alter table if exists public.funcionarios
+  add column if not exists telefone text;
+
+alter table if exists public.funcionarios
+  add column if not exists email text;
+
+alter table if exists public.funcionarios
+  add column if not exists status text;
+
+alter table if exists public.funcionarios
+  add column if not exists observacoes text;
+
+alter table if exists public.funcionarios
+  add column if not exists metadata jsonb not null default '{}'::jsonb;
+
+alter table if exists public.funcionarios
+  add column if not exists created_at timestamptz not null default timezone('utc', now());
+
+alter table if exists public.funcionarios
+  add column if not exists updated_at timestamptz not null default timezone('utc', now());
 
 create table if not exists public.rotinas (
   id bigint generated by default as identity primary key,
@@ -690,6 +1420,24 @@ create table if not exists public.rotinas (
   updated_at timestamptz not null default timezone('utc', now())
 );
 
+alter table if exists public.rotinas
+  add column if not exists fazenda_id bigint;
+
+alter table if exists public.rotinas
+  add column if not exists funcionario_id bigint;
+
+alter table if exists public.rotinas
+  add column if not exists lote_id bigint;
+
+alter table if exists public.rotinas
+  add column if not exists data date;
+
+alter table if exists public.rotinas
+  add column if not exists created_at timestamptz not null default timezone('utc', now());
+
+alter table if exists public.rotinas
+  add column if not exists updated_at timestamptz not null default timezone('utc', now());
+
 create index if not exists rotinas_owner_user_id_idx on public.rotinas (owner_user_id);
 create index if not exists rotinas_fazenda_id_idx on public.rotinas (fazenda_id);
 create index if not exists rotinas_funcionario_id_idx on public.rotinas (funcionario_id);
@@ -697,6 +1445,66 @@ create index if not exists rotinas_lote_id_idx on public.rotinas (lote_id);
 create index if not exists rotinas_data_idx on public.rotinas (data desc);
 create index if not exists rotinas_created_at_idx on public.rotinas (created_at desc);
 create index if not exists rotinas_updated_at_idx on public.rotinas (updated_at desc);
+
+alter table if exists public.rotinas
+  add column if not exists fazenda_id bigint;
+
+alter table if exists public.rotinas
+  add column if not exists funcionario_id bigint;
+
+alter table if exists public.rotinas
+  add column if not exists lote_id bigint;
+
+alter table if exists public.rotinas
+  add column if not exists tarefa text;
+
+alter table if exists public.rotinas
+  add column if not exists setor text;
+
+alter table if exists public.rotinas
+  add column if not exists descricao text;
+
+alter table if exists public.rotinas
+  add column if not exists obs text;
+
+alter table if exists public.rotinas
+  add column if not exists recorrente boolean;
+
+alter table if exists public.rotinas
+  add column if not exists recorrencia_tipo text;
+
+alter table if exists public.rotinas
+  add column if not exists dias_semana jsonb not null default '[]'::jsonb;
+
+alter table if exists public.rotinas
+  add column if not exists data date;
+
+alter table if exists public.rotinas
+  add column if not exists data_inicio date;
+
+alter table if exists public.rotinas
+  add column if not exists data_fim date;
+
+alter table if exists public.rotinas
+  add column if not exists status text;
+
+alter table if exists public.rotinas
+  add column if not exists concluido_datas jsonb not null default '[]'::jsonb;
+
+alter table if exists public.rotinas
+  add column if not exists origem_sistema text;
+
+alter table if exists public.rotinas
+  add column if not exists origem_sanitario_id bigint;
+
+alter table if exists public.rotinas
+  add column if not exists metadata jsonb not null default '{}'::jsonb;
+
+alter table if exists public.rotinas
+  add column if not exists created_at timestamptz not null default timezone('utc', now());
+
+alter table if exists public.rotinas
+  add column if not exists updated_at timestamptz not null default timezone('utc', now());
 
 create table if not exists public.tarefas (
   id bigint generated by default as identity primary key,
@@ -717,12 +1525,69 @@ create table if not exists public.tarefas (
   updated_at timestamptz not null default timezone('utc', now())
 );
 
+alter table if exists public.tarefas
+  add column if not exists fazenda_id bigint;
+
+alter table if exists public.tarefas
+  add column if not exists lote_id bigint;
+
+alter table if exists public.tarefas
+  add column if not exists responsavel_id bigint;
+
+alter table if exists public.tarefas
+  add column if not exists created_at timestamptz not null default timezone('utc', now());
+
+alter table if exists public.tarefas
+  add column if not exists updated_at timestamptz not null default timezone('utc', now());
+
 create index if not exists tarefas_owner_user_id_idx on public.tarefas (owner_user_id);
 create index if not exists tarefas_fazenda_id_idx on public.tarefas (fazenda_id);
 create index if not exists tarefas_lote_id_idx on public.tarefas (lote_id);
 create index if not exists tarefas_responsavel_id_idx on public.tarefas (responsavel_id);
 create index if not exists tarefas_created_at_idx on public.tarefas (created_at desc);
 create index if not exists tarefas_updated_at_idx on public.tarefas (updated_at desc);
+
+alter table if exists public.tarefas
+  add column if not exists fazenda_id bigint;
+
+alter table if exists public.tarefas
+  add column if not exists lote_id bigint;
+
+alter table if exists public.tarefas
+  add column if not exists responsavel_id bigint;
+
+alter table if exists public.tarefas
+  add column if not exists titulo text;
+
+alter table if exists public.tarefas
+  add column if not exists descricao text;
+
+alter table if exists public.tarefas
+  add column if not exists prioridade text;
+
+alter table if exists public.tarefas
+  add column if not exists categoria text;
+
+alter table if exists public.tarefas
+  add column if not exists status text;
+
+alter table if exists public.tarefas
+  add column if not exists data_vencimento date;
+
+alter table if exists public.tarefas
+  add column if not exists concluida_em timestamptz;
+
+alter table if exists public.tarefas
+  add column if not exists adiado_em timestamptz;
+
+alter table if exists public.tarefas
+  add column if not exists metadata jsonb not null default '{}'::jsonb;
+
+alter table if exists public.tarefas
+  add column if not exists created_at timestamptz not null default timezone('utc', now());
+
+alter table if exists public.tarefas
+  add column if not exists updated_at timestamptz not null default timezone('utc', now());
 
 create table if not exists public.usuarios (
   id bigint generated by default as identity primary key,
@@ -737,10 +1602,43 @@ create table if not exists public.usuarios (
   updated_at timestamptz not null default timezone('utc', now())
 );
 
+alter table if exists public.usuarios
+  add column if not exists email text;
+
+alter table if exists public.usuarios
+  add column if not exists created_at timestamptz not null default timezone('utc', now());
+
+alter table if exists public.usuarios
+  add column if not exists updated_at timestamptz not null default timezone('utc', now());
+
 create index if not exists usuarios_owner_user_id_idx on public.usuarios (owner_user_id);
 create index if not exists usuarios_email_idx on public.usuarios (email);
 create index if not exists usuarios_created_at_idx on public.usuarios (created_at desc);
 create index if not exists usuarios_updated_at_idx on public.usuarios (updated_at desc);
+
+alter table if exists public.usuarios
+  add column if not exists nome text;
+
+alter table if exists public.usuarios
+  add column if not exists email text;
+
+alter table if exists public.usuarios
+  add column if not exists perfil text;
+
+alter table if exists public.usuarios
+  add column if not exists status text;
+
+alter table if exists public.usuarios
+  add column if not exists notes text;
+
+alter table if exists public.usuarios
+  add column if not exists metadata jsonb not null default '{}'::jsonb;
+
+alter table if exists public.usuarios
+  add column if not exists created_at timestamptz not null default timezone('utc', now());
+
+alter table if exists public.usuarios
+  add column if not exists updated_at timestamptz not null default timezone('utc', now());
 
 create table if not exists public.configuracoes (
   id bigint generated by default as identity primary key,
@@ -753,10 +1651,37 @@ create table if not exists public.configuracoes (
   updated_at timestamptz not null default timezone('utc', now())
 );
 
+alter table if exists public.configuracoes
+  add column if not exists fazenda_selecionada_id bigint;
+
+alter table if exists public.configuracoes
+  add column if not exists created_at timestamptz not null default timezone('utc', now());
+
+alter table if exists public.configuracoes
+  add column if not exists updated_at timestamptz not null default timezone('utc', now());
+
 create unique index if not exists configuracoes_owner_user_id_unique_idx on public.configuracoes (owner_user_id);
 create index if not exists configuracoes_fazenda_selecionada_id_idx on public.configuracoes (fazenda_selecionada_id);
 create index if not exists configuracoes_created_at_idx on public.configuracoes (created_at desc);
 create index if not exists configuracoes_updated_at_idx on public.configuracoes (updated_at desc);
+
+alter table if exists public.configuracoes
+  add column if not exists fazenda_selecionada_id bigint;
+
+alter table if exists public.configuracoes
+  add column if not exists geral jsonb not null default '{}'::jsonb;
+
+alter table if exists public.configuracoes
+  add column if not exists notificacoes jsonb not null default '{}'::jsonb;
+
+alter table if exists public.configuracoes
+  add column if not exists metadata jsonb not null default '{}'::jsonb;
+
+alter table if exists public.configuracoes
+  add column if not exists created_at timestamptz not null default timezone('utc', now());
+
+alter table if exists public.configuracoes
+  add column if not exists updated_at timestamptz not null default timezone('utc', now());
 
 create table if not exists public.cenarios (
   id bigint generated by default as identity primary key,
@@ -781,11 +1706,77 @@ create table if not exists public.cenarios (
   updated_at timestamptz not null default timezone('utc', now())
 );
 
+alter table if exists public.cenarios
+  add column if not exists fazenda_id bigint;
+
+alter table if exists public.cenarios
+  add column if not exists lote_id bigint;
+
+alter table if exists public.cenarios
+  add column if not exists created_at timestamptz not null default timezone('utc', now());
+
+alter table if exists public.cenarios
+  add column if not exists updated_at timestamptz not null default timezone('utc', now());
+
 create index if not exists cenarios_owner_user_id_idx on public.cenarios (owner_user_id);
 create index if not exists cenarios_fazenda_id_idx on public.cenarios (fazenda_id);
 create index if not exists cenarios_lote_id_idx on public.cenarios (lote_id);
 create index if not exists cenarios_created_at_idx on public.cenarios (created_at desc);
 create index if not exists cenarios_updated_at_idx on public.cenarios (updated_at desc);
+
+alter table if exists public.cenarios
+  add column if not exists fazenda_id bigint;
+
+alter table if exists public.cenarios
+  add column if not exists lote_id bigint;
+
+alter table if exists public.cenarios
+  add column if not exists nome text;
+
+alter table if exists public.cenarios
+  add column if not exists periodo_inicio date;
+
+alter table if exists public.cenarios
+  add column if not exists periodo_fim date;
+
+alter table if exists public.cenarios
+  add column if not exists observacoes text;
+
+alter table if exists public.cenarios
+  add column if not exists status text;
+
+alter table if exists public.cenarios
+  add column if not exists compras_simuladas numeric(14, 2);
+
+alter table if exists public.cenarios
+  add column if not exists vendas_simuladas numeric(14, 2);
+
+alter table if exists public.cenarios
+  add column if not exists mortalidade_pct numeric(14, 4);
+
+alter table if exists public.cenarios
+  add column if not exists natalidade_pct numeric(14, 4);
+
+alter table if exists public.cenarios
+  add column if not exists valor_medio_venda numeric(14, 2);
+
+alter table if exists public.cenarios
+  add column if not exists custo_medio_compra numeric(14, 2);
+
+alter table if exists public.cenarios
+  add column if not exists capacidade_suporte_ua numeric(14, 2);
+
+alter table if exists public.cenarios
+  add column if not exists area_pastagem_ha numeric(14, 2);
+
+alter table if exists public.cenarios
+  add column if not exists metadata jsonb not null default '{}'::jsonb;
+
+alter table if exists public.cenarios
+  add column if not exists created_at timestamptz not null default timezone('utc', now());
+
+alter table if exists public.cenarios
+  add column if not exists updated_at timestamptz not null default timezone('utc', now());
 
 create table if not exists public.auditoria (
   id bigint generated by default as identity primary key,
@@ -866,6 +1857,24 @@ create table if not exists public.consumo_suplementacao (
   updated_at timestamptz not null default timezone('utc', now())
 );
 
+alter table if exists public.consumo_suplementacao
+  add column if not exists fazenda_id bigint;
+
+alter table if exists public.consumo_suplementacao
+  add column if not exists lote_id bigint;
+
+alter table if exists public.consumo_suplementacao
+  add column if not exists item_estoque_id bigint;
+
+alter table if exists public.consumo_suplementacao
+  add column if not exists data date;
+
+alter table if exists public.consumo_suplementacao
+  add column if not exists created_at timestamptz not null default timezone('utc', now());
+
+alter table if exists public.consumo_suplementacao
+  add column if not exists updated_at timestamptz not null default timezone('utc', now());
+
 create index if not exists consumo_suplementacao_owner_user_id_idx on public.consumo_suplementacao (owner_user_id);
 create index if not exists consumo_suplementacao_fazenda_id_idx on public.consumo_suplementacao (fazenda_id);
 create index if not exists consumo_suplementacao_lote_id_idx on public.consumo_suplementacao (lote_id);
@@ -873,6 +1882,72 @@ create index if not exists consumo_suplementacao_item_estoque_id_idx on public.c
 create index if not exists consumo_suplementacao_data_idx on public.consumo_suplementacao (data desc);
 create index if not exists consumo_suplementacao_created_at_idx on public.consumo_suplementacao (created_at desc);
 create index if not exists consumo_suplementacao_updated_at_idx on public.consumo_suplementacao (updated_at desc);
+
+alter table if exists public.consumo_suplementacao
+  add column if not exists fazenda_id bigint;
+
+alter table if exists public.consumo_suplementacao
+  add column if not exists lote_id bigint;
+
+alter table if exists public.consumo_suplementacao
+  add column if not exists item_estoque_id bigint;
+
+alter table if exists public.consumo_suplementacao
+  add column if not exists dieta_id bigint;
+
+alter table if exists public.consumo_suplementacao
+  add column if not exists origem_tipo text;
+
+alter table if exists public.consumo_suplementacao
+  add column if not exists ref_id bigint;
+
+alter table if exists public.consumo_suplementacao
+  add column if not exists produto_nome text;
+
+alter table if exists public.consumo_suplementacao
+  add column if not exists dieta_nome text;
+
+alter table if exists public.consumo_suplementacao
+  add column if not exists modo text;
+
+alter table if exists public.consumo_suplementacao
+  add column if not exists quantidade numeric(14, 4);
+
+alter table if exists public.consumo_suplementacao
+  add column if not exists qtd_total numeric(14, 4);
+
+alter table if exists public.consumo_suplementacao
+  add column if not exists quantidade_total numeric(14, 4);
+
+alter table if exists public.consumo_suplementacao
+  add column if not exists consumo_por_cabeca_dia numeric(14, 4);
+
+alter table if exists public.consumo_suplementacao
+  add column if not exists percentual_peso_vivo numeric(14, 4);
+
+alter table if exists public.consumo_suplementacao
+  add column if not exists peso_medio_usado numeric(14, 4);
+
+alter table if exists public.consumo_suplementacao
+  add column if not exists unidade text;
+
+alter table if exists public.consumo_suplementacao
+  add column if not exists custo_total numeric(14, 2);
+
+alter table if exists public.consumo_suplementacao
+  add column if not exists data date;
+
+alter table if exists public.consumo_suplementacao
+  add column if not exists obs text;
+
+alter table if exists public.consumo_suplementacao
+  add column if not exists metadata jsonb not null default '{}'::jsonb;
+
+alter table if exists public.consumo_suplementacao
+  add column if not exists created_at timestamptz not null default timezone('utc', now());
+
+alter table if exists public.consumo_suplementacao
+  add column if not exists updated_at timestamptz not null default timezone('utc', now());
 
 alter table public.sanitario
   drop constraint if exists sanitario_funcionario_responsavel_id_fkey;
