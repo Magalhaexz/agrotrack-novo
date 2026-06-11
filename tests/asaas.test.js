@@ -262,6 +262,33 @@ test('recent pending checkout sessions can be reused for the same plan', async (
   assert.equal(result?.checkout_url, 'https://sandbox.example/checkout');
 });
 
+test('recent pending checkout sessions without a usable url are ignored', async () => {
+  const client = createCheckoutSessionsClient([
+    {
+      id: 11,
+      owner_user_id: '11111111-1111-1111-1111-111111111111',
+      plan_code: 'pro',
+      status: 'pending',
+      provider_reference: 'herdon:11111111-1111-1111-1111-111111111111:pro',
+      checkout_url: null,
+      payment_url: null,
+      invoice_url: null,
+      bank_slip_url: null,
+      transaction_receipt_url: null,
+      updated_at: new Date().toISOString(),
+      created_at: new Date().toISOString(),
+    },
+  ]);
+
+  const result = await findRecentCheckoutSession(client, {
+    ownerUserId: '11111111-1111-1111-1111-111111111111',
+    planCode: 'pro',
+    providerReference: 'herdon:11111111-1111-1111-1111-111111111111:pro',
+  });
+
+  assert.equal(result, null);
+});
+
 test('frontend checkout request uses the server route and Authorization header', async () => {
   const originalFetch = globalThis.fetch;
   const calls = [];
@@ -293,6 +320,33 @@ test('frontend checkout request uses the server route and Authorization header',
     const body = JSON.parse(calls[0].init.body);
     assert.equal(body.planCode, 'pro');
     assert.equal(body.customer.name, 'Cliente Teste');
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
+
+test('paymentLinks response with top-level url is treated as a browser payment url', async () => {
+  const originalFetch = globalThis.fetch;
+
+  globalThis.fetch = async () => ({
+    ok: true,
+    json: async () => ({
+      ok: true,
+      url: 'https://sandbox.example/payment-link',
+      paymentLink: { id: 'plink_123' },
+      message: 'Checkout preparado.',
+    }),
+  });
+
+  try {
+    const result = await requestAsaasSandboxCheckout({
+      session: { access_token: 'jwt.token.value' },
+      planCode: 'pro',
+      customer: { name: 'Cliente Teste', email: 'cliente@teste.com' },
+    });
+
+    assert.equal(result.ok, true);
+    assert.equal(result.paymentUrl, 'https://sandbox.example/payment-link');
   } finally {
     globalThis.fetch = originalFetch;
   }

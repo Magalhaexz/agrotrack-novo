@@ -94,13 +94,36 @@ function extractString(value) {
   return normalizeText(value) || null;
 }
 
+function extractUrlCandidate(value) {
+  if (!value) return null;
+  if (typeof value === 'string' || typeof value === 'number') {
+    return extractString(value);
+  }
+  if (isObject(value)) {
+    return [
+      value.url,
+      value.checkoutUrl,
+      value.checkout_url,
+      value.paymentUrl,
+      value.payment_url,
+      value.invoiceUrl,
+      value.invoice_url,
+      value.bankSlipUrl,
+      value.bank_slip_url,
+      value.transactionReceiptUrl,
+      value.transaction_receipt_url,
+    ].map(extractString).find(Boolean) || null;
+  }
+  return null;
+}
+
 function extractProviderCheckoutData(payload = {}) {
   const checkoutUrl = [
     payload.checkoutUrl,
     payload.checkout_url,
     payload.hostedCheckoutUrl,
     payload.hosted_checkout_url,
-    payload.paymentLink?.url,
+    extractUrlCandidate(payload.paymentLink),
     payload.payment_link?.url,
     payload.url,
     payload.payment?.checkoutUrl,
@@ -138,8 +161,13 @@ function extractProviderCheckoutData(payload = {}) {
     bankSlipUrl,
     transactionReceiptUrl,
     payload.url,
+    extractUrlCandidate(payload.paymentLink),
     payload.data?.paymentUrl,
     payload.data?.checkoutUrl,
+    payload.data?.url,
+    extractUrlCandidate(payload.data?.paymentLink),
+    extractUrlCandidate(payload.data?.payment),
+    extractUrlCandidate(payload.data?.invoice),
   ].map(extractString).find(Boolean) || null;
 
   return {
@@ -458,7 +486,7 @@ export async function findRecentCheckoutSession(client, { ownerUserId, planCode,
   return rows.find((row) => {
     const hasUrl = Boolean(row?.checkout_url || row?.payment_url || row?.invoice_url || row?.bank_slip_url || row?.transaction_receipt_url);
     return hasUrl && isRecentDate(row?.updated_at || row?.created_at, 30);
-  }) || rows.find((row) => isRecentDate(row?.updated_at || row?.created_at, 30)) || null;
+  }) || null;
 }
 
 async function resolveProfileForUser(client, userId) {
