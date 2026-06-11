@@ -289,7 +289,7 @@ export default function LoginPage() {
 
       if (!data?.session) {
         setErro(
-          'Login nao concluido. Verifique se a confirmacao de e-mail esta ativada no Supabase.'
+          'Não foi possível concluir o acesso. Verifique sua conta e tente novamente.'
         );
       }
     } catch (err) {
@@ -298,7 +298,7 @@ export default function LoginPage() {
       setErro(
         isTransientLoginError(err)
           ? 'Nao foi possivel conectar ao servidor. Verifique sua internet e tente novamente.'
-          : (err?.message || 'Erro ao autenticar.')
+          : 'Nao foi possivel concluir o acesso. Verifique suas informacoes e tente novamente.'
       );
     } finally {
       marcarLogoutEmAndamento(false);
@@ -340,7 +340,7 @@ export default function LoginPage() {
       setEtapaRecuperacao(2);
       setMensagem('Link de recuperacao enviado. Confira sua caixa de entrada.');
     } catch (err) {
-      setErro(err?.message || 'Nao foi possivel enviar o link de recuperacao.');
+      setErro('Nao foi possivel enviar o link de recuperacao. Tente novamente em alguns instantes.');
     } finally {
       setCarregando(false);
     }
@@ -369,7 +369,7 @@ export default function LoginPage() {
       setSenha('');
       setNovaSenha('');
     } catch (err) {
-      setErro(err?.message || 'Nao foi possivel redefinir a senha.');
+      setErro('Nao foi possivel redefinir a senha. Tente novamente em alguns instantes.');
     } finally {
       setCarregando(false);
     }
@@ -394,7 +394,7 @@ export default function LoginPage() {
       if (error) throw error;
     } catch (err) {
       if (isGoogleProviderDisabledError(err)) {
-        setErro('Login com Google ainda não está configurado. Ative o provedor Google no Supabase.');
+        setErro('Login com Google ainda não está disponível neste momento. Tente outro método de acesso.');
         return;
       }
       setErro('Não foi possível entrar com Google no momento. Tente novamente.');
