@@ -587,7 +587,7 @@ export default function ConfiguracoesPage({ db, setDb, onConfirmAction, subscrip
             </Button>
           </div>
           <p style={{ marginTop: 0, marginBottom: 12, color: 'var(--text-muted)' }}>
-            Usuário = acesso ao sistema HERDON. Funcionário = pessoa da operação da fazenda.
+            Usuário é quem acessa o HERDON. Funcionário é a pessoa da operação da fazenda.
           </p>
 
           {accessModuleReady ? (
@@ -604,7 +604,7 @@ export default function ConfiguracoesPage({ db, setDb, onConfirmAction, subscrip
                           <td>{item.nome || 'Sem nome'}</td>
                           <td>{item.email}</td>
                           <td><span className={badgeStatusClass(item.perfil)}>{obterLabelPerfil(item.perfil)}</span></td>
-                          <td>profile</td>
+                          <td>Perfil</td>
                           <td>{item.updated_at ? new Date(item.updated_at).toLocaleString('pt-BR') : '-'}</td>
                         </tr>
                       ))

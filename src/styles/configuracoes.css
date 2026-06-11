@@ -2,7 +2,7 @@
 /* --- Config Page --- */
 .config-page {
   display: grid;
-  gap: 12px;
+  gap: 16px;
 }
 
 .config-page h1 {
@@ -18,7 +18,7 @@
   display: flex;
   gap: 8px;
   flex-wrap: wrap;
-  margin-bottom: 16px; /* Added margin for separation */
+  margin-bottom: 18px;
 }
 
 .config-tabs button {
@@ -53,8 +53,8 @@
   border: 1px solid var(--card-border);
   border-radius: var(--radius-lg);
   padding: 20px;
-  display: grid; /* Use grid for internal layout */
-  gap: 16px; /* Gap between items in the section */
+  display: grid;
+  gap: 16px;
 }
 
 .config-section-header {
@@ -83,7 +83,7 @@
   display: flex;
   justify-content: flex-end; /* Align buttons to the right */
   gap: 10px;
-  margin-top: 20px; /* Space above action buttons */
+  margin-top: 20px;
 }
 
 .config-data-stack {
@@ -223,7 +223,8 @@
 /* --- Responsive Design --- */
 @media (max-width: 900px) {
   .config-grid {
-    grid-template-columns: 1fr; /* Stack columns on smaller screens */
+    grid-template-columns: 1fr;
+    gap: 16px;
   }
 
   .config-actions-wrap--data,
@@ -240,5 +241,29 @@
   .config-action-cluster > *,
   .danger-zone-controls > * {
     width: 100%;
+  }
+
+  .config-page {
+    gap: 14px;
+  }
+
+  .config-tabs {
+    gap: 6px;
+  }
+
+  .config-tabs button {
+    flex: 1 1 160px;
+  }
+
+  .config-section {
+    padding: 16px;
+  }
+
+  .config-actions {
+    justify-content: stretch;
+  }
+
+  .config-actions > * {
+    flex: 1 1 200px;
   }
 }

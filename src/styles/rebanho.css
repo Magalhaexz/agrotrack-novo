@@ -374,6 +374,15 @@ label textarea {
   .lote-details-grid {
     grid-template-columns: 1fr;
   }
+
+  .rebanho-page {
+    gap: 14px;
+  }
+
+  .rebanho-header {
+    flex-direction: column;
+    align-items: stretch;
+  }
 }
 
 /* SPRINT21C - Lotes/Rebanho visual polish */
@@ -498,5 +507,32 @@ label textarea {
 
   .lote-actions .ui-button {
     min-height: 44px;
+  }
+
+  .lote-card-title,
+  .lote-actions,
+  .lote-card-statuses {
+    align-items: stretch;
+    justify-content: flex-start;
+  }
+
+  .lote-card-title {
+    flex-direction: column;
+  }
+
+  .lote-card-statuses {
+    flex-wrap: wrap;
+  }
+
+  .lote-history-item {
+    grid-template-columns: 1fr;
+  }
+
+  .form-grid.two {
+    grid-template-columns: 1fr;
+  }
+
+  .tabs-row button {
+    flex: 1 1 160px;
   }
 }
