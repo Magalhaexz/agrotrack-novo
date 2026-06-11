@@ -4,6 +4,7 @@ import Button from '../components/ui/Button';
 import Card from '../components/ui/Card';
 import Input from '../components/ui/Input';
 import Modal from '../components/ui/Modal';
+import SuplementacaoConsumoModal from '../components/SuplementacaoConsumoModal';
 import { useToast } from '../hooks/useToast';
 import { useAuth } from '../auth/useAuth';
 import { gerarNovoId } from '../utils/id';
@@ -561,7 +562,7 @@ export default function SuplementacaoPage({ db, setDb }) {
       ) : null}
 
       {openConsumo ? (
-        <ConsumoModal
+        <SuplementacaoConsumoModal
           key={consumoEmEdicao?.id ?? 'novo-consumo'}
           db={db}
           setDb={setDb}
