@@ -94,20 +94,60 @@ function extractString(value) {
   return normalizeText(value) || null;
 }
 
-function extractProviderUrl(payload = {}) {
-  const candidates = [
+function extractProviderCheckoutData(payload = {}) {
+  const checkoutUrl = [
     payload.checkoutUrl,
     payload.checkout_url,
     payload.hostedCheckoutUrl,
     payload.hosted_checkout_url,
+    payload.paymentLink?.url,
+    payload.payment_link?.url,
+    payload.payment?.checkoutUrl,
+    payload.payment?.checkout_url,
+  ].map(extractString).find(Boolean) || null;
+
+  const invoiceUrl = [
     payload.invoiceUrl,
     payload.invoice_url,
+    payload.invoice?.url,
+    payload.invoice?.invoiceUrl,
+    payload.payment?.invoiceUrl,
+    payload.payment?.invoice_url,
+  ].map(extractString).find(Boolean) || null;
+
+  const bankSlipUrl = [
+    payload.bankSlipUrl,
+    payload.bankSlip_url,
+    payload.payment?.bankSlipUrl,
+    payload.payment?.bank_slip_url,
+  ].map(extractString).find(Boolean) || null;
+
+  const transactionReceiptUrl = [
+    payload.transactionReceiptUrl,
+    payload.transactionReceipt_url,
+    payload.payment?.transactionReceiptUrl,
+    payload.payment?.transaction_receipt_url,
+  ].map(extractString).find(Boolean) || null;
+
+  const paymentUrl = [
     payload.paymentUrl,
     payload.payment_url,
+    checkoutUrl,
+    invoiceUrl,
+    bankSlipUrl,
+    transactionReceiptUrl,
     payload.url,
-  ];
+    payload.data?.paymentUrl,
+    payload.data?.checkoutUrl,
+  ].map(extractString).find(Boolean) || null;
 
-  return candidates.map(extractString).find(Boolean) || null;
+  return {
+    checkoutUrl,
+    paymentUrl,
+    invoiceUrl,
+    bankSlipUrl,
+    transactionReceiptUrl,
+  };
 }
 
 function getUserProfileSeed(user, profile = null, body = {}) {
@@ -119,6 +159,29 @@ function getUserProfileSeed(user, profile = null, body = {}) {
   const mobilePhone = extractString(body.mobilePhone || body.mobile_phone || rawProfile.mobile_phone || rawProfile.mobilePhone || rawProfile.telefone || userMetadata.mobilePhone || userMetadata.mobile_phone || userMetadata.telefone);
 
   return { name, email, cpfCnpj, mobilePhone };
+}
+
+function buildCheckoutProviderReference({ userId, planCode }) {
+  return `herdon:${normalizeText(userId)}:${normalizeLower(planCode)}`;
+}
+
+function buildCheckoutExternalReference({ userId, planCode }) {
+  return buildCheckoutProviderReference({ userId, planCode });
+}
+
+function buildCustomerFieldsMissing(seed = {}) {
+  const missingFields = [];
+  if (!seed.name) missingFields.push('nome');
+  if (!seed.email) missingFields.push('e-mail');
+  if (!seed.cpfCnpj) missingFields.push('cpfCnpj');
+  if (!seed.mobilePhone) missingFields.push('mobilePhone');
+  return missingFields;
+}
+
+function isRecentDate(isoValue, maxMinutes = 30) {
+  const time = new Date(isoValue || 0).getTime();
+  if (!Number.isFinite(time) || !time) return false;
+  return Date.now() - time <= (maxMinutes * 60 * 1000);
 }
 
 export function validateWebhookToken(headers = {}, expectedToken = getRuntimeEnv().webhookToken) {
@@ -272,6 +335,16 @@ async function upsertCheckoutSession(client, row) {
     raw_payload: isObject(row.raw_payload) ? row.raw_payload : {},
   };
 
+  if (payload.provider_reference) {
+    const { data, error } = await client
+      .from('checkout_sessions')
+      .upsert(payload, { onConflict: 'provider_reference' })
+      .select('*')
+      .maybeSingle();
+    if (error) throw error;
+    return data || null;
+  }
+
   if (payload.provider_checkout_session_id) {
     const { data, error } = await client
       .from('checkout_sessions')
@@ -333,6 +406,31 @@ async function findLinkedSubscription(client, { providerCustomerId = null, provi
   return Array.isArray(data) && data.length > 0 ? data[0] : null;
 }
 
+export async function findRecentCheckoutSession(client, { ownerUserId, planCode, providerReference = null }) {
+  let query = client
+    .from('checkout_sessions')
+    .select('*')
+    .eq('owner_user_id', ownerUserId)
+    .eq('plan_code', planCode)
+    .order('updated_at', { ascending: false })
+    .limit(3);
+
+  if (providerReference) {
+    query = query.eq('provider_reference', providerReference);
+  } else {
+    query = query.in('status', ['pending', 'completed']);
+  }
+
+  const { data, error } = await query;
+  if (error) throw error;
+
+  const rows = Array.isArray(data) ? data : [];
+  return rows.find((row) => {
+    const hasUrl = Boolean(row?.checkout_url || row?.payment_url || row?.invoice_url || row?.bank_slip_url || row?.transaction_receipt_url);
+    return hasUrl && isRecentDate(row?.updated_at || row?.created_at, 30);
+  }) || rows.find((row) => isRecentDate(row?.updated_at || row?.created_at, 30)) || null;
+}
+
 async function resolveProfileForUser(client, userId) {
   const { data, error } = await client
     .from('profiles')
@@ -370,14 +468,19 @@ function buildMissingCustomerFieldsMessage(fields = []) {
   if (!Array.isArray(fields) || fields.length === 0) {
     return 'Precisamos conferir alguns dados do seu cadastro antes de continuar.';
   }
-  return `Precisamos confirmar ${fields.join(', ')} antes de continuar.`;
+  const labels = {
+    nome: 'nome completo',
+    email: 'e-mail',
+    cpfCnpj: 'CPF/CNPJ',
+    mobilePhone: 'telefone/WhatsApp',
+  };
+  const readable = fields.map((field) => labels[field] || field).join(', ');
+  return `Precisamos confirmar ${readable} antes de continuar.`;
 }
 
 async function createCustomerOnAsaas({ user, profile, body }) {
   const seed = getUserProfileSeed(user, profile, body.customer || body);
-  const missingFields = [];
-  if (!seed.name) missingFields.push('nome');
-  if (!seed.email) missingFields.push('e-mail');
+  const missingFields = buildCustomerFieldsMissing(seed);
 
   if (missingFields.length > 0) {
     const error = new Error(buildMissingCustomerFieldsMessage(missingFields));
@@ -425,7 +528,7 @@ async function createMonthlySubscriptionOnAsaas({ customerId, plan, externalRefe
   });
 }
 
-function buildCustomerSubscriptionPatch({ userId, plan, customer, subscription, body }) {
+function buildCustomerSubscriptionPatch({ userId, plan, customer, subscription, body, checkoutData = {}, providerReference = null, externalReference = null }) {
   const now = new Date().toISOString();
   const status = normalizeLower(subscription?.status || body?.status || 'trialing') || 'trialing';
   const currentPeriodStart = subscription?.currentPeriodStart || subscription?.billingDate || body?.currentPeriodStart || now;
@@ -442,12 +545,60 @@ function buildCustomerSubscriptionPatch({ userId, plan, customer, subscription, 
     provider_customer_id: normalizeText(customer?.id || body?.providerCustomerId || customer?.providerCustomerId) || null,
     provider_subscription_id: normalizeText(subscription?.id || body?.providerSubscriptionId) || null,
     provider_payment_id: normalizeText(subscription?.payment?.id || body?.providerPaymentId || subscription?.latestInvoice?.payment?.id) || null,
+    asaas_customer_id: normalizeText(customer?.id || body?.asaasCustomerId || null) || null,
+    asaas_subscription_id: normalizeText(subscription?.id || body?.asaasSubscriptionId || null) || null,
+    asaas_payment_id: normalizeText(subscription?.payment?.id || body?.asaasPaymentId || subscription?.latestInvoice?.payment?.id || null) || null,
+    provider_reference: providerReference || body?.providerReference || null,
+    external_reference: externalReference || body?.externalReference || null,
+    checkout_url: checkoutData?.checkoutUrl || null,
+    payment_url: checkoutData?.paymentUrl || null,
+    invoice_url: checkoutData?.invoiceUrl || null,
+    bank_slip_url: checkoutData?.bankSlipUrl || null,
+    transaction_receipt_url: checkoutData?.transactionReceiptUrl || null,
     current_period_start: currentPeriodStart,
     current_period_end: currentPeriodEnd,
     trial_ends_at: subscription?.trialEndsAt || body?.trialEndsAt || null,
     canceled_at: status === 'canceled' ? now : null,
     blocked_at: status === 'blocked' ? now : null,
     raw_payload: rawPayload,
+  };
+}
+
+function buildCheckoutSessionPatch({
+  userId,
+  plan,
+  providerReference,
+  externalReference,
+  customer,
+  subscription,
+  checkoutData,
+  body,
+  status = 'pending',
+  existingSession = null,
+}) {
+  const now = new Date().toISOString();
+  return {
+    owner_user_id: userId,
+    user_id: userId,
+    plan_code: plan?.planCode || body?.planCode || null,
+    status,
+    billing_provider: 'asaas',
+    provider_reference: providerReference || existingSession?.provider_reference || null,
+    external_reference: externalReference || existingSession?.external_reference || null,
+    asaas_customer_id: normalizeText(customer?.id || existingSession?.asaas_customer_id || null) || null,
+    asaas_subscription_id: normalizeText(subscription?.id || existingSession?.asaas_subscription_id || null) || null,
+    asaas_payment_id: normalizeText(subscription?.payment?.id || existingSession?.asaas_payment_id || null) || null,
+    provider_checkout_session_id: normalizeText(subscription?.id || existingSession?.provider_checkout_session_id || providerReference || null) || null,
+    checkout_url: checkoutData?.checkoutUrl || existingSession?.checkout_url || null,
+    payment_url: checkoutData?.paymentUrl || existingSession?.payment_url || null,
+    invoice_url: checkoutData?.invoiceUrl || existingSession?.invoice_url || null,
+    bank_slip_url: checkoutData?.bankSlipUrl || existingSession?.bank_slip_url || null,
+    transaction_receipt_url: checkoutData?.transactionReceiptUrl || existingSession?.transaction_receipt_url || null,
+    expires_at: body?.expiresAt || existingSession?.expires_at || null,
+    completed_at: checkoutData?.paymentUrl || checkoutData?.checkoutUrl || checkoutData?.invoiceUrl || checkoutData?.bankSlipUrl || checkoutData?.transactionReceiptUrl
+      ? now
+      : existingSession?.completed_at || null,
+    raw_payload: isObject(subscription) ? subscription : (isObject(existingSession?.raw_payload) ? existingSession.raw_payload : {}),
   };
 }
 
@@ -567,9 +718,7 @@ export async function handleCreateSubscriptionRequest(req, { client = getSupabas
 
   const profile = await resolveProfileForUser(client, user.id);
   const seed = getUserProfileSeed(user, profile, body.customer || body);
-  const requiredFields = [];
-  if (!seed.name) requiredFields.push('nome');
-  if (!seed.email) requiredFields.push('e-mail');
+  const requiredFields = buildCustomerFieldsMissing(seed);
   if (requiredFields.length > 0) {
     return json(422, {
       ok: false,
@@ -577,6 +726,67 @@ export async function handleCreateSubscriptionRequest(req, { client = getSupabas
       missingFields: requiredFields,
       message: buildMissingCustomerFieldsMessage(requiredFields),
     });
+  }
+
+  const providerReference = buildCheckoutProviderReference({ userId: user.id, planCode: availablePlan.planCode });
+  const externalReference = buildCheckoutExternalReference({ userId: user.id, planCode: availablePlan.planCode });
+
+  const recentCheckoutSession = await findRecentCheckoutSession(client, {
+    ownerUserId: user.id,
+    planCode: availablePlan.planCode,
+    providerReference,
+  }).catch(() => null);
+
+  const recentCheckoutUrl = extractProviderCheckoutData(recentCheckoutSession || {}).paymentUrl
+    || recentCheckoutSession?.checkout_url
+    || recentCheckoutSession?.payment_url
+    || recentCheckoutSession?.invoice_url
+    || recentCheckoutSession?.bank_slip_url
+    || recentCheckoutSession?.transaction_receipt_url
+    || null;
+
+  if (recentCheckoutSession && isRecentDate(recentCheckoutSession.updated_at || recentCheckoutSession.created_at, 30)) {
+    return json(200, {
+      ok: true,
+      reused: true,
+      manual: false,
+      checkoutUrl: recentCheckoutUrl,
+      paymentUrl: recentCheckoutUrl,
+      invoiceUrl: recentCheckoutSession.invoice_url || null,
+      bankSlipUrl: recentCheckoutSession.bank_slip_url || null,
+      transactionReceiptUrl: recentCheckoutSession.transaction_receipt_url || null,
+      customer: recentCheckoutSession.raw_payload?.customer || null,
+      subscription: recentCheckoutSession.raw_payload || null,
+      checkoutSession: recentCheckoutSession,
+      message: recentCheckoutUrl
+        ? 'Seu pagamento ja esta pronto para abrir.'
+        : 'Seu pagamento ja esta sendo preparado. Tente novamente em alguns instantes.',
+    });
+  }
+
+  let checkoutSession = recentCheckoutSession;
+  if (!checkoutSession) {
+    checkoutSession = await upsertCheckoutSession(client, {
+      owner_user_id: user.id,
+      user_id: user.id,
+      plan_code: availablePlan.planCode,
+      status: 'pending',
+      billing_provider: 'asaas',
+      provider_reference: providerReference,
+      external_reference: externalReference,
+      provider_checkout_session_id: providerReference,
+      checkout_url: null,
+      payment_url: null,
+      invoice_url: null,
+      bank_slip_url: null,
+      transaction_receipt_url: null,
+      expires_at: body.expiresAt || null,
+      completed_at: null,
+      raw_payload: {},
+      asaas_customer_id: null,
+      asaas_subscription_id: null,
+      asaas_payment_id: null,
+    }).catch(() => null);
   }
 
   const existingLinkedSubscription = await findLinkedSubscription(client, {
@@ -595,11 +805,12 @@ export async function handleCreateSubscriptionRequest(req, { client = getSupabas
   const subscription = await createMonthlySubscriptionOnAsaas({
     customerId: providerCustomer.id,
     plan: availablePlan,
-    externalReference: user.id,
+    externalReference: providerReference,
     body,
   });
 
-  const checkoutUrl = extractProviderUrl(subscription);
+  const checkoutData = extractProviderCheckoutData(subscription);
+  const checkoutUrl = checkoutData.paymentUrl || checkoutData.checkoutUrl || checkoutData.invoiceUrl || checkoutData.bankSlipUrl || checkoutData.transactionReceiptUrl || null;
   const mappedStatus = mapAsaasEventToSubscriptionStatus({
     eventName: body.eventName || 'subscription.created',
     paymentStatus: subscription?.status || 'trialing',
@@ -612,20 +823,25 @@ export async function handleCreateSubscriptionRequest(req, { client = getSupabas
     customer: providerCustomer,
     subscription,
     body,
-  }));
+    checkoutData,
+    providerReference,
+    externalReference,
+  })).catch(() => null);
 
-  const checkoutSession = await upsertCheckoutSession(client, {
-    owner_user_id: user.id,
-    user_id: user.id,
-    plan_code: availablePlan.planCode,
+  checkoutSession = await upsertCheckoutSession(client, buildCheckoutSessionPatch({
+    userId: user.id,
+    plan: availablePlan,
+    providerReference,
+    externalReference,
+    customer: providerCustomer,
+    subscription,
+    checkoutData,
+    body,
     status: checkoutUrl ? 'completed' : 'pending',
-    billing_provider: 'asaas',
-    provider_checkout_session_id: normalizeText(subscription?.id || body.providerCheckoutSessionId || providerCustomer?.id) || null,
-    checkout_url: checkoutUrl,
-    expires_at: body.expiresAt || null,
-    completed_at: checkoutUrl ? new Date().toISOString() : null,
-    raw_payload: subscription,
-  }).catch(() => null);
+    existingSession: checkoutSession,
+  })).catch(() => checkoutSession);
+
+  const persistenceIssue = !subscriptionRow || !checkoutSession;
 
   const billingEvent = await upsertBillingEvent(client, buildBillingEventRow({
     userId: user.id,
@@ -651,15 +867,25 @@ export async function handleCreateSubscriptionRequest(req, { client = getSupabas
 
   return json(200, {
     ok: true,
+    persisted: !persistenceIssue,
+    persistenceWarning: persistenceIssue,
     checkoutUrl,
+    paymentUrl: checkoutData.paymentUrl || checkoutUrl,
+    invoiceUrl: checkoutData.invoiceUrl || null,
+    bankSlipUrl: checkoutData.bankSlipUrl || null,
+    transactionReceiptUrl: checkoutData.transactionReceiptUrl || null,
     manual: false,
     customer: providerCustomer,
     subscription,
     checkoutSession,
     billingEvent,
+    providerReference,
+    externalReference,
     message: checkoutUrl
-      ? 'Checkout preparado.'
-      : 'Checkout em preparacao. Fale com a equipe se precisar de ajuda.',
+      ? (persistenceIssue
+        ? 'O pagamento foi preparado. Se a abertura não acontecer agora, use o botão Abrir pagamento.'
+        : 'Abrindo checkout seguro...')
+      : 'Pagamento em preparação. Tente novamente em alguns instantes.',
   });
 }
 

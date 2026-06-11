@@ -221,6 +221,16 @@ create table if not exists public.customer_subscriptions (
   provider_customer_id text,
   provider_subscription_id text,
   provider_payment_id text,
+  asaas_customer_id text,
+  asaas_subscription_id text,
+  asaas_payment_id text,
+  provider_reference text,
+  external_reference text,
+  checkout_url text,
+  payment_url text,
+  invoice_url text,
+  bank_slip_url text,
+  transaction_receipt_url text,
   current_period_start timestamptz,
   current_period_end timestamptz,
   trial_ends_at timestamptz,
@@ -264,6 +274,36 @@ alter table if exists public.customer_subscriptions
   add column if not exists provider_payment_id text;
 
 alter table if exists public.customer_subscriptions
+  add column if not exists asaas_customer_id text;
+
+alter table if exists public.customer_subscriptions
+  add column if not exists asaas_subscription_id text;
+
+alter table if exists public.customer_subscriptions
+  add column if not exists asaas_payment_id text;
+
+alter table if exists public.customer_subscriptions
+  add column if not exists provider_reference text;
+
+alter table if exists public.customer_subscriptions
+  add column if not exists external_reference text;
+
+alter table if exists public.customer_subscriptions
+  add column if not exists checkout_url text;
+
+alter table if exists public.customer_subscriptions
+  add column if not exists payment_url text;
+
+alter table if exists public.customer_subscriptions
+  add column if not exists invoice_url text;
+
+alter table if exists public.customer_subscriptions
+  add column if not exists bank_slip_url text;
+
+alter table if exists public.customer_subscriptions
+  add column if not exists transaction_receipt_url text;
+
+alter table if exists public.customer_subscriptions
   add column if not exists current_period_start timestamptz;
 
 alter table if exists public.customer_subscriptions
@@ -288,6 +328,7 @@ alter table if exists public.customer_subscriptions
   add column if not exists updated_at timestamptz not null default timezone('utc', now());
 
 create unique index if not exists customer_subscriptions_provider_subscription_id_unique_idx on public.customer_subscriptions (provider_subscription_id) where provider_subscription_id is not null;
+create unique index if not exists customer_subscriptions_provider_reference_unique_idx on public.customer_subscriptions (provider_reference) where provider_reference is not null;
 create index if not exists customer_subscriptions_owner_user_id_idx on public.customer_subscriptions (owner_user_id);
 create index if not exists customer_subscriptions_user_id_idx on public.customer_subscriptions (user_id);
 create index if not exists customer_subscriptions_plan_code_idx on public.customer_subscriptions (plan_code);
@@ -329,7 +370,16 @@ create table if not exists public.checkout_sessions (
   status text not null default 'pending',
   billing_provider text not null default 'manual',
   provider_checkout_session_id text,
+  provider_reference text,
+  external_reference text,
   checkout_url text,
+  payment_url text,
+  invoice_url text,
+  bank_slip_url text,
+  transaction_receipt_url text,
+  asaas_customer_id text,
+  asaas_subscription_id text,
+  asaas_payment_id text,
   expires_at timestamptz,
   completed_at timestamptz,
   raw_payload jsonb not null default '{}'::jsonb,
@@ -339,6 +389,7 @@ create table if not exists public.checkout_sessions (
 );
 
 create unique index if not exists checkout_sessions_provider_checkout_session_id_unique_idx on public.checkout_sessions (provider_checkout_session_id) where provider_checkout_session_id is not null;
+create unique index if not exists checkout_sessions_provider_reference_unique_idx on public.checkout_sessions (provider_reference) where provider_reference is not null;
 create index if not exists checkout_sessions_owner_user_id_idx on public.checkout_sessions (owner_user_id);
 create index if not exists checkout_sessions_plan_code_idx on public.checkout_sessions (plan_code);
 create index if not exists checkout_sessions_status_idx on public.checkout_sessions (status);

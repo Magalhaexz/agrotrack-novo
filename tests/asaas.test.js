@@ -5,13 +5,16 @@ import path from 'node:path';
 import {
   buildBillingEventRow,
   buildAsaasEventIdentity,
+  findRecentCheckoutSession,
   mapAsaasEventToSubscriptionStatus,
   upsertBillingEvent,
   validateWebhookToken,
 } from '../api/_asaas.js';
 import {
+  getMissingAsaasCustomerFields,
   getSandboxCheckoutCopy,
   isSandboxCheckoutAllowed,
+  resolveAsaasPaymentUrl,
   requestAsaasSandboxCheckout,
 } from '../src/services/asaasBilling.js';
 
@@ -53,6 +56,52 @@ function createBillingEventsClient() {
               };
             },
           };
+        },
+      };
+    },
+  };
+}
+
+function createCheckoutSessionsClient(rows) {
+  return {
+    from(table) {
+      assert.equal(table, 'checkout_sessions');
+      const state = {
+        ownerUserId: null,
+        planCode: null,
+        providerReference: null,
+        statuses: null,
+      };
+
+      return {
+        select() {
+          return this;
+        },
+        eq(column, value) {
+          if (column === 'owner_user_id') state.ownerUserId = value;
+          if (column === 'plan_code') state.planCode = value;
+          if (column === 'provider_reference') state.providerReference = value;
+          return this;
+        },
+        order() {
+          return this;
+        },
+        limit() {
+          return this;
+        },
+        in(column, values) {
+          if (column === 'status') state.statuses = values;
+          return this;
+        },
+        then(resolve) {
+          const data = rows.filter((row) => {
+            const ownerMatch = !state.ownerUserId || row.owner_user_id === state.ownerUserId;
+            const planMatch = !state.planCode || row.plan_code === state.planCode;
+            const providerMatch = !state.providerReference || row.provider_reference === state.providerReference;
+            const statusMatch = !state.statuses || state.statuses.includes(row.status);
+            return ownerMatch && planMatch && providerMatch && statusMatch;
+          });
+          resolve({ data, error: null });
         },
       };
     },
@@ -155,6 +204,48 @@ test('checkout helper only allows sandbox checkout for eligible states', async (
   assert.equal(getSandboxCheckoutCopy({ plan_code: 'pro', status: 'past_due' }).label, 'Regularizar assinatura');
 });
 
+test('missing customer data is detected before checkout', () => {
+  const missing = getMissingAsaasCustomerFields({
+    name: 'Cliente Teste',
+    email: 'cliente@teste.com',
+  });
+
+  assert.deepEqual(missing, ['cpfCnpj', 'mobilePhone']);
+});
+
+test('provider payment url resolution prefers the best available redirect target', () => {
+  const url = resolveAsaasPaymentUrl({
+    paymentLink: { url: 'https://sandbox.example/payment-link' },
+    invoiceUrl: 'https://sandbox.example/invoice',
+    checkoutUrl: 'https://sandbox.example/checkout',
+  });
+
+  assert.equal(url, 'https://sandbox.example/checkout');
+});
+
+test('recent pending checkout sessions can be reused for the same plan', async () => {
+  const client = createCheckoutSessionsClient([
+    {
+      id: 10,
+      owner_user_id: '11111111-1111-1111-1111-111111111111',
+      plan_code: 'pro',
+      status: 'pending',
+      provider_reference: 'herdon:11111111-1111-1111-1111-111111111111:pro',
+      checkout_url: 'https://sandbox.example/checkout',
+      updated_at: new Date().toISOString(),
+      created_at: new Date().toISOString(),
+    },
+  ]);
+
+  const result = await findRecentCheckoutSession(client, {
+    ownerUserId: '11111111-1111-1111-1111-111111111111',
+    planCode: 'pro',
+    providerReference: 'herdon:11111111-1111-1111-1111-111111111111:pro',
+  });
+
+  assert.equal(result?.checkout_url, 'https://sandbox.example/checkout');
+});
+
 test('frontend checkout request uses the server route and Authorization header', async () => {
   const originalFetch = globalThis.fetch;
   const calls = [];
@@ -166,6 +257,7 @@ test('frontend checkout request uses the server route and Authorization header',
       json: async () => ({
         ok: true,
         checkoutUrl: 'https://sandbox.example/checkout',
+        paymentUrl: 'https://sandbox.example/checkout',
         message: 'Checkout preparado.',
       }),
     };
@@ -179,6 +271,7 @@ test('frontend checkout request uses the server route and Authorization header',
     });
 
     assert.equal(result.ok, true);
+    assert.equal(result.paymentUrl, 'https://sandbox.example/checkout');
     assert.equal(calls[0].url, '/api/asaas-create-subscription');
     assert.equal(calls[0].init.headers.Authorization, 'Bearer jwt.token.value');
     const body = JSON.parse(calls[0].init.body);
@@ -200,4 +293,10 @@ test('event identity remains stable for repeated webhook deliveries', () => {
   };
 
   assert.equal(buildAsaasEventIdentity(event), buildAsaasEventIdentity(event));
+});
+
+test('webhook token still validates the official header', () => {
+  const headers = { 'asaas-access-token': 'secret-token' };
+  assert.equal(validateWebhookToken(headers, 'secret-token'), true);
+  assert.equal(validateWebhookToken({}, 'secret-token'), false);
 });

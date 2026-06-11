@@ -13,7 +13,9 @@ import {
   hasSubscriptionBillingReady,
 } from '../services/subscriptions';
 import {
+  getMissingAsaasCustomerFields,
   isSandboxCheckoutAllowed,
+  resolveAsaasPaymentUrl,
   requestAsaasSandboxCheckout,
 } from '../services/asaasBilling';
 import '../styles/subscription.css';
@@ -78,11 +80,14 @@ export default function MinhaAssinaturaPage({
   const [customerModalOpen, setCustomerModalOpen] = useState(false);
   const [customerSeed, setCustomerSeed] = useState(() => getSafeCustomerSeed({ usuarioLogado, session }));
   const [missingFields, setMissingFields] = useState([]);
+  const [pendingPlanCode, setPendingPlanCode] = useState(selectedPlanFallback);
+  const [pendingPaymentUrl, setPendingPaymentUrl] = useState(null);
 
   const normalizedPlanCode = String(subscription?.plan_code || subscription?.plan?.planCode || '').toLowerCase();
   const checkoutReady = hasSubscriptionBillingReady(subscription);
   const canStartCheckout = isSandboxCheckoutAllowed(subscription);
   const statusTone = buildStatusTone(actionCopy.status);
+  const customerFieldIssues = useMemo(() => getMissingAsaasCustomerFields(customerSeed), [customerSeed]);
 
   useEffect(() => {
     setCustomerSeed(getSafeCustomerSeed({ usuarioLogado, session }));
@@ -93,6 +98,29 @@ export default function MinhaAssinaturaPage({
       setSelectedPlanCode(selectedPlanFallback);
     }
   }, [selectedPlanCode, selectedPlanFallback]);
+
+  useEffect(() => {
+    if (!pendingPlanCode) {
+      setPendingPlanCode(selectedPlanCode);
+    }
+  }, [pendingPlanCode, selectedPlanCode]);
+
+  function openPaymentUrl(url) {
+    if (!url) return false;
+    setPendingPaymentUrl(url);
+    try {
+      window.location.assign(url);
+      return true;
+    } catch {
+      return false;
+    }
+  }
+
+  function openCustomerForm(planCode = selectedPlanCode) {
+    setPendingPlanCode(planCode);
+    setMissingFields(customerFieldIssues);
+    setCustomerModalOpen(true);
+  }
 
   async function iniciarCheckout(planCode = selectedPlanCode, customerOverride = null) {
     if (checkoutBusy) {
@@ -115,18 +143,41 @@ export default function MinhaAssinaturaPage({
       return;
     }
 
+    const customerData = customerOverride || customerSeed;
+    const requiredCustomerFields = getMissingAsaasCustomerFields(customerData);
+    if (requiredCustomerFields.length > 0) {
+      setMissingFields(requiredCustomerFields);
+      setPendingPlanCode(plan.planCode);
+      setCustomerModalOpen(true);
+      return;
+    }
+
     setCheckoutBusy(true);
     try {
       const result = await requestAsaasSandboxCheckout({
         session,
         planCode: plan.planCode,
-        customer: customerOverride || customerSeed,
+        customer: customerData,
       });
 
       if (result?.code === 'MISSING_CUSTOMER_FIELDS') {
         setMissingFields(Array.isArray(result.missingFields) ? result.missingFields : []);
         setCustomerModalOpen(true);
         showToast({ type: 'warning', message: result.message || 'Precisamos conferir alguns dados antes de continuar.' });
+        return;
+      }
+
+      const redirectUrl = resolveAsaasPaymentUrl(result) || result?.paymentUrl || result?.checkoutUrl || null;
+      if (redirectUrl) {
+        setPendingPaymentUrl(redirectUrl);
+        showToast({ type: 'success', message: 'Abrindo checkout seguro...' });
+        const opened = openPaymentUrl(redirectUrl);
+        if (!opened) {
+          showToast({
+            type: 'warning',
+            message: 'O pagamento ficou pronto para abrir. Use o botão abaixo se a abertura automática não acontecer.',
+          });
+        }
         return;
       }
 
@@ -143,13 +194,7 @@ export default function MinhaAssinaturaPage({
         return;
       }
 
-      if (result.checkoutUrl) {
-        showToast({ type: 'success', message: 'Checkout do sandbox preparado.' });
-        window.location.assign(result.checkoutUrl);
-        return;
-      }
-
-      showToast({ type: 'warning', message: result.message || 'Checkout em preparação. Tente novamente em alguns instantes.' });
+      showToast({ type: 'warning', message: result.message || 'O pagamento ficou pronto, mas ainda não foi possível abrir a tela automaticamente.' });
     } catch {
       showToast({ type: 'warning', message: 'Não foi possível confirmar o salvamento agora. Tente novamente em alguns instantes.' });
     } finally {
@@ -180,7 +225,14 @@ export default function MinhaAssinaturaPage({
 
   function handleChoosePlan(planCode) {
     setSelectedPlanCode(planCode);
-    void iniciarCheckout(planCode);
+    const customerData = customerSeed;
+    const requiredCustomerFields = getMissingAsaasCustomerFields(customerData);
+    if (requiredCustomerFields.length > 0) {
+      openCustomerForm(planCode);
+      return;
+    }
+
+    void iniciarCheckout(planCode, customerData);
   }
 
   return (
@@ -243,6 +295,19 @@ export default function MinhaAssinaturaPage({
           </div>
         </Card>
       </div>
+
+      {pendingPaymentUrl ? (
+        <Card title="Pagamento pronto" subtitle="Se a abertura automática não acontecer, use o botão abaixo.">
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 10, alignItems: 'center' }}>
+            <Button type="button" variant="outline" onClick={() => openPaymentUrl(pendingPaymentUrl)}>
+              Abrir pagamento
+            </Button>
+            <span style={{ color: 'var(--color-text-secondary)' }}>
+              O checkout já foi preparado para você.
+            </span>
+          </div>
+        </Card>
+      ) : null}
 
       <Card title="Planos disponíveis" subtitle="Referência comercial para revisão do caminho de upgrade antes da integração de pagamento.">
         <div className="subscription-page__plans">
@@ -308,7 +373,7 @@ export default function MinhaAssinaturaPage({
         open={customerModalOpen}
         onClose={() => setCustomerModalOpen(false)}
         title="Complete seus dados"
-        subtitle="Precisamos confirmar algumas informações antes de preparar o checkout."
+        subtitle="Precisamos confirmar alguns dados antes de abrir seu pagamento com segurança."
         size="md"
         footer={(
           <div style={{ display: 'flex', flexWrap: 'wrap', gap: 10, justifyContent: 'flex-end' }}>
@@ -320,7 +385,7 @@ export default function MinhaAssinaturaPage({
               loading={checkoutBusy}
               onClick={() => {
                 setCustomerModalOpen(false);
-                void iniciarCheckout(selectedPlanCode, customerSeed);
+                void iniciarCheckout(pendingPlanCode || selectedPlanCode, customerSeed);
               }}
             >
               Confirmar e continuar
@@ -330,7 +395,7 @@ export default function MinhaAssinaturaPage({
       >
         <div style={{ display: 'grid', gap: 14 }}>
           <Input
-            label="Nome"
+            label="Nome completo"
             value={customerSeed.name}
             onChange={(event) => setCustomerSeed((prev) => ({ ...prev, name: event.target.value }))}
           />
@@ -340,18 +405,23 @@ export default function MinhaAssinaturaPage({
             onChange={(event) => setCustomerSeed((prev) => ({ ...prev, email: event.target.value }))}
           />
           <Input
-            label="CPF ou CNPJ"
+            label="CPF/CNPJ"
             value={customerSeed.cpfCnpj}
             onChange={(event) => setCustomerSeed((prev) => ({ ...prev, cpfCnpj: event.target.value }))}
           />
           <Input
-            label="Celular"
+            label="Telefone/WhatsApp"
             value={customerSeed.mobilePhone}
             onChange={(event) => setCustomerSeed((prev) => ({ ...prev, mobilePhone: event.target.value }))}
           />
           {missingFields.length ? (
             <p style={{ margin: 0, color: 'var(--color-text-secondary)' }}>
-              Campos pendentes: {missingFields.join(', ')}.
+              Campos pendentes: {missingFields.map((field) => ({
+                name: 'nome completo',
+                email: 'e-mail',
+                cpfCnpj: 'CPF/CNPJ',
+                mobilePhone: 'telefone/WhatsApp',
+              }[field] || field)).join(', ')}.
             </p>
           ) : null}
         </div>
