@@ -14,6 +14,7 @@ import {
   getCloudSyncCooldownState,
   updateOperationalRecord,
 } from '../services/operationalPersistence';
+import { canCreateFarm, getSubscriptionLimitMessage } from '../services/subscriptions';
 import { runMinimalCloudDiagnostic } from '../services/supabaseDiagnostics';
 function ensureObject(value) {
   return value && typeof value === 'object' && !Array.isArray(value) ? value : {};
@@ -44,7 +45,7 @@ function logFazendaDirectCreate(payload = {}) {
   }
 }
 
-export default function FazendasPage({ db, setDb, onConfirmAction, session: sessionProp }) {
+export default function FazendasPage({ db, setDb, onConfirmAction, session: sessionProp, subscription = null }) {
   const { showToast, dismissToast } = useToast();
   const { hasPermission, session: authSession, user, forceLocalSignOut } = useAuth();
   const session = sessionProp ?? authSession;
@@ -134,6 +135,14 @@ export default function FazendasPage({ db, setDb, onConfirmAction, session: sess
       }
       if (!session?.user?.id) {
         showToast({ type: 'warning', message: 'Faça login novamente para continuar.' });
+      }
+      const capacity = canCreateFarm(subscription, fazendas.length);
+      if (!capacity.allowed) {
+        showToast({
+          type: 'warning',
+          message: getSubscriptionLimitMessage('farms', capacity) || 'Regularize sua assinatura para continuar usando o HERDON.',
+        });
+        return;
       }
       const localId = gerarNovoId(fazendas);
       const createPayload = {

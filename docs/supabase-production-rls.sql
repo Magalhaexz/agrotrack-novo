@@ -149,6 +149,112 @@ for delete
 to authenticated
 using (public.app_can_manage_account(owner_user_id));
 
+alter table public.subscription_plans enable row level security;
+alter table public.subscription_plans force row level security;
+
+drop policy if exists subscription_plans_select_authenticated on public.subscription_plans;
+create policy subscription_plans_select_authenticated
+on public.subscription_plans
+for select
+to authenticated
+using (true);
+
+alter table public.customer_subscriptions enable row level security;
+alter table public.customer_subscriptions force row level security;
+
+drop policy if exists customer_subscriptions_select_same_account on public.customer_subscriptions;
+create policy customer_subscriptions_select_same_account
+on public.customer_subscriptions
+for select
+to authenticated
+using (public.app_is_same_account(owner_user_id));
+
+drop policy if exists customer_subscriptions_insert_same_account on public.customer_subscriptions;
+create policy customer_subscriptions_insert_same_account
+on public.customer_subscriptions
+for insert
+to authenticated
+with check (public.app_can_manage_account(owner_user_id));
+
+drop policy if exists customer_subscriptions_update_same_account on public.customer_subscriptions;
+create policy customer_subscriptions_update_same_account
+on public.customer_subscriptions
+for update
+to authenticated
+using (public.app_can_manage_account(owner_user_id))
+with check (public.app_can_manage_account(owner_user_id));
+
+drop policy if exists customer_subscriptions_delete_same_account on public.customer_subscriptions;
+create policy customer_subscriptions_delete_same_account
+on public.customer_subscriptions
+for delete
+to authenticated
+using (public.app_can_manage_account(owner_user_id));
+
+alter table public.billing_events enable row level security;
+alter table public.billing_events force row level security;
+
+drop policy if exists billing_events_select_same_account on public.billing_events;
+create policy billing_events_select_same_account
+on public.billing_events
+for select
+to authenticated
+using (public.app_is_same_account(owner_user_id));
+
+drop policy if exists billing_events_insert_same_account on public.billing_events;
+create policy billing_events_insert_same_account
+on public.billing_events
+for insert
+to authenticated
+with check (public.app_can_manage_account(owner_user_id));
+
+drop policy if exists billing_events_update_same_account on public.billing_events;
+create policy billing_events_update_same_account
+on public.billing_events
+for update
+to authenticated
+using (public.app_can_manage_account(owner_user_id))
+with check (public.app_can_manage_account(owner_user_id));
+
+drop policy if exists billing_events_delete_same_account on public.billing_events;
+create policy billing_events_delete_same_account
+on public.billing_events
+for delete
+to authenticated
+using (public.app_can_manage_account(owner_user_id));
+
+alter table public.checkout_sessions enable row level security;
+alter table public.checkout_sessions force row level security;
+
+drop policy if exists checkout_sessions_select_same_account on public.checkout_sessions;
+create policy checkout_sessions_select_same_account
+on public.checkout_sessions
+for select
+to authenticated
+using (public.app_is_same_account(owner_user_id));
+
+drop policy if exists checkout_sessions_insert_same_account on public.checkout_sessions;
+create policy checkout_sessions_insert_same_account
+on public.checkout_sessions
+for insert
+to authenticated
+with check (public.app_can_manage_account(owner_user_id));
+
+drop policy if exists checkout_sessions_update_same_account on public.checkout_sessions;
+create policy checkout_sessions_update_same_account
+on public.checkout_sessions
+for update
+to authenticated
+using (public.app_can_manage_account(owner_user_id))
+with check (public.app_can_manage_account(owner_user_id));
+
+drop policy if exists checkout_sessions_delete_same_account on public.checkout_sessions;
+create policy checkout_sessions_delete_same_account
+on public.checkout_sessions
+for delete
+to authenticated
+using (public.app_can_manage_account(owner_user_id));
+
 do $$
 declare
   table_name text;

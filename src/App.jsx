@@ -9,6 +9,7 @@ import RotaProtegida from './components/RotaProtegida';
 import Sidebar from './components/Sidebar';
 import Toast from './components/Toast';
 import Modal from './components/ui/Modal';
+import Button from './components/ui/Button';
 import {
   gerarAlertasCalendario,
   gerarAlertasEstoque,
@@ -19,6 +20,7 @@ import {
 import { useOperationalData } from './hooks/useOperationalData';
 import { useToast } from './hooks/useToast';
 import { useCloudControls } from './hooks/useCloudControls';
+import AssinaturaBloqueadaPage from './pages/AssinaturaBloqueadaPage';
 import {
   limparPersistenciaSessao,
   limparMarcadoresFluxoAuth,
@@ -36,6 +38,11 @@ import {
   getPendingSyncQueueSnapshot,
   processPendingSyncQueue,
 } from './services/operationalPersistence';
+import {
+  buildSubscriptionAccessState,
+  getCurrentSubscription,
+  canAccessModule,
+} from './services/subscriptions';
 import { buildAlerts } from './utils/alerts';
 import './styles/app.css';
 import './styles/ui.css';
@@ -199,6 +206,23 @@ export default function App() {
   } = useOperationalData(session, {
     enabled: Boolean(session?.user?.id) && !loadingAuth,
   });
+  const currentSubscription = useMemo(
+    () => getCurrentSubscription({ session, user, db }),
+    [session, user, db]
+  );
+  const subscriptionGate = useMemo(
+    () => buildSubscriptionAccessState(currentSubscription),
+    [currentSubscription]
+  );
+  const subscriptionUsage = useMemo(() => ({
+    farms: Array.isArray(db?.fazendas) ? db.fazendas.length : 0,
+    animals: Array.isArray(db?.animais)
+      ? db.animais.reduce((acc, animal) => acc + Number(animal?.qtd || 1), 0)
+      : 0,
+    users: Array.isArray(db?.usuarios)
+      ? db.usuarios.filter((item) => String(item?.status || 'ativo') === 'ativo').length
+      : 0,
+  }), [db]);
   const [usuarioLogado, setUsuarioLogado] = useState(null);
   const [menuExtraAberto, setMenuExtraAberto] = useState(false);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(() => readSidebarCollapsedState());
@@ -663,6 +687,13 @@ export default function App() {
   function navigateWithPermission(pagina, intent = null) {
     const permissaoDestino = permissoesPorPagina[pagina];
     if (!permissaoDestino || hasPermission(permissaoDestino)) {
+      if (!canAccessModule(currentSubscription, pagina)) {
+        showToast({
+          type: 'warning',
+          message: 'Este recurso não está disponível no seu plano. Fale com o suporte para ajustar seu plano.',
+        });
+        return false;
+      }
       setCurrentPage(pagina);
       setNavigationIntent(intent ? { ...intent, page: pagina, at: Date.now() } : null);
       return true;
@@ -782,6 +813,15 @@ export default function App() {
     );
   }
 
+  if (subscriptionGate.blocked) {
+    return (
+      <AssinaturaBloqueadaPage
+        subscription={currentSubscription}
+        onSignOut={handleLogout}
+      />
+    );
+  }
+
   return (
     <div className={`app app-shell ${sidebarCollapsed ? 'app-shell--sidebar-collapsed' : ''}`}>
       {showAuthDebug && session ? (
@@ -816,6 +856,33 @@ export default function App() {
       />
 
       <main className="main">
+        {subscriptionGate.warning ? (
+          <div
+            style={{
+              margin: '0 16px 16px',
+              padding: '16px',
+              borderRadius: 16,
+              border: '1px solid rgba(245, 158, 11, 0.25)',
+              background: 'linear-gradient(180deg, rgba(255, 247, 237, 0.96), rgba(255, 255, 255, 0.96))',
+              boxShadow: '0 14px 30px rgba(15, 23, 42, 0.06)',
+              display: 'grid',
+              gap: 10,
+            }}
+          >
+            <strong style={{ fontSize: 15, color: 'var(--color-text)' }}>Sua assinatura está pendente.</strong>
+            <p style={{ margin: 0, color: 'var(--color-text-secondary)', lineHeight: 1.5 }}>
+              Regularize sua assinatura para continuar usando o HERDON.
+            </p>
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 10 }}>
+              <Button type="button" variant="outline" size="sm" onClick={() => navigateWithPermission('perfil')}>
+                Ver minha assinatura
+              </Button>
+              <Button type="button" variant="ghost" size="sm" onClick={handleLogout}>
+                Sair da conta
+              </Button>
+            </div>
+          </div>
+        ) : null}
         <AppHeader
           currentPage={pageKey}
           farmName={fazendaSelecionada?.nome || db?.fazendas?.[0]?.nome || 'Fazenda Atual'}
@@ -884,6 +951,8 @@ export default function App() {
                   db={pageKey === 'dashboard' ? dbDashboard : db}
                   setDb={setDb}
                   session={session}
+                  subscription={currentSubscription}
+                  subscriptionUsage={subscriptionUsage}
                   navigationIntent={navigationIntent}
                   alerts={alerts}
                   onNavigate={navigateWithPermission}

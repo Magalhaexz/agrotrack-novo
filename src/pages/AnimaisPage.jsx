@@ -15,6 +15,7 @@ import {
   persistCollectionMutation,
   updateOperationalRecord,
 } from '../services/operationalPersistence';
+import { canCreateAnimal, getSubscriptionLimitMessage } from '../services/subscriptions';
 
 const INDIVIDUAL_INACTIVE_STATUSES = new Set(['vendido', 'morte', 'descarte', 'transferencia', 'perda', 'inativo']);
 const MOVEMENT_LABELS = {
@@ -141,7 +142,7 @@ function resolveAnimalFazendaNome(animal, fazendasMap, lotesMap) {
   return fazendasMap.get(Number(fazendaId))?.nome || lote?.fazendaNome || '-';
 }
 
-export default function AnimaisPage({ db, setDb, onConfirmAction }) {
+export default function AnimaisPage({ db, setDb, onConfirmAction, subscription = null }) {
   const { hasPermission, session } = useAuth();
   const { showToast } = useToast();
   const [abrirForm, setAbrirForm] = useState(false);
@@ -239,6 +240,17 @@ export default function AnimaisPage({ db, setDb, onConfirmAction }) {
   }
 
   async function salvarAnimal(dados) {
+    const currentQuantity = animalEditando ? Number(animalEditando.qtd || 0) || 0 : 0;
+    const nextQuantity = Number(dados?.qtd ?? animalEditando?.qtd ?? 1) || 1;
+    const evaluation = canCreateAnimal(subscription, Math.max(resumo.totalCabecas - currentQuantity, 0), nextQuantity);
+    if (!evaluation.allowed) {
+      showToast({
+        type: 'warning',
+        message: getSubscriptionLimitMessage('animals', evaluation) || 'Regularize sua assinatura para continuar usando o HERDON.',
+      });
+      return;
+    }
+
     if (animalEditando) {
       const persisted = await updateOperationalRecord('animais', animalEditando.id, dados, session);
       const mergedAnimal = {

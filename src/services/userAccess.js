@@ -1,7 +1,7 @@
 import { obterLabelPerfil, obterPerfilDoUsuario, PERFIS, normalizarPerfil, perfilEhAdministrador } from '../auth/perfis.js';
 import { supabase } from '../lib/supabase.js';
 
-const PROFILE_COLUMNS = 'id, email, nome, perfil, telefone, cargo, foto_url, created_at, updated_at';
+const PROFILE_COLUMNS = 'id, owner_user_id, email, nome, perfil, telefone, cargo, foto_url, created_at, updated_at';
 const INVITE_COLUMNS = 'id, email, nome, perfil, status, notes, created_by, used_by, used_at, created_at, updated_at';
 const PROFILE_CACHE_PREFIX = 'HERDON_PROFILE_CACHE::';
 const DEFAULT_BOOTSTRAP_ADMIN_EMAILS = ['magalhaesh617@gmail.com'];
@@ -110,6 +110,7 @@ export function mapProfileRowToUser(user, profile) {
 
   return {
     ...user,
+    owner_user_id: profile?.owner_user_id ?? user?.owner_user_id ?? null,
     nome: profile?.nome || nomeFallback,
     email: profile?.email || user?.email || '',
     perfil,

@@ -13,6 +13,10 @@ Runtime tables provisioned:
 
 - `profiles`
 - `invites`
+- `subscription_plans`
+- `customer_subscriptions`
+- `billing_events`
+- `checkout_sessions`
 - `fazendas`
 - `pastagens`
 - `lotes`
@@ -42,6 +46,35 @@ Local-only or not provisioned by this bundle:
 - any demo/mock/sample dataset
 
 Those structures are still UI-local today and are not created here on purpose, because the current production runtime does not use a dedicated Supabase persistence helper for them.
+
+## Internal subscription structure
+
+This bundle also prepares the internal SaaS subscription model, even before payment checkout exists.
+
+Subscription statuses supported by the app:
+
+- `trialing`
+- `active`
+- `past_due`
+- `canceled`
+- `blocked`
+- `internal_test`
+
+Planned internal plans:
+
+- `FUNDADOR` - R$ 297/mês, acesso completo durante o lançamento
+- `ESSENCIAL` - R$ 197/mês, até 1 fazenda, 300 animais e 2 usuários
+- `PRO` - R$ 397/mês, até 3 fazendas, 1000 animais e 5 usuários
+- `PREMIUM` - R$ 697/mês, até 10 fazendas, 3000 animais e 10 usuários
+- `ENTERPRISE` - sob consulta, com limites personalizados
+
+Behavior notes:
+
+- assinaturas `active`, `trialing` e `internal_test` podem usar o app normalmente
+- assinaturas `past_due` entram no app, mas mostram aviso
+- assinaturas `canceled` e `blocked` levam a uma tela de bloqueio
+- `internal_test` fica disponível para validação interna sem expor detalhes ao usuário normal
+- os limites do plano vivem em `plan_entitlements` como JSON para facilitar a evolução futura
 
 ## Fresh project setup
 

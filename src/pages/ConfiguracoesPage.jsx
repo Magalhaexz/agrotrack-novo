@@ -8,6 +8,7 @@ import { supabase } from '../lib/supabase'; // Assumindo que supabase está conf
 import { useAuth } from '../auth/useAuth';
 import { useToast } from '../hooks/useToast'; // Importa o hook de toast
 import { createInvite, deleteInvite, isAccessModuleUnavailable, listInvites, listProfiles, updateInvite } from '../services/userAccess';
+import { canInviteUser, getSubscriptionLimitMessage } from '../services/subscriptions';
 import { gerarNovoId } from '../utils/id'; // Importa a função de gerar ID
 import { normalizeBackupPayload } from '../utils/backupValidation';
 import {
@@ -37,7 +38,7 @@ const TABS = [
  * @param {function} props.setDb - Função para atualizar o banco de dados.
  * @param {function} [props.onConfirmAction] - Função para exibir um modal de confirmação customizado.
  */
-export default function ConfiguracoesPage({ db, setDb, onConfirmAction }) {
+export default function ConfiguracoesPage({ db, setDb, onConfirmAction, subscription = null }) {
   const { perfil, user, session, hasPermission } = useAuth();
   const { showToast } = useToast(); // Hook para exibir toasts
   const [tab, setTab] = useState('geral');
@@ -83,6 +84,11 @@ export default function ConfiguracoesPage({ db, setDb, onConfirmAction }) {
     () => invitesRows.filter((invite) => String(invite?.status || '').toLowerCase() === 'aceito' || Boolean(invite?.used_at)),
     [invitesRows]
   );
+  const totalUsuariosPlano = useMemo(() => {
+    const usuariosAtivos = usuariosFallback.filter((item) => String(item?.status || 'ativo') === 'ativo').length;
+    const convitesEmUso = invitesRows.filter((invite) => ['pendente', 'enviado', 'aceito'].includes(String(invite?.status || '').toLowerCase())).length;
+    return usuariosAtivos + convitesEmUso;
+  }, [usuariosFallback, invitesRows]);
   const totalAdminsAtivosFallback = useMemo(
     () => usuariosFallback.filter((item) => perfilEhAdministrador(item?.perfil) && String(item?.status || 'ativo') === 'ativo').length,
     [usuariosFallback]
@@ -854,6 +860,14 @@ export default function ConfiguracoesPage({ db, setDb, onConfirmAction }) {
           onClose={() => setOpenInvite(false)}
           onInvite={async (payload) => {
             if (!validarPermissao('acessos:gerenciar')) return;
+            const capacity = canInviteUser(subscription, totalUsuariosPlano);
+            if (!capacity.allowed) {
+              showToast({
+                type: 'warning',
+                message: getSubscriptionLimitMessage('users', capacity) || 'Regularize sua assinatura para continuar usando o HERDON.',
+              });
+              return;
+            }
             if (!accessModuleReady) {
               const persisted = await createOperationalRecord('usuarios', {
                 ...payload,

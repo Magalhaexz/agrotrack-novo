@@ -3,6 +3,7 @@ import { FileText, LogOut } from 'lucide-react'; // Importar LogOut
 import Card from '../components/ui/Card';
 import Button from '../components/ui/Button';
 import UserAvatar from '../components/ui/UserAvatar';
+import SubscriptionSummary from '../components/subscription/SubscriptionSummary';
 import { obterLabelPerfil } from '../auth/perfis';
 import { supabase } from '../lib/supabase';
 import { useToast } from '../hooks/useToast'; // Importar useToast
@@ -22,7 +23,7 @@ function calcularForcaSenha(senha) {
   return { score, label: 'Forte', color: 'var(--color-success)', percent: 100 };
 }
 
-export default function PerfilPage({ db, usuarioLogado, atualizarUsuario, onConfirmAction, onSignOut }) {
+export default function PerfilPage({ db, usuarioLogado, atualizarUsuario, onConfirmAction, onSignOut, subscription = null, subscriptionUsage = {} }) {
   const { showToast } = useToast(); // Usar o hook de toast
 
   const [usuarioLocal, setUsuarioLocal] = useState({
@@ -217,6 +218,10 @@ export default function PerfilPage({ db, usuarioLogado, atualizarUsuario, onConf
     await supabase.auth.signOut();
   }
 
+  function abrirAjusteAssinatura() {
+    showToast({ type: 'info', message: 'Fale com o suporte para ajustar seu plano.' });
+  }
+
   // Mover estilos para CSS ou usar classes
   const avatarUploadButtonStyle = {
     position: 'absolute',
@@ -281,6 +286,15 @@ export default function PerfilPage({ db, usuarioLogado, atualizarUsuario, onConf
         </div>
         <div className="perfil-actions"><Button onClick={salvarDadosPessoais}>Salvar alterações</Button></div>
       </Card>
+
+      <SubscriptionSummary
+        subscription={subscription}
+        usage={subscriptionUsage}
+        onPrimaryAction={abrirAjusteAssinatura}
+        onSecondaryAction={sairDaConta}
+        primaryLabel="Regularizar assinatura"
+        secondaryLabel="Sair da conta"
+      />
 
       <Card title="Segurança" subtitle="Altere sua senha com validação de força">
         <div className="perfil-form-grid">

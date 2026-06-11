@@ -339,7 +339,7 @@ export default function LoginPage() {
 
       setEtapaRecuperacao(2);
       setMensagem('Link de recuperacao enviado. Confira sua caixa de entrada.');
-    } catch (err) {
+    } catch {
       setErro('Nao foi possivel enviar o link de recuperacao. Tente novamente em alguns instantes.');
     } finally {
       setCarregando(false);
@@ -368,7 +368,7 @@ export default function LoginPage() {
       setModo('login');
       setSenha('');
       setNovaSenha('');
-    } catch (err) {
+    } catch {
       setErro('Nao foi possivel redefinir a senha. Tente novamente em alguns instantes.');
     } finally {
       setCarregando(false);
