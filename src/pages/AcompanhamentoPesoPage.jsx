@@ -44,8 +44,9 @@ function getLotHeadCount(lote, animaisLote) {
 
 function getLatestByDate(items = []) {
   return [...items]
-    .filter((item) => item?.data)
-    .sort((a, b) => new Date(a.data).getTime() - new Date(b.data).getTime())
+    .map((item) => ({ ...item, dataKey: toDateKey(item?.data) }))
+    .filter((item) => item.dataKey)
+    .sort((a, b) => a.dataKey.localeCompare(b.dataKey))
     .at(-1) || null;
 }
 

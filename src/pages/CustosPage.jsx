@@ -4,6 +4,7 @@ import { formatarNumero, formatarData } from '../utils/formatters';
 import { gerarNovoId } from '../utils/id'; // Importa a função de gerar ID
 import { useAuth } from '../auth/useAuth';
 import { useToast } from '../hooks/useToast';
+import { toDateKey } from '../domain/calcHelpers.js';
 import {
   createOperationalRecord,
   deleteOperationalRecord,
@@ -79,9 +80,11 @@ export default function CustosPage({ db, setDb, onConfirmAction }) {
         return {
           ...custo,
           loteNome: lote?.nome || '—',
+          dataKey: toDateKey(custo?.data),
         };
       })
-      .sort((a, b) => new Date(b.data) - new Date(a.data));
+      .filter((item) => item.dataKey)
+      .sort((a, b) => b.dataKey.localeCompare(a.dataKey));
   }, [custos, lotesMap]); // Depende de custos e do mapa de lotes
 
   const resumo = useMemo(() => {
