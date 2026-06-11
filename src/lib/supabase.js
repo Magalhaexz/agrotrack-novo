@@ -19,17 +19,33 @@ const runtimeEnv = (typeof import.meta !== 'undefined' && import.meta?.env)
 const processEnv = globalThis?.process?.env || {};
 const supabaseUrl = normalizeEnvValue(runtimeEnv.VITE_SUPABASE_URL || processEnv.VITE_SUPABASE_URL);
 const supabaseAnonKey = normalizeEnvValue(runtimeEnv.VITE_SUPABASE_ANON_KEY || processEnv.VITE_SUPABASE_ANON_KEY);
+const isDevRuntime = Boolean((typeof import.meta !== 'undefined' && import.meta?.env?.DEV) || processEnv.NODE_ENV === 'development');
 const isTestEnvironment = processEnv.NODE_ENV === 'test';
 const supabaseEnvConfigured = Boolean(supabaseUrl && supabaseAnonKey);
-const publicAppUrl = normalizeEnvValue(runtimeEnv.VITE_PUBLIC_APP_URL || processEnv.VITE_PUBLIC_APP_URL);
+const publicAppUrl = normalizeEnvValue(
+  runtimeEnv.VITE_APP_URL
+  || runtimeEnv.VITE_PUBLIC_APP_URL
+  || processEnv.VITE_APP_URL
+  || processEnv.VITE_PUBLIC_APP_URL
+);
 
 export function getSafeOAuthRedirectTo() {
-  const envUrl = normalizeEnvValue(publicAppUrl);
-  if (envUrl) return envUrl;
   if (typeof window !== 'undefined' && window?.location?.origin) {
     return window.location.origin;
   }
+  const envUrl = normalizeEnvValue(publicAppUrl);
+  if (envUrl) return envUrl;
   return undefined;
+}
+
+export function buildSupabaseSignUpOptions({ nome = '', redirectTo = null } = {}) {
+  return {
+    emailRedirectTo: normalizeEnvValue(redirectTo) || getSafeOAuthRedirectTo(),
+    data: {
+      nome: normalizeEnvValue(nome),
+      name: normalizeEnvValue(nome),
+    },
+  };
 }
 
 export function getSupabaseEnvStatus() {
@@ -40,7 +56,9 @@ export function getSupabaseEnvStatus() {
     isTestEnvironment,
     message: supabaseEnvConfigured
       ? null
-      : 'Configuração da nuvem incompleta.',
+      : (isDevRuntime
+        ? 'Configure VITE_SUPABASE_URL e VITE_SUPABASE_ANON_KEY no arquivo .env.local.'
+        : null),
   };
 }
 

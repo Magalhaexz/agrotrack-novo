@@ -3,6 +3,8 @@ import { Eye, EyeOff } from 'lucide-react';
 import logoAgrotrack from '../assets/logo_app1.png';
 import { useAuth } from '../auth/useAuth';
 import {
+  buildSupabaseSignUpOptions,
+  getSupabaseEnvStatus,
   HERDON_LOGIN_ATTEMPT_KEY,
   HERDON_LOGIN_ACCEPTED_AT,
   getSafeOAuthRedirectTo,
@@ -152,6 +154,7 @@ async function signInWithRetry({ email, password }) {
 
 export default function LoginPage() {
   const { acceptSession } = useAuth();
+  const supabaseEnvStatus = getSupabaseEnvStatus();
   const [modo, setModo] = useState('login');
   const [etapaRecuperacao, setEtapaRecuperacao] = useState(1);
   const [nome, setNome] = useState('');
@@ -200,12 +203,10 @@ export default function LoginPage() {
         const { data, error } = await supabase.auth.signUp({
           email: email.trim(),
           password: senha,
-          options: {
-            data: {
-              nome: nome || '',
-              name: nome || '',
-            },
-          },
+          options: buildSupabaseSignUpOptions({
+            nome,
+            redirectTo: getSafeOAuthRedirectTo(),
+          }),
         });
 
         if (error) throw error;
@@ -495,6 +496,12 @@ export default function LoginPage() {
               <h2 className="login-title">{tituloAtual}</h2>
               <p className="login-subtitle">{subtituloAtual}</p>
             </div>
+
+            {import.meta.env.DEV && !supabaseEnvStatus.configured ? (
+              <div className="login-info-text" style={{ marginTop: 0 }}>
+                Configure `VITE_SUPABASE_URL` e `VITE_SUPABASE_ANON_KEY` em `.env.local` para liberar login, cadastro e Google.
+              </div>
+            ) : null}
 
             {(erro || mensagem) && (
               <div className="login-feedback-stack">
