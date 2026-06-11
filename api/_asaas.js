@@ -126,6 +126,9 @@ export function validateWebhookToken(headers = {}, expectedToken = getRuntimeEnv
   if (!token) return false;
 
   const candidates = [
+    headers['asaas-access-token'],
+    headers['Asaas-Access-Token'],
+    headers['ASAAS-ACCESS-TOKEN'],
     headers['asaas-webhook-token'],
     headers['ASAAS-WEBHOOK-TOKEN'],
     headers['x-asaas-webhook-token'],

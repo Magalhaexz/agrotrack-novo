@@ -32,6 +32,9 @@ Important:
 - `ASAAS_API_KEY` must never be exposed to the frontend.
 - `ASAAS_WEBHOOK_TOKEN` is only used on the server route that receives webhook calls.
 - The customer UI uses the app route, not the provider secret.
+- In the Asaas webhook panel, the "Token de autenticação" must use the same value as `ASAAS_WEBHOOK_TOKEN`.
+- Asaas sends that value in the `asaas-access-token` header.
+- The webhook URL for Vercel is `/api/asaas-webhook`.
 
 ## Flow overview
 

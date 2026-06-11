@@ -75,9 +75,12 @@ test('frontend source does not expose Asaas private env names', async () => {
 });
 
 test('webhook token validation accepts the configured token and rejects mismatches', () => {
-  const headers = { 'asaas-webhook-token': 'secret-token' };
-  assert.equal(validateWebhookToken(headers, 'secret-token'), true);
-  assert.equal(validateWebhookToken(headers, 'wrong-token'), false);
+  const officialHeaders = { 'asaas-access-token': 'secret-token' };
+  const legacyHeaders = { 'asaas-webhook-token': 'secret-token' };
+
+  assert.equal(validateWebhookToken(officialHeaders, 'secret-token'), true);
+  assert.equal(validateWebhookToken(officialHeaders, 'wrong-token'), false);
+  assert.equal(validateWebhookToken(legacyHeaders, 'secret-token'), true);
   assert.equal(validateWebhookToken({}, 'secret-token'), false);
 });
 
