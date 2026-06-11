@@ -4,7 +4,6 @@ import Card from '../ui/Card';
 import {
   buildSubscriptionAccessState,
   getPlanLimits,
-  getSubscriptionStatusLabel,
 } from '../../services/subscriptions';
 
 function formatLimit(value) {
@@ -24,8 +23,8 @@ export default function SubscriptionSummary({
   showActions = true,
   onPrimaryAction = null,
   onSecondaryAction = null,
-  primaryLabel = 'Regularizar assinatura',
-  secondaryLabel = 'Falar com o suporte',
+  primaryLabel = null,
+  secondaryLabel = null,
 }) {
   const normalized = subscription?.plan ? subscription : {
     ...(subscription || {}),
@@ -33,8 +32,12 @@ export default function SubscriptionSummary({
   };
   const gate = buildSubscriptionAccessState(normalized);
   const plan = normalized?.plan || getPlanLimits(normalized?.plan_code);
-  const statusLabel = gate.statusLabel || getSubscriptionStatusLabel(normalized?.status);
-  const message = gate.message || 'Sua assinatura está em preparação.';
+  const actionCopy = gate.actionCopy || {};
+  const statusLabel = gate.statusLabel || actionCopy.statusLabel;
+  const message = gate.message || actionCopy.message || 'Sua assinatura está em preparação.';
+  const resolvedPrimaryLabel = primaryLabel || actionCopy.primaryLabel || 'Ver planos';
+  const resolvedSecondaryLabel = secondaryLabel || actionCopy.secondaryLabel || 'Falar com o suporte';
+  const helperText = actionCopy.helperText;
   const limitSnapshot = plan?.limits || {};
 
   return (
@@ -47,6 +50,11 @@ export default function SubscriptionSummary({
         </div>
 
         <p style={{ margin: 0, color: 'var(--color-text-secondary)', lineHeight: 1.5 }}>{message}</p>
+        {helperText ? (
+          <p style={{ margin: '-4px 0 0', color: 'var(--color-text-muted)', fontSize: 13 }}>
+            {helperText}
+          </p>
+        ) : null}
 
         <div style={{ display: 'grid', gap: 8 }}>
           <strong style={{ fontSize: 14 }}>Resumo dos limites</strong>
@@ -60,10 +68,10 @@ export default function SubscriptionSummary({
         {showActions ? (
           <div style={{ display: 'flex', flexWrap: 'wrap', gap: 10 }}>
             <Button type="button" variant="outline" onClick={onPrimaryAction || undefined} disabled={!onPrimaryAction}>
-              {primaryLabel}
+              {resolvedPrimaryLabel}
             </Button>
             <Button type="button" variant="ghost" onClick={onSecondaryAction || undefined} disabled={!onSecondaryAction}>
-              {secondaryLabel}
+              {resolvedSecondaryLabel}
             </Button>
           </div>
         ) : null}

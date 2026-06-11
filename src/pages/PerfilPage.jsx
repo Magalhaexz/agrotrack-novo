@@ -1,13 +1,15 @@
 import { useEffect, useMemo, useState } from 'react';
-import { FileText, LogOut } from 'lucide-react'; // Importar LogOut
+import { LogOut, Plus } from 'lucide-react';
 import Card from '../components/ui/Card';
 import Button from '../components/ui/Button';
 import UserAvatar from '../components/ui/UserAvatar';
 import SubscriptionSummary from '../components/subscription/SubscriptionSummary';
 import { obterLabelPerfil } from '../auth/perfis';
 import { supabase } from '../lib/supabase';
-import { useToast } from '../hooks/useToast'; // Importar useToast
+import { useToast } from '../hooks/useToast';
 import { upsertOwnProfile } from '../services/userAccess';
+import { getSubscriptionDisplayCopy } from '../services/subscriptions';
+import { uploadProfileAvatar } from '../services/profilePhotos';
 import '../styles/perfil.css';
 
 // Helper function para calcular a força da senha
@@ -24,7 +26,7 @@ function calcularForcaSenha(senha) {
 }
 
 export default function PerfilPage({ db, usuarioLogado, atualizarUsuario, onConfirmAction, onSignOut, subscription = null, subscriptionUsage = {} }) {
-  const { showToast } = useToast(); // Usar o hook de toast
+  const { showToast } = useToast();
 
   const [usuarioLocal, setUsuarioLocal] = useState({
     id: usuarioLogado?.id || '',
@@ -39,6 +41,7 @@ export default function PerfilPage({ db, usuarioLogado, atualizarUsuario, onConf
   const [senhaAtual, setSenhaAtual] = useState('');
   const [novaSenha, setNovaSenha] = useState('');
   const [confirmarSenha, setConfirmarSenha] = useState('');
+  const [fotoEnviando, setFotoEnviando] = useState(false);
 
   const [preferencias, setPreferencias] = useState({
     tema_escuro: true, // Assumindo que o tema escuro é o padrão ou vem de algum lugar
@@ -47,9 +50,8 @@ export default function PerfilPage({ db, usuarioLogado, atualizarUsuario, onConf
   });
 
   const perfilExibicao = obterLabelPerfil(usuarioLocal?.perfil);
+  const subscriptionActions = useMemo(() => getSubscriptionDisplayCopy(subscription), [subscription]);
 
-  // Sincroniza o estado local do usuário com o `usuarioLogado` prop
-  /* eslint-disable react-hooks/set-state-in-effect */
   useEffect(() => {
     if (!usuarioLogado) return;
     setUsuarioLocal({
@@ -66,33 +68,93 @@ export default function PerfilPage({ db, usuarioLogado, atualizarUsuario, onConf
       notificacoes_email: usuarioLogado.user_metadata?.notificacoes_email ?? true,
       fazenda_padrao_id: usuarioLogado.user_metadata?.fazenda_padrao_id || db?.fazendas?.[0]?.id || '',
     }));
-  }, [usuarioLogado, db.fazendas]); // Adicionado db.fazendas como dependência para o default da fazenda
-  /* eslint-enable react-hooks/set-state-in-effect */
+  }, [usuarioLogado, db.fazendas]);
 
   const forcaSenha = useMemo(() => calcularForcaSenha(novaSenha), [novaSenha]);
 
-  function handleFotoUpload(e) {
+  async function handleFotoUpload(e) {
     const file = e.target.files?.[0];
     if (!file) return;
 
-    if (file.size > 2 * 1024 * 1024) {
-      showToast({ type: 'error', message: 'Imagem muito grande. Máximo 2MB.' });
+    if (fotoEnviando) {
+      e.target.value = '';
       return;
     }
 
-    if (!file.type.startsWith('image/')) {
-      showToast({ type: 'error', message: 'Selecione uma imagem válida.' });
-      return;
-    }
+    setFotoEnviando(true);
+    const fotoAnterior = usuarioLocal.foto_url;
 
-    const reader = new FileReader();
-    reader.onloadend = () => {
+    try {
+      const uploadResult = await uploadProfileAvatar({
+        userId: usuarioLocal.id,
+        file,
+      });
+
+      if (uploadResult.error) {
+        showToast({
+          type: 'error',
+          message: uploadResult.error.message || 'Não foi possível atualizar a foto agora.',
+        });
+        setUsuarioLocal((prev) => ({
+          ...prev,
+          foto_url: fotoAnterior,
+        }));
+        return;
+      }
+
+      const fotoUrl = uploadResult.data?.publicUrl || null;
       setUsuarioLocal((prev) => ({
         ...prev,
-        foto_url: String(reader.result || ''),
+        foto_url: fotoUrl,
       }));
-    };
-    reader.readAsDataURL(file);
+
+      const { error: profileError, data: profileAtualizado } = await upsertOwnProfile(usuarioLocal.id, {
+        email: usuarioLocal.email,
+        nome: usuarioLocal.nome.trim(),
+        perfil: usuarioLocal.perfil,
+        telefone: usuarioLocal.telefone,
+        cargo: usuarioLocal.cargo,
+        foto_url: fotoUrl,
+      });
+
+      if (profileError) {
+        const storage = supabase?.storage?.from?.('profile-avatars');
+        if (storage?.remove && uploadResult.data?.storagePath) {
+          await storage.remove([uploadResult.data.storagePath.replace('profile-avatars/', '')]);
+        }
+        setUsuarioLocal((prev) => ({
+          ...prev,
+          foto_url: fotoAnterior,
+        }));
+        showToast({ type: 'error', message: 'Não foi possível atualizar a foto agora.' });
+        return;
+      }
+
+      atualizarUsuario?.({
+        ...usuarioLogado,
+        nome: usuarioLocal.nome,
+        email: usuarioLocal.email,
+        perfil: profileAtualizado?.perfil || usuarioLocal.perfil,
+        foto_url: fotoUrl,
+        telefone: usuarioLocal.telefone,
+        cargo: usuarioLocal.cargo,
+        user_metadata: {
+          ...usuarioLogado?.user_metadata,
+          avatar_url: fotoUrl,
+        },
+      });
+
+      showToast({ type: 'success', message: 'Foto atualizada com sucesso.' });
+    } catch {
+      setUsuarioLocal((prev) => ({
+        ...prev,
+        foto_url: fotoAnterior,
+      }));
+      showToast({ type: 'error', message: 'Não foi possível atualizar a foto agora.' });
+    } finally {
+      setFotoEnviando(false);
+      e.target.value = '';
+    }
   }
 
   async function salvarDadosPessoais() {
@@ -112,7 +174,7 @@ export default function PerfilPage({ db, usuarioLogado, atualizarUsuario, onConf
     const { error } = await supabase.auth.updateUser({ data: metadataPayload });
 
     if (error) {
-      showToast({ type: 'error', message: `Erro ao salvar perfil: ${error.message}` });
+      showToast({ type: 'error', message: 'Não foi possível salvar os dados agora.' });
       return;
     }
 
@@ -128,6 +190,7 @@ export default function PerfilPage({ db, usuarioLogado, atualizarUsuario, onConf
 
     if (profileError) {
       showToast({ type: 'warning', message: 'Alguns dados do perfil precisam de revisão.' });
+      return;
     }
 
     atualizarUsuario?.({
@@ -166,7 +229,7 @@ export default function PerfilPage({ db, usuarioLogado, atualizarUsuario, onConf
     // Se a lógica de backend exigir, isso precisaria ser tratado de outra forma (ex: função Edge).
     const { error } = await supabase.auth.updateUser({ password: novaSenha });
     if (error) {
-      showToast({ type: 'error', message: `Erro ao alterar senha: ${error.message}` });
+      showToast({ type: 'error', message: 'Não foi possível alterar a senha agora.' });
       return;
     }
 
@@ -186,7 +249,7 @@ export default function PerfilPage({ db, usuarioLogado, atualizarUsuario, onConf
     });
 
     if (error) {
-      showToast({ type: 'error', message: `Erro ao salvar preferências: ${error.message}` });
+      showToast({ type: 'error', message: 'Não foi possível salvar as preferências agora.' });
       return;
     }
 
@@ -219,7 +282,12 @@ export default function PerfilPage({ db, usuarioLogado, atualizarUsuario, onConf
   }
 
   function abrirAjusteAssinatura() {
-    showToast({ type: 'info', message: 'Fale com o suporte para ajustar seu plano.' });
+    showToast({
+      type: 'info',
+      message: subscriptionActions.checkoutReady
+        ? 'Fale com o suporte para ajustar seu plano.'
+        : 'Checkout em preparação. Fale com o suporte para ajustar seu plano.',
+    });
   }
 
   // Mover estilos para CSS ou usar classes
@@ -255,11 +323,22 @@ export default function PerfilPage({ db, usuarioLogado, atualizarUsuario, onConf
                 htmlFor="foto-upload"
                 className="avatar-upload-button" // Usar classe CSS
                 style={avatarUploadButtonStyle}
+                title="Atualizar foto do perfil"
               >
-                <FileText size={14} />
+                <Plus size={14} />
               </label>
-              <input id="foto-upload" type="file" accept="image/*" style={{ display: 'none' }} onChange={handleFotoUpload} />
+              <input
+                id="foto-upload"
+                type="file"
+                accept="image/jpeg,image/png,image/webp"
+                style={{ display: 'none' }}
+                onChange={handleFotoUpload}
+                disabled={fotoEnviando}
+              />
             </div>
+            <small style={{ display: 'block', color: 'var(--color-text-muted)', textAlign: 'center' }}>
+              JPG, PNG ou WEBP. Até 2 MB.
+            </small>
           </div>
           <div className="perfil-form-grid">
             <label className="ui-input-wrap">
@@ -292,7 +371,7 @@ export default function PerfilPage({ db, usuarioLogado, atualizarUsuario, onConf
         usage={subscriptionUsage}
         onPrimaryAction={abrirAjusteAssinatura}
         onSecondaryAction={sairDaConta}
-        primaryLabel="Regularizar assinatura"
+        primaryLabel={subscriptionActions.primaryLabel}
         secondaryLabel="Sair da conta"
       />
 

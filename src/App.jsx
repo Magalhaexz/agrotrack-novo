@@ -869,7 +869,7 @@ export default function App() {
               gap: 10,
             }}
           >
-            <strong style={{ fontSize: 15, color: 'var(--color-text)' }}>Sua assinatura está pendente.</strong>
+            <strong style={{ fontSize: 15, color: 'var(--color-text)' }}>{subscriptionGate.message}</strong>
             <p style={{ margin: 0, color: 'var(--color-text-secondary)', lineHeight: 1.5 }}>
               Regularize sua assinatura para continuar usando o HERDON.
             </p>

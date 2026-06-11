@@ -8,6 +8,7 @@ import {
   canInviteUser,
   getCurrentSubscription,
   getPlanLimits,
+  getSubscriptionDisplayCopy,
   getSubscriptionStatusLabel,
   hasActiveSubscription,
 } from '../src/services/subscriptions.js';
@@ -63,7 +64,8 @@ test('internal_test subscription allows access', () => {
   assert.equal(hasActiveSubscription(subscription), true);
   assert.equal(access.canEnterApp, true);
   assert.equal(access.blocked, false);
-  assert.equal(getSubscriptionStatusLabel(subscription.status), 'Teste interno');
+  assert.equal(getSubscriptionStatusLabel(subscription.status), 'Acesso de teste ativo');
+  assert.equal(access.message, 'Acesso de teste ativo.');
 });
 
 test('past_due shows warning behavior', () => {
@@ -112,4 +114,22 @@ test('helpers are safe when no subscription exists', () => {
   assert.equal(access.blocked, false);
   assert.equal(canAccessModule(null, 'financeiro'), true);
   assert.equal(canCreateFarm(null, 999).allowed, true);
+});
+
+test('active and internal_test subscriptions do not surface regularize CTA', () => {
+  const active = getSubscriptionDisplayCopy({ plan_code: 'pro', status: 'active' });
+  const trialing = getSubscriptionDisplayCopy({ plan_code: 'pro', status: 'trialing' });
+  const internalTest = getSubscriptionDisplayCopy({ plan_code: 'pro', status: 'internal_test' });
+  const pastDue = getSubscriptionDisplayCopy({ plan_code: 'pro', status: 'past_due' });
+  const canceled = getSubscriptionDisplayCopy({ plan_code: 'pro', status: 'canceled' });
+  const blocked = getSubscriptionDisplayCopy({ plan_code: 'pro', status: 'blocked' });
+
+  assert.notEqual(active.primaryLabel, 'Regularizar assinatura');
+  assert.notEqual(trialing.primaryLabel, 'Regularizar assinatura');
+  assert.notEqual(internalTest.primaryLabel, 'Regularizar assinatura');
+  assert.equal(active.helperText, 'Checkout em preparação');
+  assert.equal(internalTest.message, 'Acesso de teste ativo.');
+  assert.equal(pastDue.primaryLabel, 'Regularizar assinatura');
+  assert.equal(canceled.primaryLabel, 'Regularizar assinatura');
+  assert.equal(blocked.primaryLabel, 'Regularizar assinatura');
 });

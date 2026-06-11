@@ -199,10 +199,66 @@ export function getSubscriptionStatusLabel(status) {
     case SUBSCRIPTION_STATUSES.BLOCKED:
       return 'Bloqueada';
     case SUBSCRIPTION_STATUSES.INTERNAL_TEST:
-      return 'Teste interno';
+      return 'Acesso de teste ativo';
     default:
       return 'Assinatura em preparação';
   }
+}
+
+export function hasSubscriptionBillingReady(subscription) {
+  const normalized = normalizeSubscription(subscription);
+  if (!normalized) return false;
+  const billingProvider = normalizeText(normalized.billing_provider).toLowerCase();
+
+  return Boolean(
+    (billingProvider && billingProvider !== 'manual')
+    || normalized.provider_customer_id
+    || normalized.provider_subscription_id
+    || normalized.provider_payment_id
+  );
+}
+
+export function getSubscriptionDisplayCopy(subscription, options = {}) {
+  const normalized = normalizeSubscription(subscription);
+  const status = normalizePlanCode(normalized?.status);
+  const checkoutReady = options.checkoutReady ?? hasSubscriptionBillingReady(normalized);
+  const plan = normalized?.plan || getPlanLimits(normalized?.plan_code);
+
+  let message = 'Sua assinatura está em preparação.';
+  let primaryLabel = 'Ver planos';
+  let secondaryLabel = 'Falar com o suporte';
+  let helperText = checkoutReady ? null : 'Checkout em preparação';
+
+  if (status === SUBSCRIPTION_STATUSES.TRIALING) {
+    message = 'Sua assinatura está em teste.';
+    primaryLabel = checkoutReady ? 'Gerenciar assinatura' : 'Ver planos';
+  } else if (status === SUBSCRIPTION_STATUSES.ACTIVE) {
+    message = 'Sua assinatura está ativa.';
+    primaryLabel = checkoutReady ? 'Gerenciar assinatura' : 'Ver planos';
+  } else if (status === SUBSCRIPTION_STATUSES.INTERNAL_TEST) {
+    message = 'Acesso de teste ativo.';
+    primaryLabel = checkoutReady ? 'Gerenciar assinatura' : 'Ver planos';
+  } else if (status === SUBSCRIPTION_STATUSES.PAST_DUE) {
+    message = 'Sua assinatura está pendente.';
+    primaryLabel = 'Regularizar assinatura';
+    helperText = null;
+  } else if (status === SUBSCRIPTION_STATUSES.CANCELED || status === SUBSCRIPTION_STATUSES.BLOCKED) {
+    message = 'Regularize sua assinatura para continuar usando o HERDON.';
+    primaryLabel = 'Regularizar assinatura';
+    helperText = null;
+  }
+
+  return {
+    status,
+    statusLabel: getSubscriptionStatusLabel(status),
+    message,
+    primaryLabel,
+    secondaryLabel,
+    helperText,
+    planName: plan?.planName || 'Plano em preparação',
+    priceLabel: plan?.priceLabel || 'Sob consulta',
+    checkoutReady,
+  };
 }
 
 export function normalizeSubscription(subscription) {
@@ -281,29 +337,19 @@ export function buildSubscriptionAccessState(subscription, options = {}) {
     && !canEnterApp(normalized, options)
     && !hasActiveSubscription(normalized, options);
   const warning = status === SUBSCRIPTION_STATUSES.PAST_DUE;
-  const statusLabel = getSubscriptionStatusLabel(status);
-
-  let message = 'Sua assinatura está em preparação.';
-  if (status === SUBSCRIPTION_STATUSES.TRIALING) {
-    message = 'Sua assinatura está em teste.';
-  } else if (status === SUBSCRIPTION_STATUSES.ACTIVE || status === SUBSCRIPTION_STATUSES.INTERNAL_TEST) {
-    message = 'Sua assinatura está ativa.';
-  } else if (status === SUBSCRIPTION_STATUSES.PAST_DUE) {
-    message = 'Sua assinatura está pendente.';
-  } else if (status === SUBSCRIPTION_STATUSES.CANCELED || status === SUBSCRIPTION_STATUSES.BLOCKED) {
-    message = 'Regularize sua assinatura para continuar usando o HERDON.';
-  }
+  const display = getSubscriptionDisplayCopy(normalized, options);
 
   return {
     subscription: normalized,
     hasSubscription,
     status,
-    statusLabel,
+    statusLabel: display.statusLabel,
     canEnterApp: canEnterApp(normalized, options),
     blocked,
     warning,
-    message,
+    message: display.message,
     badgeTone: blocked ? 'danger' : warning ? 'warning' : 'success',
+    actionCopy: display,
   };
 }
 
