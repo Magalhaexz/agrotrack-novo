@@ -1,6 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {
+  clearOperationalSnapshotsLocal,
   loadOperationalSnapshotLocal,
   saveOperationalSnapshotLocal,
 } from '../src/hooks/useOperationalData.js';
@@ -12,6 +13,8 @@ function installLocalStorageMock() {
     setItem: (key, value) => { store.set(String(key), String(value)); },
     removeItem: (key) => { store.delete(String(key)); },
     clear: () => { store.clear(); },
+    key: (index) => Array.from(store.keys())[index] ?? null,
+    get length() { return store.size; },
   };
 }
 
@@ -47,4 +50,17 @@ test('local operational snapshot is isolated by user', () => {
 
   assert.equal(userOne.animais[0].nome, 'User 1');
   assert.equal(userTwo.animais[0].nome, 'User 2');
+});
+
+test('logout cleanup clears the visible snapshot for the user', () => {
+  localStorage.clear();
+  saveOperationalSnapshotLocal({
+    userId: 'user-1',
+    db: { animais: [{ id: 'a1', nome: 'User 1' }] },
+  });
+  const cleared = clearOperationalSnapshotsLocal({ userId: 'user-1' });
+  const hydrated = loadOperationalSnapshotLocal({ userId: 'user-1' });
+
+  assert.equal(cleared, true);
+  assert.equal(hydrated, null);
 });

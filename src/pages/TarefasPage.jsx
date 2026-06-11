@@ -107,6 +107,10 @@ export default function TarefasPage({ db, setDb, onConfirmAction }) {
     }
     if (editingTask) {
       const persisted = await updateOperationalRecord('tarefas', editingTask.id, formData, session);
+      if (!persisted.persisted) {
+        showToast({ type: 'warning', message: persisted.error || 'Não foi possível confirmar a alteração agora.' });
+        return;
+      }
       setDb((prev) => {
         const lista = Array.isArray(prev?.tarefas) ? prev.tarefas : [];
         return {
@@ -114,15 +118,16 @@ export default function TarefasPage({ db, setDb, onConfirmAction }) {
           tarefas: lista.map((item) => (item.id === editingTask.id ? { ...item, ...(persisted.data || formData) } : item)),
         };
       });
-      if (!persisted.persisted) {
-        showToast({ type: 'warning', message: 'Tarefa atualizada apenas localmente.' });
-      }
     } else {
       const payload = {
         ...formData,
         created_at: new Date().toISOString(),
       };
       const persisted = await createOperationalRecord('tarefas', payload, session);
+      if (!persisted.persisted) {
+        showToast({ type: 'warning', message: persisted.error || 'Não foi possível confirmar o cadastro agora.' });
+        return;
+      }
       setDb((prev) => {
         const lista = Array.isArray(prev?.tarefas) ? prev.tarefas : [];
         return {
@@ -137,9 +142,6 @@ export default function TarefasPage({ db, setDb, onConfirmAction }) {
           ],
         };
       });
-      if (!persisted.persisted) {
-        showToast({ type: 'warning', message: 'Tarefa criada apenas localmente.' });
-      }
     }
     showToast({ type: 'success', message: `Tarefa "${formData.titulo}" salva com sucesso!` });
     setOpenModal(false);
@@ -161,13 +163,14 @@ export default function TarefasPage({ db, setDb, onConfirmAction }) {
     if (!canDelete) return;
 
     const persisted = await deleteOperationalRecord('tarefas', task.id, session);
+    if (!persisted.persisted) {
+      showToast({ type: 'warning', message: persisted.error || 'Não foi possível confirmar a exclusão agora.' });
+      return;
+    }
     setDb((prev) => ({
       ...prev,
       tarefas: (prev?.tarefas || []).filter((item) => item.id !== task.id),
     }));
-    if (!persisted.persisted) {
-      showToast({ type: 'warning', message: 'Exclusão salva apenas localmente.' });
-    }
     showToast({ type: 'success', message: `Tarefa "${task.titulo}" excluída com sucesso.` });
   }, [hasPermission, onConfirmAction, session, setDb, showToast]);
 
@@ -183,6 +186,10 @@ export default function TarefasPage({ db, setDb, onConfirmAction }) {
     }
 
     const persisted = await updateOperationalRecord('tarefas', task.id, { status: next }, session);
+    if (!persisted.persisted) {
+      showToast({ type: 'warning', message: persisted.error || 'Não foi possível confirmar a alteração agora.' });
+      return;
+    }
     setDb((prev) => ({
       ...prev,
       tarefas: (prev?.tarefas || []).map((item) =>
@@ -195,9 +202,6 @@ export default function TarefasPage({ db, setDb, onConfirmAction }) {
           : item
       ),
     }));
-    if (!persisted.persisted) {
-      showToast({ type: 'warning', message: 'Status salvo apenas localmente.' });
-    }
     showToast({ type: 'success', message: `Tarefa "${task.titulo}" movida para "${toLabel(next)}".` });
   }, [hasPermission, session, setDb, showToast]);
 
@@ -207,11 +211,14 @@ export default function TarefasPage({ db, setDb, onConfirmAction }) {
       return;
     }
     const persisted = await updateOperationalRecord('tarefas', task.id, patch, session);
+    if (!persisted.persisted) {
+      showToast({ type: 'warning', message: persisted.error || 'Não foi possível confirmar a alteração agora.' });
+      return;
+    }
     setDb((prev) => ({
       ...prev,
       tarefas: (prev?.tarefas || []).map((item) => (item.id === task.id ? { ...item, ...(persisted.data || {}), ...patch } : item)),
     }));
-    if (!persisted.persisted) showToast({ type: 'warning', message: 'Alteração salva apenas localmente.' });
     if (successMessage) showToast({ type: 'success', message: successMessage });
   }, [hasPermission, mensagemSemPermissao, session, setDb, showToast]);
 

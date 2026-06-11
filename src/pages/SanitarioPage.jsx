@@ -138,7 +138,7 @@ export default function SanitarioPage({ db, setDb, onConfirmAction }) {
       };
     });
     if (!persistedBatch.persisted) {
-      showToast({ type: 'warning', message: 'Exclusão salva parcialmente apenas localmente.' });
+      showToast({ type: 'warning', message: 'Não foi possível confirmar a exclusão agora.' });
     }
     showToast({ type: 'success', message: 'Manejo sanitário excluído com sucesso!' });
   }, [db?.sanitario, hasPermission, onConfirmAction, session, setDb, showToast]);
@@ -249,7 +249,7 @@ export default function SanitarioPage({ db, setDb, onConfirmAction }) {
 
     const persistedBatch = await persistCollectionMutation(mutations);
     if (!persistedBatch.persisted) {
-      showToast({ type: 'warning', message: 'Manejo salvo parcialmente apenas localmente.' });
+      showToast({ type: 'warning', message: 'Não foi possível confirmar o salvamento agora.' });
     }
 
     showToast({ type: 'success', message: `Manejo sanitário ${itemEditando ? 'atualizado' : 'criado'} com sucesso!` });

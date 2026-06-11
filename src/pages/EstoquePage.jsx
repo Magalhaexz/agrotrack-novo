@@ -436,6 +436,10 @@ function CadastroItemModal({ setDb, initialData = null, onClose, hasPermission, 
     const persisted = isEdit
       ? await updateOperationalRecord('estoque', Number(initialData.id), payload, session)
       : await createOperationalRecord('estoque', payload, session);
+    if (!persisted?.persisted) {
+      showToast({ type: 'warning', message: persisted?.error || 'Não foi possível confirmar o salvamento agora.' });
+      return;
+    }
 
     setDb((prev) => ({
       ...prev,
@@ -451,16 +455,7 @@ function CadastroItemModal({ setDb, initialData = null, onClose, hasPermission, 
           ],
     }));
 
-    if (persisted?.syncStatus === 'cloud_success') {
-      showToast({ type: 'success', message: isEdit ? 'Item atualizado com sucesso.' : 'Registro salvo com sucesso.' });
-    } else if (persisted?.syncStatus === 'pending_sync' || persisted?.syncStatus === 'local_only') {
-      showToast({ type: 'warning', message: `Registro salvo. ${import.meta.env.DEV ? `Motivo: ${persisted.error || persisted.code || 'unknown'}.` : 'Revise a conexão e tente novamente.'}` });
-    } else if (!persisted?.persisted) {
-      showToast({ type: 'error', message: persisted?.error || 'Não foi possível salvar o item.' });
-      return;
-    } else {
-      showToast({ type: 'success', message: isEdit ? 'Item atualizado com sucesso.' : 'Item cadastrado com sucesso.' });
-    }
+    showToast({ type: 'success', message: isEdit ? 'Item atualizado com sucesso.' : 'Item cadastrado com sucesso.' });
     onClose();
   }
 
@@ -566,7 +561,7 @@ function EntradaModal({ db, setDb, selectedItem, estoqueMap, onOpenCadastroItem,
     }));
 
     if (!estoquePersist.persisted || !movPersist.persisted) {
-      showToast({ type: 'warning', message: 'Entrada salva apenas localmente.' });
+      showToast({ type: 'warning', message: 'Não foi possível confirmar a entrada agora.' });
     }
     onClose();
   }
@@ -755,4 +750,3 @@ function SaidaModal({ db, setDb, selectedItem, onRegistrarSaidaEstoque, estoqueM
     </Modal>
   );
 }
-

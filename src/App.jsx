@@ -245,7 +245,7 @@ export default function App() {
     });
   }
 
-  const isBootLoading = loadingAuth;
+  const isBootLoading = loadingAuth || (Boolean(session?.user?.id) && !dataReady);
   const isOperationalSyncing = Boolean(session) && (dataSource === 'syncing' || manualSyncInFlight);
 
   useEffect(() => {
@@ -746,8 +746,10 @@ export default function App() {
       <div className="app-loading">
         <div className="app-loading-panel">
           <span className="app-loading-pill">HERDON</span>
-          <strong>Verificando seu acesso...</strong>
-          <p>Estamos validando sua sessão para iniciar o sistema.</p>
+          <strong>Estamos carregando seus dados.</strong>
+          <p>
+            {dataError?.message || 'Aguarde um instante enquanto preparamos seu ambiente.'}
+          </p>
           <div className="app-loading-bars" aria-hidden="true">
             <span className="app-loading-bar" />
             <span className="app-loading-bar" />
@@ -756,13 +758,13 @@ export default function App() {
           {showBootRecovery ? (
             <div style={{ display: 'grid', gap: 10, marginTop: 8 }}>
               <strong>O carregamento está demorando mais que o normal.</strong>
-              <p>Você pode tentar novamente ou limpar a sessão local para voltar ao login.</p>
+              <p>Você pode tentar novamente ou entrar novamente para continuar.</p>
               <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
                 <button type="button" className="ui-button ui-button--outline ui-button--sm" onClick={() => window.location.reload()}>
                   Tentar novamente
                 </button>
                 <button type="button" className="ui-button ui-button--ghost ui-button--sm" onClick={handleClearSessionAndReload}>
-                  Limpar sessão e voltar ao login
+                  Entrar novamente
                 </button>
               </div>
             </div>
@@ -993,4 +995,3 @@ function parseSnoozeDate(option) {
   data.setDate(data.getDate() + dias);
   return data.toISOString().slice(0, 10);
 }
-

@@ -164,7 +164,7 @@ export default function CustosPage({ db, setDb, onConfirmAction }) {
       ),
     }));
     if (!custoPersist.persisted || !movPersist.persisted) {
-      showToast({ type: 'warning', message: 'Exclusão aplicada apenas localmente.' });
+      showToast({ type: 'warning', message: 'Não foi possível confirmar a exclusão agora.' });
     }
   }
 
@@ -211,7 +211,7 @@ export default function CustosPage({ db, setDb, onConfirmAction }) {
         })(),
       }));
       if (!custoPersist.persisted || !ledgerPersist.persisted) {
-        showToast({ type: 'warning', message: 'Alteração salva apenas localmente.' });
+        showToast({ type: 'warning', message: 'Não foi possível confirmar a alteração agora.' });
       }
     } else {
       const custoPersist = await createOperationalRecord('custos', dados, session);
@@ -236,7 +236,7 @@ export default function CustosPage({ db, setDb, onConfirmAction }) {
         };
       });
       if (!custoPersist.persisted) {
-        showToast({ type: 'warning', message: 'Cadastro salvo apenas localmente.' });
+        showToast({ type: 'warning', message: 'Não foi possível confirmar o cadastro agora.' });
       }
     }
 

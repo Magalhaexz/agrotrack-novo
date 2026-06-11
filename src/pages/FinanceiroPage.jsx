@@ -553,7 +553,7 @@ function NovoLancamentoModal({ db, setDb, onClose, hasPermission, showToast, ses
       ],
     }));
     if (persistedRows.some((item) => !item.persisted)) {
-      showToast({ type: 'warning', message: 'Lançamento salvo apenas localmente para algumas parcelas.' });
+      showToast({ type: 'warning', message: 'Não foi possível confirmar o lançamento agora.' });
     }
 
     onClose();

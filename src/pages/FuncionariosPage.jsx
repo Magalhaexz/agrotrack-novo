@@ -69,18 +69,23 @@ export default function FuncionariosPage({ db, setDb, onConfirmAction }) {
   async function salvarFuncionario(payload) {
     if (editando) {
       const persisted = await updateOperationalRecord('funcionarios', editando.id, payload, session);
+      if (!persisted.persisted) {
+        showToast({ type: 'warning', message: persisted.error || 'Não foi possível confirmar a alteração agora.' });
+        return;
+      }
       setDb((prev) => ({
         ...prev,
         funcionarios: prev.funcionarios.map((f) =>
           f.id === editando.id ? { ...f, ...(persisted.data || payload) } : f
         ),
       }));
-      if (!persisted.persisted) {
-        showToast({ type: 'warning', message: 'Funcionário atualizado apenas localmente.' });
-      }
       showToast({ type: 'success', message: 'Funcionário atualizado com sucesso!' });
     } else {
       const persisted = await createOperationalRecord('funcionarios', payload, session);
+      if (!persisted.persisted) {
+        showToast({ type: 'warning', message: persisted.error || 'Não foi possível confirmar o cadastro agora.' });
+        return;
+      }
       setDb((prev) => ({
         ...prev,
         funcionarios: [
@@ -92,9 +97,6 @@ export default function FuncionariosPage({ db, setDb, onConfirmAction }) {
           },
         ],
       }));
-      if (!persisted.persisted) {
-        showToast({ type: 'warning', message: 'Funcionário criado apenas localmente.' });
-      }
       showToast({ type: 'success', message: 'Funcionário adicionado com sucesso!' });
     }
     setOpenModal(false);
@@ -111,6 +113,10 @@ export default function FuncionariosPage({ db, setDb, onConfirmAction }) {
       : window.confirm(mensagemConfirmacao);
     if (!confirmado) return;
     const persisted = await updateOperationalRecord('funcionarios', funcionario.id, { status: novoStatus }, session);
+    if (!persisted.persisted) {
+      showToast({ type: 'warning', message: persisted.error || 'Não foi possível confirmar a alteração agora.' });
+      return;
+    }
     setDb((prev) => ({ ...prev, funcionarios: (prev.funcionarios || []).map((f) => (f.id === funcionario.id ? { ...f, ...(persisted.data || { status: novoStatus }) } : f)) }));
   }
 

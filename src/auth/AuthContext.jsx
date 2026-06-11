@@ -12,6 +12,7 @@ import {
   limparPersistenciaSessao,
   supabase,
 } from '../lib/supabase';
+import { clearOperationalSnapshotsLocal } from '../hooks/useOperationalData';
 import { obterPerfilDoUsuario, usuarioTemPermissao } from './perfis';
 
 const AuthContext = createContext(null);
@@ -94,6 +95,7 @@ export function AuthProvider({ children }) {
 
   const registrarLogoutLocal = useCallback(() => {
     authGenerationRef.current += 1;
+    clearOperationalSnapshotsLocal({ userId: activeUserIdRef.current || null });
     limparPersistenciaSessao();
     profileInFlightRef.current.clear();
     profileFailureAtRef.current.clear();

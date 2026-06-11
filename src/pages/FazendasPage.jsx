@@ -112,6 +112,10 @@ export default function FazendasPage({ db, setDb, onConfirmAction, session: sess
       };
       const targetId = cloudId || editando?.id || localId;
       const persisted = await updateOperationalRecord('fazendas', targetId, patch, session, { selector });
+      if (!persisted.persisted) {
+        showToast({ type: 'warning', message: persisted.error || 'Não foi possível confirmar a alteração agora.' });
+        return;
+      }
       const editIdentity = resolveFazendaIdentity(editando) || buildFazendaFallbackIdentity(editando);
       setDb((prev) => ({
         ...prev,
@@ -121,10 +125,7 @@ export default function FazendasPage({ db, setDb, onConfirmAction, session: sess
             : f
         ),
       }));
-      if (persisted.syncStatus === 'cloud_success') showToast({ type: 'success', message: 'Fazenda atualizada com sucesso.' });
-      if (persisted.syncStatus === 'pending_sync' || persisted.syncStatus === 'local_only') {
-        showToast({ type: 'warning', message: `Fazenda atualizada. ${import.meta.env.DEV ? `Motivo: ${persisted.error || persisted.code || 'unknown'}.` : 'Revise a conexão e tente novamente.'}` });
-      }
+      showToast({ type: 'success', message: 'Fazenda atualizada com sucesso.' });
     } else {
       const nomeNormalizado = String(payload?.nome ?? '').trim();
       if (!nomeNormalizado) {
@@ -150,6 +151,10 @@ export default function FazendasPage({ db, setDb, onConfirmAction, session: sess
         payloadKeys: Object.keys(createPayload || {}),
       });
       const persisted = await createOperationalRecord('fazendas', createPayload, session);
+      if (!persisted.persisted) {
+        showToast({ type: 'warning', message: persisted.error || 'Não foi possível confirmar o salvamento agora.' });
+        return;
+      }
       const incoming = persisted.data || { id: localId, ...createPayload };
       setDb((prev) => {
         const next = Array.isArray(prev?.fazendas) ? [...prev.fazendas] : [];
@@ -171,10 +176,7 @@ export default function FazendasPage({ db, setDb, onConfirmAction, session: sess
         safeMessage: persisted.error || 'Registro salvo com sucesso.',
         payloadKeys: Object.keys(createPayload || {}),
       });
-      if (persisted.syncStatus === 'cloud_success') showToast({ type: 'success', message: 'Registro salvo com sucesso.' });
-      if (persisted.syncStatus === 'pending_sync' || persisted.syncStatus === 'local_only') {
-        showToast({ type: 'warning', message: `Registro salvo. ${import.meta.env.DEV ? `Motivo: ${persisted.error || persisted.code || 'unknown'}.` : 'Revise a conexão e tente novamente.'}` });
-      }
+      showToast({ type: 'success', message: 'Registro salvo com sucesso.' });
     }
     setOpenModal(false);
     setEditando(null);
@@ -251,6 +253,10 @@ export default function FazendasPage({ db, setDb, onConfirmAction, session: sess
         estado: String(fazenda?.estado ?? ''),
       },
     });
+    if (!persisted.persisted) {
+      showToast({ type: 'warning', message: persisted.error || 'Não foi possível confirmar a exclusão agora.' });
+      return;
+    }
     const deletedIdentity = buildFazendaFallbackIdentity(fazenda);
     setDb((prev) => ({
       ...prev,
@@ -260,10 +266,7 @@ export default function FazendasPage({ db, setDb, onConfirmAction, session: sess
         return !(sameIdentity || sameFallback);
       }),
     }));
-    if (persisted.syncStatus === 'cloud_success') showToast({ type: 'success', message: 'Fazenda excluída com sucesso.' });
-    if (persisted.syncStatus === 'pending_sync' || persisted.syncStatus === 'local_only') {
-      showToast({ type: 'warning', message: 'Exclusão registrada com sucesso.' });
-    }
+    showToast({ type: 'success', message: 'Fazenda excluída com sucesso.' });
   }
 
   function traduzirStatusEtapa(step) {
@@ -527,7 +530,7 @@ export default function FazendasPage({ db, setDb, onConfirmAction, session: sess
     });
 
     try {
-      showToast({ type: 'info', message: 'Sincronização iniciada. Aguarde...' });
+      showToast({ type: 'info', message: 'Estamos atualizando seus dados. Aguarde...' });
 
       let fazendasSync = null;
       let lotesSync = null;
@@ -715,5 +718,3 @@ export default function FazendasPage({ db, setDb, onConfirmAction, session: sess
     </div>
   );
 }
-
-

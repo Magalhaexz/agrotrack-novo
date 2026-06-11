@@ -5,6 +5,8 @@ import {
   createOperationalRecord,
   deleteOwnerScopedCollection,
   getPendingSyncQueueSnapshot,
+  canUseLocalRecoveryForWrite,
+  getFriendlySaveFailureMessage,
 } from '../src/services/operationalPersistence.js';
 import { supabase } from '../src/lib/supabase.js';
 import { makeSession } from './fixtures.js';
@@ -62,9 +64,25 @@ test('createOperationalRecord com erro do supabase retorna falha estruturada', a
     }),
   });
 
-  const result = await createOperationalRecord('tarefas', { titulo: 'x' }, makeSession());
+  const result = await createOperationalRecord('tarefas', { titulo: 'x' }, makeSession(), { forceStrictWrite: true });
   assert.equal(result.persisted, false);
-  assert.match(String(result.error), /erro remoto/i);
+  assert.match(String(result.error), /Não foi possível confirmar o salvamento agora/i);
+  assert.equal(getPendingSyncQueueSnapshot(makeSession()).pendingCount, 0);
+});
+
+test('authenticated strict write does not fall back to local recovery', async () => {
+  supabase.from = () => ({
+    insert: () => ({
+      select: () => ({
+        single: async () => ({ data: null, error: { message: 'network fail' } }),
+      }),
+    }),
+  });
+
+  const result = await createOperationalRecord('tarefas', { titulo: 'x' }, makeSession(), { forceStrictWrite: true });
+  assert.equal(result.persisted, false);
+  assert.equal(result.syncStatus, 'error');
+  assert.equal(getPendingSyncQueueSnapshot(makeSession()).pendingCount, 0);
 });
 
 test('deleteOwnerScopedCollection aplica filtro owner_user_id da sessao', async () => {
@@ -126,6 +144,17 @@ test('pending sync snapshot is user-scoped', () => {
   assert.equal(userOne.queue[0].ownerUserId, 'user-1');
   assert.equal(userTwo.pendingCount, 1);
   assert.equal(userTwo.queue[0].ownerUserId, 'user-2');
+});
+
+test('friendly persistence error messages stay neutral in Portuguese', () => {
+  const message = getFriendlySaveFailureMessage({ readinessCode: 'SESSION_MISSING' });
+  assert.match(message, /Não foi possível confirmar o salvamento agora/i);
+  assert.doesNotMatch(message.toLowerCase(), /sync|sync|cloud|fallback|schema|supabase|postgrest|fila|pendente|modo local/);
+});
+
+test('strict write policy can be forced for production-like checks', () => {
+  assert.equal(canUseLocalRecoveryForWrite(makeSession(), { forceStrictWrite: true }), false);
+  assert.equal(canUseLocalRecoveryForWrite(null, { forceStrictWrite: true }), false);
 });
 
 test('repeated failed create does not duplicate pending queue for same user', async () => {

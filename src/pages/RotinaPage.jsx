@@ -144,7 +144,7 @@ export default function RotinaPage({ db, setDb, onConfirmAction }) {
       rotinas: prev.rotinas.filter((r) => r.id !== id),
     }));
     if (!persisted.persisted) {
-      showToast({ type: 'warning', message: 'Exclusão salva apenas localmente.' });
+      showToast({ type: 'warning', message: 'Não foi possível confirmar a exclusão agora.' });
     }
     showToast({ type: 'success', message: 'Tarefa excluída com sucesso!' });
   }, [onConfirmAction, session, setDb, showToast]);
@@ -159,7 +159,7 @@ export default function RotinaPage({ db, setDb, onConfirmAction }) {
         ),
       }));
       if (!persisted.persisted) {
-        showToast({ type: 'warning', message: 'Tarefa atualizada apenas localmente.' });
+        showToast({ type: 'warning', message: 'Não foi possível confirmar a alteração agora.' });
       }
       showToast({ type: 'success', message: 'Tarefa atualizada com sucesso!' });
     } else {
@@ -176,7 +176,7 @@ export default function RotinaPage({ db, setDb, onConfirmAction }) {
         ],
       }));
       if (!persisted.persisted) {
-        showToast({ type: 'warning', message: 'Tarefa criada apenas localmente.' });
+        showToast({ type: 'warning', message: 'Não foi possível confirmar o cadastro agora.' });
       }
       showToast({ type: 'success', message: 'Tarefa criada com sucesso!' });
     }
@@ -207,7 +207,7 @@ export default function RotinaPage({ db, setDb, onConfirmAction }) {
         }),
       }));
       if (!persisted.persisted) {
-        showToast({ type: 'warning', message: 'Atualização salva apenas localmente.' });
+        showToast({ type: 'warning', message: 'Não foi possível confirmar a alteração agora.' });
       }
       showToast({ type: 'success', message: `Tarefa ${concluir ? 'concluída' : 'reaberta'} com sucesso!` });
     } else {
@@ -220,7 +220,7 @@ export default function RotinaPage({ db, setDb, onConfirmAction }) {
         ),
       }));
       if (!persisted.persisted) {
-        showToast({ type: 'warning', message: 'Atualização salva apenas localmente.' });
+        showToast({ type: 'warning', message: 'Não foi possível confirmar a alteração agora.' });
       }
       showToast({ type: 'success', message: `Tarefa ${concluir ? 'concluída' : 'reaberta'} com sucesso!` });
     }

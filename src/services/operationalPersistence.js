@@ -8,6 +8,10 @@ const tableCapabilityCache = new Map();
 const PENDING_SYNC_QUEUE_KEY = 'herdon-pending-sync-queue';
 const AUTO_RETRY_EVENT = 'herdon-pending-sync-updated';
 const BLOCKED_SCHEMA_ERROR_CODE = 'blocked_schema_error';
+const FRIENDLY_SAVE_RETRY_MESSAGE = 'Não foi possível confirmar o salvamento agora. Verifique sua conexão e tente novamente.';
+const FRIENDLY_SAVE_RETRY_LATER_MESSAGE = 'Não foi possível confirmar o salvamento agora. Tente novamente em alguns instantes.';
+const FRIENDLY_SESSION_RETRY_MESSAGE = 'Não foi possível confirmar o salvamento agora. Entre novamente e tente outra vez.';
+const FRIENDLY_PERMISSION_MESSAGE = 'Você não tem permissão para concluir esta ação.';
 
 function getSessionUserId(session) {
   return session?.user?.id || null;
@@ -64,6 +68,36 @@ function getSafeErrorDetails(error) {
   const details = error?.details ? String(error.details) : null;
   const hint = error?.hint ? String(error.hint) : null;
   return { safeMessage, details, hint };
+}
+
+export function canUseLocalRecoveryForWrite(session, options = {}) {
+  if (options?.forceStrictWrite === true) return false;
+  if (options?.allowLocalRecovery === true) return true;
+  if (IS_DEV || IS_TEST) return true;
+  return !getSessionUserId(session);
+}
+
+export function getFriendlySaveFailureMessage({
+  readinessCode = null,
+  error = null,
+  defaultMessage = FRIENDLY_SAVE_RETRY_MESSAGE,
+} = {}) {
+  const status = getHttpStatus(error);
+  const code = String(readinessCode || error?.code || '').toUpperCase();
+  const message = String(getErrorMessage(error) || '').toLowerCase();
+  if (code === 'SESSION_MISSING' || code === 'SESSION_STALE' || status === 401 || message.includes('session')) {
+    return FRIENDLY_SESSION_RETRY_MESSAGE;
+  }
+  if (code === '42501' || message.includes('permission denied') || message.includes('row-level security')) {
+    return FRIENDLY_PERMISSION_MESSAGE;
+  }
+  if (status === 400 || code === 'PGRST204' || code === '42703' || code === '42P01' || message.includes('schema') || message.includes('column') || message.includes('relation')) {
+    return FRIENDLY_SAVE_RETRY_LATER_MESSAGE;
+  }
+  if (isNetworkError(error)) {
+    return FRIENDLY_SAVE_RETRY_MESSAGE;
+  }
+  return defaultMessage;
 }
 
 function isSchemaCompatibilityError(error) {
@@ -232,25 +266,25 @@ function logModuleSyncEvent({
 
 function getSchemaMissingMessageByTable(table) {
   if (table === 'lotes') {
-    return 'Tabela de lotes n\u00E3o encontrada na nuvem. Verifique a estrutura do Supabase.';
+    return FRIENDLY_SAVE_RETRY_LATER_MESSAGE;
   }
   if (table === 'funcionarios') {
-    return 'Tabela de funcion\u00E1rios n\u00E3o encontrada na nuvem. Verifique a estrutura do Supabase.';
+    return FRIENDLY_SAVE_RETRY_LATER_MESSAGE;
   }
-  return 'Estrutura da base nao compativel com o app. Use o modo local e valide a configuracao.';
+  return FRIENDLY_SAVE_RETRY_LATER_MESSAGE;
 }
 
 function classifyOperationalError(error, fallbackMessage, table = null) {
   const message = String(getErrorMessage(error) || '').toLowerCase();
   const code = String(error?.code || '').toUpperCase();
   if (isNetworkError(error)) {
-    return 'N\u00E3o foi poss\u00EDvel conectar \u00E0 nuvem. Verifique sua conex\u00E3o e tente novamente.';
+    return FRIENDLY_SAVE_RETRY_MESSAGE;
   }
   if (code === '42501' || message.includes('row-level security') || message.includes('permission denied')) {
-    return 'Permiss\u00E3o insuficiente para sincronizar este registro.';
+    return FRIENDLY_PERMISSION_MESSAGE;
   }
   if (code === 'CONFIG_ERROR' || message.includes('missing_rest_config_or_token')) {
-    return 'Configura\u00E7\u00E3o da nuvem incompleta. Verifique as vari\u00E1veis do Supabase.';
+    return FRIENDLY_SAVE_RETRY_LATER_MESSAGE;
   }
   if (code === 'PGRST204' || code === '42703' || code === '42P01' || message.includes('schema') || message.includes('column') || message.includes('relation')) {
     return getSchemaMissingMessageByTable(table);
@@ -414,7 +448,7 @@ function enqueuePendingSync(item = {}) {
     lastAttemptAt: item.lastAttemptAt || null,
     retryCount: Number(item.retryCount || 0),
     code: item.code || 'unknown',
-    message: item.message || 'Registro salvo localmente. SincronizaÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â§ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â£o pendente.',
+    message: item.message || FRIENDLY_SAVE_RETRY_LATER_MESSAGE,
     ownerUserId: normalizedOwner,
   };
   const fingerprint = buildQueueFingerprint(nextItem);
@@ -511,7 +545,7 @@ export async function ensureSupabaseRequestReadiness(session, context = {}) {
     return {
       ok: false,
       code: 'SUPABASE_ENV_MISSING',
-      message: envStatus.message || 'ConfiguraÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â§ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â£o da nuvem ausente neste ambiente.',
+      message: FRIENDLY_SAVE_RETRY_LATER_MESSAGE,
     };
   }
 
@@ -526,7 +560,7 @@ export async function ensureSupabaseRequestReadiness(session, context = {}) {
     return {
       ok: false,
       code: 'SESSION_MISSING',
-      message: 'SessÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â£o expirada. Entre novamente para sincronizar com a nuvem.',
+      message: FRIENDLY_SESSION_RETRY_MESSAGE,
     };
   }
 
@@ -544,7 +578,7 @@ export async function ensureSupabaseRequestReadiness(session, context = {}) {
           tokenExpired: Boolean(validated?.authState?.tokenExpired),
           refreshAttempted: Boolean(validated?.authState?.refreshAttempted),
           refreshSucceeded: Boolean(validated?.authState?.refreshSucceeded),
-          safeMessage: validated?.safeMessage || 'SessÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â£o expirada. Entre novamente para sincronizar com a nuvem.',
+          safeMessage: validated?.safeMessage || FRIENDLY_SESSION_RETRY_MESSAGE,
         });
       }
       logOperationalSync({
@@ -557,7 +591,7 @@ export async function ensureSupabaseRequestReadiness(session, context = {}) {
       return {
         ok: false,
         code: validated?.code || 'SESSION_STALE',
-        message: validated?.safeMessage || 'SessÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â£o expirada. Entre novamente para sincronizar com a nuvem.',
+        message: validated?.safeMessage || FRIENDLY_SESSION_RETRY_MESSAGE,
       };
     }
     return {
@@ -577,7 +611,7 @@ export async function ensureSupabaseRequestReadiness(session, context = {}) {
     return {
       ok: false,
       code: 'SESSION_READ_ERROR',
-      message: classifyOperationalError(error, 'Falha ao validar sessÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â£o com a nuvem. Seus dados locais continuam disponÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â­veis.', context?.table || null),
+      message: classifyOperationalError(error, FRIENDLY_SAVE_RETRY_MESSAGE, context?.table || null),
     };
   }
 }
@@ -1344,18 +1378,26 @@ export async function createOperationalRecord(table, record, session, options = 
     hasUserId: Boolean(getSessionUserId(session)),
     envReady: Boolean(getSupabaseEnvStatus()?.configured),
   };
+  const allowLocalRecovery = canUseLocalRecoveryForWrite(session, options);
   const readiness = await ensureSupabaseRequestReadiness(session, { action: 'create', table });
   if (!readiness.ok) {
-    const isFazendas = String(table || '').toLowerCase() === 'fazendas';
-    const fallbackMessage = (isFazendas && readiness.code === 'SESSION_MISSING')
-      ? 'SessÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â£o da nuvem nÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â£o encontrada. FaÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â§a login novamente para salvar na nuvem.'
-      : 'Registro salvo localmente. Sincronizacao pendente.';
-    const fallback = buildFallback(
-      fallbackMessage,
-      sanitizeRecord(record),
-      readiness.code || 'CLOUD_NOT_READY',
-      'pending_sync'
-    );
+    const fallbackMessage = getFriendlySaveFailureMessage({
+      readinessCode: readiness.code,
+    });
+    const fallback = allowLocalRecovery
+      ? buildFallback(
+          fallbackMessage,
+          sanitizeRecord(record),
+          readiness.code || 'CLOUD_NOT_READY',
+          'pending_sync'
+        )
+      : {
+          persisted: false,
+          data: null,
+          error: fallbackMessage,
+          syncStatus: 'error',
+          code: readiness.code || 'CLOUD_NOT_READY',
+        };
     emitCloudSaveState({
       table,
       action: 'create',
@@ -1365,7 +1407,7 @@ export async function createOperationalRecord(table, record, session, options = 
       session,
       cloudConfigured: readiness.code !== 'SUPABASE_ENV_MISSING',
     });
-    if (!options?.skipQueueOnFailure) {
+    if (allowLocalRecovery && !options?.skipQueueOnFailure) {
       enqueuePendingSync({
         table,
         action: 'create',
@@ -1392,12 +1434,21 @@ export async function createOperationalRecord(table, record, session, options = 
     if (String(table || '').toLowerCase() === 'fazendas') {
       const validation = validateFazendaCreatePayload(payload, session);
       if (!validation.ok) {
-        const fallback = buildFallback(
-          validation.safeMessage || 'Registro salvo localmente. Sincronizacao pendente.',
-          sanitizeRecord(record),
-          validation.code || 'PAYLOAD_INVALID',
-          'pending_sync'
-        );
+        const fallbackMessage = validation.safeMessage || getFriendlySaveFailureMessage({ readinessCode: validation.code });
+        const fallback = allowLocalRecovery
+          ? buildFallback(
+              fallbackMessage,
+              sanitizeRecord(record),
+              validation.code || 'PAYLOAD_INVALID',
+              'pending_sync'
+            )
+          : {
+              persisted: false,
+              data: null,
+              error: fallbackMessage,
+              syncStatus: 'error',
+              code: validation.code || 'PAYLOAD_INVALID',
+            };
         emitCloudSaveState({
           table,
           action: 'create',
@@ -1407,7 +1458,7 @@ export async function createOperationalRecord(table, record, session, options = 
           session,
           cloudConfigured: validation.code !== 'SESSION_MISSING',
         });
-        if (!options?.skipQueueOnFailure) {
+        if (allowLocalRecovery && !options?.skipQueueOnFailure) {
           enqueuePendingSync({
             table,
             action: 'create',
@@ -1429,13 +1480,22 @@ export async function createOperationalRecord(table, record, session, options = 
       }
     }
     if (!payload || typeof payload !== 'object') {
-      const fallback = buildFallback(
-        'Registro salvo localmente. SincronizaÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â§ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â£o pendente.',
-        sanitizeRecord(record),
-        'PAYLOAD_INCOMPATIBLE',
-        'pending_sync'
-      );
-        emitCloudSaveState({
+      const fallbackMessage = FRIENDLY_SAVE_RETRY_LATER_MESSAGE;
+      const fallback = allowLocalRecovery
+        ? buildFallback(
+            fallbackMessage,
+            sanitizeRecord(record),
+            'PAYLOAD_INCOMPATIBLE',
+            'pending_sync'
+          )
+        : {
+            persisted: false,
+            data: null,
+            error: fallbackMessage,
+            syncStatus: 'error',
+            code: 'PAYLOAD_INCOMPATIBLE',
+          };
+      emitCloudSaveState({
         table,
         action: 'create',
         syncStatus: fallback.syncStatus,
@@ -1443,27 +1503,27 @@ export async function createOperationalRecord(table, record, session, options = 
         message: fallback.error,
         session,
         cloudConfigured: true,
+      });
+      if (allowLocalRecovery && !options?.skipQueueOnFailure) {
+        enqueuePendingSync({
+          table,
+          action: 'create',
+          localId: sanitizeRecord(record)?.id ?? null,
+          cloudId: sanitizeRecord(record)?.cloud_id ?? null,
+          payload: sanitizeRecord(record),
+          code: 'schema_error',
+          message: fallback.error,
+          ownerUserId: userId,
         });
-        if (!options?.skipQueueOnFailure) {
-          enqueuePendingSync({
-            table,
-            action: 'create',
-            localId: sanitizeRecord(record)?.id ?? null,
-            cloudId: sanitizeRecord(record)?.cloud_id ?? null,
-            payload: sanitizeRecord(record),
-            code: 'schema_error',
-            message: fallback.error,
-            ownerUserId: userId,
-          });
-        }
-        logCloudRuntime({
-          ...runtimeContext,
-          cloudStatus: 'fallback',
-          syncStatus: fallback.syncStatus,
-          code: 'PAYLOAD_INCOMPATIBLE',
-        }, 'warn');
-        return fallback;
       }
+      logCloudRuntime({
+        ...runtimeContext,
+        cloudStatus: 'fallback',
+        syncStatus: fallback.syncStatus,
+        code: 'PAYLOAD_INCOMPATIBLE',
+      }, 'warn');
+      return fallback;
+    }
     if (String(table || '').toLowerCase() === 'fazendas') {
       const existing = await findExistingFazendaRecord(payload, userId);
       if (existing?.error) throw existing.error;
@@ -1564,16 +1624,22 @@ export async function createOperationalRecord(table, record, session, options = 
       });
     }
     const fallbackMessage = schemaIncompatible
-      ? 'Estrutura da nuvem incompatÃƒÆ’Ã‚Â­vel com este registro. Registro mantido localmente.'
-      : ((IS_TEST && (safe.safeMessage || getErrorMessage(error)))
-          ? (safe.safeMessage || getErrorMessage(error))
-          : 'Registro salvo localmente. SincronizaÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â§ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â£o pendente.');
-    const fallback = buildFallback(
-      fallbackMessage,
-      sanitizeRecord(record),
-      classifiedCode,
-      'pending_sync'
-    );
+      ? FRIENDLY_SAVE_RETRY_LATER_MESSAGE
+      : getFriendlySaveFailureMessage({ error, defaultMessage: FRIENDLY_SAVE_RETRY_MESSAGE });
+    const fallback = allowLocalRecovery
+      ? buildFallback(
+          fallbackMessage,
+          sanitizeRecord(record),
+          classifiedCode,
+          'pending_sync'
+        )
+      : {
+          persisted: false,
+          data: null,
+          error: fallbackMessage,
+          syncStatus: 'error',
+          code: classifiedCode,
+        };
     emitCloudSaveState({
       table,
       action: 'create',
@@ -1583,7 +1649,7 @@ export async function createOperationalRecord(table, record, session, options = 
       session,
       cloudConfigured: true,
     });
-    if (!options?.skipQueueOnFailure) {
+    if (allowLocalRecovery && !options?.skipQueueOnFailure) {
       enqueuePendingSync({
         table,
         action: 'create',
@@ -1619,19 +1685,19 @@ function validateFazendaCreatePayload(payload = {}, session) {
 
   if (!hasUserId || !hasOwnerUserId) {
     code = 'SESSION_MISSING';
-    safeMessage = 'SessÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â£o da nuvem nÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â£o encontrada. FaÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â§a login novamente para salvar na nuvem.';
+    safeMessage = FRIENDLY_SESSION_RETRY_MESSAGE;
   } else if (!hasNome) {
     code = 'NOME_REQUIRED';
     safeMessage = 'Informe o nome da fazenda.';
   } else if (Object.prototype.hasOwnProperty.call(payload, 'id')) {
     code = 'INVALID_PAYLOAD_ID';
-    safeMessage = 'Falha de validaÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â§ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â£o do cadastro da fazenda.';
+    safeMessage = FRIENDLY_SAVE_RETRY_LATER_MESSAGE;
   } else if (hasCloudIdKey && !normalizeCloudUuid(payload?.cloud_id)) {
     code = 'INVALID_CLOUD_ID';
-    safeMessage = 'Falha de validaÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â§ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â£o do cadastro da fazenda.';
+    safeMessage = FRIENDLY_SAVE_RETRY_LATER_MESSAGE;
   } else if (!isObject(payload?.metadata)) {
     code = 'INVALID_METADATA';
-    safeMessage = 'Falha de validaÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â§ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â£o do cadastro da fazenda.';
+    safeMessage = FRIENDLY_SAVE_RETRY_LATER_MESSAGE;
   }
 
   if (IS_DEV) {
@@ -1667,14 +1733,24 @@ export async function updateOperationalRecord(table, id, patch, session, options
     hasUserId: Boolean(getSessionUserId(session)),
     envReady: Boolean(getSupabaseEnvStatus()?.configured),
   };
+  const allowLocalRecovery = canUseLocalRecoveryForWrite(session, options);
   const readiness = await ensureSupabaseRequestReadiness(session, { action: 'update', table });
   if (!readiness.ok) {
-    const fallback = buildFallback(
-      'Registro salvo localmente. Sincronizacao pendente.',
-      sanitizeRecord(patch),
-      readiness.code || 'CLOUD_NOT_READY',
-      'pending_sync'
-    );
+    const fallbackMessage = getFriendlySaveFailureMessage({ readinessCode: readiness.code });
+    const fallback = allowLocalRecovery
+      ? buildFallback(
+          fallbackMessage,
+          sanitizeRecord(patch),
+          readiness.code || 'CLOUD_NOT_READY',
+          'pending_sync'
+        )
+      : {
+          persisted: false,
+          data: null,
+          error: fallbackMessage,
+          syncStatus: 'error',
+          code: readiness.code || 'CLOUD_NOT_READY',
+        };
     emitCloudSaveState({
       table,
       action: 'update',
@@ -1684,7 +1760,7 @@ export async function updateOperationalRecord(table, id, patch, session, options
       session,
       cloudConfigured: readiness.code !== 'SUPABASE_ENV_MISSING',
     });
-    if (!options?.skipQueueOnFailure) {
+    if (allowLocalRecovery && !options?.skipQueueOnFailure) {
       enqueuePendingSync({
         table,
         action: 'update',
@@ -1851,14 +1927,23 @@ export async function updateOperationalRecord(table, id, patch, session, options
         removedKeys: [],
       });
     }
-    const fallback = buildFallback(
-      schemaIncompatible
-        ? 'Estrutura da nuvem incompatÃ­vel com este registro. Registro mantido localmente.'
-        : 'Registro salvo localmente. SincronizaÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â§ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â£o pendente.',
-      sanitizeRecord(patch),
-      classifiedCode,
-      'pending_sync'
-    );
+    const fallbackMessage = schemaIncompatible
+      ? FRIENDLY_SAVE_RETRY_LATER_MESSAGE
+      : getFriendlySaveFailureMessage({ error, defaultMessage: FRIENDLY_SAVE_RETRY_MESSAGE });
+    const fallback = allowLocalRecovery
+      ? buildFallback(
+          fallbackMessage,
+          sanitizeRecord(patch),
+          classifiedCode,
+          'pending_sync'
+        )
+      : {
+          persisted: false,
+          data: null,
+          error: fallbackMessage,
+          syncStatus: 'error',
+          code: classifiedCode,
+        };
     emitCloudSaveState({
       table,
       action: 'update',
@@ -1868,7 +1953,7 @@ export async function updateOperationalRecord(table, id, patch, session, options
       session,
       cloudConfigured: true,
     });
-    if (!options?.skipQueueOnFailure) {
+    if (allowLocalRecovery && !options?.skipQueueOnFailure) {
       enqueuePendingSync({
         table,
         action: 'update',
@@ -1897,14 +1982,24 @@ export async function deleteOperationalRecord(table, id, session, options = {}) 
     hasUserId: Boolean(getSessionUserId(session)),
     envReady: Boolean(getSupabaseEnvStatus()?.configured),
   };
+  const allowLocalRecovery = canUseLocalRecoveryForWrite(session, options);
   const readiness = await ensureSupabaseRequestReadiness(session, { action: 'delete', table });
   if (!readiness.ok) {
-    const fallback = buildFallback(
-      'Registro salvo localmente. Sincronizacao pendente.',
-      null,
-      readiness.code || 'CLOUD_NOT_READY',
-      'pending_sync'
-    );
+    const fallbackMessage = getFriendlySaveFailureMessage({ readinessCode: readiness.code });
+    const fallback = allowLocalRecovery
+      ? buildFallback(
+          fallbackMessage,
+          null,
+          readiness.code || 'CLOUD_NOT_READY',
+          'pending_sync'
+        )
+      : {
+          persisted: false,
+          data: null,
+          error: fallbackMessage,
+          syncStatus: 'error',
+          code: readiness.code || 'CLOUD_NOT_READY',
+        };
     emitCloudSaveState({
       table,
       action: 'delete',
@@ -1914,7 +2009,7 @@ export async function deleteOperationalRecord(table, id, session, options = {}) 
       session,
       cloudConfigured: readiness.code !== 'SUPABASE_ENV_MISSING',
     });
-    if (!options?.skipQueueOnFailure) {
+    if (allowLocalRecovery && !options?.skipQueueOnFailure) {
       const pendingPayload = isObject(options?.pendingPayload)
         ? options.pendingPayload
         : { id, selector: options?.selector || null };
@@ -2033,12 +2128,21 @@ export async function deleteOperationalRecord(table, id, session, options = {}) 
       safeDetails: safe.details,
       safeHint: safe.hint,
     }, 'warn');
-    const fallback = buildFallback(
-      'Registro salvo localmente. SincronizaÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â§ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â£o pendente.',
-      null,
-      classifiedCode,
-      'pending_sync'
-    );
+    const fallbackMessage = getFriendlySaveFailureMessage({ error, defaultMessage: FRIENDLY_SAVE_RETRY_MESSAGE });
+    const fallback = allowLocalRecovery
+      ? buildFallback(
+          fallbackMessage,
+          null,
+          classifiedCode,
+          'pending_sync'
+        )
+      : {
+          persisted: false,
+          data: null,
+          error: fallbackMessage,
+          syncStatus: 'error',
+          code: classifiedCode,
+        };
     emitCloudSaveState({
       table,
       action: 'delete',
@@ -2048,7 +2152,7 @@ export async function deleteOperationalRecord(table, id, session, options = {}) 
       session,
       cloudConfigured: true,
     });
-    if (!options?.skipQueueOnFailure) {
+    if (allowLocalRecovery && !options?.skipQueueOnFailure) {
       const pendingPayload = isObject(options?.pendingPayload)
         ? options.pendingPayload
         : { id, selector: options?.selector || null };
@@ -2117,7 +2221,7 @@ export async function processPendingSyncQueue(session, options = {}) {
         ...current,
         localId,
         code: BLOCKED_SCHEMA_ERROR_CODE,
-        message: 'PendÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Âªncia bloqueada por incompatibilidade de dados.',
+        message: FRIENDLY_SAVE_RETRY_LATER_MESSAGE,
       };
       failed += 1;
       continue;
@@ -2140,10 +2244,10 @@ export async function processPendingSyncQueue(session, options = {}) {
     failed += 1;
     const nextRetryCount = retryCount + 1;
     let nextCode = result?.code || current.code || 'unknown';
-    let nextMessage = result?.error || current.message || 'Registro salvo localmente. SincronizaÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â§ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â£o pendente.';
+    let nextMessage = result?.error || current.message || FRIENDLY_SAVE_RETRY_LATER_MESSAGE;
     if (nextRetryCount > 5 && String(nextCode) === 'schema_error') {
       nextCode = BLOCKED_SCHEMA_ERROR_CODE;
-      nextMessage = 'PendÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Âªncia bloqueada por incompatibilidade de dados.';
+      nextMessage = FRIENDLY_SAVE_RETRY_LATER_MESSAGE;
     }
     remaining[baseIndex] = {
       ...current,

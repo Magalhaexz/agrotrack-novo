@@ -326,6 +326,33 @@ export function loadOperationalSnapshotLocal({ userId, fazendaId = null } = {}) 
   }
 }
 
+export function clearOperationalSnapshotsLocal({ userId } = {}) {
+  const normalizedUserId = String(userId || '').trim();
+  if (!normalizedUserId) return false;
+  const prefix = `${OPERATIONAL_SNAPSHOT_KEY_PREFIX}:${normalizedUserId}`;
+  try {
+    const keys = [];
+    if (typeof localStorage.key === 'function' && Number.isFinite(Number(localStorage.length))) {
+      for (let index = 0; index < localStorage.length; index += 1) {
+        const key = localStorage.key(index);
+        if (key && key.startsWith(prefix)) {
+          keys.push(key);
+        }
+      }
+    } else {
+      Object.keys(localStorage).forEach((key) => {
+        if (String(key).startsWith(prefix)) {
+          keys.push(key);
+        }
+      });
+    }
+    keys.forEach((key) => localStorage.removeItem(key));
+    return keys.length > 0;
+  } catch {
+    return false;
+  }
+}
+
 export function createOperationalFallbackDb(initialDb) {
   return normalizeDb(initialDb || {});
 }
@@ -682,10 +709,10 @@ export function useOperationalData(session, options = {}) {
     }
 
     setDbState(localBaselineDb);
-      setDataSource('fallback');
-      setDataError(null);
-      setDataReady(true);
-      setManualSyncInFlight(false);
+    setDataSource('fallback');
+    setDataError(null);
+    setDataReady(false);
+    setManualSyncInFlight(false);
       logSyncGuard({
         stage: manualSyncRequested ? 'fallback_published' : 'auto_sync_bootstrap',
         action: syncTrigger,
@@ -751,27 +778,30 @@ export function useOperationalData(session, options = {}) {
         saveOperationalSnapshotLocal({ userId, db: normalizedSnapshot });
         if (snapshotResult?.circuitOpen) {
           setDataSource('offline_circuit_open');
-          setDataError(new Error('O carregamento dos dados ficou instável. O app continuará com os dados locais.'));
+          setDataError(new Error('Não foi possível confirmar o carregamento agora. Tente novamente em alguns instantes.'));
+          setDataReady(false);
           logSyncGuard({
             stage: 'sync_finished_circuit_open',
             action: syncTrigger,
             status: 'error',
             errorName: 'CIRCUIT_OPEN',
-            errorMessage: 'O carregamento dos dados ficou instável. O app continuará com os dados locais.',
+            errorMessage: 'Não foi possível confirmar o carregamento agora. Tente novamente em alguns instantes.',
           }, 'warn');
         } else if (snapshotResult?.hadFailures) {
           setDataSource('fallback_error');
-          setDataError(new Error('Houve falha no carregamento dos dados. O app seguirá com os dados locais.'));
+          setDataError(new Error('Não foi possível confirmar o carregamento agora. Verifique sua conexão e tente novamente.'));
+          setDataReady(false);
           logSyncGuard({
             stage: 'sync_finished_partial_failure',
             action: syncTrigger,
             status: 'error',
             errorName: 'PARTIAL_SYNC_FAILURE',
-            errorMessage: 'Houve falha no carregamento dos dados. O app seguirá com os dados locais.',
+            errorMessage: 'Não foi possível confirmar o carregamento agora. Verifique sua conexão e tente novamente.',
           }, 'warn');
         } else {
           setDataSource('supabase');
           setDataError(null);
+          setDataReady(true);
           setLastSyncAt(new Date().toISOString());
           logSyncGuard({
             stage: 'sync_finished_success',
@@ -793,8 +823,9 @@ export function useOperationalData(session, options = {}) {
         const isTimeout = errorName === 'TimeoutError' || rawMessage === 'snapshot_timeout';
         setDataSource(isTimeout ? 'fallback_timeout' : 'offline_circuit_open');
         setDataError(new Error(isTimeout
-          ? 'O carregamento demorou mais que o esperado. O app seguirá com os dados locais.'
-          : 'O carregamento ficou instável. Seus dados locais continuam disponíveis.'));
+          ? 'Não foi possível confirmar o carregamento agora. Tente novamente em alguns instantes.'
+          : 'Não foi possível confirmar o carregamento agora. Verifique sua conexão e tente novamente.'));
+        setDataReady(false);
         logSyncGuard({
           stage: 'sync_finished_exception',
           action: syncTrigger,

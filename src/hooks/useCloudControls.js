@@ -16,10 +16,10 @@ export function useCloudControls({ db, setDb, session, hasPermission, showToast,
     setDiagnosticandoNuvem(true);
     try {
       const result = await runMinimalCloudDiagnostic({ session, table: 'lotes', timeoutMs: 8000 });
-      showToast({ type: result?.ok ? 'success' : 'warning', message: result?.conclusionMessage || 'Não foi possível verificar o status. Verifique a configuração.' });
+      showToast({ type: result?.ok ? 'success' : 'warning', message: result?.conclusionMessage || 'Não foi possível confirmar o acesso agora. Tente novamente em alguns instantes.' });
       window.dispatchEvent(new CustomEvent('herdon-cloud-diagnostic-state', { detail: { verified: Boolean(result?.ok), message: result?.conclusionMessage || null, checkedAt: Date.now() } }));
     } catch {
-      showToast({ type: 'warning', message: 'Não foi possível verificar o status. Verifique a configuração.' });
+      showToast({ type: 'warning', message: 'Não foi possível confirmar o acesso agora. Tente novamente em alguns instantes.' });
     } finally {
       setDiagnosticandoNuvem(false);
     }
@@ -32,10 +32,10 @@ export function useCloudControls({ db, setDb, session, hasPermission, showToast,
     try {
       resetSupabaseAuthLocally();
       forceLocalSignOut?.();
-      showToast({ type: 'info', message: 'Sessão limpa. Entre novamente para continuar.' });
+      showToast({ type: 'info', message: 'Tudo pronto. Entre novamente para continuar.' });
     } catch {
       forceLocalSignOut?.();
-      showToast({ type: 'warning', message: 'Sessão limpa. Entre novamente para continuar.' });
+      showToast({ type: 'warning', message: 'Tudo pronto. Entre novamente para continuar.' });
     } finally { setReconectandoNuvem(false); }
   }
 
@@ -47,35 +47,35 @@ export function useCloudControls({ db, setDb, session, hasPermission, showToast,
     manualSyncRef.current = { inFlight: true, lastStartAt: now };
     if (!session?.user?.id) { showToast({ type: 'warning', message: 'Faça login para continuar.' }); manualSyncRef.current.inFlight = false; return; }
     const sessionValidation = await validateSupabaseSessionForCloud();
-    if (!sessionValidation?.ok) { showToast({ type: 'warning', message: 'Sessão expirada. Entre novamente.' }); manualSyncRef.current.inFlight = false; return; }
+    if (!sessionValidation?.ok) { showToast({ type: 'warning', message: 'Não foi possível confirmar o acesso agora. Entre novamente.' }); manualSyncRef.current.inFlight = false; return; }
 
     setSincronizandoNuvem(true);
-    loadingToastRef.current = showToast({ id: 'global-cloud-sync-loading', type: 'info', message: 'Atualizando...', persist: true });
+    loadingToastRef.current = showToast({ id: 'global-cloud-sync-loading', type: 'info', message: 'Atualizando seus dados...', persist: true });
     try {
       const sessionResult = await supabase.auth.getSession();
       const accessToken = sessionResult?.data?.session?.access_token || null;
       const tokenLooksJwt = typeof accessToken === 'string' && accessToken.split('.').length === 3;
-      if (!accessToken || !tokenLooksJwt) { showToast({ type: 'warning', message: 'Sessão inválida. Entre novamente.' }); return; }
+      if (!accessToken || !tokenLooksJwt) { showToast({ type: 'warning', message: 'Não foi possível confirmar o acesso agora. Entre novamente.' }); return; }
       const response = await fetch('/api/cloud-sync', { method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${accessToken}` }, body: JSON.stringify({ fazendas: db?.fazendas || [], lotes: db?.lotes || [] }) });
       const payload = await response.json().catch(() => null);
-      if (!response.ok || !payload) { showToast({ type: 'warning', message: 'Falha na atualização. Tente novamente.' }); return; }
+      if (!response.ok || !payload) { showToast({ type: 'warning', message: 'Não foi possível confirmar a atualização agora. Tente novamente em alguns instantes.' }); return; }
       const fazendasData = Array.isArray(payload?.fazendas?.data) ? payload.fazendas.data : null;
       const lotesData = Array.isArray(payload?.lotes?.data) ? payload.lotes.data : null;
       if (fazendasData || lotesData) setDb((prev) => ({ ...prev, fazendas: fazendasData || prev.fazendas, lotes: lotesData || prev.lotes }));
-      if (payload?.fazendas?.status === 'success' && payload?.lotes?.status === 'success') showToast({ type: 'success', message: 'Fazendas e lotes atualizados com sucesso.' });
-      else showToast({ type: 'warning', message: 'Falha na atualização. Tente novamente.' });
+      if (payload?.fazendas?.status === 'success' && payload?.lotes?.status === 'success') showToast({ type: 'success', message: 'Seus dados foram atualizados.' });
+      else showToast({ type: 'warning', message: 'Não foi possível confirmar a atualização agora. Tente novamente em alguns instantes.' });
       const queueResult = await processPendingSyncQueue(session, { maxItems: 40, manual: true });
       if ((queueResult?.pendingCount || 0) === 0) {
-        showToast({ type: 'success', message: 'Pendências atualizadas com sucesso.' });
+        showToast({ type: 'success', message: 'Pendências atualizadas.' });
       } else {
         const firstError = queueResult?.firstError;
         const safeCode = firstError?.code ? String(firstError.code) : null;
         const safeMessage = firstError?.message ? String(firstError.message) : null;
         const safeError = safeCode || safeMessage ? ` | ${safeCode || 'erro'}: ${safeMessage || 'pendência restante'}` : '';
-        showToast({ type: 'info', message: `Atualização manual concluída: ${queueResult?.synced || 0} atualizadas, ${queueResult?.pendingCount || 0} pendentes${safeError}` });
+        showToast({ type: 'info', message: `Atualização concluída: ${queueResult?.synced || 0} itens revisados, ${queueResult?.pendingCount || 0} ainda precisam de atenção${safeError}` });
       }
     } catch {
-      showToast({ type: 'warning', message: 'Não foi possível atualizar fazendas e lotes. Seus dados locais continuam disponíveis.' });
+      showToast({ type: 'warning', message: 'Não foi possível confirmar a atualização agora. Tente novamente em alguns instantes.' });
     } finally {
       manualSyncRef.current.inFlight = false;
       if (loadingToastRef.current) dismissToast(loadingToastRef.current);

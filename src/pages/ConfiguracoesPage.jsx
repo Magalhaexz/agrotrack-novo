@@ -96,7 +96,7 @@ export default function ConfiguracoesPage({ db, setDb, onConfirmAction }) {
 
   function mensagemErroSegura(error, fallbackMessage) {
     if ([400, 406].includes(Number(error?.status)) || ['400', '406'].includes(String(error?.code || ''))) {
-      return 'Não foi possível atualizar o convite. Atualize a lista e tente novamente.';
+      return 'Não foi possível confirmar a ação agora. Atualize a lista e tente novamente.';
     }
     const message = String(error?.message || '').toLowerCase();
 
@@ -140,7 +140,7 @@ export default function ConfiguracoesPage({ db, setDb, onConfirmAction }) {
       const erro = profilesResponse.error || invitesResponse.error;
 
       if (!isAccessModuleUnavailable(erro)) {
-        showToast({ type: 'error', message: erro.message || 'Nao foi possivel carregar usuarios e convites.' });
+        showToast({ type: 'error', message: erro.message || 'Não foi possível carregar usuários e convites agora.' });
       }
 
       setAccessModuleReady(false);
@@ -176,7 +176,7 @@ export default function ConfiguracoesPage({ db, setDb, onConfirmAction }) {
       console.debug('[HERDON_INVITES_DEBUG]', { action: 'cancel', inviteId: invite.id, hasData: Boolean(data), error: error?.message || null });
     }
     if (error) {
-      showToast({ type: 'error', message: mensagemErroSegura(error, 'Nao foi possivel cancelar o convite.') });
+      showToast({ type: 'error', message: mensagemErroSegura(error, 'Não foi possível cancelar o convite agora.') });
       return;
     }
     setInvitesRows((prev) => prev.filter((item) => item.id !== invite.id));
@@ -207,7 +207,7 @@ export default function ConfiguracoesPage({ db, setDb, onConfirmAction }) {
       }
     }
     if (removeError) {
-      showToast({ type: 'error', message: mensagemErroSegura(removeError, 'Nao foi possivel remover o convite.') });
+      showToast({ type: 'error', message: mensagemErroSegura(removeError, 'Não foi possível remover o convite agora.') });
       return;
     }
     setInvitesRows((prev) => prev.filter((item) => item.id !== invite.id));
@@ -239,6 +239,10 @@ export default function ConfiguracoesPage({ db, setDb, onConfirmAction }) {
       geral: geralPayload,
       notificacoes: db?.configuracoes?.notificacoes || {},
     }, user ? { user } : null);
+    if (!persisted.persisted) {
+      showToast({ type: 'warning', message: 'Não foi possível confirmar as alterações agora.' });
+      return;
+    }
     setDb((prev) => ({
       ...prev,
       configuracoes: {
@@ -247,9 +251,6 @@ export default function ConfiguracoesPage({ db, setDb, onConfirmAction }) {
         geral: geralPayload,
       },
     }));
-    if (!persisted.persisted) {
-      showToast({ type: 'warning', message: 'Configurações gerais salvas apenas localmente.' });
-    }
     registrarEventoAuditoria({
       acao: 'configuracoes_gerais_salvas',
       entidade: 'configuracoes',
@@ -258,7 +259,9 @@ export default function ConfiguracoesPage({ db, setDb, onConfirmAction }) {
       detalhes: { persistido: persisted.persisted },
     });
 
-    showToast({ type: 'success', message: 'Configurações gerais salvas com sucesso.' });
+    if (persisted.persisted) {
+      showToast({ type: 'success', message: 'Configurações gerais salvas com sucesso.' });
+    }
   }
 
   async function salvarNotificacoes() {
@@ -278,6 +281,10 @@ export default function ConfiguracoesPage({ db, setDb, onConfirmAction }) {
       geral: db?.configuracoes?.geral || {},
       notificacoes: notificacoesPayload,
     }, user ? { user } : null);
+    if (!persisted.persisted) {
+      showToast({ type: 'warning', message: 'Não foi possível confirmar as alterações agora.' });
+      return;
+    }
     setDb((prev) => ({
       ...prev,
       configuracoes: {
@@ -286,9 +293,6 @@ export default function ConfiguracoesPage({ db, setDb, onConfirmAction }) {
         notificacoes: notificacoesPayload,
       },
     }));
-    if (!persisted.persisted) {
-      showToast({ type: 'warning', message: 'Notificações salvas apenas localmente.' });
-    }
     registrarEventoAuditoria({
       acao: 'configuracoes_notificacoes_salvas',
       entidade: 'configuracoes',
@@ -297,7 +301,9 @@ export default function ConfiguracoesPage({ db, setDb, onConfirmAction }) {
       detalhes: { persistido: persisted.persisted },
     });
 
-    showToast({ type: 'success', message: 'Preferências de notificação salvas com sucesso.' });
+    if (persisted.persisted) {
+      showToast({ type: 'success', message: 'Preferências de notificação salvas com sucesso.' });
+    }
   }
 
   function exportarDados() {
@@ -351,7 +357,7 @@ export default function ConfiguracoesPage({ db, setDb, onConfirmAction }) {
           : window.confirm('O backup será aplicado localmente. Deseja continuar?');
 
         if (!confirmarImportacao) {
-          showToast({ type: 'info', message: 'Importação cancelada pelo usuário.' });
+          showToast({ type: 'info', message: 'Importação cancelada.' });
           return;
         }
 
@@ -371,7 +377,7 @@ export default function ConfiguracoesPage({ db, setDb, onConfirmAction }) {
           });
           showToast({
             type: 'warning',
-            message: 'Backup validado. Alguns registros inválidos foram ignorados.',
+            message: 'Arquivo verificado. Alguns registros foram ignorados.',
           });
           return;
         }
@@ -382,7 +388,7 @@ export default function ConfiguracoesPage({ db, setDb, onConfirmAction }) {
           criticidade: 'media',
           detalhes: normalized.summary,
         });
-        showToast({ type: 'warning', message: 'Backup validado. Confirme a importação para continuar.' });
+        showToast({ type: 'warning', message: 'Arquivo verificado. Confirme a importação para continuar.' });
       } catch {
         registrarEventoAuditoria({
           acao: 'backup_importado_invalido',
@@ -464,7 +470,7 @@ export default function ConfiguracoesPage({ db, setDb, onConfirmAction }) {
     });
 
     if (houveFalhaPersistencia) {
-      showToast({ type: 'warning', message: 'Dados removidos. Parte da limpeza não foi concluída.' });
+      showToast({ type: 'warning', message: 'Dados removidos. Parte da limpeza ainda precisa de atenção.' });
       return;
     }
     showToast({ type: 'success', message: 'Dados operacionais removidos com sucesso.' });
