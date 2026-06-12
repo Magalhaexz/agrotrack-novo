@@ -10,9 +10,10 @@ const LABELS = {
   descarte: 'Saída por descarte',
   transferencia_saida: 'Saída por transferência',
   abate: 'Saída por abate',
+  consumo: 'Consumo nutricional',
 };
 
-export default function LoteHistoricoTab({ historico }) {
+export default function LoteHistoricoTab({ historico, onDeleteConsumo }) {
   return (
     <Card title="Histórico" subtitle="Linha do tempo consolidada do lote">
       <div className="lote-history-list">
@@ -25,8 +26,15 @@ export default function LoteHistoricoTab({ historico }) {
               <strong>{item.tipo === 'pesagem' ? 'Pesagem registrada' : LABELS[item.tipo] || 'Movimentação'}</strong>
               <p>{item.tipo === 'pesagem'
                 ? `Peso médio: ${formatNumber(item.peso_medio, 1)} kg`
-                : `Quantidade: ${formatNumber(item.qtd, 0)} cabeças · Peso médio: ${formatNumber(item.peso_medio, 1)} kg`}</p>
+                : item.tipo === 'consumo'
+                  ? `Consumo total: ${formatNumber(item.quantidade, 1)} kg · Peso médio usado: ${formatNumber(item.peso_medio, 1)} kg`
+                  : `Quantidade: ${formatNumber(item.qtd, 0)} cabeças · Peso médio: ${formatNumber(item.peso_medio, 1)} kg`}</p>
               <span>{item.observacao || item.obs || 'Sem observação'} {item.valor_total ? `· Valor: ${formatCurrency(item.valor_total)}` : ''}</span>
+              {item.tipo === 'consumo' && typeof onDeleteConsumo === 'function' ? (
+                <button type="button" className="ui-button ui-button--ghost ui-button--sm" onClick={() => onDeleteConsumo(item)}>
+                  Excluir consumo
+                </button>
+              ) : null}
             </div>
           </article>
         )) : <p>Sem histórico operacional para este lote.</p>}

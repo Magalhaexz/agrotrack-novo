@@ -1,4 +1,4 @@
-﻿import { useMemo, useState } from 'react';
+﻿import { useEffect, useMemo, useState } from 'react';
 import Input from '../components/ui/Input';
 import Modal from '../components/ui/Modal';
 import Button from '../components/ui/Button';
@@ -8,7 +8,7 @@ import { useToast } from '../hooks/useToast';
 import { getResumoLote } from '../domain/resumoLote';
 import { calcLote } from '../utils/calculations';
 import { gerarNovoId } from '../utils/id';
-import { createOperationalRecord, updateOperationalRecord } from '../services/operationalPersistence';
+import { createOperationalRecord, deleteOperationalRecord, updateOperationalRecord } from '../services/operationalPersistence';
 import LoteCard from '../components/lotes/LoteCard';
 import LoteDetailsPanel from '../components/lotes/LoteDetailsPanel';
 import LotesFilters from '../components/lotes/LotesFilters';
@@ -52,6 +52,75 @@ function calculateGmd30(pesagens = []) {
   return gain / days;
 }
 
+function getActiveFarmId(fazendaSelecionada) {
+  const direct = fazendaSelecionada?.id ?? fazendaSelecionada?.fazenda_id ?? fazendaSelecionada?.fazendaSelecionadaId ?? null;
+  const value = Number(direct);
+  return Number.isFinite(value) && value > 0 ? value : null;
+}
+
+function filterLotesByActiveFarm(lotes = [], activeFarmId = null) {
+  if (!activeFarmId) return [];
+  return (Array.isArray(lotes) ? lotes : []).filter((lote) => Number(lote?.faz_id) === Number(activeFarmId));
+}
+
+function buildLoteConsumptionHistoryRows(consumos = [], loteId = null) {
+  const targetId = Number(loteId);
+  return (Array.isArray(consumos) ? consumos : [])
+    .filter((item) => Number(item?.lote_id) === targetId)
+    .map((item) => ({
+      ...item,
+      key: `consumo-${item.id}`,
+      tipo: 'consumo',
+      quantidade: toNumber(item?.qtd_total ?? item?.quantidade_total ?? item?.quantidade),
+      peso_medio: toNumber(item?.peso_medio_usado),
+      obs: item?.obs || '',
+    }));
+}
+
+function buildLoteConsumptionAlert({ lote, consumoRows = [] } = {}) {
+  const expectedDaily = calculateDailyPlannedConsumption(
+    lote,
+    toNumber(lote?.heads || lote?.qtd || 0),
+    toNumber(lote?.pesoAtual || lote?.p_at || lote?.p_ini)
+  );
+  const totalRecorded = (Array.isArray(consumoRows) ? consumoRows : []).reduce((sum, item) => sum + toNumber(item?.quantidade), 0);
+  const averageRecorded = consumoRows.length > 0 ? totalRecorded / consumoRows.length : 0;
+
+  if (expectedDaily <= 0 || consumoRows.length === 0) {
+    return {
+      tone: 'neutral',
+      message: 'Sem histórico de consumo registrado.',
+      expectedDaily,
+      actualDaily: averageRecorded,
+    };
+  }
+
+  if (averageRecorded > expectedDaily) {
+    return {
+      tone: 'warning',
+      message: 'Consumo acima do esperado para este lote.',
+      expectedDaily,
+      actualDaily: averageRecorded,
+    };
+  }
+
+  if (averageRecorded <= expectedDaily * 0.8) {
+    return {
+      tone: 'danger',
+      message: 'Consumo muito abaixo do esperado para este lote.',
+      expectedDaily,
+      actualDaily: averageRecorded,
+    };
+  }
+
+  return {
+    tone: 'success',
+    message: 'Consumo dentro do esperado.',
+    expectedDaily,
+    actualDaily: averageRecorded,
+  };
+}
+
 function calculateDailyPlannedConsumption(lote, heads, pesoAtual) {
   const consumoTipo = String(lote?.consumo_tipo || '').toLowerCase();
   const consumoInformado = toNumber(lote?.consumo_por_cabeca_dia);
@@ -74,6 +143,44 @@ function calculateDailyPlannedConsumption(lote, heads, pesoAtual) {
   });
 }
 
+function buildLoteSavePatch(payload = {}, loteEmEdicao = null, activeFarmId = null) {
+  return {
+    ...payload,
+    faz_id: loteEmEdicao?.faz_id ? Number(loteEmEdicao.faz_id) : activeFarmId,
+    pastagem_id: payload.pastagem_id ?? null,
+    categoria_animal: payload.categoria_animal || '',
+    raca: payload.raca || '',
+    sistema: payload.sistema || 'confinamento',
+    tipo: payload.tipo || 'confinamento',
+    tem_recria: false,
+    dias_recria: 0,
+    tem_engorda: true,
+    dias_engorda: toNumber(payload.dias_estimados || payload.dias_engorda),
+    gmd_meta: toNumber(payload.gmd_meta),
+    investimento: toNumber(payload.investimento),
+    preco_arroba: toNumber(payload.preco_arroba),
+    rendimento_carcaca: toNumber(payload.rendimento_carcaca),
+    qtd: toNumber(payload.qtd),
+    p_ini: toNumber(payload.p_ini),
+    p_at: toNumber(payload.p_at || payload.p_ini),
+    peso_alvo: toNumber(payload.peso_alvo),
+    dias_estimados: toNumber(payload.dias_estimados),
+    consumo_tipo: payload.consumo_tipo || 'percentual_pv',
+    consumo_por_cabeca_dia: toNumber(payload.consumo_por_cabeca_dia),
+    consumo_total_estimado: toNumber(payload.consumo_total_estimado),
+    custo_total_estimado: toNumber(payload.custo_total_estimado),
+    preco_kg: toNumber(payload.preco_kg || payload.supl_rkg),
+    supl_nome: payload.supl_nome || '',
+    supl_rkg: toNumber(payload.supl_rkg || payload.preco_kg),
+    supl_pv_pct: toNumber(payload.supl_pv_pct),
+    supl_meta_dias: toNumber(payload.supl_meta_dias || payload.dias_estimados),
+  };
+}
+
+function canCreateLoteInCurrentFarm(activeFarmId, loteEmEdicao = null) {
+  return Boolean(activeFarmId) || Boolean(loteEmEdicao);
+}
+
 function normalizeStatus(lote) {
   const status = String(lote?.status || 'ativo').toLowerCase();
   return status;
@@ -88,7 +195,7 @@ function resolvePastagemNome(pastagensMap, lote) {
   return byId?.nome || lote?.pastagem_nome || lote?.pastagemAtualNome || LABEL_OR_DASH;
 }
 
-export default function LotesPage({ db, setDb, onRegistrarSaidaAnimal, session }) {
+export default function LotesPage({ db, setDb, onRegistrarSaidaAnimal, session, fazendaSelecionada = null }) {
   const { hasPermission } = useAuth();
   const { showToast } = useToast();
   const [filters, setFilters] = useState({ status: 'todos', fazenda: 'todas', periodo: 'todos', busca: '' });
@@ -108,6 +215,9 @@ export default function LotesPage({ db, setDb, onRegistrarSaidaAnimal, session }
   const sanitarios = Array.isArray(db?.sanitario) ? db.sanitario : EMPTY_LIST;
   const movAnimais = Array.isArray(db?.movimentacoes_animais) ? db.movimentacoes_animais : EMPTY_LIST;
   const movFinanceiros = Array.isArray(db?.movimentacoes_financeiras) ? db.movimentacoes_financeiras : EMPTY_LIST;
+  const consumoHistorico = Array.isArray(db?.consumo_suplementacao) ? db.consumo_suplementacao : EMPTY_LIST;
+  const activeFarmId = useMemo(() => getActiveFarmId(fazendaSelecionada), [fazendaSelecionada]);
+  const fazendaAtiva = useMemo(() => fazendas.find((fazenda) => Number(fazenda.id) === Number(activeFarmId)) || null, [fazendas, activeFarmId]);
   const pastagensMap = useMemo(() => new Map(pastagens.map((item) => [Number(item.id), item])), [pastagens]);
 
   const lotesEnriquecidos = useMemo(() => lotes.map((lote) => {
@@ -145,9 +255,10 @@ export default function LotesPage({ db, setDb, onRegistrarSaidaAnimal, session }
     };
   }), [db, lotes, pesagens, fazendas, pastagensMap]);
 
-  const lotesFiltrados = useMemo(() => lotesEnriquecidos.filter((lote) => {
+  const lotesDaFazendaAtiva = useMemo(() => filterLotesByActiveFarm(lotesEnriquecidos, activeFarmId), [lotesEnriquecidos, activeFarmId]);
+
+  const lotesFiltrados = useMemo(() => lotesDaFazendaAtiva.filter((lote) => {
     if (filters.status !== 'todos' && lote.status !== filters.status) return false;
-    if (filters.fazenda !== 'todas' && Number(lote.faz_id) !== Number(filters.fazenda)) return false;
     if (filters.periodo === '30d' && daysFrom(lote.entrada) > 30) return false;
     if (filters.periodo === '90d' && daysFrom(lote.entrada) > 90) return false;
     if (String(filters.busca || '').trim()) {
@@ -156,12 +267,32 @@ export default function LotesPage({ db, setDb, onRegistrarSaidaAnimal, session }
       if (!alvo.includes(termo)) return false;
     }
     return true;
-  }), [filters, lotesEnriquecidos]);
+  }), [filters, lotesDaFazendaAtiva]);
 
   const selectedLote = useMemo(
     () => lotesEnriquecidos.find((lote) => Number(lote.id) === Number(selectedLoteId)) || null,
     [lotesEnriquecidos, selectedLoteId]
   );
+
+  const selectedLoteConsumos = useMemo(() => buildLoteConsumptionHistoryRows(consumoHistorico, selectedLote?.id), [consumoHistorico, selectedLote?.id]);
+  const consumoAlerta = useMemo(() => buildLoteConsumptionAlert({ lote: selectedLote, consumoRows: selectedLoteConsumos }), [selectedLote, selectedLoteConsumos]);
+
+  useEffect(() => {
+    const timer = window.setTimeout(() => {
+      setFilters((prev) => ({ ...prev, fazenda: activeFarmId ? String(activeFarmId) : 'todas' }));
+      if (selectedLote && activeFarmId && Number(selectedLote.faz_id) !== Number(activeFarmId)) {
+        setSelectedLoteId(null);
+        setActiveTab('visao_geral');
+        setOpenRetirada(false);
+        setOpenFechamento(false);
+        setOpenPesagem(false);
+        setOpenNovoLote(false);
+        setLoteEmEdicao(null);
+      }
+    }, 0);
+
+    return () => window.clearTimeout(timer);
+  }, [activeFarmId, selectedLote]);
 
   function updateFilter(field, value) {
     setFilters((prev) => ({ ...prev, [field]: value }));
@@ -176,6 +307,45 @@ export default function LotesPage({ db, setDb, onRegistrarSaidaAnimal, session }
   function abrirRetirada(modo) {
     setRetiradaModo(modo);
     setOpenRetirada(true);
+  }
+
+  async function handleExcluirHistoricoConsumo(item) {
+    if (!ensurePermission('estoque:editar')) return;
+    if (!item?.id) {
+      showToast({ type: 'warning', message: 'Não foi possível identificar o registro para exclusão.' });
+      return;
+    }
+
+    const confirmado = window.confirm('Deseja excluir este consumo do histórico?');
+    if (!confirmado) return;
+
+    const consumoId = Number(item.id);
+    const linkedFinanceiro = movFinanceiros.find(
+      (mov) => String(mov?.origem_tipo || '') === 'consumo_suplementacao' && Number(mov?.origem_id) === consumoId
+    );
+
+    const consumoPersist = await deleteOperationalRecord('consumo_suplementacao', consumoId, session);
+    const financePersist = linkedFinanceiro?.id
+      ? await deleteOperationalRecord('movimentacoes_financeiras', linkedFinanceiro.id, session)
+      : { persisted: true };
+
+    if (!consumoPersist?.persisted || !financePersist?.persisted) {
+      showToast({ type: 'warning', message: consumoPersist?.error || financePersist?.error || 'Não foi possível confirmar a exclusão agora.' });
+      return;
+    }
+
+    setDb((prev) => ({
+      ...prev,
+      consumo_suplementacao: (prev.consumo_suplementacao || []).filter((registro) => Number(registro.id) !== consumoId),
+      movimentacoes_financeiras: (prev.movimentacoes_financeiras || []).filter((mov) => {
+        if (Number(mov?.id) === Number(linkedFinanceiro?.id)) return false;
+        return !(
+          String(mov?.origem_tipo || '') === 'consumo_suplementacao'
+          && Number(mov?.origem_id) === consumoId
+        );
+      }),
+    }));
+    showToast({ type: 'success', message: 'Consumo excluído com sucesso.' });
   }
 
   function handleRetirada(payload) {
@@ -266,37 +436,12 @@ export default function LotesPage({ db, setDb, onRegistrarSaidaAnimal, session }
 
   async function handleNovoLote(payload) {
     if (!ensurePermission('lotes:editar')) return;
+    if (!canCreateLoteInCurrentFarm(activeFarmId, loteEmEdicao)) {
+      showToast({ type: 'warning', message: 'Selecione uma fazenda ativa para cadastrar um lote.' });
+      return;
+    }
 
-    const patch = {
-      ...payload,
-      pastagem_id: payload.pastagem_id ?? null,
-      categoria_animal: payload.categoria_animal || '',
-      raca: payload.raca || '',
-      sistema: payload.sistema || 'confinamento',
-      tipo: payload.tipo || 'confinamento',
-      tem_recria: false,
-      dias_recria: 0,
-      tem_engorda: true,
-      dias_engorda: toNumber(payload.dias_estimados || payload.dias_engorda),
-      gmd_meta: toNumber(payload.gmd_meta),
-      investimento: toNumber(payload.investimento),
-      preco_arroba: toNumber(payload.preco_arroba),
-      rendimento_carcaca: toNumber(payload.rendimento_carcaca),
-      qtd: toNumber(payload.qtd),
-      p_ini: toNumber(payload.p_ini),
-      p_at: toNumber(payload.p_at || payload.p_ini),
-      peso_alvo: toNumber(payload.peso_alvo),
-      dias_estimados: toNumber(payload.dias_estimados),
-      consumo_tipo: payload.consumo_tipo || 'percentual_pv',
-      consumo_por_cabeca_dia: toNumber(payload.consumo_por_cabeca_dia),
-      consumo_total_estimado: toNumber(payload.consumo_total_estimado),
-      custo_total_estimado: toNumber(payload.custo_total_estimado),
-      preco_kg: toNumber(payload.preco_kg || payload.supl_rkg),
-      supl_nome: payload.supl_nome || '',
-      supl_rkg: toNumber(payload.supl_rkg || payload.preco_kg),
-      supl_pv_pct: toNumber(payload.supl_pv_pct),
-      supl_meta_dias: toNumber(payload.supl_meta_dias || payload.dias_estimados),
-    };
+    const patch = buildLoteSavePatch(payload, loteEmEdicao, activeFarmId);
 
     if (loteEmEdicao) {
       const loteId = loteEmEdicao.id;
@@ -319,6 +464,7 @@ export default function LotesPage({ db, setDb, onRegistrarSaidaAnimal, session }
     const novoLote = {
       id: gerarNovoId(lotes),
       ...patch,
+      faz_id: activeFarmId,
       status: 'ativo',
     };
 
@@ -339,9 +485,11 @@ export default function LotesPage({ db, setDb, onRegistrarSaidaAnimal, session }
     const loteRetiradas = movAnimais.filter((item) => Number(item.lote_id) === Number(selectedLote.id) && ['venda', 'morte', 'descarte', 'transferencia_saida', 'abate', 'outro'].includes(String(item.tipo || '').toLowerCase()));
     const loteSanitario = sanitarios.filter((item) => Number(item.lote_id) === Number(selectedLote.id));
     const loteFinanceiro = movFinanceiros.filter((item) => Number(item.lote_id) === Number(selectedLote.id));
+    const loteConsumos = selectedLoteConsumos;
     const historico = [
       ...lotePesagens.map((item) => ({ ...item, key: `pesagem-${item.id}`, tipo: 'pesagem' })),
       ...movAnimais.filter((item) => Number(item.lote_id) === Number(selectedLote.id)).map((item) => ({ ...item, key: `mov-${item.id}` })),
+      ...loteConsumos.map((item) => ({ ...item, key: `consumo-${item.id}`, tipo: 'consumo' })),
     ]
       .map((item) => ({ ...item, data: toDateKey(item?.data) }))
       .sort((a, b) => String(b.data || '').localeCompare(String(a.data || '')));
@@ -355,19 +503,19 @@ export default function LotesPage({ db, setDb, onRegistrarSaidaAnimal, session }
           resumo={selectedLote.resumo}
           activeTab={activeTab}
           onChangeTab={setActiveTab}
-      onBack={() => setSelectedLoteId(null)}
-      canMove={hasPermission('animais:movimentar')}
-      canEdit={hasPermission('lotes:editar')}
-      canEditPesagem={hasPermission('pesagens:editar')}
-      onEdit={() => {
-        setLoteEmEdicao(selectedLote);
-        setOpenNovoLote(true);
-      }}
-      onRegistrarVendaParcial={() => abrirRetirada('sale_partial')}
-      onRegistrarMorte={() => abrirRetirada('death_loss')}
-      onRegistrarSaida={() => abrirRetirada('exit')}
-      onNovaPesagem={() => setOpenPesagem(true)}
-      onEncerrar={() => setOpenFechamento(true)}
+          onBack={() => setSelectedLoteId(null)}
+          canMove={hasPermission('animais:movimentar')}
+          canEdit={hasPermission('lotes:editar')}
+          canEditPesagem={hasPermission('pesagens:editar')}
+          onEdit={() => {
+            setLoteEmEdicao(selectedLote);
+            setOpenNovoLote(true);
+          }}
+          onRegistrarVendaParcial={() => abrirRetirada('sale_partial')}
+          onRegistrarMorte={() => abrirRetirada('death_loss')}
+          onRegistrarSaida={() => abrirRetirada('exit')}
+          onNovaPesagem={() => setOpenPesagem(true)}
+          onEncerrar={() => setOpenFechamento(true)}
           animais={loteAnimais}
           pesagens={lotePesagens}
           retiradas={loteRetiradas}
@@ -375,6 +523,8 @@ export default function LotesPage({ db, setDb, onRegistrarSaidaAnimal, session }
           financeiros={loteFinanceiro}
           historico={historico}
           consumoNutricao={consumoNutricao}
+          consumoAlerta={consumoAlerta}
+          onDeleteHistoricoConsumo={handleExcluirHistoricoConsumo}
         />
 
         <RetiradaAnimaisModal
@@ -412,6 +562,10 @@ export default function LotesPage({ db, setDb, onRegistrarSaidaAnimal, session }
       <LotesPageHeader
         canEdit={hasPermission('lotes:editar')}
         onNovoLote={() => {
+          if (!canCreateLoteInCurrentFarm(activeFarmId, null)) {
+            showToast({ type: 'warning', message: 'Selecione uma fazenda ativa para cadastrar um lote.' });
+            return;
+          }
           setLoteEmEdicao(null);
           setOpenNovoLote(true);
         }}
@@ -419,15 +573,15 @@ export default function LotesPage({ db, setDb, onRegistrarSaidaAnimal, session }
 
       <LotesFilters
         filters={filters}
-        fazendas={fazendas}
+        fazendaAtiva={fazendaAtiva}
         onChange={updateFilter}
       />
 
       <div className="lote-cards-grid">
         {lotesFiltrados.length === 0 ? (
           <div className="empty-state">
-            <strong>Nenhum lote encontrado.</strong>
-            <span>Ajuste os filtros ou cadastre um novo lote para continuar.</span>
+            <strong>{activeFarmId ? 'Nenhum lote encontrado.' : 'Selecione uma fazenda ativa.'}</strong>
+            <span>{activeFarmId ? 'Ajuste os filtros ou cadastre um novo lote para continuar.' : 'Os lotes são exibidos por fazenda ativa.'}</span>
           </div>
         ) : lotesFiltrados.map((lote) => (
           <LoteCard
@@ -472,6 +626,7 @@ export default function LotesPage({ db, setDb, onRegistrarSaidaAnimal, session }
           initialData={loteEmEdicao}
           fazendas={fazendas}
           pastagens={pastagens}
+          fazendaAtiva={fazendaAtiva}
           onCancel={() => {
             setOpenNovoLote(false);
             setLoteEmEdicao(null);
@@ -518,3 +673,5 @@ function PesagemModal({ open, lote, onClose, onSubmit }) {
     </Modal>
   );
 }
+
+

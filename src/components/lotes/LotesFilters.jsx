@@ -1,13 +1,13 @@
-﻿import Input from '../ui/Input';
+import Input from '../ui/Input';
 import { PERIODO_OPTIONS, STATUS_OPTIONS } from './constants';
 
-export default function LotesFilters({ filters, fazendas, onChange }) {
+export default function LotesFilters({ filters, fazendaAtiva, onChange }) {
   return (
     <div className="section-card rebanho-filters-shell">
       <div className="section-header">
         <div>
           <h3>Filtros</h3>
-          <p>Refine por fazenda, status, período e busca.</p>
+          <p>Refine por status, período e busca. A fazenda ativa é aplicada automaticamente.</p>
         </div>
       </div>
 
@@ -25,12 +25,12 @@ export default function LotesFilters({ filters, fazendas, onChange }) {
           ))}
         </Input>
 
-        <Input as="select" label="Fazenda" value={filters.fazenda} onChange={(e) => onChange('fazenda', e.target.value)}>
-          <option value="todas">Todas as fazendas</option>
-          {fazendas.map((fazenda) => (
-            <option key={fazenda.id} value={String(fazenda.id)}>{fazenda.nome}</option>
-          ))}
-        </Input>
+        <div className="ui-input-wrap">
+          <label className="ui-input-label">Fazenda ativa</label>
+          <div className="ui-input-shell" style={{ minHeight: 48 }}>
+            <span className="ui-input-affix">{fazendaAtiva?.nome || 'Selecione uma fazenda no topo da tela.'}</span>
+          </div>
+        </div>
 
         <Input as="select" label="Período" value={filters.periodo} onChange={(e) => onChange('periodo', e.target.value)}>
           {PERIODO_OPTIONS.map((item) => (

@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+﻿import { useEffect, useMemo, useState } from 'react';
 import Modal from './ui/Modal';
 import Button from './ui/Button';
 import Input from './ui/Input';
@@ -78,6 +78,11 @@ function stripPlanningSummary(text) {
   return raw.slice(0, matchIndex).replace(/\|\s*$/, '').trim();
 }
 
+function isWholePositiveInteger(value) {
+  const text = String(value ?? '').trim();
+  return /^\d+$/.test(text) && Number(text) > 0;
+}
+
 function buildPlanningSummary({
   gmdEsperado,
   produto,
@@ -90,8 +95,8 @@ function buildPlanningSummary({
   return [
     `GMD esperado: ${gmdEsperado}`,
     `Dieta/produto: ${produto}`,
-    `Modo de consumo: ${consumoTipo}`,
-    `Valor de consumo: ${consumoInformado}`,
+    `Consumo esperado: ${consumoTipo}`,
+    `Consumo esperado informado: ${consumoInformado}`,
     `Saída projetada (informativa): ${dataPrevistaSaida}`,
     `Consumo estimado suplemento (kg): ${consumoEstimado}`,
     `Custo estimado suplemento (R$): ${custoEstimado}`,
@@ -120,12 +125,17 @@ function findPastagemLabel(pastagens, pastagemId) {
   return pastagens.find((item) => String(item.id) === String(pastagemId))?.nome || '';
 }
 
-function normalizarInitialData(data, pastagens = []) {
-  if (!data) return FORM_VAZIO;
+function normalizarInitialData(data, pastagens = [], fazendaAtiva = null) {
+  if (!data) {
+    return {
+      ...FORM_VAZIO,
+      faz_id: fazendaAtiva?.id ?? '',
+    };
+  }
   return {
     ...FORM_VAZIO,
     nome: data.nome || '',
-    faz_id: data.faz_id ?? '',
+    faz_id: data.faz_id ?? data.fazenda_id ?? fazendaAtiva?.id ?? '',
     pastagem_id: data.pastagem_id ?? data.pastagemId ?? data.pastagem_atual_id ?? '',
     categoria_animal: data.categoria_animal ?? data.categoria ?? '',
     raca: data.raca ?? data.raca_animal ?? data.gen ?? '',
@@ -203,11 +213,12 @@ function validarForm(form, planejamento) {
   if (toNumber(form.consumo_por_cabeca_dia) <= 0) return 'Informe o consumo diário por animal.';
   if (toNumber(form.supl_rkg) <= 0) return 'Informe o preço por kg.';
   if (toNumber(form.preco_arroba) <= 0) return 'Informe o valor manual da arroba.';
+  if (!isWholePositiveInteger(form.supl_meta_dias)) return 'Informe um número inteiro de dias.';
   return null;
 }
 
-export default function LoteForm({ initialData, fazendas = [], pastagens = [], onSave, onCancel }) {
-  const [form, setForm] = useState(() => normalizarInitialData(initialData, pastagens));
+export default function LoteForm({ initialData, fazendas = [], pastagens = [], fazendaAtiva = null, onSave, onCancel }) {
+  const [form, setForm] = useState(() => normalizarInitialData(initialData, pastagens, fazendaAtiva));
   const [erro, setErro] = useState('');
 
   const planejamento = useMemo(() => calcularPlanejamento(form), [form]);
@@ -218,6 +229,28 @@ export default function LoteForm({ initialData, fazendas = [], pastagens = [], o
       return !fazendaId || String(fazendaId) === String(form.faz_id);
     });
   }, [form.faz_id, pastagens]);
+
+  const fazendaSelecionada = useMemo(
+    () => fazendas.find((item) => String(item.id) === String(form.faz_id)) || fazendaAtiva || null,
+    [fazendas, form.faz_id, fazendaAtiva]
+  );
+
+  useEffect(() => {
+    const timer = window.setTimeout(() => {
+      if (initialData) {
+        setForm(normalizarInitialData(initialData, pastagens, fazendaAtiva));
+        return;
+      }
+
+      if (fazendaAtiva?.id) {
+        setForm((prev) => (String(prev.faz_id) === String(fazendaAtiva.id)
+          ? prev
+          : { ...prev, faz_id: String(fazendaAtiva.id) }));
+      }
+    }, 0);
+
+    return () => window.clearTimeout(timer);
+  }, [initialData, pastagens, fazendaAtiva]);
 
   function handleChange(event) {
     const { name, value } = event.target;
@@ -248,6 +281,7 @@ export default function LoteForm({ initialData, fazendas = [], pastagens = [], o
     });
     const manualObs = stripPlanningSummary(initialData?.obs || '');
     const pesoInicial = toNumber(form.p_ini);
+    const metaDias = Number(form.supl_meta_dias);
 
     setErro('');
     onSave?.({
@@ -278,7 +312,7 @@ export default function LoteForm({ initialData, fazendas = [], pastagens = [], o
       supl_nome: form.supl_nome.trim(),
       supl_rkg: toNumber(form.supl_rkg),
       supl_pv_pct: form.consumo_tipo === 'percentual_pv' ? toNumber(form.consumo_por_cabeca_dia) : 0,
-      supl_meta_dias: planejamento.diasEstimados,
+      supl_meta_dias: metaDias,
       obs: manualObs ? `${manualObs} | ${planningSummary}` : planningSummary,
       outras_desp_pc_mes: initialData?.outras_desp_pc_mes ?? 0,
       tem_recria: initialData?.tem_recria ?? (form.tipo === 'recria' || form.tipo === 'recria+engorda'),
@@ -292,6 +326,7 @@ export default function LoteForm({ initialData, fazendas = [], pastagens = [], o
   }
 
   const titulo = initialData ? 'Editar lote' : 'Novo lote';
+  const modoFazenda = initialData ? 'Lote vinculado' : 'Fazenda ativa';
   const pastagemSelecionada = form.pastagem_id
     ? findPastagemLabel(pastagens, form.pastagem_id)
     : '';
@@ -299,8 +334,8 @@ export default function LoteForm({ initialData, fazendas = [], pastagens = [], o
     ? 'Cadastre uma pastagem em Cadastros > Pastos para vincular ao lote.'
     : 'Selecione a fazenda para listar os pastos compatíveis.';
   const consumoLabel = form.consumo_tipo === 'percentual_pv'
-    ? 'Consumo diário por animal (% PV)'
-    : 'Consumo diário por animal (kg/cab/dia)';
+    ? 'Consumo esperado por animal (% PV)'
+    : 'Consumo esperado por animal (kg/cab/dia)';
 
   const footer = (
     <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8 }}>
@@ -324,15 +359,12 @@ export default function LoteForm({ initialData, fazendas = [], pastagens = [], o
         </label>
 
         <div className="grid-2">
-          <label>
-            Fazenda
-            <select className="ui-input" name="faz_id" value={form.faz_id} onChange={handleChange}>
-              <option value="">Selecione</option>
-              {fazendas.map((fazenda) => (
-                <option key={fazenda.id} value={fazenda.id}>{fazenda.nome}</option>
-              ))}
-            </select>
-          </label>
+          <div className="ui-input-wrap">
+            <label className="ui-input-label">{modoFazenda}</label>
+            <div className="ui-input-shell" style={{ minHeight: 48 }}>
+              <span className="ui-input-affix">{fazendaSelecionada?.nome || 'Selecione uma fazenda ativa antes de cadastrar o lote.'}</span>
+            </div>
+          </div>
 
           <label>
             Data de entrada
@@ -479,7 +511,7 @@ export default function LoteForm({ initialData, fazendas = [], pastagens = [], o
             />
           </label>
 
-          <Input as="select" name="consumo_tipo" label="Modo de consumo" value={form.consumo_tipo} onChange={handleChange}>
+          <Input as="select" name="consumo_tipo" label="Modo de consumo esperado" value={form.consumo_tipo} onChange={handleChange}>
             {TIPOS_CONSUMO.map((tipo) => (
               <option key={tipo.value} value={tipo.value}>{tipo.label}</option>
             ))}
@@ -546,70 +578,32 @@ export default function LoteForm({ initialData, fazendas = [], pastagens = [], o
 
         <div className="grid-3">
           <label>
-            Custo fixo mensal (R$)
+            Dias estimados que o lote ficará no pasto
             <input
               className="ui-input"
-              name="custo_fixo_mensal"
+              name="supl_meta_dias"
               type="number"
-              min={0}
-              step="0.01"
-              value={form.custo_fixo_mensal}
+              min={1}
+              step="1"
+              value={form.supl_meta_dias}
               onChange={handleChange}
-              placeholder="Ex: 4500"
+              placeholder="Ex: 30"
             />
           </label>
 
-          <label>
-            Rendimento de carcaça (%)
-            <input
-              className="ui-input"
-              name="rendimento_carcaca"
-              type="number"
-              min={0}
-              step="0.01"
-              value={form.rendimento_carcaca}
-              onChange={handleChange}
-              placeholder="Ex: 52"
-            />
-          </label>
+          <div className="ui-input-wrap">
+            <label className="ui-input-label">Dias estimados</label>
+            <div className="ui-input-shell" style={{ minHeight: 48 }}>
+              <span className="ui-input-affix">{planejamento.diasEstimados ? `${planejamento.diasEstimados} dias` : '—'}</span>
+            </div>
+          </div>
 
-          <label>
-            Dias estimados
-            <input
-              className="ui-input"
-              value={planejamento.diasEstimados ? `${planejamento.diasEstimados} dias` : '—'}
-              readOnly
-            />
-          </label>
-        </div>
-
-        <div className="grid-3">
-          <label>
-            Saída prevista
-            <input
-              className="ui-input"
-              value={planejamento.dataPrevistaSaida ? formatDateBr(planejamento.dataPrevistaSaida) : '—'}
-              readOnly
-            />
-          </label>
-
-          <label>
-            Consumo total estimado (kg)
-            <input
-              className="ui-input"
-              value={formatNumber(planejamento.consumoTotalEstimado, 2)}
-              readOnly
-            />
-          </label>
-
-          <label>
-            Custo estimado do suplemento (R$)
-            <input
-              className="ui-input"
-              value={formatNumber(planejamento.custoEstimadoTotal, 2)}
-              readOnly
-            />
-          </label>
+          <div className="ui-input-wrap">
+            <label className="ui-input-label">Saída prevista</label>
+            <div className="ui-input-shell" style={{ minHeight: 48 }}>
+              <span className="ui-input-affix">{planejamento.dataPrevistaSaida ? formatDateBr(planejamento.dataPrevistaSaida) : '—'}</span>
+            </div>
+          </div>
         </div>
 
         {erro ? <p className="err">{erro}</p> : null}
@@ -617,3 +611,6 @@ export default function LoteForm({ initialData, fazendas = [], pastagens = [], o
     </Modal>
   );
 }
+
+
+

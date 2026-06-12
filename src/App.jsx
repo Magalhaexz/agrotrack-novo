@@ -968,6 +968,7 @@ export default function App() {
                   db={pageKey === 'dashboard' ? dbDashboard : db}
                   setDb={setDb}
                   session={session}
+                  fazendaSelecionada={fazendaSelecionada}
                   subscription={currentSubscription}
                   subscriptionUsage={subscriptionUsage}
                   navigationIntent={navigationIntent}

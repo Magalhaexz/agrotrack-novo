@@ -31,6 +31,8 @@ export default function LoteDetailsPanel({
   financeiros,
   historico,
   consumoNutricao,
+  consumoAlerta,
+  onDeleteHistoricoConsumo,
 }) {
   return (
     <div className="rebanho-page">
@@ -77,10 +79,10 @@ export default function LoteDetailsPanel({
       {activeTab === 'animais' ? <LoteAnimaisTab animais={animais} /> : null}
       {activeTab === 'pesagens' ? <LotePesagensTab pesagens={pesagens} onNovaPesagem={onNovaPesagem} canEditPesagem={canEditPesagem && !lote.bloqueado} /> : null}
       {activeTab === 'retiradas' ? <LoteRetiradasTab retiradas={retiradas} onNovaRetirada={onRegistrarVendaParcial} canMove={canMove && !lote.bloqueado} /> : null}
-      {activeTab === 'nutricao' ? <LoteNutricaoTab lote={lote} consumo={consumoNutricao} /> : null}
+      {activeTab === 'nutricao' ? <LoteNutricaoTab lote={lote} consumo={consumoNutricao} alertaConsumo={consumoAlerta} /> : null}
       {activeTab === 'sanitario' ? <LoteSanitarioTab itens={sanitarios} /> : null}
       {activeTab === 'financeiro' ? <LoteFinanceiroTab movimentos={financeiros} resumo={resumo} /> : null}
-      {activeTab === 'historico' ? <LoteHistoricoTab historico={historico} /> : null}
+      {activeTab === 'historico' ? <LoteHistoricoTab historico={historico} onDeleteConsumo={onDeleteHistoricoConsumo} /> : null}
     </div>
   );
 }
