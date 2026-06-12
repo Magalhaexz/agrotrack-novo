@@ -1,3 +1,4 @@
+/* global process */
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs/promises';
@@ -9,7 +10,9 @@ import {
   mapAsaasEventToSubscriptionStatus,
   upsertBillingEvent,
   validateWebhookToken,
+  handleCreateSubscriptionRequest,
 } from '../api/_asaas.js';
+import createSubscriptionHandler from '../api/asaas-create-subscription.js';
 import {
   getMissingAsaasCustomerFields,
   getSandboxCheckoutCopy,
@@ -104,6 +107,30 @@ function createCheckoutSessionsClient(rows) {
           resolve({ data, error: null });
         },
       };
+    },
+  };
+}
+
+function createMockResponse() {
+  return {
+    statusCode: null,
+    headers: {},
+    ended: false,
+    body: null,
+    setHeader(name, value) {
+      this.headers[name] = value;
+    },
+    status(code) {
+      this.statusCode = code;
+      return this;
+    },
+    json(payload) {
+      this.body = payload;
+      return this;
+    },
+    end() {
+      this.ended = true;
+      return this;
     },
   };
 }
@@ -323,6 +350,138 @@ test('frontend checkout request uses the server route and Authorization header',
   } finally {
     globalThis.fetch = originalFetch;
   }
+});
+
+test('server rejects GET with 405 for checkout route', async () => {
+  const response = createMockResponse();
+
+  await createSubscriptionHandler({ method: 'GET' }, response);
+
+  assert.equal(response.statusCode, 405);
+  assert.equal(response.body.ok, false);
+  assert.equal(response.body.message, 'Metodo nao permitido.');
+});
+
+test('server accepts POST for checkout route', async () => {
+  const originalFetch = globalThis.fetch;
+  const originalAsaasBaseUrl = process.env.ASAAS_API_BASE_URL;
+  const originalAsaasApiKey = process.env.ASAAS_API_KEY;
+  const originalSupabaseUrl = process.env.SUPABASE_URL;
+  const originalSupabaseServiceRole = process.env.SUPABASE_SERVICE_ROLE_KEY;
+
+  process.env.ASAAS_API_BASE_URL = 'https://sandbox.asaas.com/api/v3';
+  process.env.ASAAS_API_KEY = 'sandbox-key';
+  process.env.SUPABASE_URL = 'https://project.supabase.co';
+  process.env.SUPABASE_SERVICE_ROLE_KEY = 'service-role-key';
+
+  globalThis.fetch = async (url) => {
+    const target = String(url || '');
+    if (target.includes('/auth/v1/user')) {
+      return {
+        ok: true,
+        json: async () => ({ id: '11111111-1111-1111-1111-111111111111', email: 'cliente@teste.com', user_metadata: {} }),
+      };
+    }
+    if (target.includes('/paymentLinks')) {
+      return {
+        ok: true,
+        json: async () => ({
+          id: 'paylink_123',
+          url: 'https://sandbox.example/payment-link',
+          paymentLink: { id: 'paylink_123', url: 'https://sandbox.example/payment-link' },
+          status: 'pending',
+        }),
+      };
+    }
+    return {
+      ok: true,
+      json: async () => ({}),
+    };
+  };
+
+  const client = {
+    from(table) {
+      if (table === 'profiles') {
+        return {
+          select() { return this; },
+          eq() { return this; },
+          maybeSingle: async () => ({ data: { id: '11111111-1111-1111-1111-111111111111', owner_user_id: '11111111-1111-1111-1111-111111111111', email: 'cliente@teste.com', nome: 'Cliente Teste' }, error: null }),
+        };
+      }
+      if (table === 'checkout_sessions') {
+        return {
+          select() { return this; },
+          eq() { return this; },
+          order() { return this; },
+          limit() { return this; },
+          in() { return this; },
+          upsert(payload) {
+            return {
+              select() {
+                return {
+                  maybeSingle: async () => ({ data: { id: 1, ...payload }, error: null }),
+                };
+              },
+            };
+          },
+          insert(payload) {
+            return {
+              select() {
+                return {
+                  maybeSingle: async () => ({ data: { id: 1, ...payload }, error: null }),
+                };
+              },
+            };
+          },
+        };
+      }
+      if (table === 'customer_subscriptions' || table === 'billing_events') {
+        return {
+          upsert(payload) {
+            return {
+              select() {
+                return {
+                  maybeSingle: async () => ({ data: { id: 1, ...payload }, error: null }),
+                };
+              },
+            };
+          },
+        };
+      }
+      throw new Error(`unexpected table ${table}`);
+    },
+  };
+
+  const req = {
+    method: 'POST',
+    headers: { authorization: 'Bearer jwt.token.value' },
+    body: {
+      planCode: 'pro',
+      customer: { name: 'Cliente Teste', email: 'cliente@teste.com', cpfCnpj: '12345678901', mobilePhone: '11999999999' },
+    },
+  };
+
+  try {
+    const result = await handleCreateSubscriptionRequest(req, { client });
+    assert.equal(result.status, 200);
+    assert.equal(result.payload.ok, true);
+    assert.equal(result.payload.paymentUrl, 'https://sandbox.example/payment-link');
+  } finally {
+    globalThis.fetch = originalFetch;
+    process.env.ASAAS_API_BASE_URL = originalAsaasBaseUrl;
+    process.env.ASAAS_API_KEY = originalAsaasApiKey;
+    process.env.SUPABASE_URL = originalSupabaseUrl;
+    process.env.SUPABASE_SERVICE_ROLE_KEY = originalSupabaseServiceRole;
+  }
+});
+
+test('OPTIONS does not create checkout and responds safely', async () => {
+  const response = createMockResponse();
+
+  await createSubscriptionHandler({ method: 'OPTIONS' }, response);
+
+  assert.equal(response.statusCode, 204);
+  assert.equal(response.ended, true);
 });
 
 test('paymentLinks response with top-level url is treated as a browser payment url', async () => {

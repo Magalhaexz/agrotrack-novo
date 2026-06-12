@@ -686,10 +686,12 @@ export function buildBillingEventRow({ userId, subscriptionRow, eventIdentity, e
   };
 }
 
-export async function handleCreateCustomerRequest(req, { client = getSupabaseAdminClient() } = {}) {
+export async function handleCreateCustomerRequest(req, options = {}) {
   if (req.method !== 'POST') {
     return json(405, { ok: false, message: 'Metodo nao permitido.' });
   }
+
+  const client = options.client || getSupabaseAdminClient();
 
   const env = getAsaasServerEnvStatus();
   if (!env.configured) {
@@ -737,10 +739,12 @@ export async function handleCreateCustomerRequest(req, { client = getSupabaseAdm
   }
 }
 
-export async function handleCreateSubscriptionRequest(req, { client = getSupabaseAdminClient() } = {}) {
+export async function handleCreateSubscriptionRequest(req, options = {}) {
   if (req.method !== 'POST') {
     return json(405, { ok: false, message: 'Metodo nao permitido.' });
   }
+
+  const client = options.client || getSupabaseAdminClient();
 
   const env = getAsaasServerEnvStatus();
   if (!env.configured) {
@@ -1023,10 +1027,12 @@ export async function handleCreateSubscriptionRequest(req, { client = getSupabas
   });
 }
 
-export async function handleWebhookRequest(req, { client = getSupabaseAdminClient() } = {}) {
+export async function handleWebhookRequest(req, options = {}) {
   if (req.method !== 'POST') {
     return json(405, { ok: false, message: 'Metodo nao permitido.' });
   }
+
+  const client = options.client || getSupabaseAdminClient();
 
   const env = getAsaasServerEnvStatus();
   if (!env.configured) {
