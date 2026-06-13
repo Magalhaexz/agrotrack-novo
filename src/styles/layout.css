@@ -124,11 +124,12 @@ body {
   padding: 14px 12px 12px;
   overflow-y: auto;
   overflow-x: hidden;
-  scrollbar-gutter: stable both-edges;
+  scrollbar-gutter: stable;
 }
 
 .app-shell .sidebar-nav {
   padding: 0;
+  scrollbar-gutter: stable;
 }
 
 .app-shell .sidebar-nav::-webkit-scrollbar {
@@ -315,6 +316,17 @@ body {
   border-bottom: 1px solid rgba(255, 255, 255, 0.06);
 }
 
+.app-shell .ui-modal-overlay {
+  box-sizing: border-box;
+  padding-left: calc(var(--layout-sidebar-width) + var(--layout-page-padding-inline));
+  padding-right: var(--layout-page-padding-inline);
+}
+
+.app-shell .ui-modal {
+  width: min(960px, calc(100vw - var(--layout-sidebar-width) - (var(--layout-page-padding-inline) * 2)));
+  max-width: calc(100vw - var(--layout-sidebar-width) - (var(--layout-page-padding-inline) * 2));
+}
+
 .app-shell--sidebar-collapsed .header.top-header {
   left: var(--layout-sidebar-collapsed-width);
 }
@@ -335,6 +347,18 @@ body {
   justify-items: center;
 }
 
+.app-shell--sidebar-collapsed .sidebar-content {
+  padding: 12px 10px 12px 12px;
+  scrollbar-gutter: stable;
+}
+
+.app-shell--sidebar-collapsed .sidebar-nav {
+  padding: 0 2px 0 0;
+  overflow-x: hidden;
+  overflow-y: auto;
+  scrollbar-gutter: stable;
+}
+
 .app-shell--sidebar-collapsed .sidebar-logo-copy,
 .app-shell--sidebar-collapsed .sidebar-group-copy,
 .app-shell--sidebar-collapsed .sidebar-item-copy,
@@ -352,12 +376,23 @@ body {
 
 .app-shell--sidebar-collapsed .sidebar-link,
 .app-shell--sidebar-collapsed .sidebar-item.nav.subnav {
+  width: 100%;
+  min-width: 0;
   justify-content: center;
+  justify-items: center;
+  grid-template-columns: 1fr;
+  gap: 0;
   padding-inline: 0;
 }
 
 .app-shell--sidebar-collapsed .sidebar-link .nav-icon {
   margin: 0;
+  flex: 0 0 18px;
+}
+
+.app-shell--sidebar-collapsed .sidebar-link:hover,
+.app-shell--sidebar-collapsed .sidebar-item.nav.subnav:hover {
+  transform: none;
 }
 
 .app-shell--sidebar-collapsed .sidebar-user {
@@ -372,6 +407,16 @@ body {
 
 .app-shell--sidebar-collapsed .sidebar-user-caret {
   display: none;
+}
+
+.app-shell--sidebar-collapsed .ui-modal-overlay {
+  padding-left: calc(var(--layout-sidebar-collapsed-width) + var(--layout-page-padding-inline));
+  padding-right: var(--layout-page-padding-inline);
+}
+
+.app-shell--sidebar-collapsed .ui-modal {
+  width: min(960px, calc(100vw - var(--layout-sidebar-collapsed-width) - (var(--layout-page-padding-inline) * 2)));
+  max-width: calc(100vw - var(--layout-sidebar-collapsed-width) - (var(--layout-page-padding-inline) * 2));
 }
 
 .mobile-topbar {

@@ -58,3 +58,44 @@ Date: 2026-06-13
 - Some dense modules were checked through their empty or fallback states in this environment, so content-rich production records may still reveal micro-spacing issues.
 - The historical CSS surface is large, so future regressions should keep using browser QA at the notebook widths listed above.
 
+## Sidebar Icons + Centered Cadastro Layout — Sprint 29
+
+## Widths Tested
+
+- 1280x800
+- 1366x768
+- 1440x900
+- 1512x982
+- 1728x1117
+- 1920x1080
+
+## Pages Tested
+
+- Dashboard
+- Fazendas modal
+- Fazendas page
+
+## Bugs Found
+
+- Collapsed sidebar nav icons were partially crowded by the scrollbar gutter on notebook widths.
+- The compact icon rail could read as visually compressed instead of intentional.
+- The Fazenda cadastro modal sat too far to the right in the expanded shell because the overlay was centering against the full viewport instead of the content area.
+
+## Fixes Applied
+
+- Added stable scrollbar gutter spacing to the sidebar content and navigation.
+- Centered collapsed sidebar items and disabled the hover shift that was nudging icons toward the scrollbar.
+- Aligned the user card and avatar in the compact rail so the footer stayed intentional.
+- Offset the modal overlay and width calculations by the sidebar width so the Fazenda cadastro form recenters inside the content area.
+
+## Validation Result
+
+- No horizontal overflow was observed in the tested dashboard states.
+- Sidebar icons remained fully visible in both expanded and collapsed states.
+- The `Cadastros` section stayed readable and the compact rail kept a clean active state.
+- The Fazenda modal was centered within the available content area in both expanded and collapsed sidebar states.
+
+## Remaining Visual Risks
+
+- The shell still depends on the broader historical CSS surface, so future page-specific regressions should keep using the same notebook-width sweep.
+- Live data-heavy pages can still shift slightly once real records are present, so production-like QA remains important before beta.

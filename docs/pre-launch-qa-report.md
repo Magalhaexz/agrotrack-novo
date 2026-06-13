@@ -15,6 +15,64 @@ Validation completed successfully:
 - `npm test -- --run`
 - `npm run e2e` is unavailable in this environment because the required E2E credentials are missing
 
+## Sidebar Icon Visibility + Centered Cadastro Layout — Sprint 29
+
+### Build / lint / test result
+
+- `npm run lint` passed
+- `npm run build` passed
+- `npm test -- --run` passed
+
+### Widths tested
+
+- 1280x800
+- 1366x768
+- 1440x900
+- 1512x982
+- 1728x1117
+- 1920x1080
+
+### Sidebar result
+
+- Collapsed sidebar icons were fully visible at all tested widths.
+- The compact rail kept a clean active state and no longer read as a clipped icon column.
+- Scroll overflow stayed controlled, and the user card/avatar remained aligned at the bottom of the sidebar.
+- The `Cadastros` section remained intact in expanded mode.
+
+### Fixes applied
+
+- Added stable scrollbar gutter spacing to the sidebar content and navigation container.
+- Centered collapsed sidebar items so icon buttons no longer drift into the scrollbar area.
+- Disabled the compact hover translation that was nudging icons into a visually cramped position.
+- Offset modal overlay sizing by sidebar width so the Fazenda cadastro modal centers inside the content area.
+
+### Dashboard result
+
+- Dashboard shell metrics stayed stable with zero horizontal overflow in the tested widths.
+- Topbar alignment remained clean against both expanded and collapsed sidebar states.
+
+### Fazendas result
+
+- The Fazenda cadastro modal recenters inside the content area instead of drifting too far to the right.
+- The modal remained visually lighter and narrower than the full content width.
+- The form and action row stayed aligned in both expanded and collapsed sidebar states.
+
+### Dense modules result
+
+- The densest shell surfaces inherited the same spacing rhythm and container rules from the layout standardization pass.
+- No clipping or card overlap was observed in the dashboard and Fazendas checks used for this sprint.
+
+### Remaining risks
+
+- Live backend data states still need a real authenticated smoke pass before launch.
+- The QA run used the local developer environment, so production-like records may still expose subtle spacing differences.
+- The broader historical CSS surface remains a regression risk and should keep receiving notebook-width browser checks.
+
+### Final beta impact
+
+- This sprint materially improved sidebar legibility and form centering on notebook-sized screens.
+- The product is still **NOT READY FOR BETA** because the authenticated smoke test, checkout, and user/farm isolation checks are still pending.
+
 ## Responsive Visual QA + Dense Module Polish — Sprint 27B
 
 This pass completed the browser-based responsive sweep after the shell standardization work and verified that the main dense surfaces stay balanced across notebook and desktop widths.
