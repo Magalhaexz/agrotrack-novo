@@ -265,6 +265,9 @@ body {
   min-height: 100dvh;
   overflow-x: clip;
   overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+  overscroll-behavior-y: contain;
+  touch-action: pan-y;
   padding:
     calc(var(--layout-topbar-height) + var(--layout-page-padding-block))
     var(--layout-page-padding-inline)
@@ -349,14 +352,22 @@ body {
 
 .app-shell--sidebar-collapsed .sidebar-content {
   padding: 12px 10px 12px 12px;
-  scrollbar-gutter: stable;
+  scrollbar-gutter: auto;
 }
 
 .app-shell--sidebar-collapsed .sidebar-nav {
   padding: 0 2px 0 0;
   overflow-x: hidden;
   overflow-y: auto;
-  scrollbar-gutter: stable;
+  scrollbar-gutter: auto;
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+
+.app-shell--sidebar-collapsed .sidebar-content::-webkit-scrollbar,
+.app-shell--sidebar-collapsed .sidebar-nav::-webkit-scrollbar {
+  width: 0;
+  height: 0;
 }
 
 .app-shell--sidebar-collapsed .sidebar-logo-copy,
@@ -376,13 +387,20 @@ body {
 
 .app-shell--sidebar-collapsed .sidebar-link,
 .app-shell--sidebar-collapsed .sidebar-item.nav.subnav {
-  width: 100%;
-  min-width: 0;
+  width: 48px;
+  min-width: 48px;
+  max-width: 48px;
+  height: 48px;
+  min-height: 48px;
   justify-content: center;
   justify-items: center;
   grid-template-columns: 1fr;
   gap: 0;
   padding-inline: 0;
+  margin-inline: auto;
+  border-radius: 16px;
+  overflow: hidden;
+  flex: 0 0 48px;
 }
 
 .app-shell--sidebar-collapsed .sidebar-link .nav-icon {
@@ -409,6 +427,25 @@ body {
   display: none;
 }
 
+.app-shell--sidebar-collapsed .sidebar-user-card {
+  width: 48px;
+  min-width: 48px;
+  min-height: 48px;
+  height: 48px;
+  padding: 0;
+  justify-content: center;
+  align-items: center;
+  border-radius: 50%;
+  background: transparent;
+  border-color: transparent;
+  box-shadow: none;
+}
+
+.app-shell--sidebar-collapsed .sidebar-user-card .sidebar-user-info,
+.app-shell--sidebar-collapsed .sidebar-user-card .sidebar-user-caret {
+  display: none !important;
+}
+
 .app-shell--sidebar-collapsed .ui-modal-overlay {
   padding-left: calc(var(--layout-sidebar-collapsed-width) + var(--layout-page-padding-inline));
   padding-right: var(--layout-page-padding-inline);
@@ -417,6 +454,74 @@ body {
 .app-shell--sidebar-collapsed .ui-modal {
   width: min(960px, calc(100vw - var(--layout-sidebar-collapsed-width) - (var(--layout-page-padding-inline) * 2)));
   max-width: calc(100vw - var(--layout-sidebar-collapsed-width) - (var(--layout-page-padding-inline) * 2));
+}
+
+.app-shell.app-shell--sidebar-collapsed .sidebar-content,
+.app-shell.app-shell--sidebar-collapsed .sidebar-nav {
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+
+.app-shell.app-shell--sidebar-collapsed .sidebar-content::-webkit-scrollbar,
+.app-shell.app-shell--sidebar-collapsed .sidebar-nav::-webkit-scrollbar {
+  width: 0 !important;
+  height: 0 !important;
+}
+
+.app-shell.app-shell--sidebar-collapsed .sidebar-link,
+.app-shell.app-shell--sidebar-collapsed .sidebar-item.nav.subnav {
+  width: 48px !important;
+  min-width: 48px !important;
+  max-width: 48px !important;
+  height: 48px !important;
+  min-height: 48px !important;
+  padding: 0 !important;
+  margin-inline: auto !important;
+  justify-content: center !important;
+  justify-items: center !important;
+  gap: 0 !important;
+  grid-template-columns: 1fr !important;
+  border-radius: 16px !important;
+  overflow: hidden !important;
+  flex: 0 0 48px !important;
+}
+
+.app-shell.app-shell--sidebar-collapsed .sidebar-link.active,
+.app-shell.app-shell--sidebar-collapsed .sidebar-link.on,
+.app-shell.app-shell--sidebar-collapsed .sidebar-item.nav.subnav.active,
+.app-shell.app-shell--sidebar-collapsed .sidebar-item.nav.subnav.on,
+.app-shell.app-shell--sidebar-collapsed .sidebar-link[aria-current='page'] {
+  width: 48px !important;
+  min-width: 48px !important;
+  max-width: 48px !important;
+  height: 48px !important;
+  min-height: 48px !important;
+  padding: 0 !important;
+  margin-inline: auto !important;
+  justify-content: center !important;
+  justify-items: center !important;
+  gap: 0 !important;
+  overflow: hidden !important;
+  border-radius: 16px !important;
+}
+
+.app-shell.app-shell--sidebar-collapsed .sidebar-link .nav-icon {
+  flex: 0 0 18px !important;
+  margin: 0 !important;
+}
+
+.app-shell.app-shell--sidebar-collapsed .sidebar-user-card {
+  width: 48px !important;
+  min-width: 48px !important;
+  height: 48px !important;
+  min-height: 48px !important;
+  padding: 0 !important;
+  justify-content: center !important;
+  align-items: center !important;
+  border-radius: 50% !important;
+  background: transparent !important;
+  border-color: transparent !important;
+  box-shadow: none !important;
 }
 
 .mobile-topbar {
@@ -429,7 +534,8 @@ body {
 
 @media (max-width: 1024px) {
   .app-shell {
-    display: block;
+    display: flex;
+    height: 100dvh;
   }
 
   .app-shell .sidebar {
@@ -449,6 +555,10 @@ body {
 
   .app-shell .main {
     min-height: 100dvh;
+    height: 100dvh;
+    margin-left: 0 !important;
+    width: 100% !important;
+    max-width: 100% !important;
     padding:
       calc(var(--layout-topbar-height) + var(--layout-page-padding-block))
       14px
@@ -456,8 +566,8 @@ body {
   }
 
   .app-shell .header.top-header {
-    left: 0;
-    right: 0;
+    left: 0 !important;
+    right: 0 !important;
   }
 
   .mobile-bottom-nav {

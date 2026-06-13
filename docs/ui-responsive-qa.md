@@ -99,3 +99,56 @@ Date: 2026-06-13
 
 - The shell still depends on the broader historical CSS surface, so future page-specific regressions should keep using the same notebook-width sweep.
 - Live data-heavy pages can still shift slightly once real records are present, so production-like QA remains important before beta.
+
+## Collapsed Sidebar + Tablet Scroll Fix — Sprint 30
+
+## Widths Tested
+
+- 768x1024
+- 1024x768
+- 820x1180
+- 1180x820
+- 834x1194
+- 1194x834
+- 1280x800
+- 1366x768
+- 1440x900
+- 1512x982
+- 1728x1117
+- 1920x1080
+
+## Pages Tested
+
+- Login
+- Dashboard
+- Lotes
+- Fazendas
+- Animais
+- Financeiro
+- Estoque
+- Minha Assinatura
+
+## Bugs Found
+
+- The tablet login layout could extend below the viewport without an internal scroll surface, so the form felt hidden on landscape tablets.
+- The authenticated shell on tablet was still carrying a desktop left offset, which prevented the main content area from using the full width.
+- The collapsed desktop sidebar still showed a visible scrollbar gutter and looked cramped instead of like a clean icon rail.
+
+## Fixes Applied
+
+- Converted the login screen into a true scroll container with tablet-friendly padding and hidden brand content on narrower widths.
+- Kept the authenticated tablet shell in flex layout, removed the stale desktop left offset, and allowed the main content to scroll naturally.
+- Forced the collapsed sidebar into a fixed 48px icon rail, hid the scrollbar visually, and centered the user avatar at the bottom.
+
+## Validation Result
+
+- Tablet portrait and landscape login remained visible and scrollable.
+- The `Lotes` page scrolled normally on tablet after the fix.
+- `Dashboard`, `Fazendas`, `Animais`, `Financeiro`, `Estoque`, and `Minha Assinatura` remained reachable in the tablet sweep.
+- Desktop widths stayed clean with no horizontal overflow.
+- The collapsed sidebar read as a premium icon-only rail with no clipped active item.
+
+## Remaining Visual Risks
+
+- Live production records may still reveal a few spacing differences that do not appear in empty-state QA.
+- Modal-heavy pages should keep receiving the same notebook and tablet sweeps before beta.

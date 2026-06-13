@@ -73,6 +73,70 @@ Validation completed successfully:
 - This sprint materially improved sidebar legibility and form centering on notebook-sized screens.
 - The product is still **NOT READY FOR BETA** because the authenticated smoke test, checkout, and user/farm isolation checks are still pending.
 
+## Collapsed Sidebar + Tablet Login/Scroll Fix — Sprint 30
+
+### Build / lint / test result
+
+- `npm run lint` passed
+- `npm run build` passed
+- `npm test -- --run` passed
+
+### Widths tested
+
+- 768x1024
+- 1024x768
+- 820x1180
+- 1180x820
+- 834x1194
+- 1194x834
+- 1280x800
+- 1366x768
+- 1440x900
+- 1512x982
+- 1728x1117
+- 1920x1080
+
+### Sidebar result
+
+- Collapsed sidebar icons stayed fully visible and centered.
+- The scrollbar no longer crossed the icon rail.
+- Section labels, badges, and carets were hidden in collapsed mode so the rail read as intentional.
+- The avatar/user circle remained aligned at the bottom.
+
+### Login result
+
+- Tablet portrait and tablet landscape login were both visible.
+- The login form now scrolls inside the page when the viewport height is short.
+- The brand side is hidden on narrower tablet widths so the form no longer sits below the fold.
+
+### Scroll result
+
+- The authenticated shell now keeps `main` as the active scroll container on tablet.
+- `Lotes` scrolls naturally past the first visible items instead of freezing at the top.
+- The main content area regains the full width on tablet because the stale desktop offset was removed.
+
+### Bugs found
+
+- Login was effectively clipped on tablet landscape because the page was taller than the viewport while the body remained scroll-locked.
+- Tablet shell content was offset by the desktop sidebar margin, preventing full-width usage and contributing to the frozen feel.
+- The collapsed sidebar still exposed a scrollbar gutter and did not yet read as a premium icon rail.
+
+### Fixes applied
+
+- Turned the login screen into a real scroll container with `100dvh`, touch-friendly overflow, and narrower-tablet brand suppression.
+- Kept the tablet app shell in flex layout, zeroed the desktop left margin, and allowed `main` to scroll with touch-friendly settings.
+- Rebuilt the collapsed sidebar into a fixed 48px icon rail and hid the scrollbar visually while preserving scroll.
+
+### Remaining risks
+
+- Live production data can still expose edge-case spacing issues that do not show up in the empty QA environment.
+- Modal-heavy tablet interactions should keep getting rechecked before beta because they depend on the same shell/scroll rules.
+
+### Final beta impact
+
+- This sprint materially improved tablet usability and the collapsed sidebar experience.
+- The product is still **NOT READY FOR BETA** because the authenticated smoke test, checkout, and user/farm isolation checks are still pending.
+
 ## Responsive Visual QA + Dense Module Polish — Sprint 27B
 
 This pass completed the browser-based responsive sweep after the shell standardization work and verified that the main dense surfaces stay balanced across notebook and desktop widths.
