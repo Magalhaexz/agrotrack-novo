@@ -3898,6 +3898,7 @@ a:hover {
   display: grid;
   align-content: start;
   padding: 16px 14px 24px;
+  scrollbar-gutter: stable;
 }
 
 .sidebar-section {
@@ -3934,7 +3935,26 @@ a:hover {
 }
 
 .sidebar-item .nav-icon {
+  width: 16px;
+  height: 16px;
+  min-width: 16px;
+  min-height: 16px;
   flex-shrink: 0;
+}
+
+.sidebar-item-copy {
+  min-width: 0;
+}
+
+.sidebar-badge,
+.nav-group-arrow,
+.sidebar-user-caret {
+  flex-shrink: 0;
+}
+
+.sidebar-user-wrap,
+.sidebar-user-card {
+  overflow: visible;
 }
 
 .sidebar-item-copy {
@@ -9838,16 +9858,16 @@ html, body, #root, .app, .main, .main-content, .page { max-width: 100%; }
 /* Sprint 22B - sidebar polish and mobile UI cleanup */
 @media (min-width: 901px) {
   .app-shell .sidebar-logo-actions {
-    top: 16px;
+    top: 12px;
     right: 14px;
   }
 
   .app-shell .sidebar-header {
-    padding-top: 48px;
+    padding-top: 44px;
   }
 
   .app-shell.app-shell--sidebar-collapsed .sidebar-logo-actions {
-    top: 12px;
+    top: 8px;
     right: 50%;
   }
 
@@ -9958,9 +9978,9 @@ html, body, #root, .app, .main, .main-content, .page { max-width: 100%; }
     flex-direction: column-reverse;
     align-items: center;
     justify-content: flex-start;
-    gap: 12px;
-    min-height: 132px;
-    padding: 14px 10px 12px;
+    gap: 10px;
+    min-height: 136px;
+    padding: 10px 10px 12px;
   }
 
   .app-shell.app-shell--sidebar-collapsed .sidebar-logo-content {
@@ -9990,7 +10010,8 @@ html, body, #root, .app, .main, .main-content, .page { max-width: 100%; }
   }
 
   .app-shell.app-shell--sidebar-collapsed .sidebar-nav {
-    padding-top: 10px;
+    padding: 10px 12px 8px;
+    scrollbar-gutter: stable;
   }
 
   .app-shell.app-shell--sidebar-collapsed .sidebar-link {
@@ -10012,7 +10033,7 @@ html, body, #root, .app, .main, .main-content, .page { max-width: 100%; }
   }
 
   .app-shell.app-shell--sidebar-collapsed .sidebar-user-wrap {
-    padding-top: 8px;
+    padding-top: 10px;
   }
 }
 
