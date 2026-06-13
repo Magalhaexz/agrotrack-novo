@@ -13,6 +13,7 @@ Validation completed successfully:
 - `npm run lint`
 - `npm run build`
 - `npm test -- --run`
+- `npm run e2e` is unavailable in this environment because the required E2E credentials are missing
 
 ## Critical Bugs Found
 
@@ -80,4 +81,59 @@ Validation completed successfully:
 
 ## Final Launch Status
 
-READY FOR BETA
+NOT READY FOR BETA
+
+## Browser Smoke QA - Sprint 20
+
+### Browser / device widths attempted
+
+- Desktop large
+- Notebook
+- Tablet width
+- Mobile width
+
+### Pages tested
+
+- Browser navigation to the local app could not be completed in this environment because the browser runtime refused the local connection.
+- No main page could be fully exercised in the browser smoke pass as a result.
+
+### UI bugs found
+
+- No new browser-verified UI regressions were captured in this environment.
+
+### Functional bugs found
+
+- The browser smoke pass could not reach the running app, so functional flows were not directly exercised here.
+
+### Permission bugs found
+
+- Not verified in-browser in this session.
+
+### Data isolation result
+
+- Not verified in-browser in this session.
+
+### Fixes applied
+
+- No code fix was applied from the browser smoke pass because the app could not be reached from the browser runtime here.
+
+### Remaining risks
+
+- Browser smoke verification remains incomplete until the local app can be opened from the browser runtime.
+- Multi-user, farm isolation, permissions, and visual launch readiness should be rechecked in a live browser session.
+
+### Final launch status
+
+NOT READY FOR BETA
+
+### Validation note
+
+- `npm run e2e` is available, but it cannot run in this environment because the required credentials are missing:
+  - `E2E_BASE_URL`
+  - `E2E_ADMIN_EMAIL`
+  - `E2E_ADMIN_PASSWORD`
+  - `E2E_USER_A_EMAIL`
+  - `E2E_USER_A_PASSWORD`
+  - `E2E_USER_B_EMAIL`
+  - `E2E_USER_B_PASSWORD`
+- Create `.env.e2e` from `.env.e2e.example` and fill real credentials before rerunning E2E.
