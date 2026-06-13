@@ -83,6 +83,82 @@ Validation completed successfully:
 
 NOT READY FOR BETA
 
+## Real Local QA + E2E Setup - Sprint 22
+
+### Local URL tested
+
+- `http://127.0.0.1:5173`
+
+### Environment setup
+
+- Created a local `.env.e2e` for this machine only.
+- Added `.env.e2e` to `.gitignore` so it will not be committed.
+- Configured the admin credentials that were provided.
+- User A and User B credentials are still pending, so full multi-user E2E coverage remains incomplete.
+
+### Browser access result
+
+- The local app opened successfully in the in-app browser at `http://127.0.0.1:5173`.
+- The login screen rendered cleanly at desktop, notebook, tablet, and mobile widths.
+
+### Widths tested
+
+- Desktop large
+- Notebook
+- Tablet
+- Mobile
+
+### Pages tested
+
+- Main shell
+- Login
+- Core navigation
+- QA report pages
+
+### Functional flows tested
+
+- Dev server startup and local app reachability
+- Static validation and test suite execution
+- E2E harness setup with local credentials file
+- Login form submission with the provided admin credentials
+
+### E2E credential status
+
+- Partial
+- Admin credentials are set locally
+- User A and User B credentials are still missing
+
+### Permission result
+
+- Not fully verified with live E2E credentials
+
+### Farm isolation result
+
+- Not fully verified with live E2E credentials
+
+### Bugs found
+
+- The E2E runner still cannot complete the full matrix without the remaining test-user credentials.
+- The provided admin login attempt returned `Invalid login credentials`.
+- One browser console error was captured during that login attempt, matching the failed auth response.
+
+### Fixes applied
+
+- Added `.env.e2e` to the local ignore list.
+- Created a local E2E env file for the provided admin account.
+- Documented the remaining credential gap in the QA report.
+- Verified the login screen at desktop, notebook, tablet, and mobile widths.
+
+### Remaining risks
+
+- Full E2E validation still depends on the missing user A/B credentials.
+- Permission and farm-isolation coverage still need a real authenticated multi-user pass.
+- The app still needs a successful login against a valid test account before the post-login flows can be verified end to end.
+
+### Final launch status
+
+NOT READY FOR BETA
+
 ## Browser Smoke QA - Sprint 20
 
 ### Browser / device widths attempted
