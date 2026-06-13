@@ -9951,6 +9951,71 @@ html, body, #root, .app, .main, .main-content, .page { max-width: 100%; }
   }
 }
 
+@media (min-width: 901px) {
+  /* Final override: keep the collapsed sidebar header stacked and collision-free. */
+  .app-shell.app-shell--sidebar-collapsed .sidebar-logo {
+    display: flex;
+    flex-direction: column-reverse;
+    align-items: center;
+    justify-content: flex-start;
+    gap: 12px;
+    min-height: 132px;
+    padding: 14px 10px 12px;
+  }
+
+  .app-shell.app-shell--sidebar-collapsed .sidebar-logo-content {
+    width: 100%;
+    justify-content: center;
+  }
+
+  .app-shell.app-shell--sidebar-collapsed .sidebar-logo-actions {
+    position: static;
+    width: auto;
+    transform: none;
+    margin: 0;
+    pointer-events: auto;
+  }
+
+  .app-shell.app-shell--sidebar-collapsed .sidebar-toggle {
+    width: 38px;
+    height: 38px;
+    min-width: 38px;
+    min-height: 38px;
+  }
+
+  .app-shell.app-shell--sidebar-collapsed .sidebar-logo-mark {
+    width: 44px;
+    height: 44px;
+    flex: 0 0 44px;
+  }
+
+  .app-shell.app-shell--sidebar-collapsed .sidebar-nav {
+    padding-top: 10px;
+  }
+
+  .app-shell.app-shell--sidebar-collapsed .sidebar-link {
+    width: 48px;
+    min-width: 48px;
+    max-width: 48px;
+    height: 48px;
+    min-height: 48px;
+  }
+
+  .app-shell.app-shell--sidebar-collapsed .sidebar-link.active,
+  .app-shell.app-shell--sidebar-collapsed .sidebar-link.on,
+  .app-shell.app-shell--sidebar-collapsed .sidebar-link[aria-current='page'] {
+    width: 48px !important;
+    min-width: 48px !important;
+    max-width: 48px !important;
+    height: 48px !important;
+    min-height: 48px !important;
+  }
+
+  .app-shell.app-shell--sidebar-collapsed .sidebar-user-wrap {
+    padding-top: 8px;
+  }
+}
+
 /* Sprint 17B - shared visual polish */
 .page-shell,
 .reports-page,
