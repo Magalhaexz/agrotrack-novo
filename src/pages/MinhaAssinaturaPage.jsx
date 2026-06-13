@@ -160,10 +160,28 @@ export default function MinhaAssinaturaPage({
         customer: customerData,
       });
 
+      if (result?.code === 'SESSION_MISSING') {
+        showToast({ type: 'warning', message: result.message || 'Sua sessão expirou. Entre novamente para continuar.' });
+        return;
+      }
+
+      if (result?.code === 'INVALID_SUBSCRIPTION_PAYLOAD' || result?.code === 'INVALID_PLAN') {
+        showToast({ type: 'warning', message: result.message || 'Revise os dados do plano antes de continuar.' });
+        return;
+      }
+
       if (result?.code === 'MISSING_CUSTOMER_FIELDS') {
         setMissingFields(Array.isArray(result.missingFields) ? result.missingFields : []);
         setCustomerModalOpen(true);
         showToast({ type: 'warning', message: result.message || 'Precisamos conferir alguns dados antes de continuar.' });
+        return;
+      }
+
+      if (!result?.ok) {
+        showToast({
+          type: 'warning',
+          message: result?.message || 'Não foi possível criar sua assinatura agora. Tente novamente em alguns instantes.',
+        });
         return;
       }
 

@@ -20,6 +20,7 @@ Use server-side variables for the Asaas integration:
 
 ```env
 ASAAS_ENV=sandbox
+# Use ASAAS_API_BASE_URL or ASAAS_BASE_URL (alias) for the provider API host.
 ASAAS_API_BASE_URL=https://sandbox.asaas.com/api/v3
 ASAAS_API_KEY=YOUR_PRIVATE_SANDBOX_KEY
 ASAAS_WEBHOOK_TOKEN=YOUR_PRIVATE_WEBHOOK_TOKEN
@@ -31,6 +32,7 @@ Important:
 
 - `ASAAS_API_KEY` must never be exposed to the frontend.
 - `ASAAS_WEBHOOK_TOKEN` is only used on the server route that receives webhook calls.
+- The server accepts `ASAAS_API_BASE_URL` and `ASAAS_BASE_URL` as aliases for the Asaas host.
 - The customer UI uses the app route, not the provider secret.
 - In the Asaas webhook panel, the "Token de autenticação" must use the same value as `ASAAS_WEBHOOK_TOKEN`.
 - Asaas sends that value in the `asaas-access-token` header.

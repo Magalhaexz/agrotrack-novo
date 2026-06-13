@@ -13,6 +13,32 @@ function normalizeCustomerValue(value) {
   return normalizeText(value);
 }
 
+function resolveFriendlyCheckoutErrorMessage(payload = {}, fallback = 'Não foi possível abrir o pagamento agora. Tente novamente em alguns instantes ou fale com o suporte.') {
+  const code = normalizeText(payload?.code).toUpperCase();
+
+  if (code === 'SESSION_MISSING') {
+    return 'Sua sessão expirou. Entre novamente para continuar.';
+  }
+
+  if (code === 'INVALID_SUBSCRIPTION_PAYLOAD' || code === 'INVALID_PLAN') {
+    return 'Revise os dados do plano antes de continuar.';
+  }
+
+  if (code === 'MISSING_CUSTOMER_FIELDS') {
+    return payload?.message || 'Precisamos conferir alguns dados antes de continuar.';
+  }
+
+  if (code === 'ASAAS_SUBSCRIPTION_FAILED' || code === 'ASAAS_ENV_MISSING') {
+    return 'Não foi possível criar sua assinatura agora. Tente novamente em alguns instantes.';
+  }
+
+  if (code === 'CHECKOUT_URL_MISSING') {
+    return payload?.message || fallback;
+  }
+
+  return payload?.message || fallback;
+}
+
 export function getMissingAsaasCustomerFields(customer = {}) {
   const seed = isPlainObject(customer) ? customer : {};
   const missing = [];
@@ -120,7 +146,7 @@ export async function requestAsaasSandboxCheckout({ session = null, planCode, cu
       ok: false,
       code: payload?.code || null,
       missingFields: Array.isArray(payload?.missingFields) ? payload.missingFields : [],
-      message: payload?.message || 'Não foi possível confirmar o salvamento agora. Tente novamente em alguns instantes.',
+      message: resolveFriendlyCheckoutErrorMessage(payload, 'Não foi possível confirmar o salvamento agora. Tente novamente em alguns instantes.'),
     };
   }
 
@@ -135,7 +161,7 @@ export async function requestAsaasSandboxCheckout({ session = null, planCode, cu
       manual: Boolean(payload?.manual),
       checkoutUrl: resolvedPaymentUrl,
       paymentUrl: resolvedPaymentUrl,
-      message: payload?.message || 'Não foi possível abrir o pagamento agora. Tente novamente em alguns instantes ou fale com o suporte.',
+      message: resolveFriendlyCheckoutErrorMessage(payload),
       ...payload,
     };
   }
@@ -149,7 +175,7 @@ export async function requestAsaasSandboxCheckout({ session = null, planCode, cu
       manual: Boolean(payload?.manual),
       checkoutUrl: null,
       paymentUrl: null,
-      message: payload?.message || 'Não foi possível abrir o pagamento agora. Tente novamente em alguns instantes ou fale com o suporte.',
+      message: resolveFriendlyCheckoutErrorMessage(payload),
       ...payload,
     };
   }

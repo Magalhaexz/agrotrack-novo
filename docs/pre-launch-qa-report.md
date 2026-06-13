@@ -15,6 +15,37 @@ Validation completed successfully:
 - `npm test -- --run`
 - `npm run e2e` is unavailable in this environment because the required E2E credentials are missing
 
+## Sprint 25 - Asaas Subscription 500 Fix
+
+### Issue observed
+
+- The subscription creation route could surface a raw HTTP 500 when the Asaas provider or runtime setup failed.
+- The local checkout flow could also continue opening the payment URL before fully honoring a failed backend response.
+
+### Fixes applied
+
+- Accepted `ASAAS_BASE_URL` as an alias for `ASAAS_API_BASE_URL` on the server side.
+- Added structured server-side logging for subscription failures without exposing secrets.
+- Added payload validation for subscription requests so missing or invalid plan data now returns a controlled 400 response.
+- Wrapped the subscription handler in a top-level failure path so provider/runtime problems now return a structured error instead of a blind 500.
+- Updated the frontend to show friendly Portuguese messages and only open the payment URL after a successful backend response.
+- Added automated coverage for the env alias, provider rejection, and invalid payload cases.
+
+### Validation result
+
+- `npm run lint` passed
+- `npm run build` passed
+- `npm test -- --run` passed
+- `npm run e2e` could not complete because the required local credentials are still missing:
+  - `E2E_USER_A_EMAIL`
+  - `E2E_USER_A_PASSWORD`
+  - `E2E_USER_B_EMAIL`
+  - `E2E_USER_B_PASSWORD`
+
+### Final launch status
+
+NOT READY FOR BETA
+
 ## Critical Bugs Found
 
 1. Collapsed sidebar header collision

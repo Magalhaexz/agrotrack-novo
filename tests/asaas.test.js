@@ -8,6 +8,7 @@ import {
   buildAsaasEventIdentity,
   findRecentCheckoutSession,
   mapAsaasEventToSubscriptionStatus,
+  getAsaasServerEnvStatus,
   upsertBillingEvent,
   validateWebhookToken,
   handleCreateSubscriptionRequest,
@@ -362,6 +363,27 @@ test('server rejects GET with 405 for checkout route', async () => {
   assert.equal(response.body.message, 'Metodo nao permitido.');
 });
 
+test('Asaas env status accepts the ASAAS_BASE_URL alias', () => {
+  const originalAsaasBaseUrl = process.env.ASAAS_API_BASE_URL;
+  const originalAsaasBaseUrlAlias = process.env.ASAAS_BASE_URL;
+  const originalAsaasApiKey = process.env.ASAAS_API_KEY;
+
+  delete process.env.ASAAS_API_BASE_URL;
+  process.env.ASAAS_BASE_URL = 'https://sandbox.asaas.com/api/v3';
+  process.env.ASAAS_API_KEY = 'sandbox-key';
+
+  try {
+    const status = getAsaasServerEnvStatus();
+    assert.equal(status.configured, true);
+    assert.equal(status.apiBaseUrlPresent, true);
+    assert.equal(status.apiBaseUrlAliasPresent, true);
+  } finally {
+    process.env.ASAAS_API_BASE_URL = originalAsaasBaseUrl;
+    process.env.ASAAS_BASE_URL = originalAsaasBaseUrlAlias;
+    process.env.ASAAS_API_KEY = originalAsaasApiKey;
+  }
+});
+
 test('server accepts POST for checkout route', async () => {
   const originalFetch = globalThis.fetch;
   const originalAsaasBaseUrl = process.env.ASAAS_API_BASE_URL;
@@ -466,6 +488,166 @@ test('server accepts POST for checkout route', async () => {
     assert.equal(result.status, 200);
     assert.equal(result.payload.ok, true);
     assert.equal(result.payload.paymentUrl, 'https://sandbox.example/payment-link');
+  } finally {
+    globalThis.fetch = originalFetch;
+    process.env.ASAAS_API_BASE_URL = originalAsaasBaseUrl;
+    process.env.ASAAS_API_KEY = originalAsaasApiKey;
+    process.env.SUPABASE_URL = originalSupabaseUrl;
+    process.env.SUPABASE_SERVICE_ROLE_KEY = originalSupabaseServiceRole;
+  }
+});
+
+test('server returns structured failure when Asaas provider rejects the request', async () => {
+  const originalFetch = globalThis.fetch;
+  const originalAsaasBaseUrl = process.env.ASAAS_API_BASE_URL;
+  const originalAsaasApiKey = process.env.ASAAS_API_KEY;
+  const originalSupabaseUrl = process.env.SUPABASE_URL;
+  const originalSupabaseServiceRole = process.env.SUPABASE_SERVICE_ROLE_KEY;
+
+  process.env.ASAAS_API_BASE_URL = 'https://sandbox.asaas.com/api/v3';
+  process.env.ASAAS_API_KEY = 'sandbox-key';
+  process.env.SUPABASE_URL = 'https://project.supabase.co';
+  process.env.SUPABASE_SERVICE_ROLE_KEY = 'service-role-key';
+
+  globalThis.fetch = async (url) => {
+    const target = String(url || '');
+    if (target.includes('/auth/v1/user')) {
+      return {
+        ok: true,
+        json: async () => ({ id: '11111111-1111-1111-1111-111111111111', email: 'cliente@teste.com', user_metadata: {} }),
+      };
+    }
+    if (target.includes('/customers')) {
+      return {
+        ok: false,
+        status: 503,
+        statusText: 'Service Unavailable',
+        json: async () => ({
+          message: 'Provider offline',
+          code: 'SERVICE_UNAVAILABLE',
+          errors: [{ code: 'service_unavailable', description: 'Provider offline' }],
+        }),
+      };
+    }
+    return {
+      ok: true,
+      json: async () => ({}),
+    };
+  };
+
+  const client = {
+    from(table) {
+      if (table === 'profiles') {
+        return {
+          select() { return this; },
+          eq() { return this; },
+          maybeSingle: async () => ({ data: { id: '11111111-1111-1111-1111-111111111111', owner_user_id: '11111111-1111-1111-1111-111111111111', email: 'cliente@teste.com', nome: 'Cliente Teste' }, error: null }),
+        };
+      }
+      if (table === 'checkout_sessions' || table === 'customer_subscriptions' || table === 'billing_events') {
+        return {
+          select() { return this; },
+          eq() { return this; },
+          order() { return this; },
+          limit() { return this; },
+          in() { return this; },
+          upsert(payload) {
+            return {
+              select() {
+                return {
+                  maybeSingle: async () => ({ data: { id: 1, ...payload }, error: null }),
+                };
+              },
+            };
+          },
+          insert(payload) {
+            return {
+              select() {
+                return {
+                  maybeSingle: async () => ({ data: { id: 1, ...payload }, error: null }),
+                };
+              },
+            };
+          },
+        };
+      }
+      throw new Error(`unexpected table ${table}`);
+    },
+  };
+
+  const req = {
+    method: 'POST',
+    headers: { authorization: 'Bearer jwt.token.value' },
+    body: {
+      planCode: 'pro',
+      customer: { name: 'Cliente Teste', email: 'cliente@teste.com', cpfCnpj: '12345678901', mobilePhone: '11999999999' },
+    },
+  };
+
+  try {
+    const result = await handleCreateSubscriptionRequest(req, { client });
+    assert.equal(result.status, 502);
+    assert.equal(result.payload.ok, false);
+    assert.equal(result.payload.code, 'ASAAS_SUBSCRIPTION_FAILED');
+    assert.equal(result.payload.message, 'Não foi possível criar a assinatura no Asaas. Tente novamente em alguns instantes.');
+  } finally {
+    globalThis.fetch = originalFetch;
+    process.env.ASAAS_API_BASE_URL = originalAsaasBaseUrl;
+    process.env.ASAAS_API_KEY = originalAsaasApiKey;
+    process.env.SUPABASE_URL = originalSupabaseUrl;
+    process.env.SUPABASE_SERVICE_ROLE_KEY = originalSupabaseServiceRole;
+  }
+});
+
+test('server rejects incomplete subscription payload with 400', async () => {
+  const originalFetch = globalThis.fetch;
+  const originalAsaasBaseUrl = process.env.ASAAS_API_BASE_URL;
+  const originalAsaasApiKey = process.env.ASAAS_API_KEY;
+  const originalSupabaseUrl = process.env.SUPABASE_URL;
+  const originalSupabaseServiceRole = process.env.SUPABASE_SERVICE_ROLE_KEY;
+
+  process.env.ASAAS_API_BASE_URL = 'https://sandbox.asaas.com/api/v3';
+  process.env.ASAAS_API_KEY = 'sandbox-key';
+  process.env.SUPABASE_URL = 'https://project.supabase.co';
+  process.env.SUPABASE_SERVICE_ROLE_KEY = 'service-role-key';
+
+  globalThis.fetch = async (url) => {
+    const target = String(url || '');
+    if (target.includes('/auth/v1/user')) {
+      return {
+        ok: true,
+        json: async () => ({ id: '11111111-1111-1111-1111-111111111111', email: 'cliente@teste.com', user_metadata: {} }),
+      };
+    }
+    return {
+      ok: true,
+      json: async () => ({}),
+    };
+  };
+
+  const result = await handleCreateSubscriptionRequest({
+    method: 'POST',
+    headers: { authorization: 'Bearer jwt.token.value' },
+    body: {},
+  }, {
+    client: {
+      from(table) {
+        if (table === 'profiles') {
+          return {
+            select() { return this; },
+            eq() { return this; },
+            maybeSingle: async () => ({ data: { id: '11111111-1111-1111-1111-111111111111', owner_user_id: '11111111-1111-1111-1111-111111111111', email: 'cliente@teste.com', nome: 'Cliente Teste' }, error: null }),
+          };
+        }
+        throw new Error(`unexpected table ${table}`);
+      },
+    },
+  });
+
+  try {
+    assert.equal(result.status, 400);
+    assert.equal(result.payload.ok, false);
+    assert.equal(result.payload.code, 'INVALID_SUBSCRIPTION_PAYLOAD');
   } finally {
     globalThis.fetch = originalFetch;
     process.env.ASAAS_API_BASE_URL = originalAsaasBaseUrl;

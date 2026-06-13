@@ -19,7 +19,7 @@ function json(status, payload) {
 }
 
 function getRuntimeEnv() {
-  const baseUrl = normalizeText(process.env.ASAAS_API_BASE_URL || 'https://sandbox.asaas.com/api/v3');
+  const baseUrl = normalizeText(process.env.ASAAS_API_BASE_URL || process.env.ASAAS_BASE_URL || 'https://sandbox.asaas.com/api/v3');
   const apiKey = normalizeText(process.env.ASAAS_API_KEY);
   const webhookToken = normalizeText(process.env.ASAAS_WEBHOOK_TOKEN);
   const environment = normalizeLower(process.env.ASAAS_ENV || 'sandbox') || 'sandbox';
@@ -37,10 +37,68 @@ export function getAsaasServerEnvStatus() {
   return {
     configured: env.configured,
     apiBaseUrlPresent: Boolean(env.baseUrl),
+    apiBaseUrlAliasPresent: Boolean(normalizeText(process.env.ASAAS_BASE_URL)),
     apiKeyPresent: Boolean(env.apiKey),
     webhookTokenPresent: Boolean(env.webhookToken),
     environment: env.environment,
   };
+}
+
+const ASAAS_SUBSCRIPTION_FAILURE_MESSAGE = 'Não foi possível criar a assinatura no Asaas. Tente novamente em alguns instantes.';
+const INVALID_SUBSCRIPTION_PAYLOAD_MESSAGE = 'Dados insuficientes para criar a assinatura.';
+
+function buildSubscriptionFailurePayload({ status = 502, code = 'ASAAS_SUBSCRIPTION_FAILED', message = ASAAS_SUBSCRIPTION_FAILURE_MESSAGE, extra = {} } = {}) {
+  return json(status, {
+    ok: false,
+    code,
+    message,
+    ...extra,
+  });
+}
+
+function buildInvalidPayloadResponse({ message = INVALID_SUBSCRIPTION_PAYLOAD_MESSAGE, code = 'INVALID_SUBSCRIPTION_PAYLOAD', missingFields = [], extra = {} } = {}) {
+  return json(400, {
+    ok: false,
+    code,
+    message,
+    missingFields: Array.isArray(missingFields) ? missingFields : [],
+    ...extra,
+  });
+}
+
+function logSubscriptionFailure({
+  step = 'unknown',
+  error = null,
+  userId = null,
+  planCode = null,
+  providerCustomerId = null,
+  providerSubscriptionId = null,
+  missingFields = null,
+  env = null,
+  body = null,
+} = {}) {
+  console.error('[asaas-create-subscription]', {
+    step,
+    userId,
+    planCode,
+    providerCustomerId,
+    providerSubscriptionId,
+    missingFields,
+    missingEnv: env ? {
+      apiBaseUrlPresent: env.apiBaseUrlPresent,
+      apiBaseUrlAliasPresent: env.apiBaseUrlAliasPresent,
+      apiKeyPresent: env.apiKeyPresent,
+      webhookTokenPresent: env.webhookTokenPresent,
+      environment: env.environment,
+    } : null,
+    error: error ? {
+      code: error.code || null,
+      status: error.status || null,
+      message: error.message || null,
+      details: error.details || null,
+    } : null,
+    body: body || null,
+  });
 }
 
 function buildAsaasHeaders() {
@@ -536,6 +594,53 @@ function buildMissingCustomerFieldsMessage(fields = []) {
   return `Precisamos confirmar ${readable} antes de continuar.`;
 }
 
+function validateSubscriptionPayload({ body, user, profile } = {}) {
+  if (!isObject(body)) {
+    return buildInvalidPayloadResponse();
+  }
+
+  const planCode = normalizeLower(body.planCode || body.plan_code || body.plano || '');
+  if (!planCode) {
+    return buildInvalidPayloadResponse();
+  }
+
+  if (planCode === 'enterprise') {
+    return {
+      ok: true,
+      manual: true,
+      planCode,
+      selectedPlan: { planCode: 'enterprise' },
+      seed: null,
+    };
+  }
+
+  const selectedPlan = getPlanLimits(planCode);
+  if (!selectedPlan?.planCode) {
+    return buildInvalidPayloadResponse({
+      code: 'INVALID_PLAN',
+      message: 'Escolha um plano disponivel para continuar.',
+    });
+  }
+
+  const seed = getUserProfileSeed(user, profile, body.customer || body);
+  const missingCustomerFields = buildCustomerFieldsMissing(seed);
+  if (missingCustomerFields.length > 0) {
+    return json(400, {
+      ok: false,
+      code: 'MISSING_CUSTOMER_FIELDS',
+      missingFields: missingCustomerFields,
+      message: buildMissingCustomerFieldsMessage(missingCustomerFields),
+    });
+  }
+
+  return {
+    ok: true,
+    planCode,
+    selectedPlan,
+    seed,
+  };
+}
+
 async function createCustomerOnAsaas({ user, profile, body }) {
   const seed = getUserProfileSeed(user, profile, body.customer || body);
   const missingFields = buildCustomerFieldsMissing(seed);
@@ -744,59 +849,70 @@ export async function handleCreateSubscriptionRequest(req, options = {}) {
     return json(405, { ok: false, message: 'Metodo nao permitido.' });
   }
 
-  const client = options.client || getSupabaseAdminClient();
-
   const env = getAsaasServerEnvStatus();
-  if (!env.configured) {
-    return json(500, {
-      ok: false,
+  let client;
+  try {
+    client = options.client || getSupabaseAdminClient();
+  } catch (error) {
+    logSubscriptionFailure({
+      step: 'resolve_supabase_admin_client',
+      error,
+      env,
+    });
+    return buildSubscriptionFailurePayload({
+      status: 500,
+      code: 'ASAAS_ENV_MISSING',
       message: 'O recurso de assinatura ainda nao esta pronto. Tente novamente em alguns instantes.',
     });
   }
 
-  const user = await resolveAuthenticatedUser(req);
-  if (!user?.id) {
-    return json(401, {
-      ok: false,
-      message: 'Sessao expirada. Entre novamente para continuar.',
+  if (!env.configured) {
+    logSubscriptionFailure({
+      step: 'validate_env',
+      env,
+    });
+    return buildSubscriptionFailurePayload({
+      status: 500,
+      code: 'ASAAS_ENV_MISSING',
+      message: 'O recurso de assinatura ainda nao esta pronto. Tente novamente em alguns instantes.',
     });
   }
 
-  const body = isObject(req.body) ? req.body : {};
-  const planCode = normalizeLower(body.planCode || body.plan_code || body.plano || '');
-  const selectedPlan = getPlanLimits(planCode);
+  let body = null;
+  try {
+    const user = await resolveAuthenticatedUser(req);
+    if (!user?.id) {
+      return json(401, {
+        ok: false,
+        code: 'SESSION_MISSING',
+        message: 'Sessao expirada. Entre novamente para continuar.',
+      });
+    }
 
-  if (planCode === 'enterprise') {
-    return json(200, {
-      ok: true,
-      manual: true,
-      checkoutUrl: null,
-      message: 'Plano sob atendimento. Fale com a equipe para continuar.',
-      subscription: null,
-      customer: null,
-    });
-  }
+    body = isObject(req.body) ? req.body : {};
+    const profile = await resolveProfileForUser(client, user.id);
+    const validation = validateSubscriptionPayload({ body, user, profile });
+    if (validation?.status) {
+      return validation;
+    }
 
-  const availablePlan = selectedPlan || null;
-  if (!availablePlan?.planCode) {
-    return json(400, {
-      ok: false,
-      code: 'INVALID_PLAN',
-      message: 'Escolha um plano disponivel para continuar.',
-    });
-  }
+    const {
+      selectedPlan,
+      manual = false,
+    } = validation;
 
-  const profile = await resolveProfileForUser(client, user.id);
-  const seed = getUserProfileSeed(user, profile, body.customer || body);
-  const requiredFields = buildCustomerFieldsMissing(seed);
-  if (requiredFields.length > 0) {
-    return json(422, {
-      ok: false,
-      code: 'MISSING_CUSTOMER_FIELDS',
-      missingFields: requiredFields,
-      message: buildMissingCustomerFieldsMessage(requiredFields),
-    });
-  }
+    if (manual) {
+      return json(200, {
+        ok: true,
+        manual: true,
+        checkoutUrl: null,
+        message: 'Plano sob atendimento. Fale com a equipe para continuar.',
+        subscription: null,
+        customer: null,
+      });
+    }
+
+    const availablePlan = selectedPlan || null;
 
   const providerReference = buildCheckoutProviderReference({ userId: user.id, planCode: availablePlan.planCode });
   const externalReference = buildCheckoutExternalReference({ userId: user.id, planCode: availablePlan.planCode });
@@ -1025,6 +1141,70 @@ export async function handleCreateSubscriptionRequest(req, options = {}) {
         : 'Abrindo pagamento seguro...')
       : 'O pagamento foi criado, mas o link ainda nao foi retornado. Tente novamente em alguns instantes.',
   });
+  } catch (error) {
+    const currentPlanCode = normalizeLower(body?.planCode || body?.plan_code || body?.plano || '');
+    const missingFields = Array.isArray(error?.details?.missingFields) ? error.details.missingFields : [];
+
+    logSubscriptionFailure({
+      step: error?.code === 'MISSING_CUSTOMER_FIELDS'
+        ? 'validate_customer_fields'
+        : (error?.status ? 'asaas_request' : 'handler'),
+      error,
+      planCode: currentPlanCode || null,
+      missingFields,
+      env,
+      body: {
+        hasPlanCode: Boolean(currentPlanCode),
+        hasCustomer: Boolean(body?.customer || body),
+      },
+    });
+
+    if (error?.code === 'MISSING_CUSTOMER_FIELDS') {
+      return json(400, {
+        ok: false,
+        code: 'MISSING_CUSTOMER_FIELDS',
+        missingFields,
+        message: buildMissingCustomerFieldsMessage(missingFields),
+      });
+    }
+
+    if (error?.code === 'INVALID_PLAN') {
+      return buildInvalidPayloadResponse({
+        code: 'INVALID_PLAN',
+        message: 'Escolha um plano disponivel para continuar.',
+      });
+    }
+
+    if (error?.code === 'ASAAS_ENV_MISSING') {
+      return buildSubscriptionFailurePayload({
+        status: 500,
+        code: 'ASAAS_ENV_MISSING',
+        message: 'O recurso de assinatura ainda nao esta pronto. Tente novamente em alguns instantes.',
+      });
+    }
+
+    if (error?.status === 401) {
+      return json(401, {
+        ok: false,
+        code: 'SESSION_MISSING',
+        message: 'Sessao expirada. Entre novamente para continuar.',
+      });
+    }
+
+    if (error?.status === 400 || error?.status === 422) {
+      return buildInvalidPayloadResponse({
+        code: error?.code || 'INVALID_SUBSCRIPTION_PAYLOAD',
+        message: error?.message || INVALID_SUBSCRIPTION_PAYLOAD_MESSAGE,
+        missingFields,
+      });
+    }
+
+    return buildSubscriptionFailurePayload({
+      status: 502,
+      code: 'ASAAS_SUBSCRIPTION_FAILED',
+      message: ASAAS_SUBSCRIPTION_FAILURE_MESSAGE,
+    });
+  }
 }
 
 export async function handleWebhookRequest(req, options = {}) {
