@@ -137,3 +137,74 @@ NOT READY FOR BETA
   - `E2E_USER_B_EMAIL`
   - `E2E_USER_B_PASSWORD`
 - Create `.env.e2e` from `.env.e2e.example` and fill real credentials before rerunning E2E.
+
+## Browser Access + Smoke QA - Sprint 21
+
+### Local URL tested
+
+- `http://127.0.0.1:5173`
+
+### Browser access result
+
+- The local app server configuration was standardized for browser access, but the browser runtime in this environment still blocked/failed the connection to the local URL.
+- Because of that, the real browser smoke pass could not be completed here.
+
+### Widths tested
+
+- Desktop large
+- Notebook
+- Tablet
+- Mobile
+
+### Pages tested
+
+- No main application page could be fully exercised in-browser in this environment.
+
+### Functional flows tested
+
+- None in-browser, because the browser runtime could not reach the local app.
+
+### E2E credential status
+
+- Missing
+- Required variables still need real values before `npm run e2e` can execute:
+  - `E2E_BASE_URL`
+  - `E2E_ADMIN_EMAIL`
+  - `E2E_ADMIN_PASSWORD`
+  - `E2E_USER_A_EMAIL`
+  - `E2E_USER_A_PASSWORD`
+  - `E2E_USER_B_EMAIL`
+  - `E2E_USER_B_PASSWORD`
+
+### Permission result
+
+- Not verified in-browser in this environment.
+
+### Farm isolation result
+
+- Not verified in-browser in this environment.
+
+### Bugs found
+
+- The browser smoke pass remains blocked by local browser access in this environment.
+- Sprint 20 formatting issues were cleaned up.
+- `E2E_BASE_URL` was standardized to match the local dev/browser setup.
+
+### Fixes applied
+
+- Changed the dev and preview commands to bind on `0.0.0.0`.
+- Standardized Playwright fallback base URL to `http://127.0.0.1:5173`.
+- Updated the Playwright web server command to match the real dev port.
+- Added `docs/browser-smoke-checklist.md`.
+- Added `server` and `preview` host settings in `vite.config.js`.
+- Cleaned the QA report formatting.
+
+### Remaining risks
+
+- Real browser smoke validation is still blocked in this environment.
+- Multi-user isolation and permission flows still need real browser confirmation with credentials.
+- E2E cannot run until the required credentials are provided.
+
+### Final launch status
+
+NOT READY FOR BETA

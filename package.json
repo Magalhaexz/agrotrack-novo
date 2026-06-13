@@ -4,12 +4,12 @@
   "version": "0.0.0",
   "type": "module",
   "scripts": {
-    "dev": "vite",
+    "dev": "vite --host 0.0.0.0",
     "build": "vite build --configLoader native",
     "test": "node scripts/run-node-tests.mjs",
     "test:run": "node scripts/run-node-tests.mjs",
     "lint": "eslint .",
-    "preview": "vite preview",
+    "preview": "vite preview --host 0.0.0.0",
     "e2e": "node scripts/run-e2e.mjs",
     "e2e:headed": "node scripts/run-e2e.mjs --headed"
   },
