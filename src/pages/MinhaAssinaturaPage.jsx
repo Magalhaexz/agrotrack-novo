@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { CheckCircle2, FileText } from 'lucide-react';
 import SubscriptionSummary from '../components/subscription/SubscriptionSummary';
 import Badge from '../components/ui/Badge';
@@ -82,6 +82,7 @@ export default function MinhaAssinaturaPage({
   const [missingFields, setMissingFields] = useState([]);
   const [pendingPlanCode, setPendingPlanCode] = useState(selectedPlanFallback);
   const [pendingPaymentUrl, setPendingPaymentUrl] = useState(null);
+  const checkoutLockRef = useRef(false);
 
   const normalizedPlanCode = String(subscription?.plan_code || subscription?.plan?.planCode || '').toLowerCase();
   const checkoutReady = hasSubscriptionBillingReady(subscription);
@@ -123,7 +124,7 @@ export default function MinhaAssinaturaPage({
   }
 
   async function iniciarCheckout(planCode = selectedPlanCode, customerOverride = null) {
-    if (checkoutBusy) {
+    if (checkoutBusy || checkoutLockRef.current) {
       return;
     }
 
@@ -152,6 +153,7 @@ export default function MinhaAssinaturaPage({
       return;
     }
 
+    checkoutLockRef.current = true;
     setCheckoutBusy(true);
     try {
       const result = await requestAsaasSandboxCheckout({
@@ -219,6 +221,7 @@ export default function MinhaAssinaturaPage({
     } catch {
       showToast({ type: 'warning', message: 'Não foi possível abrir o pagamento agora. Tente novamente em alguns instantes ou fale com o suporte.' });
     } finally {
+      checkoutLockRef.current = false;
       setCheckoutBusy(false);
     }
   }

@@ -396,12 +396,24 @@ test('server accepts POST for checkout route', async () => {
   process.env.SUPABASE_URL = 'https://project.supabase.co';
   process.env.SUPABASE_SERVICE_ROLE_KEY = 'service-role-key';
 
-  globalThis.fetch = async (url) => {
+  const calls = [];
+  globalThis.fetch = async (url, init) => {
     const target = String(url || '');
+    calls.push({ url: target, init });
     if (target.includes('/auth/v1/user')) {
       return {
         ok: true,
         json: async () => ({ id: '11111111-1111-1111-1111-111111111111', email: 'cliente@teste.com', user_metadata: {} }),
+      };
+    }
+    if (target.includes('/customers')) {
+      return {
+        ok: true,
+        json: async () => ({
+          id: 'cus_123',
+          name: 'Cliente Teste',
+          email: 'cliente@teste.com',
+        }),
       };
     }
     if (target.includes('/paymentLinks')) {
@@ -488,6 +500,11 @@ test('server accepts POST for checkout route', async () => {
     assert.equal(result.status, 200);
     assert.equal(result.payload.ok, true);
     assert.equal(result.payload.paymentUrl, 'https://sandbox.example/payment-link');
+    const paymentLinkCall = calls.find((call) => String(call.url || '').includes('/paymentLinks'));
+    assert.ok(paymentLinkCall);
+    const paymentLinkBody = JSON.parse(paymentLinkCall.init.body);
+    assert.equal(paymentLinkBody.dueDateLimitDays, 5);
+    assert.equal(paymentLinkBody.customer, 'cus_123');
   } finally {
     globalThis.fetch = originalFetch;
     process.env.ASAAS_API_BASE_URL = originalAsaasBaseUrl;
@@ -648,6 +665,70 @@ test('server rejects incomplete subscription payload with 400', async () => {
     assert.equal(result.status, 400);
     assert.equal(result.payload.ok, false);
     assert.equal(result.payload.code, 'INVALID_SUBSCRIPTION_PAYLOAD');
+  } finally {
+    globalThis.fetch = originalFetch;
+    process.env.ASAAS_API_BASE_URL = originalAsaasBaseUrl;
+    process.env.ASAAS_API_KEY = originalAsaasApiKey;
+    process.env.SUPABASE_URL = originalSupabaseUrl;
+    process.env.SUPABASE_SERVICE_ROLE_KEY = originalSupabaseServiceRole;
+  }
+});
+
+test('server rejects invalid due date limit values with 400', async () => {
+  const originalFetch = globalThis.fetch;
+  const originalAsaasBaseUrl = process.env.ASAAS_API_BASE_URL;
+  const originalAsaasApiKey = process.env.ASAAS_API_KEY;
+  const originalSupabaseUrl = process.env.SUPABASE_URL;
+  const originalSupabaseServiceRole = process.env.SUPABASE_SERVICE_ROLE_KEY;
+
+  process.env.ASAAS_API_BASE_URL = 'https://sandbox.asaas.com/api/v3';
+  process.env.ASAAS_API_KEY = 'sandbox-key';
+  process.env.SUPABASE_URL = 'https://project.supabase.co';
+  process.env.SUPABASE_SERVICE_ROLE_KEY = 'service-role-key';
+
+  const calls = [];
+  globalThis.fetch = async (url, init) => {
+    calls.push({ url: String(url || ''), init });
+    if (String(url || '').includes('/auth/v1/user')) {
+      return {
+        ok: true,
+        json: async () => ({ id: '11111111-1111-1111-1111-111111111111', email: 'cliente@teste.com', user_metadata: {} }),
+      };
+    }
+    return {
+      ok: true,
+      json: async () => ({}),
+    };
+  };
+
+  const result = await handleCreateSubscriptionRequest({
+    method: 'POST',
+    headers: { authorization: 'Bearer jwt.token.value' },
+    body: {
+      planCode: 'pro',
+      dueDateLimitDays: 'abc',
+      customer: { name: 'Cliente Teste', email: 'cliente@teste.com', cpfCnpj: '12345678901', mobilePhone: '11999999999' },
+    },
+  }, {
+    client: {
+      from(table) {
+        if (table === 'profiles') {
+          return {
+            select() { return this; },
+            eq() { return this; },
+            maybeSingle: async () => ({ data: { id: '11111111-1111-1111-1111-111111111111', owner_user_id: '11111111-1111-1111-1111-111111111111', email: 'cliente@teste.com', nome: 'Cliente Teste' }, error: null }),
+          };
+        }
+        throw new Error(`unexpected table ${table}`);
+      },
+    },
+  });
+
+  try {
+    assert.equal(result.status, 400);
+    assert.equal(result.payload.ok, false);
+    assert.equal(result.payload.code, 'INVALID_DUE_DATE_LIMIT_DAYS');
+    assert.equal(calls.some((call) => String(call.url || '').includes('/paymentLinks')), false);
   } finally {
     globalThis.fetch = originalFetch;
     process.env.ASAAS_API_BASE_URL = originalAsaasBaseUrl;

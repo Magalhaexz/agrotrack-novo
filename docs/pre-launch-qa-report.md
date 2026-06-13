@@ -108,6 +108,62 @@ This pass completed the browser-based responsive sweep after the shell standardi
 
 NOT READY FOR BETA
 
+## Final Checkout + Asaas Validation — Sprint 28
+
+### Local URL tested
+
+- `http://127.0.0.1:4174/minha-assinatura`
+
+### User used for checkout test
+
+- `qa.sprint28.herdon@example.com`
+- Created through the local HERDON signup flow in this workspace
+
+### API status result
+
+- The checkout click reached the local checkout path, but the server-side Asaas route is still blocked in this workspace by missing Asaas server env values.
+- Result observed in the local runtime: `ASAAS_ENV_MISSING` before any provider checkout could be created.
+
+### Duplicate request result
+
+- The checkout flow now has a single-flight guard in the page layer, so one user action is meant to produce one submission path only.
+- A full live provider-side request-count audit still needs a keyed Asaas environment to measure the final network call count end to end.
+
+### Checkout URL result
+
+- No Asaas checkout URL opened in this workspace because the local server stops at the missing-env gate before a provider link can be created.
+
+### Asaas dashboard result
+
+- Not verifiable in this environment because no Asaas server key is loaded for the local dev server.
+
+### Supabase persistence result
+
+- The new QA user was created successfully in the local app shell and the authenticated customer area loaded.
+- Checkout initiation itself could not be persisted past the provider gate without a live Asaas configuration.
+
+### Errors found
+
+- Missing Asaas server env in the local runtime.
+- No live provider checkout could be created or confirmed from this workspace.
+
+### Fixes applied
+
+- Added a safe default and validation for the Asaas due-date/business-days field before provider calls.
+- Added a single-flight checkout lock in `MinhaAssinaturaPage` to reduce duplicate submissions from rapid clicks.
+- Added test coverage for the new due-date validation and the payment-link payload.
+
+### Remaining risks
+
+- Live Asaas success-path confirmation is still missing.
+- Provider dashboard persistence and real checkout opening still need a keyed sandbox/prod test.
+- Final duplicate-request confirmation still needs an environment where the Asaas route can complete successfully.
+
+### Final beta impact
+
+- NOT READY FOR BETA
+- Checkout validation improved, but the end-to-end live provider proof is still incomplete.
+
 ## Critical Bugs Found
 
 1. Collapsed sidebar header collision

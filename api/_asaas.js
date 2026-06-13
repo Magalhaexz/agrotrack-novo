@@ -46,6 +46,7 @@ export function getAsaasServerEnvStatus() {
 
 const ASAAS_SUBSCRIPTION_FAILURE_MESSAGE = 'Não foi possível criar a assinatura no Asaas. Tente novamente em alguns instantes.';
 const INVALID_SUBSCRIPTION_PAYLOAD_MESSAGE = 'Dados insuficientes para criar a assinatura.';
+const DEFAULT_ASAAS_DUE_DATE_LIMIT_DAYS = 5;
 
 function buildSubscriptionFailurePayload({ status = 502, code = 'ASAAS_SUBSCRIPTION_FAILED', message = ASAAS_SUBSCRIPTION_FAILURE_MESSAGE, extra = {} } = {}) {
   return json(status, {
@@ -594,6 +595,41 @@ function buildMissingCustomerFieldsMessage(fields = []) {
   return `Precisamos confirmar ${readable} antes de continuar.`;
 }
 
+function resolveDueDateLimitDays(source = {}) {
+  const candidates = [
+    source?.dueDateLimitDays,
+    source?.due_date_limit_days,
+    source?.billingDueBusinessDays,
+    source?.billing_due_business_days,
+    source?.businessDaysToDueDate,
+    source?.business_days_to_due_date,
+  ];
+
+  for (const candidate of candidates) {
+    if (candidate === null || candidate === undefined || candidate === '') {
+      continue;
+    }
+
+    const normalized = Number(candidate);
+    if (!Number.isInteger(normalized) || normalized < 1 || normalized > 60) {
+      return {
+        ok: false,
+        code: 'INVALID_DUE_DATE_LIMIT_DAYS',
+      };
+    }
+
+    return {
+      ok: true,
+      value: normalized,
+    };
+  }
+
+  return {
+    ok: true,
+    value: DEFAULT_ASAAS_DUE_DATE_LIMIT_DAYS,
+  };
+}
+
 function validateSubscriptionPayload({ body, user, profile } = {}) {
   if (!isObject(body)) {
     return buildInvalidPayloadResponse();
@@ -622,6 +658,17 @@ function validateSubscriptionPayload({ body, user, profile } = {}) {
     });
   }
 
+  const dueDateLimitDays = resolveDueDateLimitDays({
+    ...body,
+    ...selectedPlan,
+  });
+  if (!dueDateLimitDays.ok) {
+    return buildInvalidPayloadResponse({
+      code: 'INVALID_DUE_DATE_LIMIT_DAYS',
+      message: 'A quantidade de dias úteis para vencimento da cobrança precisa ser um número válido.',
+    });
+  }
+
   const seed = getUserProfileSeed(user, profile, body.customer || body);
   const missingCustomerFields = buildCustomerFieldsMissing(seed);
   if (missingCustomerFields.length > 0) {
@@ -638,6 +685,7 @@ function validateSubscriptionPayload({ body, user, profile } = {}) {
     planCode,
     selectedPlan,
     seed,
+    dueDateLimitDays: dueDateLimitDays.value,
   };
 }
 
@@ -667,7 +715,7 @@ async function createCustomerOnAsaas({ user, profile, body }) {
   });
 }
 
-async function createRecurringPaymentLinkOnAsaas({ customerId, plan, externalReference, body }) {
+async function createRecurringPaymentLinkOnAsaas({ customerId, plan, externalReference, body, dueDateLimitDays }) {
   const valueCents = Number(plan?.priceCents || 0);
   const value = Number.isFinite(valueCents) ? Number((valueCents / 100).toFixed(2)) : null;
   const payload = {
@@ -678,6 +726,7 @@ async function createRecurringPaymentLinkOnAsaas({ customerId, plan, externalRef
     chargeType: 'RECURRENT',
     subscriptionCycle: 'MONTHLY',
     value,
+    dueDateLimitDays,
     externalReference: externalReference || null,
     notificationDisabled: false,
   };
@@ -899,6 +948,7 @@ export async function handleCreateSubscriptionRequest(req, options = {}) {
     const {
       selectedPlan,
       manual = false,
+      dueDateLimitDays,
     } = validation;
 
     if (manual) {
@@ -1023,6 +1073,7 @@ export async function handleCreateSubscriptionRequest(req, options = {}) {
     plan: availablePlan,
     externalReference: providerReference,
     body,
+    dueDateLimitDays,
   });
 
   const checkoutData = extractProviderCheckoutData(providerCheckout);
