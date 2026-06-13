@@ -15,6 +15,68 @@ Validation completed successfully:
 - `npm test -- --run`
 - `npm run e2e` is unavailable in this environment because the required E2E credentials are missing
 
+## Responsive Visual QA + Dense Module Polish — Sprint 27B
+
+This pass completed the browser-based responsive sweep after the shell standardization work and verified that the main dense surfaces stay balanced across notebook and desktop widths.
+
+### Validation result
+
+- `npm run lint` passed
+- `npm run build` passed
+- `npm test -- --run` passed
+
+### Widths tested
+
+- 1280x800
+- 1366x768
+- 1440x900
+- 1512x982
+- 1728x1117
+- 1920x1080
+
+### Pages tested
+
+- Dashboard
+- Fazendas modal
+- Financeiro
+- Minha Assinatura
+
+### Sidebar result
+
+- `Cadastros` rendered correctly in expanded mode.
+- The collapsed sidebar kept a visible, intentional icon column instead of reading as an empty rail.
+- The active state remained clean in both expanded and collapsed states.
+- No sidebar clipping or icon cropping was observed in the tested widths.
+
+### Dashboard result
+
+- The dashboard kept its layout balance across notebook and desktop widths.
+- No horizontal overflow was observed.
+- The topbar stayed aligned with the main content container.
+
+### Fazendas result
+
+- The Fazendas modal kept clear section spacing and a lighter footer treatment.
+- The action bar remained aligned and did not visually overpower the form.
+- No hidden fields or footer overlap were observed in the tested viewport sizes.
+
+### Dense modules result
+
+- `Minha Assinatura` retained a balanced two-column desktop rhythm.
+- Financeiro and the shared shell containers stayed stable at the tested widths.
+- No full-width form stretching or overlapping cards were observed in the inspected states.
+
+### Remaining risks
+
+- The browser QA used the documented offline-disabled data path so the authenticated shell could render without live Supabase hydration.
+- Live backend data states still need a real authenticated smoke pass before launch.
+- Permission and per-farm isolation still remain launch blockers until they are rechecked in a live environment.
+
+### Final beta impact
+
+- The responsive shell and dense module polish materially improve the notebook and desktop experience.
+- The product is still **NOT READY FOR BETA** because the authenticated smoke test, checkout, and user/farm isolation checks are still pending.
+
 ## Sprint 25 - Asaas Subscription 500 Fix
 
 ### Issue observed
