@@ -27,7 +27,7 @@ export default function ConfirmModal({
       subtitle={message}
       size="sm"
       footer={(
-        <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 10 }}>
+        <div className="form-actions action-row">
           <Button variant="outline" onClick={onCancel}>Cancelar</Button>
           <Button variant={tone === 'danger' ? 'danger' : 'primary'} icon={icon} onClick={onConfirm}>
             Confirmar

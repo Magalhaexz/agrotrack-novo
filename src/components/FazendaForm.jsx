@@ -104,14 +104,15 @@ export default function FazendaForm({ open, initialData, onSave, onCancel }) {
       onClose={onCancel}
       title={titulo}
       subtitle="Cadastro e controle de propriedades"
+      size="xl"
       footer={(
-        <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8 }}>
+        <div className="form-actions action-row">
           <Button variant="ghost" onClick={onCancel}>Cancelar</Button>
           <Button onClick={handleSubmit}>Salvar fazenda</Button>
         </div>
       )}
     >
-      <form onSubmit={handleSubmit} style={{ display: 'grid', gap: 12 }}>
+      <form onSubmit={handleSubmit} className="form-page" style={{ display: 'grid', gap: 14 }}>
         <Input label="Nome da fazenda" name="nome" value={form.nome} onChange={handleChange} required />
 
         <div className="grid-2">

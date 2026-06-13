@@ -83,21 +83,28 @@ export default function FazendaModal({ open, initialData, onSave, onCancel }) {
   }
 
   const footer = (
-    <div className="modal-footer action-row" style={{ width: '100%' }}>
+    <div className="form-actions action-row">
       <Button variant="ghost" onClick={onCancel}>Cancelar</Button>
       <Button onClick={handleSubmit}>Salvar fazenda</Button>
     </div>
   );
 
   return (
-    <Modal open={open} onClose={onCancel} title={titulo} subtitle="Organize dados, localização e capacidade da fazenda." footer={footer}>
-      <form onSubmit={handleSubmit} className="form-section fazenda-form-shell">
+    <Modal
+      open={open}
+      onClose={onCancel}
+      title={titulo}
+      subtitle="Organize dados, localização e capacidade da fazenda."
+      footer={footer}
+      size="xl"
+    >
+      <form onSubmit={handleSubmit} className="form-page form-section fazenda-form-shell">
         <section className="section-card fazenda-form-section">
           <div className="section-header">
             <h4>Dados principais</h4>
           </div>
           <div className="form-grid two">
-            <label className="ui-input-wrap full">
+            <label className="ui-input-wrap" style={{ gridColumn: '1 / -1' }}>
               <span className="ui-input-label">Nome da fazenda *</span>
               <input className="ui-input" name="nome" value={form.nome} onChange={onChange} placeholder="Ex.: Fazenda Santa Helena" />
             </label>
@@ -135,7 +142,7 @@ export default function FazendaModal({ open, initialData, onSave, onCancel }) {
           <div className="section-header">
             <h4>Capacidade e área</h4>
           </div>
-          <div className="form-grid two">
+          <div className="form-grid three">
             <label className="ui-input-wrap">
               <span className="ui-input-label">Área total (ha)</span>
               <input className="ui-input" type="number" min={0} name="hectares" value={form.hectares} onChange={onChange} placeholder="ha" />
@@ -164,7 +171,7 @@ export default function FazendaModal({ open, initialData, onSave, onCancel }) {
               <span className="ui-input-label">Telefone</span>
               <input className="ui-input" name="telefone" value={form.telefone} onChange={onChange} placeholder="(00) 00000-0000" />
             </label>
-            <label className="ui-input-wrap full">
+            <label className="ui-input-wrap" style={{ gridColumn: '1 / -1' }}>
               <span className="ui-input-label">Observações</span>
               <textarea className="ui-input" rows={3} name="observacoes" value={form.observacoes} onChange={onChange} placeholder="Detalhes operacionais e anotações relevantes" />
             </label>

@@ -47,6 +47,7 @@ import {
 import { buildAlerts } from './utils/alerts';
 import './styles/app.css';
 import './styles/ui.css';
+import './styles/layout.css';
 
 
 const DashboardPage = lazy(() => import('./pages/DashboardPage'));
