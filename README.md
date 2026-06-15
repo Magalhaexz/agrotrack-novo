@@ -66,15 +66,24 @@ src/
   services/     Persistência, sincronização, billing, auditoria
   styles/       CSS por área + tokens de design
   utils/        Formatadores, exportadores e helpers
-docs/           SQL do Supabase, guias e histórico de sprints (docs/sprints/)
+docs/           SQL do Supabase, guias e histórico de sprints (docs/archive/)
 tests/          Testes unitários/domínio
 e2e/            Testes Playwright
 ```
 
-### Fonte financeira oficial
+## Fonte financeira oficial
 
 Para custo/receita/lucro/margem **realizados** de um lote, use sempre
 `getResumoLote` (`src/domain/resumoLote.js`), que deriva os valores das
 movimentações financeiras reais. `calcLote` (`src/utils/calculations.js`)
 fornece métricas produtivas e apenas uma **projeção** (`receitaProjetada` /
 `margemProjetada`) — não é a fonte oficial.
+
+## Documentação
+
+- Arquitetura técnica: [ARCHITECTURE.md](ARCHITECTURE.md)
+- Roadmap: [ROADMAP.md](ROADMAP.md)
+- Auditoria geral: [docs/AUDITORIA_PROJETO_HERDON.md](docs/AUDITORIA_PROJETO_HERDON.md)
+- Issues recomendadas: [docs/ISSUES_RECOMENDADAS.md](docs/ISSUES_RECOMENDADAS.md)
+- Segurança Supabase: [docs/SECURITY_FIXES_HERDON.md](docs/SECURITY_FIXES_HERDON.md)
+- Perfis automáticos Supabase: [docs/supabase-perfis-e-convites.md](docs/supabase-perfis-e-convites.md)
