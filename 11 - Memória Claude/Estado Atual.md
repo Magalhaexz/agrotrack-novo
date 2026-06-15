@@ -1,7 +1,7 @@
 ---
 title: Estado Atual
 tags: [meta, estado, operacional]
-atualizado: 2026-06-15 (Sprint 3)
+atualizado: 2026-06-15 (Sprint 4)
 tipo: estado
 aliases: [Estado Atual do Projeto]
 ---
@@ -41,28 +41,34 @@ Total de branches: 30 (maioria `codex/*` — branches de agente automático)
 |------|--------|
 | `npm run build` | ✅ PASS (pós-merge PR #111) |
 | `npm run lint` | ✅ PASS (corrigido na Sprint 2 — era plugin Obsidian no ignore) |
-| Segurança Supabase RLS | ✅ PASS (5 vulnerabilidades corrigidas na Sprint 2) |
+| Segurança Supabase RLS | ✅ PASS (5 vulns Sprint 2; bug invite Sprint 4 corrigido) |
 | Financeiro unificado | ✅ PASS (PR #111 mergeado — `getResumoLote` é fonte única) |
 | Consumers de campos removidos de `calcLote` | ✅ Zero matches em `src/` |
 | Formatação de valores infinitos | ✅ Protegido (`formatNumber` / `formatCurrency`) |
+| `app_can_manage_account` case bug | ✅ CORRIGIDO (Sprint 4 — invite flow desbloqueado) |
 
 ## Última sessão registrada
 
 - **Data:** 2026-06-15
-- **O que foi feito:** Sprint 3 completa — PR #111 validado e mergeado, conflitos de merge resolvidos (158 rename/rename + 2 content), lint + build passam em main, financeiro unificado verificado, docs criados
-- **Entregáveis:** `docs/SPRINT_3_RESULTADO.md`, `docs/PRE_PRODUCAO_CHECKLIST.md`
-- **Commit de merge:** `728f9f3`
+- **O que foi feito:** Sprint 4 completa — homologação pré-produção, 9 documentos entregues, bug crítico de invite (case mismatch em `app_can_manage_account`) encontrado e corrigido diretamente no Supabase, `.env.example` atualizado
+- **Entregáveis:** `docs/ENV_VARS_HERDON.md`, `docs/SUPABASE_HOMOLOGACAO.md`, `docs/ASAAS_HOMOLOGACAO.md`, `docs/GOLDEN_PATH_HERDON.md`, `docs/ROLE_QA_HERDON.md`, `docs/QA_TELAS_HERDON.md`, `docs/VERCEL_PREVIEW_HERDON.md`, `docs/LEGAL_CHECKLIST_HERDON.md`, `docs/SPRINT_4_RESULTADO.md`
+- **Bug corrigido:** `app_can_manage_account` — `lower()` + alias `'admin'` adicionados
+- **Veredicto Sprint 4:** Precisa de mais uma sprint (Sprint 5) antes de teste com produtor externo
 - **Nota:** `[[30-Diario/2026-06-15]]`
 
-## Próximos passos sugeridos
+## Próximos passos sugeridos (Sprint 5)
 
 > Não são comprometimentos — são candidatos para a próxima sessão.
 
-1. 🟡 Executar `docs/PRE_PRODUCAO_CHECKLIST.md` — trocar Asaas sandbox→produção, configurar domínio, legal
-2. 🟡 Completar D-001: eliminar `calcLote` como fonte financeira residual (`ResultadosPage.jsx` linha 412 ainda usa ambos)
-3. 🟡 Decidir D-003: modelo de competência vs caixa para `movimentacoes_financeiras`
-4. 🟡 Remover função órfã `handle_new_user` do banco (P3)
-5. 🟡 Adicionar testes para `getResumoLote` e `calcLote` (P3)
+1. 🔴 Criar documentos legais (política de privacidade + termos de uso + aceite no cadastro) — bloqueador para go-live
+2. 🔴 Configurar Asaas de produção (trocar vars, criar webhook real, criar planos no painel)
+3. 🔴 Configurar domínio customizado na Vercel + criar `vercel.json` com headers de segurança
+4. 🟡 Validar Golden Path manualmente em browser (fazer login → criar fazenda → lote → financeiro → relatório)
+5. 🟡 Testar fluxo de convite de funcionário (após correção do bug de invite)
+6. 🟡 Normalizar `handle_new_user_profile` para `perfil = 'proprietario'` (lowercase) + migrar dados existentes
+7. 🟡 Completar D-001: eliminar `calcLote` como fonte financeira residual (`ResultadosPage.jsx`)
+8. 🔵 Remover função órfã `handle_new_user` do banco (P3)
+9. 🔵 Remover triggers duplicados de `updated_at` (P3)
 
 ## Decisões pendentes
 
