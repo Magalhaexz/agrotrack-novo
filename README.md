@@ -1,21 +1,26 @@
-# React + Vite
+# Herdon — Plataforma de Gestão Pecuária
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+Repositório do produto HERDON. Stack: React + Vite + Supabase.
 
-Currently, two official plugins are available:
+## Navegação do vault
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Oxc](https://oxc.rs)
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/)
+Ver [[Index]] para o mapa completo do vault (wiki, memória persistente, sessões, docs operacionais).
 
-## React Compiler
+## Desenvolvimento
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
+```bash
+npm run dev      # dev server local
+npm run build    # build de produção (passa)
+npm run lint     # linting (falha — débito técnico em aberto)
+```
 
-## Expanding the ESLint configuration
+## Referências rápidas
 
-If you are developing a production application, we recommend using TypeScript with type-aware lint rules enabled. Check out the [TS template](https://github.com/vitejs/vite/tree/main/packages/create-vite/template-react-ts) for information on how to integrate TypeScript and [`typescript-eslint`](https://typescript-eslint.io) in your project.
-
-## HERDON - Perfis automáticos
-
-- SQL de implantação: [docs/supabase-perfis-e-convites.sql](D:/agrotrack-novo/docs/supabase-perfis-e-convites.sql)
-- Guia rápido: [docs/supabase-perfis-e-convites.md](D:/agrotrack-novo/docs/supabase-perfis-e-convites.md)
+- Arquitetura técnica: [ARCHITECTURE.md](ARCHITECTURE.md)
+- Roadmap: [ROADMAP.md](ROADMAP.md)
+- Auditoria geral: [docs/AUDITORIA_PROJETO_HERDON.md](docs/AUDITORIA_PROJETO_HERDON.md)
+- Issues recomendadas: [docs/ISSUES_RECOMENDADAS.md](docs/ISSUES_RECOMENDADAS.md)
+- Review PR #111: [docs/REVIEW_PR_111.md](docs/REVIEW_PR_111.md)
+- Perfis automáticos Supabase: [docs/supabase-perfis-e-convites.md](docs/supabase-perfis-e-convites.md)
+- SQL de implantação: [docs/supabase-perfis-e-convites.sql](docs/supabase-perfis-e-convites.sql)
+- Estado atual do projeto: [[11 - Memória Claude/Estado Atual]]
