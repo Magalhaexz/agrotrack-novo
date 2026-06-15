@@ -87,10 +87,12 @@ export function resolveUserRoleFromAuthAndCache(user, profile) {
   const profilePerfil = normalizarPerfil(profile?.perfil || null);
   const hasProfilePerfil = Boolean(String(profile?.perfil || '').trim());
 
-  // Regra de segurança:
+  // Regra de segurança (o isolamento real entre contas é garantido pelo RLS via owner_user_id):
   // 1) metadata explícita admin/gerente/operador sempre vence cache stale visualizador.
-  // 2) se metadata não for explícita, perfil válido em cache/profile pode ser usado.
-  // 3) fallback final permanece visualizador.
+  // 2) se metadata não for explícita, perfil válido em cache/profile (ex.: convidado
+  //    visualizador) é respeitado.
+  // 3) conta nova sem profile e sem metadata (cadastro self-service) assume proprietário
+  //    da PRÓPRIA conta — owner_user_id passa a ser o próprio id do usuário.
   if (metadataExplicitRole) {
     return { perfil: metadataPerfil, source: 'auth_metadata' };
   }

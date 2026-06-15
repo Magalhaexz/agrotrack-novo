@@ -1,7 +1,8 @@
 import { useMemo } from 'react';
 import { Bar, BarChart, CartesianGrid, Legend, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
 import Card from '../ui/Card';
-import { calcLote, formatCurrency, formatNumber } from '../../utils/calculations';
+import { formatCurrency, formatNumber } from '../../utils/calculations';
+import { getResumoLote } from '../../domain/resumoLote';
 
 const TOOLTIP_STYLE = {
   background: 'var(--modal-bg)',
@@ -23,14 +24,14 @@ export default function RelatorioLote({ db, loteIds = [] }) {
     );
 
     return lotes.map((lote) => {
-      const i = calcLote(db, lote.id);
+      const resumo = getResumoLote(db, lote.id);
       return {
         id: lote.id,
         lote: lote.nome,
-        animais: i.totalAnimais,
-        gmd: i.gmdMedio,
-        margem: i.margem,
-        receita: i.receitaTotal,
+        animais: resumo.totalAnimais,
+        gmd: resumo.gmdMedio,
+        margem: resumo.lucroTotal,
+        receita: resumo.receitaTotal,
       };
     });
   }, [db, loteIds]);

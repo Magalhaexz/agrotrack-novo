@@ -68,13 +68,14 @@ export const calcularDias = daysDiff;
 
 
 /**
- * Calcula diversos indicadores financeiros e de desempenho para um lote específico.
- * IMPORTANTE: os campos financeiros retornados por esta função são estimativas legadas
- * baseadas em `db.custos` + parâmetros do lote e NÃO representam a fonte financeira oficial.
- * Para KPI financeiro oficial (custo/receita/lucro/margem), prefira `getResumoLote`.
+ * Calcula indicadores produtivos/zootécnicos de um lote (animais, peso, GMD, arrobas, dias).
+ * Expõe também uma PROJEÇÃO financeira (`receitaProjetada`/`margemProjetada`) baseada no
+ * peso atual x preço-alvo da arroba — útil apenas para alertas/estimativas.
+ * IMPORTANTE: a projeção NÃO é a fonte financeira oficial. Para custo/receita/lucro/margem
+ * realizados (a partir de vendas e custos reais), use sempre `getResumoLote`.
  * @param {object} db - O objeto do banco de dados.
  * @param {string|number} loteId - O ID do lote.
- * @returns {object} Um objeto contendo os indicadores calculados para o lote.
+ * @returns {object} Indicadores produtivos do lote + projeção financeira estimada.
  */
 export const calcLote = (db, loteId) => {
   // Garante que as coleções são arrays para evitar erros
@@ -104,12 +105,8 @@ export const calcLote = (db, loteId) => {
       pesoAtualMedio: 0,
       arrobasProduzidas: 0,
       arrobasCarcaca: 0,
-      receitaTotal: 0,
-      receitaPorCabeca: 0,
-      investimento: 0,
-      custoTotalLote: 0,
-      margem: 0,
-      margemPct: 0,
+      receitaProjetada: 0,
+      margemProjetada: 0,
       consumoSuplementoDia: 0,
       diasEstoque: 0,
       custoSuplementoCabDia: 0,
@@ -162,12 +159,11 @@ export const calcLote = (db, loteId) => {
   const rendimentoCarcaca = toNumber(lote.rendimento_carcaca || 52) / 100;
   const precoArroba = toNumber(lote.preco_arroba || 270);
   const arrobasCarcaca = (totalAnimais * pesoAtualMedio * rendimentoCarcaca) / 15;
-  const receitaTotal = arrobasCarcaca * precoArroba;
-  const receitaPorCabeca = totalAnimais ? receitaTotal / totalAnimais : 0;
+  // Projeção (NÃO oficial): receita/margem estimadas pelo peso atual x preço-alvo da arroba.
+  // O resultado financeiro realizado vem de getResumoLote/calcularResultadoLote.
   const investimento = toNumber(lote.investimento || 0);
-  const custoTotalLote = totalCustos + investimento;
-  const margem = receitaTotal - custoTotalLote;
-  const margemPct = receitaTotal ? (margem / receitaTotal) * 100 : 0;
+  const receitaProjetada = arrobasCarcaca * precoArroba;
+  const margemProjetada = receitaProjetada - (totalCustos + investimento);
 
   const percentualPv = toNumber(lote.supl_pv_pct || 0);
   const consumoSuplementoDia = totalAnimais * (pesoAtualMedio * percentualPv / 100);
@@ -192,13 +188,9 @@ export const calcLote = (db, loteId) => {
     pesoAtualMedio,
     arrobasProduzidas,
     arrobasCarcaca,
-    // Campos financeiros abaixo são legados/estimados (não oficiais):
-    receitaTotal,
-    receitaPorCabeca,
-    investimento,
-    custoTotalLote,
-    margem,
-    margemPct,
+    // Projeção estimada (não oficial) — use getResumoLote para o financeiro realizado:
+    receitaProjetada,
+    margemProjetada,
     consumoSuplementoDia,
     diasEstoque,
     custoSuplementoCabDia,
@@ -259,12 +251,12 @@ export const computeAlerts = (db) => {
       });
     }
 
-    // Alerta: Margem negativa
-    if (indicators.totalAnimais > 0 && indicators.margem < 0) {
+    // Alerta: Margem projetada negativa (estimativa pelo preço-alvo, não financeiro realizado)
+    if (indicators.totalAnimais > 0 && indicators.margemProjetada < 0) {
       alerts.push({
         level: 'crit',
-        title: `Margem negativa — ${lote.nome}`,
-        description: `Prejuízo estimado de ${formatCurrency(Math.abs(indicators.margem))}`,
+        title: `Margem projetada negativa — ${lote.nome}`,
+        description: `Prejuízo estimado de ${formatCurrency(Math.abs(indicators.margemProjetada))}`,
       });
     }
   });
