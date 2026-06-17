@@ -722,7 +722,7 @@ async function createRecurringPaymentLinkOnAsaas({ customerId, plan, externalRef
     customer: customerId,
     name: `HERDON - ${plan?.planName || 'Plano'}`,
     description: `HERDON - ${plan?.planName || 'Plano'}`,
-    billingType: normalizeText(body?.billingType || 'UNDEFINED') || 'UNDEFINED',
+    billingType: 'UNDEFINED', // UNDEFINED = Asaas mostra todos os meios ativos na conta (PIX, BOLETO, CREDIT_CARD). PIX requer "Assinatura via PIX" habilitado no painel Asaas.
     chargeType: 'RECURRENT',
     subscriptionCycle: 'MONTHLY',
     value,
