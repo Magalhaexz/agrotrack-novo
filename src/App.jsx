@@ -10,13 +10,6 @@ import Sidebar from './components/Sidebar';
 import Toast from './components/Toast';
 import Modal from './components/ui/Modal';
 import Button from './components/ui/Button';
-import {
-  gerarAlertasCalendario,
-  gerarAlertasEstoque,
-  gerarAlertasLote,
-  gerarAlertasPesagem,
-  ordenarAlertas,
-} from './domain/alertas';
 import { useOperationalData } from './hooks/useOperationalData';
 import { useToast } from './hooks/useToast';
 import { useCloudControls } from './hooks/useCloudControls';
@@ -571,16 +564,9 @@ export default function App() {
   }, [alertasAdiados]);
 
   const rawAlerts = useMemo(() => {
-    const legacy = buildAlerts(db);
-    const automaticos = [
-      ...gerarAlertasEstoque(db),
-      ...gerarAlertasCalendario(db),
-      ...gerarAlertasPesagem(db),
-      ...gerarAlertasLote(db),
-    ];
-    return ordenarAlertas([...legacy, ...automaticos]).map((alert) => ({
+    return buildAlerts(db).map((alert) => ({
       ...alert,
-      route: alert?.route || alert?.rota || alert?.acao?.rota || alert?.pagina || null,
+      route: alert?.pagina || null,
       ackKey: getAlertAckKey(alert),
     }));
   }, [db]);

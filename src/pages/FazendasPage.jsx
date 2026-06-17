@@ -1,5 +1,6 @@
 ﻿import { useMemo, useRef, useState } from 'react';
 import Button from '../components/ui/Button';
+import EmptyState from '../components/EmptyState';
 import PageHeader from '../components/PageHeader';
 import FazendaCard from '../components/fazendas/FazendaCard';
 import FazendaModal from '../components/fazendas/FazendaModal';
@@ -687,23 +688,25 @@ export default function FazendasPage({ db, setDb, onConfirmAction, session: sess
       />
 
       {cards.length === 0 ? (
-        <div className="ui-card empty-state">
-          <strong>Nenhuma fazenda cadastrada.</strong>
-          <span>Cadastre a primeira fazenda para organizar lotes, animais e operação.</span>
-          <Button
-            variant="primary"
-            onClick={() => {
-              if (!hasPermission('fazendas:editar')) {
-                showToast({ type: 'error', message: mensagemSemPermissao });
-                return;
-              }
-              setEditando(null);
-              setOpenModal(true);
-            }}
-          >
-            Cadastrar fazenda
-          </Button>
-        </div>
+        <EmptyState
+          title="Nenhuma fazenda cadastrada."
+          subtitle="Cadastre a primeira fazenda para organizar lotes, animais e operação."
+          action={
+            <Button
+              variant="primary"
+              onClick={() => {
+                if (!hasPermission('fazendas:editar')) {
+                  showToast({ type: 'error', message: mensagemSemPermissao });
+                  return;
+                }
+                setEditando(null);
+                setOpenModal(true);
+              }}
+            >
+              Cadastrar fazenda
+            </Button>
+          }
+        />
       ) : (
         <div className="grid-3 fazendas-grid">
           {cards.map((fazenda) => (

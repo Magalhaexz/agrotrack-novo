@@ -43,24 +43,14 @@ function BadgeStatus({ status }) {
 }
 
 function KpiCard({ label, value, destaque }) {
+  const valueClass = destaque === 'danger' ? 'kpi-val rd'
+    : destaque === 'success' ? 'kpi-val gn'
+    : destaque === 'warn' ? 'kpi-val am'
+    : 'kpi-value';
   return (
-    <div style={{
-      background: 'var(--color-surface, #fff)',
-      border: '1px solid var(--color-border, #e5e7eb)',
-      borderRadius: 8,
-      padding: '12px 16px',
-    }}>
-      <div style={{ fontSize: 12, color: 'var(--color-text-muted, #6b7280)', marginBottom: 4 }}>{label}</div>
-      <div style={{
-        fontSize: 20,
-        fontWeight: 700,
-        color: destaque === 'danger' ? 'var(--color-danger, #dc2626)'
-          : destaque === 'success' ? 'var(--color-success, #16a34a)'
-          : destaque === 'warn' ? 'var(--color-warn, #ca8a04)'
-          : 'var(--color-text, #111)',
-      }}>
-        {value}
-      </div>
+    <div className="kpi-card">
+      <div className="kpi-label">{label}</div>
+      <div className={valueClass}>{value}</div>
     </div>
   );
 }

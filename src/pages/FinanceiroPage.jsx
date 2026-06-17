@@ -5,6 +5,7 @@ import Button from '../components/ui/Button';
 import Card from '../components/ui/Card';
 import Input from '../components/ui/Input';
 import Modal from '../components/ui/Modal';
+import PageHeader from '../components/PageHeader';
 import { getResumoLote } from '../domain/resumoLote';
 import { formatCurrency, formatDate, formatNumber } from '../utils/calculations';
 import { gerarNovoId } from '../utils/id';
@@ -193,8 +194,11 @@ export default function FinanceiroPage({ db, setDb }) {
   if (detalhe) {
     return (
       <div className="page rebanho-page">
-        <Button variant="ghost" onClick={() => setDetailLoteId(null)}>Voltar</Button>
-        <h1>Financeiro do lote - {detalhe.lote.nome}</h1>
+        <Button variant="ghost" onClick={() => setDetailLoteId(null)}>← Voltar</Button>
+        <PageHeader
+          title={`Financeiro — ${detalhe.lote.nome}`}
+          subtitle="Resultado detalhado do lote selecionado."
+        />
 
         <Card title="Resultado detalhado">
           <div className="metrics-2col">
