@@ -251,3 +251,95 @@ test('calcularResultadoLote mantém arrobaViva no retorno (F-04 — backward com
   // arrobaViva = 450 / 15 = 30
   assert.equal(result.arrobaViva, 30);
 });
+
+// ----------------------------------------------------------------
+// calcularResultadoLote — Sprint 10: filtragem por status
+// ----------------------------------------------------------------
+
+test('receita realizada entra no resultado (Sprint 10)', () => {
+  const db = makeDb({
+    animais: [makeAnimal({ qtd: 10, p_at: 400, status: 'ativo' })],
+    movimentacoes: [makeMov({ tipo: 'receita', valor: 50000, status: 'realizado' })],
+  });
+  assert.equal(calcularResultadoLote(db, 1).receitaTotal, 50000);
+});
+
+test('despesa realizada entra no resultado (Sprint 10)', () => {
+  const db = makeDb({
+    animais: [makeAnimal({ qtd: 10, p_at: 400, status: 'ativo' })],
+    movimentacoes: [makeMov({ tipo: 'despesa', valor: 20000, status: 'realizado' })],
+  });
+  assert.equal(calcularResultadoLote(db, 1).custoTotal, 20000);
+});
+
+test('receita prevista não entra no resultado (Sprint 10)', () => {
+  const db = makeDb({
+    animais: [makeAnimal({ qtd: 10, p_at: 400, status: 'ativo' })],
+    movimentacoes: [makeMov({ tipo: 'receita', valor: 50000, status: 'previsto' })],
+  });
+  assert.equal(calcularResultadoLote(db, 1).receitaTotal, 0);
+});
+
+test('despesa prevista não entra no resultado (Sprint 10)', () => {
+  const db = makeDb({
+    animais: [makeAnimal({ qtd: 10, p_at: 400, status: 'ativo' })],
+    movimentacoes: [makeMov({ tipo: 'despesa', valor: 20000, status: 'previsto' })],
+  });
+  assert.equal(calcularResultadoLote(db, 1).custoTotal, 0);
+});
+
+test('movimentação cancelada não entra no resultado (Sprint 10)', () => {
+  const db = makeDb({
+    animais: [makeAnimal({ qtd: 10, p_at: 400, status: 'ativo' })],
+    movimentacoes: [
+      makeMov({ tipo: 'despesa', valor: 30000, status: 'cancelado' }),
+      makeMov({ tipo: 'receita', valor: 60000, status: 'cancelado' }),
+    ],
+  });
+  const result = calcularResultadoLote(db, 1);
+  assert.equal(result.custoTotal, 0);
+  assert.equal(result.receitaTotal, 0);
+});
+
+test('movimentação paga entra no resultado do lote (Sprint 10)', () => {
+  const db = makeDb({
+    animais: [makeAnimal({ qtd: 10, p_at: 400, status: 'ativo' })],
+    movimentacoes: [
+      makeMov({ tipo: 'despesa', valor: 25000, status: 'pago' }),
+      makeMov({ tipo: 'receita', valor: 70000, status: 'pago' }),
+    ],
+  });
+  const result = calcularResultadoLote(db, 1);
+  assert.equal(result.custoTotal, 25000);
+  assert.equal(result.receitaTotal, 70000);
+});
+
+test('movimentação sem status entra como legado (Sprint 10)', () => {
+  const db = makeDb({
+    animais: [makeAnimal({ qtd: 10, p_at: 400, status: 'ativo' })],
+    movimentacoes: [
+      makeMov({ tipo: 'despesa', valor: 15000 }),
+      makeMov({ tipo: 'receita', valor: 45000 }),
+    ],
+  });
+  const result = calcularResultadoLote(db, 1);
+  assert.equal(result.custoTotal, 15000);
+  assert.equal(result.receitaTotal, 45000);
+});
+
+test('dados antigos (sem status) continuam funcionando — backward compat (Sprint 10)', () => {
+  const db = makeDb({
+    animais: [makeAnimal({ qtd: 50, p_at: 420, status: 'ativo' })],
+    movimentacoes: [
+      // Legado: sem status, sem data_competencia
+      makeMov({ id: '1', tipo: 'despesa', categoria: 'compra_animal', valor: 100000 }),
+      makeMov({ id: '2', tipo: 'despesa', categoria: 'compra_estoque', valor: 20000 }),
+      makeMov({ id: '3', tipo: 'receita', categoria: 'venda_animal', valor: 180000 }),
+    ],
+    lotes: [makeLote()],
+  });
+  const result = calcularResultadoLote(db, 1);
+  assert.equal(result.custoTotal, 120000);
+  assert.equal(result.receitaTotal, 180000);
+  assert.equal(result.lucroTotal, 60000);
+});

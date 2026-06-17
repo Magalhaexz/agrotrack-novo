@@ -26,6 +26,8 @@ function upsertMovimentacaoFinanceiraDeCusto(movimentacoes, custo) {
     tipo: 'despesa',
     categoria: custo.cat || 'outros',
     data: custo.data,
+    data_competencia: custo.data,
+    status: 'realizado',
     valor: toNumber(custo.val),
     lote_id: custo.lote_id ? Number(custo.lote_id) : null,
     descricao: custo.desc || '',

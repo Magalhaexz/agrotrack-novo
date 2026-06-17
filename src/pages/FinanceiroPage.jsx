@@ -148,15 +148,18 @@ export default function FinanceiroPage({ db, setDb }) {
       return;
     }
 
+    const pagoFlag = Boolean(novoPagamento.pago);
     const payload = {
       tipo: 'despesa',
       categoria: 'Pagamento Diário',
       descricao: novoPagamento.descricao.trim(),
       valor: Number(novoPagamento.valor || 0),
       data: novoPagamento.data_vencimento || getTodayIso(),
+      data_competencia: novoPagamento.data_vencimento || getTodayIso(),
       data_vencimento: novoPagamento.data_vencimento || getTodayIso(),
+      status: pagoFlag ? 'pago' : 'realizado',
       metodo_pagamento: novoPagamento.metodo,
-      pago: Boolean(novoPagamento.pago),
+      pago: pagoFlag,
       observacao: novoPagamento.observacao || null,
     };
 

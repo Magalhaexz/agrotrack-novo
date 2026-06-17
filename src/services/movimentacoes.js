@@ -234,6 +234,8 @@ export function registrarEntradaAnimal(
             lote_id: Number(loteId),
             valor,
             data,
+            data_competencia: data,
+            status: 'realizado',
             descricao: `Compra de ${quantidade} animal(is) para o lote ${loteId}`,
             origem_tipo: 'movimentacao_animal',
             origem_id: novoMovAnimalId,
@@ -397,6 +399,8 @@ export function registrarSaidaAnimal(
               lote_id: Number(loteId),
               valor,
               data,
+              data_competencia: data,
+              status: 'realizado',
               descricao: `${tipoSaida === 'abate' ? 'Abate' : 'Venda'} de ${quantidade} animal(is) do lote ${loteId}`,
               origem_tipo: 'movimentacao_animal',
               origem_id: novoMovAnimalId,
@@ -527,9 +531,11 @@ export function registrarEntradaEstoque(
         id: novoMovFinanceiroId,
         tipo: 'despesa',
         categoria: 'compra_estoque',
-        lote_id: null, // Entrada de estoque geralmente não tem lote associado diretamente
+        lote_id: null,
         valor: valorTotal,
         data,
+        data_competencia: data,
+        status: 'realizado',
         descricao: `Entrada de estoque: ${item.produto || 'Item'} (${quantidade})`,
         origem_tipo: 'movimentacao_estoque',
         origem_id: novoMovEstoqueId,
@@ -626,12 +632,14 @@ export function registrarSaidaEstoque(
       ...(tipo === 'consumo' && loteId
         ? [
             {
-              id: gerarNovoId(movimentosFinanceiros), // Novo ID para mov financeira
+              id: gerarNovoId(movimentosFinanceiros),
               tipo: 'despesa',
-              categoria: 'consumo_estoque', // Nova categoria para consumo de estoque
+              categoria: 'consumo_estoque',
               lote_id: Number(loteId),
               valor: valorTotalSaida,
               data,
+              data_competencia: data,
+              status: 'realizado',
               descricao: `Consumo de ${item.produto || 'Item'} para o lote ${loteId}`,
               origem_tipo: 'movimentacao_estoque',
               origem_id: novoMovEstoqueId,
@@ -641,12 +649,14 @@ export function registrarSaidaEstoque(
       ...(tipo === 'venda'
         ? [
             {
-              id: gerarNovoId(movimentosFinanceiros), // Novo ID para mov financeira
+              id: gerarNovoId(movimentosFinanceiros),
               tipo: 'receita',
-              categoria: 'venda_estoque', // Nova categoria para venda de estoque
-              lote_id: loteId ? Number(loteId) : null, // Pode ter lote associado ou não
-              valor: valorTotalSaida, // Valor de venda, que pode ser diferente do custo
+              categoria: 'venda_estoque',
+              lote_id: loteId ? Number(loteId) : null,
+              valor: valorTotalSaida,
               data,
+              data_competencia: data,
+              status: 'realizado',
               descricao: `Venda de ${item.produto || 'Item'} (${qtd})`,
               origem_tipo: 'movimentacao_estoque',
               origem_id: novoMovEstoqueId,

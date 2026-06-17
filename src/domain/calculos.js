@@ -1,4 +1,5 @@
 import { isAnimalAtivo, safeDivide, toNonNegativeNumber, toNumber } from './calcHelpers.js';
+import { deveEntrarNoResultadoLote } from './financeiroStatus.js';
 
 /**
  * Verifica se um item pertence a um lote específico.
@@ -23,7 +24,7 @@ export function calcularCustoLote(db, loteId) {
   const custos = Array.isArray(db?.custos) ? db.custos : [];
 
   const despesasLote = movimentosFinanceiros.filter(
-    (mov) => mov.tipo === 'despesa' && pertenceAoLote(mov, loteId)
+    (mov) => mov.tipo === 'despesa' && pertenceAoLote(mov, loteId) && deveEntrarNoResultadoLote(mov)
   );
 
   const despesasCustosMap = new Map();
@@ -79,7 +80,7 @@ export function calcularReceitaLote(db, loteId) {
     : [];
 
   const receitasLote = movimentosFinanceiros.filter(
-    (mov) => mov.tipo === 'receita' && pertenceAoLote(mov, loteId)
+    (mov) => mov.tipo === 'receita' && pertenceAoLote(mov, loteId) && deveEntrarNoResultadoLote(mov)
   );
 
   // Otimização: calcular todas as categorias de receita em uma única passagem

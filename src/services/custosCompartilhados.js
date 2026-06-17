@@ -125,6 +125,8 @@ export function aplicarRateioCustoCompartilhado(
     lote_id: Number(p.lote_id),
     valor: p.custoRateado,
     data,
+    data_competencia: data,
+    status: 'realizado',
     descricao: descricaoMovimentacao,
     origem_tipo: 'rateio',
     origem_id: null,
