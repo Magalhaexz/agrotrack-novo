@@ -83,6 +83,7 @@ const PrivacidadePage = lazy(() => import('./pages/PrivacidadePage'));
 const CobrancaPage = lazy(() => import('./pages/CobrancaPage'));
 const SuportePage = lazy(() => import('./pages/SuportePage'));
 const CustosCompartilhadosPage = lazy(() => import('./pages/CustosCompartilhadosPage'));
+const FluxoCaixaPage = lazy(() => import('./pages/FluxoCaixaPage'));
 
 const publicPageMap = {
   termos: TermosPage,
@@ -189,6 +190,7 @@ const pageMap = {
   pesagens: PesagensPage,
   acompanhamentoPeso: AcompanhamentoPesoPage,
   custos: CustosPage,
+  fluxoCaixa: FluxoCaixaPage,
   custosCompartilhados: CustosCompartilhadosPage,
   resultados: ResultadosPage,
   financeiro: FinanceiroPage,

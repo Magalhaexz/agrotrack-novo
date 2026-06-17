@@ -60,6 +60,7 @@ export const navSections = [
     title: 'Financeiro',
     items: [
       { id: 'financeiro', label: 'Financeiro', icon: DollarSign },
+      { id: 'fluxoCaixa', label: 'Fluxo de Caixa', icon: DollarSign },
       { id: 'custosCompartilhados', label: 'Rateio de Custos', icon: DollarSign },
     ],
   },
