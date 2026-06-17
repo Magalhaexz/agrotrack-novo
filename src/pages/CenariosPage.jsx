@@ -221,8 +221,8 @@ export default function CenariosPage({ db, setDb, session }) {
       <Card title="Cenários salvos">
         {!cenarios.length ? (
           <div className="empty-state">
-            <strong>Nenhum cenário cadastrado.</strong>
-            <span>Crie um cenário para comparar baseline e projeção.</span>
+            <strong>Nenhum cenário simulado ainda.</strong>
+            <span>Crie um cenário para simular se vale a pena comprar, manter ou vender o lote.</span>
           </div>
         ) : (
           <div className="table-responsive">

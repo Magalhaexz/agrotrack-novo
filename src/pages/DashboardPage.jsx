@@ -259,8 +259,8 @@ export default function DashboardPage({
     <div className="dashboard-page">
       <header className="dashboard-toolbar page-header">
         <div className="dashboard-toolbar-copy">
-          <h1>Dashboard</h1>
-          <p>Cockpit executivo da operacao: riscos, desempenho e prioridades do dia.</p>
+          <h1>Painel Geral</h1>
+          <p>Visão rápida da operação: rebanho, financeiro e prioridades do dia.</p>
         </div>
 
         <div className="dashboard-toolbar-actions page-actions">
@@ -276,13 +276,30 @@ export default function DashboardPage({
         </div>
       </header>
 
+      {lotesAtivos.length === 0 && (
+        <section className="dashboard-onboarding-banner">
+          <div className="dashboard-onboarding-content">
+            <strong>Você ainda não tem lotes ativos.</strong>
+            <span>Cadastre seu primeiro lote para acompanhar GMD, custo e resultado financeiro da operação.</span>
+          </div>
+          <div className="dashboard-onboarding-actions">
+            <Button variant="primary" size="sm" onClick={() => onNavigate?.('fazendas')}>
+              Cadastrar fazenda
+            </Button>
+            <Button variant="outline" size="sm" onClick={() => onNavigate?.('lotes')}>
+              Criar primeiro lote
+            </Button>
+          </div>
+        </section>
+      )}
+
       {tabAtiva === 'geral' && (
         <>
           <section className="section-card dashboard-hero-shell">
             <div className="section-header">
               <div>
-                <h3 className="dashboard-section-title">Visao geral</h3>
-                <p className="dashboard-section-subtitle">Resumo rapido para apoiar decisoes imediatas.</p>
+                <h3 className="dashboard-section-title">Visão geral</h3>
+                <p className="dashboard-section-subtitle">Resumo rápido para apoiar decisões imediatas.</p>
               </div>
               <div className="action-row">
                 <span className={`status-badge ${alertasCriticos.length > 0 ? 'status-badge--critico' : 'status-badge--sucesso'}`}>

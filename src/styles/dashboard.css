@@ -1138,3 +1138,57 @@
     min-height: 44px;
   }
 }
+
+/* Sprint 12 — Onboarding banner (empty lotes state) */
+.dashboard-onboarding-banner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 20px;
+  flex-wrap: wrap;
+  padding: 20px 24px;
+  border-radius: 20px;
+  border: 1px solid rgba(47, 181, 107, 0.22);
+  background:
+    radial-gradient(circle at top left, rgba(47, 181, 107, 0.1), transparent 50%),
+    rgba(8, 14, 10, 0.9);
+}
+
+.dashboard-onboarding-content {
+  display: grid;
+  gap: 6px;
+}
+
+.dashboard-onboarding-content strong {
+  font-size: 1rem;
+  font-weight: 700;
+  color: var(--color-text);
+}
+
+.dashboard-onboarding-content span {
+  font-size: 0.9rem;
+  color: var(--color-text-secondary);
+  max-width: 520px;
+}
+
+.dashboard-onboarding-actions {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+  flex-shrink: 0;
+}
+
+@media (max-width: 640px) {
+  .dashboard-onboarding-banner {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .dashboard-onboarding-actions {
+    width: 100%;
+  }
+
+  .dashboard-onboarding-actions .ui-button {
+    flex: 1;
+  }
+}

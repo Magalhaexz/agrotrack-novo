@@ -10376,3 +10376,128 @@ html, body, #root, .app, .main, .main-content, .page { max-width: 100%; }
     border-radius: 18px;
   }
 }
+
+/* ═══════════════════════════════════════════════════
+   SPRINT 12 — Polimento Visual Global e Navegação
+   ═══════════════════════════════════════════════════ */
+
+/* kpi-val: base para o sistema de tones do KpiCard */
+.kpi-val {
+  font-size: clamp(1.4rem, 1.8vw, 1.85rem);
+  font-weight: 800;
+  line-height: 1.1;
+  color: var(--color-text);
+}
+
+.kpi-val.gn { color: var(--color-success); }
+.kpi-val.rd { color: var(--color-danger); }
+.kpi-val.am { color: var(--color-warning); }
+
+/* kpi-unit: unidade ao lado do valor */
+.kpi-unit {
+  font-size: 0.9rem;
+  font-weight: 500;
+  color: var(--color-text-secondary);
+}
+
+/* ph: page header — garante alinhamento vertical correto */
+.ph {
+  align-items: flex-start;
+  margin-bottom: 24px;
+}
+
+.ph h1 {
+  font-weight: 800;
+  letter-spacing: -0.03em;
+}
+
+/* ph + ph-actions alinhado em mobile */
+@media (max-width: 640px) {
+  .ph {
+    flex-direction: column;
+    gap: 14px;
+  }
+
+  .ph-actions {
+    width: 100%;
+    justify-content: flex-start;
+    flex-wrap: wrap;
+  }
+}
+
+/* page-header no padrão novo */
+.page-header {
+  margin-bottom: 24px;
+}
+
+/* Sidebar group titles — fonte menor, mais espaçamento */
+.sidebar-group-label,
+.sidebar-section-title {
+  font-size: 0.68rem;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--color-text-muted);
+  padding: 14px 14px 6px;
+}
+
+/* Garantia: seções da sidebar com espaçamento mínimo */
+.sidebar-section + .sidebar-section {
+  margin-top: 4px;
+}
+
+/* Financeiro-page tabs — labels mais legíveis */
+.financeiro-header h1,
+.rebanho-header h1 {
+  font-weight: 800;
+  letter-spacing: -0.03em;
+}
+
+/* Empty state — subtítulo de orientação */
+.empty-state strong {
+  font-size: 0.95rem;
+  font-weight: 700;
+  color: var(--color-text);
+}
+
+.empty-state span,
+.empty-state p:not(.empty-state-title) {
+  font-size: 0.875rem;
+  color: var(--color-text-secondary);
+  max-width: 420px;
+}
+
+/* IndicadoresPage — metric-tile tone */
+.metric-tile--warning .kpi-value,
+.metric-tile--warning .kpi-val {
+  color: var(--color-warning);
+}
+
+/* KPI grid para telas médias */
+@media (max-width: 900px) {
+  .dashboard-grid--kpi-main {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .dashboard-strip,
+  .dashboard-executive-strip,
+  .dashboard-monitor-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 560px) {
+  .dashboard-grid--kpi-main {
+    grid-template-columns: 1fr;
+  }
+
+  .dashboard-strip,
+  .dashboard-executive-strip {
+    grid-template-columns: 1fr;
+  }
+
+  .kpi-card {
+    padding: 14px;
+    gap: 14px;
+  }
+}

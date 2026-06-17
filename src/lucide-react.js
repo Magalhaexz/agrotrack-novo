@@ -279,3 +279,39 @@ export const EyeOff = icon([
   createElement('path', { d: 'M9.9 5.2A11 11 0 0 1 12 5c6.5 0 10 7 10 7a16 16 0 0 1-3 4.1' }),
   createElement('path', { d: 'M6.2 6.2A16.1 16.1 0 0 0 2 12s3.5 7 10 7c1.1 0 2.1-.2 3.1-.5' }),
 ]);
+
+/* Sprint 12 — novos ícones da navegação */
+
+export const CreditCard = icon([
+  createElement('rect', { x: 2, y: 5, width: 20, height: 14, rx: 2 }),
+  createElement('path', { d: 'M2 10h20' }),
+  createElement('path', { d: 'M7 15h2m4 0h2' }),
+]);
+
+export const FileBarChart = icon([
+  createElement('path', { d: 'M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z' }),
+  createElement('path', { d: 'M14 2v6h6' }),
+  createElement('path', { d: 'M8 18v-4m4 4v-7m4 7v-2' }),
+]);
+
+export const BarChart3 = icon([
+  createElement('path', { d: 'M3 3v18h18' }),
+  createElement('path', { d: 'M7 17V8m5 9V4m5 13v-5' }),
+]);
+
+export const Calculator = icon([
+  createElement('rect', { x: 4, y: 2, width: 16, height: 20, rx: 2 }),
+  createElement('path', { d: 'M8 6h8' }),
+  createElement('path', { d: 'M8 11h1m3 0h1m3 0h1' }),
+  createElement('path', { d: 'M8 16h1m3 0h1m3 0h1' }),
+]);
+
+export const Layers = icon([
+  createElement('path', { d: 'M12 2 2 8l10 6 10-6-10-6z' }),
+  createElement('path', { d: 'M2 13l10 6 10-6' }),
+]);
+
+export const Receipt = icon([
+  createElement('path', { d: 'M4 2v22l4-2.5 4 2.5 4-2.5 4 2.5V2H4z' }),
+  createElement('path', { d: 'M9 7h6m-6 5h4' }),
+]);

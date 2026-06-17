@@ -57,8 +57,8 @@ export default function RelatoriosGerenciaisPage({ db }) {
   return (
     <div className="page reports-page">
       <PageHeader
-        title="Relatórios Gerenciais"
-        subtitle="Resumo executivo consolidado para leitura estratégica."
+        title="Relatórios"
+        subtitle="Resumo executivo consolidado para leitura estratégica da operação."
       />
 
       <Card title="Resumo da fazenda" subtitle={`Período: ${period.start} até ${period.end}`}>

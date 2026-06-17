@@ -1,16 +1,20 @@
 import {
+  Activity,
+  BarChart3,
   Beef,
-  CalendarDays,
+  Calculator,
   CheckSquare,
   ClipboardList,
-  DollarSign,
-  FileText,
+  CreditCard,
+  FileBarChart,
+  Layers,
+  Leaf,
   LayoutDashboard,
   MapPin,
   Package,
+  Receipt,
   Scale,
   Settings,
-  ShieldPlus,
   Syringe,
   TrendingUp,
   User,
@@ -19,85 +23,56 @@ import {
 
 export const navSections = [
   {
-    id: 'main',
+    id: 'inicio',
     title: '',
-    items: [{ id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard }],
+    items: [{ id: 'dashboard', label: 'Painel Geral', icon: LayoutDashboard }],
   },
   {
-    id: 'cadastros',
-    title: 'Cadastros',
+    id: 'operacao',
+    title: 'Operação',
     items: [
       { id: 'fazendas', label: 'Fazendas', icon: MapPin },
-      { id: 'pastagens', label: 'Pastos', icon: MapPin },
-      { id: 'lotes', label: 'Lotes', icon: Beef },
+      { id: 'lotes', label: 'Lotes e Rebanho', icon: Beef },
       { id: 'animais', label: 'Animais', icon: ClipboardList },
-      { id: 'funcionarios', label: 'Funcionários', icon: Users },
-    ],
-  },
-  {
-    id: 'nutricao',
-    title: 'Nutrição / Suplementação',
-    items: [
-      { id: 'suplementacao', label: 'Nutrição e Suplementação', icon: ShieldPlus },
-    ],
-  },
-  {
-    id: 'planejamento_premium',
-    title: 'Planejamento Premium',
-    items: [
-      { id: 'planejamento', label: 'Planejamento', icon: TrendingUp },
-    ],
-  },
-  {
-    id: 'estoque',
-    title: 'Estoque',
-    items: [
-      { id: 'estoque', label: 'Estoque Geral', icon: Package },
+      { id: 'pesagens', label: 'Pesagens', icon: Scale },
+      { id: 'estoque', label: 'Estoque', icon: Package },
+      { id: 'suplementacao', label: 'Suplementação', icon: Leaf },
+      { id: 'sanitario', label: 'Sanidade', icon: Syringe },
+      { id: 'tarefas', label: 'Tarefas', icon: CheckSquare },
     ],
   },
   {
     id: 'financeiro',
     title: 'Financeiro',
     items: [
-      { id: 'financeiro', label: 'Financeiro', icon: DollarSign },
-      { id: 'fluxoCaixa', label: 'Fluxo de Caixa', icon: DollarSign },
-      { id: 'custosCompartilhados', label: 'Rateio de Custos', icon: DollarSign },
+      { id: 'financeiro', label: 'Movimentações Financeiras', icon: Receipt },
+      { id: 'fluxoCaixa', label: 'Fluxo de Caixa', icon: TrendingUp },
+      { id: 'custosCompartilhados', label: 'Rateio de Custos', icon: Layers },
     ],
   },
   {
-    id: 'operacao',
-    title: 'Operação',
+    id: 'decisao',
+    title: 'Decisão',
     items: [
-      { id: 'pesagens', label: 'Pesagens', icon: Scale },
-      { id: 'sanitario', label: 'Sanitário', icon: Syringe },
-      { id: 'tarefas', label: 'Tarefas', icon: CheckSquare },
-      { id: 'calendarioOperacional', label: 'Calendário', icon: CalendarDays },
+      { id: 'resultados', label: 'Resultado dos Lotes', icon: BarChart3 },
+      { id: 'cenarios', label: 'Simulador de Decisão', icon: Calculator },
+      { id: 'indicadores', label: 'Indicadores', icon: Activity },
+      { id: 'relatoriosGerenciais', label: 'Relatórios', icon: FileBarChart },
     ],
   },
   {
-    id: 'analises_relatorios',
-    title: 'Análises e Resultados',
+    id: 'gestao',
+    title: 'Gestão',
     items: [
-      { id: 'comparativo', label: 'Comparativo', icon: TrendingUp },
-      { id: 'resultados', label: 'Resultados e Relatórios', icon: ClipboardList },
-      { id: 'cenarios', label: 'Cenários', icon: TrendingUp },
-    ],
-  },
-  {
-    id: 'configuracoes',
-    title: 'Configurações',
-    items: [
-      { id: 'minhaAssinatura', label: 'Minha Assinatura', icon: FileText },
+      { id: 'funcionarios', label: 'Equipe', icon: Users },
+      { id: 'minhaAssinatura', label: 'Planos e Assinatura', icon: CreditCard },
       { id: 'configuracoes', label: 'Configurações', icon: Settings },
+      { id: 'perfil', label: 'Perfil', icon: User },
     ],
   },
 ];
 
-export const secondaryNavItems = [
-  { id: 'perfil', label: 'Meu Perfil', icon: User },
-  { id: 'minhaAssinatura', label: 'Minha Assinatura', icon: FileText },
-  { id: 'configuracoes', label: 'Configurações', icon: Settings },
-];
+export const secondaryNavItems = [];
 
 export const navLabelMap = [...navSections.flatMap((section) => section.items), ...secondaryNavItems].reduce(
   (acc, item) => {

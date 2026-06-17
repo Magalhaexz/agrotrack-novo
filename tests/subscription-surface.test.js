@@ -16,6 +16,6 @@ test('minha assinatura is visible in sidebar navigation and protected by profile
     .find((item) => item.id === 'minhaAssinatura');
 
   assert.ok(subscriptionEntry);
-  assert.equal(subscriptionEntry.label, 'Minha Assinatura');
+  assert.equal(subscriptionEntry.label, 'Planos e Assinatura');
   assert.equal(permissoesPorPagina.minhaAssinatura, 'perfil:ver');
 });

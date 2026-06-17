@@ -218,8 +218,8 @@ export default function ResultadosPage({ db }) {
   return (
     <div className="reports-page reports-page--rebuilt" data-print-date={new Date().toLocaleDateString('pt-BR')}>
       <PageHeader
-        title="Relatórios / Resultados"
-        subtitle="Resumo financeiro e operacional com filtros, exportações e impressão." 
+        title="Resultado dos Lotes"
+        subtitle="Resultado financeiro e operacional com filtros, exportação e impressão."
         actions={(
           <div className="reports-page-actions">
             <Button variant="outline" onClick={resetFilters}>Limpar filtros</Button>
