@@ -31,3 +31,4 @@ logo_app1.png
 playwright-report/
 test-results/
 .env.local
+.vercel
