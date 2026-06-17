@@ -263,7 +263,7 @@ export default function MinhaAssinaturaPage({
     <div className="page page-shell subscription-page">
       <header className="page-header subscription-page__header">
         <div>
-          <h1>Minha Assinatura</h1>
+          <h1>Planos e Assinatura</h1>
           <p>Veja seu plano atual, limites de uso e o próximo passo comercial antes da integração de pagamento.</p>
         </div>
         <div className="subscription-page__header-badge">

@@ -50,7 +50,7 @@ function KpiCard({ label, value, destaque }) {
       borderRadius: 8,
       padding: '12px 16px',
     }}>
-      <div style={{ fontSize: 12, color: 'var(--color-muted, #6b7280)', marginBottom: 4 }}>{label}</div>
+      <div style={{ fontSize: 12, color: 'var(--color-text-muted, #6b7280)', marginBottom: 4 }}>{label}</div>
       <div style={{
         fontSize: 20,
         fontWeight: 700,

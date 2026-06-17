@@ -190,7 +190,7 @@ export default function CenariosPage({ db, setDb, session }) {
 
   return (
     <div className="page">
-      <PageHeader title="Cenários" subtitle="Simulações estratégicas sem alterar dados operacionais." />
+      <PageHeader title="Simulador de Decisão" subtitle="Simule compra, manutenção ou venda de lote sem alterar dados operacionais." />
 
       <Card title={editando ? 'Editar cenário' : 'Novo cenário'}>
         <div className="form-grid two">

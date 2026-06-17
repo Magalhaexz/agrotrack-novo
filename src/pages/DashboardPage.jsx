@@ -147,7 +147,7 @@ export default function DashboardPage({
         ...alert,
         id: alert.id || alert.ackKey || `alert-${index}`,
         titulo: alert.titulo || alert.title || 'Alerta do sistema',
-        descricao: alert.descricao || alert.description || 'Sem descricao',
+        descricao: alert.descricao || alert.description || 'Sem descrição',
         prioridade: alert.prioridade || 'media',
         acao: alert.acao || { label: 'Abrir', rota: alert.route || 'dashboard' },
       })),
@@ -177,7 +177,7 @@ export default function DashboardPage({
 
   const kpisMain = [
     {
-      title: 'Cabecas ativas',
+      title: 'Cabeças ativas',
       value: formatNumber(totalCabecasAtivas, 0),
       variation: getVariation(totalCabecasAtivas, totalCabecasAtivas * 0.92),
       icon: Users,
@@ -218,7 +218,7 @@ export default function DashboardPage({
       return {
         ...tarefa,
         coluna: concluida ? 'feitas' : vencida ? 'vencidas' : 'pendentes',
-        responsavelNome: funcionariosMap.get(Number(tarefa.funcionario_id))?.nome || tarefa.responsavel || 'Nao definido',
+        responsavelNome: funcionariosMap.get(Number(tarefa.funcionario_id))?.nome || tarefa.responsavel || 'Não definido',
       };
     });
   }, [db.tarefas, funcionariosMap]);
@@ -303,24 +303,24 @@ export default function DashboardPage({
               </div>
               <div className="action-row">
                 <span className={`status-badge ${alertasCriticos.length > 0 ? 'status-badge--critico' : 'status-badge--sucesso'}`}>
-                  {alertasCriticos.length > 0 ? `${alertasCriticos.length} criticos` : 'Sem criticos'}
+                  {alertasCriticos.length > 0 ? `${alertasCriticos.length} críticos` : 'Sem críticos'}
                 </span>
               </div>
             </div>
 
             <div className="dashboard-executive-strip dashboard-executive-strip--compact">
               <article className="dashboard-executive-chip">
-                <span>Cabecas ativas</span>
+                <span>Cabeças ativas</span>
                 <strong>{formatNumber(totalCabecasAtivas, 0)}</strong>
                 <small>Rebanho total em lotes ativos</small>
               </article>
               <article className="dashboard-executive-chip">
-                <span>Estoque critico</span>
+                <span>Estoque crítico</span>
                 <strong>{formatNumber(estoqueCritico.length, 0)}</strong>
-                <small>Itens abaixo da minima</small>
+                <small>Itens abaixo do mínimo</small>
               </article>
               <article className="dashboard-executive-chip">
-                <span>Pendencias hoje</span>
+                <span>Pendências hoje</span>
                 <strong>{formatNumber(tarefasDoDia.length + pagamentosResumo.hoje, 0)}</strong>
                 <small>Tarefas e pagamentos com vencimento hoje</small>
               </article>
@@ -334,10 +334,10 @@ export default function DashboardPage({
           </section>
 
           <section className="dashboard-grid dashboard-grid--operations">
-            <Card className="section-card" title="Alertas importantes" subtitle="Focos prioritarios para a equipe.">
+            <Card className="section-card" title="Alertas importantes" subtitle="Focos prioritários para a equipe.">
               {alertasCriticos.length === 0 ? (
                 <div className="empty-state">
-                  <p>Nenhum alerta critico ativo.</p>
+                  <p>Nenhum alerta crítico ativo.</p>
                 </div>
               ) : (
                 <div className="dashboard-list">
@@ -347,14 +347,14 @@ export default function DashboardPage({
                         <strong>{alerta.titulo}</strong>
                         <p>{alerta.descricao}</p>
                       </div>
-                      <span className="status-badge status-badge--critico">Critico</span>
+                      <span className="status-badge status-badge--critico">Crítico</span>
                     </article>
                   ))}
                 </div>
               )}
             </Card>
 
-            <Card className="section-card" title="Tarefas do dia" subtitle="Pendencias com vencimento em hoje.">
+            <Card className="section-card" title="Tarefas do dia" subtitle="Pendências com vencimento para hoje.">
               {tarefasDoDia.length === 0 ? (
                 <div className="empty-state">
                   <p>Sem tarefas pendentes para hoje.</p>
@@ -365,7 +365,7 @@ export default function DashboardPage({
                     <article key={tarefa.id} className="dashboard-list-item">
                       <div className="dashboard-list-copy">
                         <strong>{tarefa.titulo}</strong>
-                        <p>{tarefa.descricao || 'Sem descricao adicional.'}</p>
+                        <p>{tarefa.descricao || 'Sem descrição adicional.'}</p>
                       </div>
                       <span className="status-badge status-badge--pendente">Hoje</span>
                     </article>
@@ -400,11 +400,11 @@ export default function DashboardPage({
               <div className="dashboard-task-create">
                 <input className="ui-input" placeholder="Titulo da tarefa" value={novaTarefa.titulo} onChange={(e) => setNovaTarefa((p) => ({ ...p, titulo: e.target.value }))} />
                 <select className="ui-input" value={novaTarefa.funcionario_id} onChange={(e) => setNovaTarefa((p) => ({ ...p, funcionario_id: e.target.value }))}>
-                  <option value="">Responsavel</option>
+                  <option value="">Responsável</option>
                   {(db.funcionarios || []).map((func) => <option key={func.id} value={func.id}>{func.nome}</option>)}
                 </select>
                 <input className="ui-input" type="date" value={novaTarefa.data_vencimento} onChange={(e) => setNovaTarefa((p) => ({ ...p, data_vencimento: e.target.value }))} />
-                <input className="ui-input" placeholder="Descricao" value={novaTarefa.descricao} onChange={(e) => setNovaTarefa((p) => ({ ...p, descricao: e.target.value }))} />
+                <input className="ui-input" placeholder="Descrição" value={novaTarefa.descricao} onChange={(e) => setNovaTarefa((p) => ({ ...p, descricao: e.target.value }))} />
                 <Button onClick={criarTarefaDashboard} disabled={!hasPermission('tarefas:editar')}>Adicionar tarefa</Button>
               </div>
 
@@ -433,7 +433,7 @@ export default function DashboardPage({
             <Card
               className="section-card"
               title="Resumo financeiro"
-              subtitle="Situacao diaria de pagamentos pendentes e liquidados."
+              subtitle="Situação diária de pagamentos pendentes e liquidados."
               action={
                 <Button size="sm" variant="ghost" onClick={() => onNavigate?.('financeiro')}>
                   Abrir financeiro
@@ -443,18 +443,18 @@ export default function DashboardPage({
               <div className="dashboard-list">
                 <div className="dashboard-list-item"><div className="dashboard-list-copy"><strong>Pagamentos vencidos</strong><p>{formatNumber(pagamentosResumo.vencidos, 0)}</p></div></div>
                 <div className="dashboard-list-item"><div className="dashboard-list-copy"><strong>Vencem hoje</strong><p>{formatNumber(pagamentosResumo.hoje, 0)}</p></div></div>
-                <div className="dashboard-list-item"><div className="dashboard-list-copy"><strong>Proximos pagamentos</strong><p>{formatNumber(pagamentosResumo.proximos, 0)}</p></div></div>
+                <div className="dashboard-list-item"><div className="dashboard-list-copy"><strong>Próximos pagamentos</strong><p>{formatNumber(pagamentosResumo.proximos, 0)}</p></div></div>
                 <div className="dashboard-list-item"><div className="dashboard-list-copy"><strong>Total pendente</strong><p>{pagamentosResumo.totalPendente > 0 ? formatCurrency(pagamentosResumo.totalPendente) : 'Nenhum pagamento pendente'}</p></div></div>
                 <div className="dashboard-list-item"><div className="dashboard-list-copy"><strong>Total pago</strong><p>{formatCurrency(pagamentosResumo.totalPago)}</p></div></div>
               </div>
             </Card>
 
-            <Card className="section-card" title="Resumo do rebanho" subtitle="Visao objetiva para decisao diaria da operacao.">
+            <Card className="section-card" title="Resumo do rebanho" subtitle="Visão objetiva para decisão diária da operação.">
               <div className="dashboard-list">
-                <div className="dashboard-list-item"><div className="dashboard-list-copy"><strong>Cabecas ativas</strong><p>{formatNumber(totalCabecasAtivas, 0)}</p></div></div>
+                <div className="dashboard-list-item"><div className="dashboard-list-copy"><strong>Cabeças ativas</strong><p>{formatNumber(totalCabecasAtivas, 0)}</p></div></div>
                 <div className="dashboard-list-item"><div className="dashboard-list-copy"><strong>Lotes ativos</strong><p>{formatNumber(lotesAtivos.length, 0)}</p></div></div>
-                <div className="dashboard-list-item"><div className="dashboard-list-copy"><strong>Peso medio atual</strong><p>{formatNumber(pesoMedioAtual, 1)} kg</p></div></div>
-                <div className="dashboard-list-item"><div className="dashboard-list-copy"><strong>Resultado do mes</strong><p className={resultadoMes >= 0 ? 'positive' : 'negative'}>{formatCurrency(resultadoMes)}</p></div></div>
+                <div className="dashboard-list-item"><div className="dashboard-list-copy"><strong>Peso médio atual</strong><p>{formatNumber(pesoMedioAtual, 1)} kg</p></div></div>
+                <div className="dashboard-list-item"><div className="dashboard-list-copy"><strong>Resultado do mês</strong><p className={resultadoMes >= 0 ? 'positive' : 'negative'}>{formatCurrency(resultadoMes)}</p></div></div>
               </div>
             </Card>
           </section>
@@ -480,7 +480,7 @@ export default function DashboardPage({
                 <AlertTriangle size={22} className={estoqueCritico.length > 0 ? 'text-danger' : ''} />
               </div>
               <div>
-                <p className="kpi-label">Estoque critico</p>
+                <p className="kpi-label">Estoque crítico</p>
                 <p className={`kpi-value ${estoqueCritico.length > 0 ? 'text-danger' : ''}`}>{estoqueCritico.length}</p>
                 <p className="kpi-sub">itens abaixo do minimo</p>
               </div>
@@ -533,7 +533,7 @@ export default function DashboardPage({
                       </td>
                       <td>
                         <span className={critico ? 'text-danger' : 'text-success'}>
-                          {critico ? 'Critico' : 'Normal'}
+                          {critico ? 'Crítico' : 'Normal'}
                         </span>
                       </td>
                       <td>
@@ -567,7 +567,7 @@ export default function DashboardPage({
                 <p className="kpi-value text-danger">
                   {alertasFormatados.filter((alert) => alert.prioridade === 'alta').length}
                 </p>
-                <p className="kpi-sub">requer acao imediata</p>
+                <p className="kpi-sub">requer ação imediata</p>
               </div>
             </div>
 
@@ -576,11 +576,11 @@ export default function DashboardPage({
                 <Bell size={22} className="text-warning" />
               </div>
               <div>
-                <p className="kpi-label">Media prioridade</p>
+                <p className="kpi-label">Média prioridade</p>
                 <p className="kpi-value text-warning">
                   {alertasFormatados.filter((alert) => alert.prioridade === 'media').length}
                 </p>
-                <p className="kpi-sub">atencao recomendada</p>
+                <p className="kpi-sub">atenção recomendada</p>
               </div>
             </div>
 
@@ -610,7 +610,7 @@ export default function DashboardPage({
                   <CheckCircle2 size={28} />
                 </div>
                 <p className="empty-state-title">Nenhum alerta pendente</p>
-                <p className="empty-state-desc">Sua operacao esta em dia.</p>
+                <p className="empty-state-desc">Sua operação está em dia.</p>
               </div>
             ) : (
               alertasFormatados.map((alerta) => (

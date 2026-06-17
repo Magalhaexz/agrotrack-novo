@@ -198,24 +198,24 @@ export default function FinanceiroPage({ db, setDb }) {
 
         <Card title="Resultado detalhado">
           <div className="metrics-2col">
-            <p>Custo de aquisicao: <strong>{formatCurrency(detalhe.lote.investimento || 0)}</strong></p>
+            <p>Custo de aquisição: <strong>{formatCurrency(detalhe.lote.investimento || 0)}</strong></p>
             <p>Custo de alimentação: <strong>{formatCurrency(findCategoryValue(detalheCustosCat, ['alimentacao', 'alimentaçao', 'alimentação']))}</strong></p>
             <p>Custo sanitário: <strong>{formatCurrency(findCategoryValue(detalheCustosCat, ['sanitario', 'sanitário']))}</strong></p>
             <p>Outros custos: <strong>{formatCurrency(sumOtherCategories(detalheCustosCat, ['alimentacao', 'alimentaçao', 'alimentação', 'sanitario', 'sanitário']))}</strong></p>
             <p><strong>Custo total: {formatCurrency(detalhe.custoTotal)}</strong></p>
             <p>Receita bruta: <strong>{formatCurrency(detalhe.receitaTotal)}</strong></p>
-            <p>Deducoes: <strong>{formatCurrency(detalhe.deducoes)}</strong></p>
-            <p><strong>Receita liquida: {formatCurrency(detalhe.receitaTotal - detalhe.deducoes)}</strong></p>
-            <p className={detalhe.lucroTotal >= 0 ? 'text-success' : 'text-danger'}><strong>Lucro/prejuizo: {formatCurrency(detalhe.lucroTotal)}</strong></p>
+            <p>Deduções: <strong>{formatCurrency(detalhe.deducoes)}</strong></p>
+            <p><strong>Receita líquida: {formatCurrency(detalhe.receitaTotal - detalhe.deducoes)}</strong></p>
+            <p className={detalhe.lucroTotal >= 0 ? 'text-success' : 'text-danger'}><strong>Lucro/prejuízo: {formatCurrency(detalhe.lucroTotal)}</strong></p>
             <p>Margem: <strong>{formatNumber(detalhe.margemPct, 2)}%</strong></p>
-            <p>Lucro por cabeca: <strong>{formatCurrency(detalhe.lucroPorCabeca)}</strong></p>
+            <p>Lucro por cabeça: <strong>{formatCurrency(detalhe.lucroPorCabeca)}</strong></p>
             <p>Lucro/@ carcaça: <strong>{formatCurrency(detalhe.lucroPorArroba)}</strong></p>
             <p>Custo por cabeca/dia: <strong>{formatCurrency(detalhe.custoPorCabecaDia)}</strong></p>
           </div>
         </Card>
 
         <div className="dashboard-grid dashboard-grid--dual">
-          <Card title="Distribuicao de custos">
+          <Card title="Distribuição de custos">
             <div style={{ height: 220 }}>
               <ResponsiveContainer width="100%" height={200}>
                 <PieChart>
@@ -303,7 +303,7 @@ export default function FinanceiroPage({ db, setDb }) {
               </div>
             </Card>
 
-            <Card title="Distribuicao de despesas">
+            <Card title="Distribuição de despesas">
               <div style={{ height: 220 }}>
                 <ResponsiveContainer width="100%" height={200}>
                   <PieChart>
@@ -346,7 +346,7 @@ export default function FinanceiroPage({ db, setDb }) {
                 <tbody>
                   {lotesRows.length === 0 ? (
                     <tr>
-                      <td colSpan="10" className="empty-state-td">Nenhum lote disponivel para analise financeira.</td>
+                      <td colSpan="10" className="empty-state-td">Nenhum lote disponível para análise financeira.</td>
                     </tr>
                   ) : (
                     lotesRows.map((row) => (
@@ -477,7 +477,7 @@ export default function FinanceiroPage({ db, setDb }) {
             </div>
           </Card>
 
-          <Card title="Lancamentos">
+          <Card title="Lançamentos">
             <div className="alerts-list">
               {lancamentos.length === 0 ? (
                 <div className="empty-state">
@@ -572,7 +572,7 @@ function NovoLancamentoModal({ db, setDb, onClose, hasPermission, showToast, ses
   }
 
   return (
-    <Modal open onClose={onClose} title="Novo lancamento financeiro" size="lg" footer={<Button onClick={submit}>Salvar lancamento</Button>}>
+    <Modal open onClose={onClose} title="Novo lançamento financeiro" size="lg" footer={<Button onClick={submit}>Salvar lançamento</Button>}>
       <div className="form-grid two">
         <label className="ui-input-wrap">
           <span className="ui-input-label">Tipo</span>
@@ -614,18 +614,18 @@ function NovoLancamentoModal({ db, setDb, onClose, hasPermission, showToast, ses
 
         <Input label={form.tipo === 'despesa' ? 'Fornecedor' : 'Comprador'} value={form.pessoa} onChange={(event) => setForm((prev) => ({ ...prev, pessoa: event.target.value }))} />
         <Input label="Nota fiscal" value={form.nf} onChange={(event) => setForm((prev) => ({ ...prev, nf: event.target.value }))} />
-        <Input label="Observacoes" value={form.obs} onChange={(event) => setForm((prev) => ({ ...prev, obs: event.target.value }))} />
+        <Input label="Observações" value={form.obs} onChange={(event) => setForm((prev) => ({ ...prev, obs: event.target.value }))} />
 
         <label className="ui-input-wrap">
           <span className="ui-input-label">Parcelado?</span>
           <select className="ui-input" value={form.parcelado ? 'sim' : 'nao'} onChange={(event) => setForm((prev) => ({ ...prev, parcelado: event.target.value === 'sim' }))}>
-            <option value="nao">Nao</option>
+            <option value="nao">Não</option>
             <option value="sim">Sim</option>
           </select>
         </label>
 
         {form.parcelado ? (
-          <Input label="Numero de parcelas" type="number" value={form.parcelas} onChange={(event) => setForm((prev) => ({ ...prev, parcelas: event.target.value }))} />
+          <Input label="Número de parcelas" type="number" value={form.parcelas} onChange={(event) => setForm((prev) => ({ ...prev, parcelas: event.target.value }))} />
         ) : null}
       </div>
     </Modal>

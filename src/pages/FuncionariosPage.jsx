@@ -123,7 +123,7 @@ export default function FuncionariosPage({ db, setDb, onConfirmAction }) {
   return (
     <div className="page page--funcionarios">
       <PageHeader
-        title="Funcionários"
+        title="Equipe"
         subtitle="Gerencie pessoas da operação, status e vínculo com a fazenda."
         actions={<Button onClick={() => { setEditando(null); setOpenModal(true); }}>Novo funcionário</Button>}
       />
