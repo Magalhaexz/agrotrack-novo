@@ -79,6 +79,7 @@ export const navSections = [
     items: [
       { id: 'comparativo', label: 'Comparativo', icon: TrendingUp },
       { id: 'resultados', label: 'Resultados e Relatórios', icon: ClipboardList },
+      { id: 'cenarios', label: 'Cenários', icon: TrendingUp },
     ],
   },
   {

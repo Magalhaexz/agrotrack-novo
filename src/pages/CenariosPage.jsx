@@ -7,6 +7,7 @@ import { useAuth } from '../auth/useAuth';
 import { useToast } from '../hooks/useToast';
 import { gerarNovoId } from '../utils/id';
 import { calcularProjecaoCenario } from '../domain/simuladorCenarios';
+import { calcularCenarioPecuaria } from '../domain/projecaoCenario';
 import {
   createOperationalRecord,
   updateOperationalRecord,
@@ -52,12 +53,28 @@ function emptyScenario() {
   };
 }
 
+function emptyDecisao() {
+  return {
+    cabecas: 100,
+    pesoInicialKg: 300,
+    precoCompraArroba: 200,
+    rendimentoCarcaca: 52,
+    diasConfinamento: 90,
+    gmdKgDia: 1.2,
+    custoDiarioCabeca: 15,
+    precoVendaArroba: 270,
+    custoFrete: 0,
+    outrosCustos: 0,
+  };
+}
+
 export default function CenariosPage({ db, setDb, session }) {
   const { hasPermission } = useAuth();
   const { showToast } = useToast();
   const [form, setForm] = useState(emptyScenario());
   const [editando, setEditando] = useState(null);
   const [cenarioSelecionadoId, setCenarioSelecionadoId] = useState(null);
+  const [decisao, setDecisao] = useState(emptyDecisao());
 
   const mensagemSemPermissao = 'Você não tem permissão para executar esta ação.';
   const cenarios = useMemo(() => (Array.isArray(db?.cenarios) ? db.cenarios : []), [db]);
@@ -166,6 +183,8 @@ export default function CenariosPage({ db, setDb, session }) {
     showToast({ type: 'success', message: 'Cenário arquivado.' });
   }
 
+  const resultadoDecisao = useMemo(() => calcularCenarioPecuaria(decisao), [decisao]);
+
   const p = comparativo?.projecao || {};
   const b = comparativo?.baseline || {};
 
@@ -250,6 +269,38 @@ export default function CenariosPage({ db, setDb, session }) {
           <p>UA projetada: <strong>{formatNumber(p.ua_projetada, 2)}</strong></p>
           <p>Saldo de capacidade, UA: <strong>{formatNumber(p.saldo_ua_projetado, 2)}</strong></p>
           <p>Status: <strong>{p.status_capacidade === 'superlotado' ? 'Superlotado' : p.status_capacidade === 'dentro_da_capacidade' ? 'Dentro da capacidade' : 'Sem dados suficientes'}</strong></p>
+        </div>
+      </Card>
+
+      <Card title="Decisão: vale a pena comprar este lote?">
+        <div className="form-grid two">
+          <Input label="Cabeças" type="number" value={decisao.cabecas} onChange={(e) => setDecisao((prev) => ({ ...prev, cabecas: e.target.value }))} />
+          <Input label="Peso inicial, kg" type="number" value={decisao.pesoInicialKg} onChange={(e) => setDecisao((prev) => ({ ...prev, pesoInicialKg: e.target.value }))} />
+          <Input label="Preço de compra, R$/@" type="number" value={decisao.precoCompraArroba} onChange={(e) => setDecisao((prev) => ({ ...prev, precoCompraArroba: e.target.value }))} />
+          <Input label="Rendimento de carcaça, %" type="number" value={decisao.rendimentoCarcaca} onChange={(e) => setDecisao((prev) => ({ ...prev, rendimentoCarcaca: e.target.value }))} />
+          <Input label="Dias de confinamento" type="number" value={decisao.diasConfinamento} onChange={(e) => setDecisao((prev) => ({ ...prev, diasConfinamento: e.target.value }))} />
+          <Input label="GMD esperado, kg/dia" type="number" value={decisao.gmdKgDia} onChange={(e) => setDecisao((prev) => ({ ...prev, gmdKgDia: e.target.value }))} />
+          <Input label="Custo diário/cabeça, R$" type="number" value={decisao.custoDiarioCabeca} onChange={(e) => setDecisao((prev) => ({ ...prev, custoDiarioCabeca: e.target.value }))} />
+          <Input label="Preço de venda, R$/@ carcaça" type="number" value={decisao.precoVendaArroba} onChange={(e) => setDecisao((prev) => ({ ...prev, precoVendaArroba: e.target.value }))} />
+          <Input label="Custo de frete, R$" type="number" value={decisao.custoFrete} onChange={(e) => setDecisao((prev) => ({ ...prev, custoFrete: e.target.value }))} />
+          <Input label="Outros custos fixos, R$" type="number" value={decisao.outrosCustos} onChange={(e) => setDecisao((prev) => ({ ...prev, outrosCustos: e.target.value }))} />
+        </div>
+        <div className="metrics-2col" style={{ marginTop: 16 }}>
+          <p>Peso final esperado: <strong>{formatNumber(resultadoDecisao.pesoFinalKg, 1)} kg</strong></p>
+          <p>Arrobas carcaça compra: <strong>{formatNumber(resultadoDecisao.arrobasCarcacaCompra, 2)} @/cab</strong></p>
+          <p>Arrobas carcaça venda: <strong>{formatNumber(resultadoDecisao.arrobasCarcacaVenda, 2)} @/cab</strong></p>
+          <p>Custo de compra: <strong>{formatCurrency(resultadoDecisao.custoCompra)}</strong></p>
+          <p>Custo diário total: <strong>{formatCurrency(resultadoDecisao.custoDiario)}</strong></p>
+          <p>Custo total: <strong>{formatCurrency(resultadoDecisao.custoTotal)}</strong></p>
+          <p>Receita projetada: <strong>{formatCurrency(resultadoDecisao.receitaProjetada)}</strong></p>
+          <p>Margem bruta: <strong>{formatCurrency(resultadoDecisao.margemBruta)}</strong></p>
+          <p>Lucro/@ carcaça: <strong>{formatCurrency(resultadoDecisao.lucroPorArroba)}</strong></p>
+          <p>Lucro/cabeça: <strong>{formatCurrency(resultadoDecisao.lucroPorCabeca)}</strong></p>
+          <p>ROI: <strong>{formatNumber(resultadoDecisao.roiPct, 2)} %</strong></p>
+          <p>Break-even de venda: <strong>{formatCurrency(resultadoDecisao.breakEvenArroba)} /@</strong></p>
+          <p>Viável: <strong style={{ color: resultadoDecisao.viavel ? 'var(--color-success, #16a34a)' : 'var(--color-danger, #dc2626)' }}>
+            {resultadoDecisao.viavel ? 'SIM' : 'NÃO'}
+          </strong></p>
         </div>
       </Card>
     </div>
