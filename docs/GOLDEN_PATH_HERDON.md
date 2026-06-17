@@ -1,189 +1,211 @@
-# Golden Path — Fluxo Completo do Produtor
+# Golden Path — HERDON
 
-> Sprint 4 · Etapa 5 · Gerado em 2026-06-15  
-> Método: análise de código + verificação via Supabase MCP. Teste manual em browser pendente.
-
----
-
-## O que é o Golden Path
-
-Fluxo principal de um novo produtor: do cadastro até o primeiro ciclo completo de lote com financeiro funcional. É o critério mínimo de go/no-go.
+**Sprint 15 · Etapa 2**
+**Atualizado em:** 2026-06-17 (substituiu versão Sprint 4)
+**Observação:** Documentado a partir do código-fonte. Verificação visual em browser nas Etapas 3 e 4 do Sprint 15.
 
 ---
 
-## Pré-condições
+## Fluxo completo: do zero ao primeiro resultado
 
-- App: `https://agrotrack-novo.vercel.app`
-- Supabase: projeto `ljpiszxicmmuefbiixui`
-- Asaas: sandbox configurado
-- Conta de teste: novo email (não existente no banco)
+### Passo 1 — Acessar a URL do app
 
----
+Abre `https://agrotrack-novo.vercel.app` (ou domínio customizado, se configurado).
 
-## Etapas
-
-### Etapa 1 — Cadastro de nova conta
-
-| Item | Esperado | Verificado |
-|------|----------|-----------|
-| Acessar `/` sem estar logado | Redireciona para `/login` | ⬜ Testar |
-| Clicar em "Criar conta" | Formulário de cadastro aparece | ⬜ Testar |
-| Preencher email e senha | Campos aceitos | ⬜ Testar |
-| Submeter cadastro | Supabase envia email de confirmação | ⬜ Testar |
-| Trigger `on_auth_user_created` | Profile criado com `perfil = 'PROPRIETARIO'`, `owner_user_id = id` | ✅ Verificado via SQL — função correta |
-
-**Nota:** o email de confirmação deve estar configurado no Supabase Auth. Verificar template em Auth → Email Templates.
+**Resultado esperado:** Tela de login com logo HERDON, campos email e senha, link "Criar conta" e links legais no rodapé.
 
 ---
 
-### Etapa 2 — Login
+### Passo 2 — Criar uma conta
 
-| Item | Esperado | Verificado |
-|------|----------|-----------|
-| Confirmar email (link no email) | Conta ativada | ⬜ Testar |
-| Login com email e senha | Dashboard carrega | ⬜ Testar |
-| `normalizarPerfil('PROPRIETARIO')` | → `'proprietario'` via toLowerCase | ✅ Verificado em `perfis.js:174` |
-| Permissões proprietário carregadas | `permissoesPorPerfil['proprietario'] = ['*']` | ✅ Verificado em `perfis.js:31` |
+Clica em "Criar conta". Preenche:
+- Nome / e-mail / senha (mínimo 8 chars, letra maiúscula, número, símbolo = Forte)
+- Indicador de força de senha exibido em tempo real
 
----
+Clica em "Cadastrar".
 
-### Etapa 3 — Criar fazenda
-
-| Item | Esperado | Verificado |
-|------|----------|-----------|
-| Navegar para `/fazendas` | FazendasPage carrega | ⬜ Testar |
-| Clicar em "Nova fazenda" | Formulário aparece | ⬜ Testar |
-| Preencher nome e salvar | Fazenda salva com `owner_user_id = auth.uid()` | ✅ Policy `fazendas_insert_owner` garante isso |
-| Fazenda aparece na lista | SELECT com RLS funciona | ✅ Policy `fazendas_select_owner` garante isso |
-
-**Fonte da data do banco:** 2 fazendas existentes, 0 com owner_user_id NULL — estrutura correta.
+**Resultado esperado:** Conta criada no Supabase Auth. Dependendo da configuração do projeto Supabase, pode exigir confirmação de e-mail. Se `email_confirm = false`, entra direto.
 
 ---
 
-### Etapa 4 — Criar lote
+### Passo 3 — Fazer login
 
-| Item | Esperado | Verificado |
-|------|----------|-----------|
-| Navegar para `/lotes` | LotesPage carrega | ⬜ Testar |
-| Criar novo lote vinculado à fazenda | Lote salvo | ⬜ Testar |
-| Lote aparece na lista | SELECT funciona | ⬜ Testar |
-| `owner_user_id` preenchido | Mesmo que fazenda | ✅ Policy `lotes_insert_own` garante |
+Preenche e-mail e senha. Clica em "Entrar".
 
----
+**Resultado esperado:** Redireciona para `/` (Painel Geral). Menu lateral visível (Desktop) ou bottom nav (Mobile).
 
-### Etapa 5 — Adicionar animais ao lote
-
-| Item | Esperado | Verificado |
-|------|----------|-----------|
-| Acessar detalhes do lote | Tela de detalhes carrega | ⬜ Testar |
-| Adicionar animal | Formulário de animal | ⬜ Testar |
-| Animal aparece no lote | SELECT via `animais_select_owner` | ⬜ Testar |
+**Edge case:** Até 3 tentativas automáticas com backoff em caso de erro transitório (falha de rede).
 
 ---
 
-### Etapa 6 — Registrar pesagem
+### Passo 4 — Painel Geral vazio
 
-| Item | Esperado | Verificado |
-|------|----------|-----------|
-| Navegar para `/pesagens` ou pesagens do lote | Formulário de pesagem | ⬜ Testar |
-| Registrar peso inicial | Dados salvos em `pesagens` | ⬜ Testar |
-| GMD exibido como N/A (apenas 1 pesagem) | Correto — precisa de 2 pontos para calcular GMD | ⬜ Testar |
-| Segunda pesagem após alguns dias | GMD calculado | ⬜ Testar |
+Usuário vê o Dashboard com estado vazio:
+- KPIs zerados (Cabeças, Valor em Estoque, Pendências, Resultado)
+- Seção de alertas vazia
+- Botões de ação rápida "Novo Lote", "Registrar Pesagem", "Novo Custo"
 
----
-
-### Etapa 7 — Registrar movimento financeiro (custo)
-
-| Item | Esperado | Verificado |
-|------|----------|-----------|
-| Acessar `/financeiro` ou registrar custo no lote | Formulário de movimentação | ⬜ Testar |
-| Registrar custo (ex: compra de ração) | Salvo em `movimentacoes_financeiras` | ⬜ Testar |
-| `owner_user_id` preenchido | Policy garante | ✅ `movimentacoes_financeiras_insert_owner` |
-| Custo aparece no extrato financeiro | SELECT funciona | ⬜ Testar |
+**Resultado esperado:** Painel carregado sem erro. Seção de alertas mostra "Nenhum alerta ativo".
 
 ---
 
-### Etapa 8 — Registrar venda (receita)
+### Passo 5 — Criar Fazenda
 
-| Item | Esperado | Verificado |
-|------|----------|-----------|
-| Registrar venda de animais | Movimento do tipo receita | ⬜ Testar |
-| `getResumoLote` reflete a receita | `resumo.receitaTotal` atualizado | ✅ Verificado via code review (Sprint 3) |
-| Margem calculada | `resumo.lucroTotal = receitaTotal - custoTotal` | ✅ Verificado via code review |
+Navega para "Fazendas" (ícone MapPin no menu). Clica em "+ Nova Fazenda".
 
----
+Modal `FazendaModal` abre. Preenche:
+- Nome da fazenda
+- Cidade / Estado
+- Área (hectares) — opcional
 
-### Etapa 9 — Verificar relatório do lote
+Clica em "Salvar".
 
-| Item | Esperado | Verificado |
-|------|----------|-----------|
-| Acessar relatórios | RelatorioLote carrega | ⬜ Testar |
-| Receita e margem exibidas | Via `getResumoLote` | ✅ Verificado — `RelatorioLote.jsx` usa `getResumoLote` exclusivamente |
-| GMD e total de animais | Via `resumo.totalAnimais`, `resumo.gmdMedio` | ✅ Verificado |
+**Resultado esperado:** Card da fazenda aparece na lista. Dado persistido no Supabase (`fazendas` table).
 
 ---
 
-### Etapa 10 — Comparativo de lotes
+### Passo 6 — Criar Lote
 
-| Item | Esperado | Verificado |
-|------|----------|-----------|
-| Acessar `/comparativo` | ComparativoPage carrega | ⬜ Testar |
-| Dois ou mais lotes mostrados | Dados financeiros via `getResumoLote` | ✅ Verificado — `ComparativoPage` usa `getResumoLote` |
+Navega para "Lotes e Rebanho". Clica em "+ Novo Lote".
 
----
+`LoteForm` abre. Preenche:
+- Nome do lote
+- Fazenda selecionada (dropdown com fazenda criada no Passo 5)
+- Tipo de criação (confinamento / pasto / semi-confinamento)
+- Data de entrada
+- Quantidade de animais
+- Peso médio inicial
 
-### Etapa 11 — Verificar página de resultados
+Clica em "Salvar".
 
-| Item | Esperado | Verificado |
-|------|----------|-----------|
-| Acessar `/resultados` | ResultadosPage carrega | ⬜ Testar |
-| Dados financeiros corretos | `getResumoLote` para financeiro | ✅ |
-| Dados produtivos | `calcLote` para GMD, peso vivo | ✅ (usa ambos — D-001 parcialmente resolvido) |
-
----
-
-### Etapa 12 — Fluxo de assinatura
-
-| Item | Esperado | Verificado |
-|------|----------|-----------|
-| Acessar `/minha-assinatura` | MinhaAssinaturaPage carrega | ⬜ Testar |
-| Planos exibidos corretamente | Fundador, Essencial, Pro, Premium | ⬜ Testar |
-| Clicar em "Assinar" | Redireciona para fluxo de pagamento | ⬜ Testar |
-| POST `/api/asaas-create-customer` | 200 com customerId | ⬜ Testar em sandbox |
-| POST `/api/asaas-create-subscription` | 200 com checkoutUrl | ⬜ Testar em sandbox |
-| Pagar via checkout Asaas (sandbox) | Webhook recebido | ⬜ Testar |
-| `customer_subscriptions.status = 'active'` | Atualizado após webhook | ⬜ Testar |
+**Resultado esperado:** LoteCard aparece na lista. Dashboard começa a mostrar "Cabeças ativas > 0".
 
 ---
 
-### Etapa 13 — Logout e re-login
+### Passo 7 — Registrar entrada de animais
 
-| Item | Esperado | Verificado |
-|------|----------|-----------|
-| Logout | Sessão encerrada, redirect para login | ⬜ Testar |
-| Re-login | Dados persistem | ⬜ Testar |
+No card do lote criado, clica em "Ver detalhes" → aba "Overview".
 
----
+Registra movimentação de entrada:
+- Tipo: Entrada
+- Quantidade de animais
+- Preço por arroba / por animal
 
-## Critério de aceite do Golden Path
-
-| Status | Definição |
-|--------|-----------|
-| ✅ Go | Etapas 1-11 funcionam sem bloqueio crítico |
-| 🟡 Go condicional | Etapas 1-9 funcionam; assinatura (10-12) com problema não-crítico |
-| 🔴 No-go | Qualquer etapa 1-8 com bloqueio crítico |
+**Resultado esperado:** Movimentação de animais salva em `movimentacoes_animais`. Lote com animais computados.
 
 ---
 
-## Etapas verificadas vs pendentes
+### Passo 8 — Registrar Pesagem
 
-| Verificadas via código/SQL | Pendentes (requer browser manual) |
-|---------------------------|----------------------------------|
-| Trigger de criação de perfil ✅ | Login/cadastro end-to-end |
-| RLS de fazendas/lotes ✅ | Criação de fazenda |
-| getResumoLote → RelatorioLote ✅ | Criação de lote e animais |
-| ComparativoPage → getResumoLote ✅ | Registro de pesagem e GMD |
-| Asaas server-side auth ✅ | Fluxo de pagamento sandbox |
-| Dados de movimentações financeiras isolados ✅ | Checkout e webhook |
+Navega para "Pesagens". Clica em "+ Nova Pesagem".
 
-**Nota:** O bugde `app_can_manage_account` (case mismatch) **não impacta** o Golden Path do proprietário solitário. Ele afeta apenas convite de funcionários (Etapa 6 do `ROLE_QA_HERDON.md`).
+Preenche:
+- Lote selecionado
+- Data da pesagem
+- Peso médio (kg)
+- Número de animais pesados
+
+Clica em "Salvar".
+
+**Resultado esperado:** Pesagem salva em `pesagens`. GMD (Ganho Médio Diário) começa a ser calculado. Alerta de "pesagem pendente" some do painel.
+
+---
+
+### Passo 9 — Registrar Despesa Financeira
+
+Navega para "Movimentações Financeiras". Clica em "+ Novo Lançamento".
+
+Preenche:
+- Tipo: Despesa
+- Categoria (ex: Alimentação, Veterinário)
+- Valor
+- Data de vencimento
+- Lote associado
+- Status: Previsto / Realizado / Pago
+
+Clica em "Salvar Lançamento".
+
+**Resultado esperado:** Movimentação salva em `movimentacoes_financeiras`. Se vencida e não paga, alerta financeiro aparece no Dashboard.
+
+---
+
+### Passo 10 — Verificar alertas no Painel
+
+Volta para Painel Geral (Dashboard). Clica na aba "Alertas" (ou verifica seção de alertas).
+
+**Resultado esperado:** `buildAlerts(db)` exibe:
+- Alertas críticos (vermelho) no topo
+- Alertas de atenção (amarelo) abaixo
+- Cada alerta com botão "Ir para" e opção de resolver/adiar
+
+---
+
+### Passo 11 — Ver Resultado do Lote
+
+Navega para "Resultado dos Lotes". Seleciona o lote criado.
+
+**Resultado esperado:** `getResumoLote()` calcula:
+- Custo total (animais + despesas)
+- Receita estimada (peso × preço @ arroba)
+- Resultado projetado (lucro/prejuízo)
+- GMD, @/cab, custo por @ produzida
+
+---
+
+### Passo 12 — Simular Cenário de Venda
+
+Navega para "Simulador de Decisão". Seleciona o lote. Ajusta:
+- Preço de venda por arroba
+- Data alvo de saída
+- Peso final estimado
+
+**Resultado esperado:** Projeção de resultado exibida com comparativo entre vender agora vs. na data alvo.
+
+---
+
+### Passo 13 — Verificar Fluxo de Caixa
+
+Navega para "Fluxo de Caixa".
+
+**Resultado esperado:** KPIs mostram receitas, despesas e saldo. Gráfico ou tabela com timeline de vencimentos. Alertas de vencimentos próximos.
+
+---
+
+### Passo 14 — Verificar Assinatura
+
+Navega para "Planos e Assinatura". Verifica plano ativo.
+
+Se usuário free: pode testar funcionalidades do plano gratuito. Botão "Assinar Plano" inicia fluxo Asaas.
+
+**Resultado esperado:** Status da assinatura exibido. Links para Termos e Política de Cobrança visíveis.
+
+---
+
+## Resumo do Golden Path
+
+| Passo | Tela | Ação | Dado persistido |
+|-------|------|------|-----------------|
+| 1 | URL | Acessar app | — |
+| 2 | Login | Criar conta | `auth.users` |
+| 3 | Login | Fazer login | `auth.sessions` |
+| 4 | Dashboard | Ver painel vazio | — |
+| 5 | Fazendas | Criar fazenda | `fazendas` |
+| 6 | Lotes | Criar lote | `lotes` |
+| 7 | Lotes (detalhe) | Entrada de animais | `movimentacoes_animais` |
+| 8 | Pesagens | Registrar pesagem | `pesagens` |
+| 9 | Financeiro | Registrar despesa | `movimentacoes_financeiras` |
+| 10 | Dashboard | Verificar alertas | `alertas_resolvidos` (se resolver) |
+| 11 | Resultados | Ver resultado do lote | — (calculado) |
+| 12 | Simulador | Simular cenário | `cenarios` (se salvar) |
+| 13 | Fluxo de Caixa | Ver cashflow | — (calculado) |
+| 14 | Assinatura | Verificar plano | `customer_subscriptions` |
+
+---
+
+## Status
+
+| Item | Status |
+|------|--------|
+| Fluxo documentado a partir do código | ✅ |
+| Verificação visual em browser | ⚠️ Pendente (Etapas 3 e 4 do Sprint 15) |
+| Teste de ponta a ponta em staging | ⚠️ Pendente antes do go-live |

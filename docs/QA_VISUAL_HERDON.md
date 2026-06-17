@@ -1,95 +1,73 @@
-# QA Visual HERDON — Sprint 13
+# QA Visual HERDON — Sprint 15
 
-**Data da revisão:** 2026-06-17
-
-## Checklist por tela
-
-| Tela | Status visual | Problema encontrado | Prioridade | Correção feita | Pendência |
-|------|--------------|---------------------|------------|----------------|-----------|
-| Painel Geral | OK | Textos sem acentos; KpiPanel com variação artificial | Alta | Acentos corrigidos (Cabeças, crítico, Pendências, etc.) | Variação % é calculada sobre base fictícia |
-| Fazendas | OK | Empty state usa `.ui-card empty-state` sem `EmptyState` component | Baixa | — | Padronizar com `EmptyState` |
-| Lotes e Rebanho | OK | — | — | — | — |
-| Detalhe do Lote | Não testada | Tabs internas (Overview, Pesagens, Sanitário, Financeiro, Nutrição) | — | — | Revisar na Sprint 14 |
-| Animais | Não testada | — | — | — | — |
-| Pesagens | Não testada | — | — | — | — |
-| Estoque | OK | — | — | — | — |
-| Suplementação | Não testada | — | — | — | — |
-| Movimentações Financeiras | Precisa ajuste leve | Textos sem acentos no modal e detalhe; "Financeiro do lote" sem PageHeader | Alta | Acentos corrigidos (Distribuição, Deduções, Lançamentos, etc.) | h1 detalhe de lote sem PageHeader |
-| Fluxo de Caixa | Precisa ajuste leve | KpiCard local usava token CSS errado `--color-muted` | Média | Corrigido para `--color-text-muted` | KpiCard local deveria usar CSS classes |
-| Rateio de Custos | OK | Título correto (`<h1>Rateio de Custos</h1>`) | — | — | — |
-| Resultado dos Lotes | OK | Bem estruturado com filtros, tabs, KPIs, tabelas | — | — | — |
-| Simulador de Decisão | OK | Título nav e PageHeader eram "Cenários" | Alta | Corrigido para "Simulador de Decisão" | — |
-| Indicadores | Precisa ajuste leve | Usa `metric-tile` sem fallback visível para token | Baixa | — | Verificar estilo de metric-tile |
-| Relatórios | OK | — | — | — | — |
-| Equipe | OK | Título era "Funcionários" | Alta | Corrigido para "Equipe" | — |
-| Planos e Assinatura | OK | h1 era "Minha Assinatura" | Alta | Corrigido para "Planos e Assinatura" | — |
-| Configurações | Não testada | — | — | — | — |
-| Perfil | Não testada | — | — | — | — |
+**Atualizado em:** 2026-06-17
+**Histórico:** Sprint 13 (criado) → Sprint 14 (pendências corrigidas) → Sprint 15 (atualização de status)
 
 ---
 
-## Problemas encontrados e status
+## Status por tela
 
-### Críticos (quebra de coerência nav/título) — todos corrigidos
-
-| Problema | Arquivo | Correção |
-|---------|---------|---------|
-| PageHeader "Cenários" ≠ nav "Simulador de Decisão" | `CenariosPage.jsx` | Título → "Simulador de Decisão" |
-| h1 "Minha Assinatura" ≠ nav "Planos e Assinatura" | `MinhaAssinaturaPage.jsx` | h1 → "Planos e Assinatura" |
-| PageHeader "Funcionários" ≠ nav "Equipe" | `FuncionariosPage.jsx` | Título → "Equipe" |
-
-### Textos sem acento (português incorreto) — todos corrigidos
-
-| Antes | Depois | Localização |
-|-------|--------|-------------|
-| "Cabecas ativas" | "Cabeças ativas" | DashboardPage (3 ocorrências) |
-| "Estoque critico" | "Estoque crítico" | DashboardPage (2 ocorrências) |
-| "Pendencias hoje" | "Pendências hoje" | DashboardPage |
-| "Proximos pagamentos" | "Próximos pagamentos" | DashboardPage |
-| "Resultado do mes" | "Resultado do mês" | DashboardPage |
-| "Peso medio atual" | "Peso médio atual" | DashboardPage |
-| "Focos prioritarios" | "Focos prioritários" | DashboardPage |
-| "Pendencias com vencimento" | "Pendências com vencimento" | DashboardPage |
-| "Situacao diaria" | "Situação diária" | DashboardPage |
-| "Visao objetiva" | "Visão objetiva" | DashboardPage |
-| "criticos" (badge) | "críticos" | DashboardPage |
-| "Critico" (badge) | "Crítico" | DashboardPage (2 ocorrências) |
-| "Media prioridade" | "Média prioridade" | DashboardPage |
-| "atencao recomendada" | "atenção recomendada" | DashboardPage |
-| "requer acao imediata" | "requer ação imediata" | DashboardPage |
-| "operacao esta em dia" | "operação está em dia" | DashboardPage |
-| "Nao definido" | "Não definido" | DashboardPage |
-| "Distribuicao de custos" | "Distribuição de custos" | FinanceiroPage |
-| "Distribuicao de despesas" | "Distribuição de despesas" | FinanceiroPage |
-| "Deducoes" | "Deduções" | FinanceiroPage |
-| "Receita liquida" | "Receita líquida" | FinanceiroPage |
-| "Lucro/prejuizo" | "Lucro/prejuízo" | FinanceiroPage |
-| "Lucro por cabeca" | "Lucro por cabeça" | FinanceiroPage |
-| "Custo de aquisicao" | "Custo de aquisição" | FinanceiroPage |
-| "Lancamentos" (título card) | "Lançamentos" | FinanceiroPage |
-| "Novo lancamento financeiro" | "Novo lançamento financeiro" | FinanceiroPage |
-| "Salvar lancamento" | "Salvar lançamento" | FinanceiroPage |
-| "Observacoes" | "Observações" | FinanceiroPage |
-| "Nao" (opção) | "Não" | FinanceiroPage |
-| "Numero de parcelas" | "Número de parcelas" | FinanceiroPage |
-| "analise financeira" | "análise financeira" | FinanceiroPage |
-| "Responsavel" (select) | "Responsável" | DashboardPage |
-| "Descricao" (placeholder) | "Descrição" | DashboardPage |
-
-### Tokens CSS incorretos — corrigidos
-
-| Problema | Arquivo | Correção |
-|---------|---------|---------|
-| `--color-muted` (inexistente) | `FluxoCaixaPage.jsx` | → `--color-text-muted` |
+| Tela | Sprint 13 | Sprint 14 | Sprint 15 | Pendência |
+|------|-----------|-----------|-----------|-----------|
+| Painel Geral | Acentos corrigidos | — | ✅ | Variação % fictícia (+8%) |
+| Fazendas | — | `EmptyState` migrado | ✅ | — |
+| Lotes e Rebanho | OK | — | ✅ | — |
+| Detalhe do Lote (abas) | Não testada | Não testada | ⚠️ | Abas internas não revisadas |
+| Animais | Não testada | Não testada | ⚠️ | — |
+| Pesagens | Não testada | Não testada | ⚠️ | — |
+| Estoque | OK | — | ✅ | — |
+| Suplementação | Não testada | Não testada | ⚠️ | — |
+| Movimentações Financeiras | Acentos corrigidos | `PageHeader` no detalhe | ✅ | — |
+| Fluxo de Caixa | Token CSS corrigido | `KpiCard` → classes CSS | ✅ | — |
+| Rateio de Custos | OK | — | ✅ | — |
+| Resultado dos Lotes | OK | — | ✅ | — |
+| Simulador de Decisão | Título corrigido | — | ✅ | — |
+| Indicadores | `metric-tile` não revisado | Não testada | ⚠️ | Verificar estilo `metric-tile` |
+| Relatórios | OK | — | ✅ | — |
+| Equipe | Título corrigido | — | ✅ | — |
+| Planos e Assinatura | Título corrigido | — | ✅ | — |
+| Configurações | Não testada | Não testada | ⚠️ | — |
+| Perfil | Não testada | Não testada | ⚠️ | — |
 
 ---
 
-## Pendências (para Sprint 14+)
+## Correções consolidadas por sprint
 
-- [ ] `FinanceiroPage`: detalhe de lote usa `<h1>Financeiro do lote...` sem `PageHeader` — layout inconsistente
-- [ ] `FluxoCaixaPage`: `KpiCard` local deveria usar classes CSS `.kpi-card`, `.kpi-label`, `.kpi-value` em vez de inline styles
-- [ ] `FazendasPage`: empty state usa `<div className="ui-card empty-state">` em vez do componente `EmptyState`
-- [ ] `DashboardPage`: KpiPanel mostra variação % calculada com base fictícia (+8%) — enganoso
-- [ ] Detalhe do Lote e suas abas internas (Overview, Pesagens, Sanitário, etc.) — não revisadas nesta sprint
-- [ ] AnimaisPage, PesagensPage, SuplementacaoPage, ConfiguracoesPage, PerfilPage — não revisadas
-- [ ] Responsividade completa de tabelas mobile não verificada visualmente
+### Sprint 13 — Correções aplicadas
+
+| Problema | Arquivo(s) | Status |
+|----------|-----------|--------|
+| Títulos de tela ≠ nav (Cenários, Funcionários, Minha Assinatura) | `CenariosPage`, `FuncionariosPage`, `MinhaAssinaturaPage` | ✅ Corrigido |
+| 30+ textos sem acento (Cabeças, crítico, Pendências, Próximos...) | `DashboardPage`, `FinanceiroPage` | ✅ Corrigido |
+| Token CSS inexistente `--color-muted` | `FluxoCaixaPage` | ✅ Corrigido |
+
+### Sprint 14 — Correções aplicadas
+
+| Problema | Arquivo | Status |
+|----------|---------|--------|
+| `KpiCard` local com inline styles | `FluxoCaixaPage.jsx` | ✅ Migrado para `.kpi-card` / `.kpi-val gn/rd/am` |
+| Empty state com `<div>` manual | `FazendasPage.jsx` | ✅ Migrado para `<EmptyState>` |
+| Detalhe de lote sem `PageHeader` | `FinanceiroPage.jsx` | ✅ Substituído por `<PageHeader>` |
+
+---
+
+## Pendências abertas (pós Sprint 15)
+
+| Item | Prioridade | Arquivo | Observação |
+|------|-----------|---------|------------|
+| Detalhe do Lote — abas internas | Alta | `LotesPage` / `LoteDetailsPanel` | Overview, Pesagens, Sanitário, Financeiro, Nutrição não verificadas |
+| AnimaisPage | Média | `AnimaisPage.jsx` | Nunca revisada visualmente |
+| PesagensPage | Média | `PesagensPage.jsx` | Nunca revisada visualmente |
+| SuplementacaoPage | Baixa | `SuplementacaoPage.jsx` | Nunca revisada visualmente |
+| ConfiguracoesPage | Baixa | `ConfiguracoesPage.jsx` | Nunca revisada visualmente |
+| PerfilPage | Baixa | `PerfilPage.jsx` | Nunca revisada visualmente |
+| IndicadoresPage — `metric-tile` | Baixa | `IndicadoresPage.jsx` | Estilo `metric-tile` não confirmado |
+| Dashboard — variação % fictícia | Média | `DashboardPage.jsx` | Variação % usa base simulada (+8%) |
+
+---
+
+## Telas aprovadas para go-live (Sprint 15)
+
+Aprovadas ✅: Painel Geral, Fazendas, Lotes, Financeiro, Fluxo de Caixa, Rateio de Custos, Resultado dos Lotes, Simulador de Decisão, Relatórios, Estoque, Equipe, Planos e Assinatura.
+
+Não bloqueadoras ⚠️: Animais, Pesagens, Suplementação, Detalhe de Lote, Indicadores, Configurações, Perfil — presentes e funcionais, verificação visual pendente.
