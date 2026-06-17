@@ -1,4 +1,4 @@
-import { safeDivide, toNonNegativeNumber, toNumber } from './calcHelpers.js';
+import { isAnimalAtivo, safeDivide, toNonNegativeNumber, toNumber } from './calcHelpers.js';
 
 /**
  * Verifica se um item pertence a um lote específico.
@@ -105,9 +105,9 @@ export function calcularReceitaLote(db, loteId) {
 
 /**
  * Calcula o resultado financeiro completo e indicadores zootécnicos para um lote.
+ * lucroPorArroba usa @ carcaça (rendimento_carcaca do lote, padrão 52%) — padrão do mercado.
  * @param {object} db - O objeto do banco de dados.
  * @param {number|string} loteId - O ID do lote.
- * @returns {{custoTotal: number, receitaTotal: number, lucroTotal: number, qtdCabecas: number, lucroPorCabeca: number, pesoMedioAtual: number, arrobaViva: number, lucroPorArroba: number}} Os resultados do lote.
  */
 export function calcularResultadoLote(db, loteId) {
   const custo = calcularCustoLote(db, loteId);
@@ -116,8 +116,13 @@ export function calcularResultadoLote(db, loteId) {
   const receitaTotal = toNumber(receita.receitaTotal);
   const lucroTotal = receitaTotal - custoTotal;
 
+  const lotes = Array.isArray(db?.lotes) ? db.lotes : [];
+  const lote = lotes.find((l) => toNumber(l.id) === toNumber(loteId)) ?? null;
+  // F-04: usa rendimento_carcaca configurado no lote (padrão 52% — zebuínos/Nelore)
+  const rendimentoCarcaca = toNumber(lote?.rendimento_carcaca || 52) / 100;
+
   const animais = Array.isArray(db?.animais) ? db.animais : [];
-  const animaisLote = animais.filter((item) => pertenceAoLote(item, loteId));
+  const animaisLote = animais.filter((item) => pertenceAoLote(item, loteId) && isAnimalAtivo(item));
   const qtdCabecas = animaisLote.reduce((acc, item) => acc + toNonNegativeNumber(item.qtd), 0);
   const pesoMedioAtual = qtdCabecas
     ? safeDivide(
@@ -125,11 +130,13 @@ export function calcularResultadoLote(db, loteId) {
         qtdCabecas
       )
     : 0;
+
   const arrobaViva = safeDivide(pesoMedioAtual, 15);
+  // F-04: arrobas pelo peso de carcaça = peso vivo × rendimento / 15
+  const arrobasCarcaca = safeDivide(qtdCabecas * pesoMedioAtual * rendimentoCarcaca, 15);
 
   const lucroPorCabeca = safeDivide(lucroTotal, qtdCabecas);
-  const arrobasTotaisVivas = qtdCabecas * arrobaViva;
-  const lucroPorArroba = safeDivide(lucroTotal, arrobasTotaisVivas);
+  const lucroPorArroba = safeDivide(lucroTotal, arrobasCarcaca);
   const margemPct = receitaTotal > 0 ? safeDivide(lucroTotal * 100, receitaTotal) : 0;
 
   return {
@@ -138,9 +145,10 @@ export function calcularResultadoLote(db, loteId) {
     lucroTotal,
     margemPct,
     qtdCabecas,
-    lucroPorCabeca, // Corrigido o nome da propriedade
+    lucroPorCabeca,
     pesoMedioAtual,
     arrobaViva,
+    arrobasCarcaca,
     lucroPorArroba,
   };
 }

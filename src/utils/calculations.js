@@ -1,10 +1,14 @@
 import {
+  calcularDiasNoLote,
   daysBetween,
+  isAnimalAtivo,
   safeDivide,
   toDateKey,
   toNonNegativeNumber,
   toNumber,
 } from '../domain/calcHelpers.js';
+import { calcularCustoLote } from '../domain/calculos.js';
+import { calcularArrobasProduzidas } from '../domain/indicadores.js';
 
 /**
  * Formata um número para exibição com um número específico de casas decimais, usando o locale pt-BR.
@@ -77,7 +81,7 @@ export const calcularDias = daysDiff;
  * @param {string|number} loteId - O ID do lote.
  * @returns {object} Indicadores produtivos do lote + projeção financeira estimada.
  */
-export const calcLote = (db, loteId) => {
+export const calcLote = (db, loteId, referenceDate = new Date().toISOString().slice(0, 10)) => {
   // Garante que as coleções são arrays para evitar erros
   const lotes = Array.isArray(db?.lotes) ? db.lotes : [];
   const animais = Array.isArray(db?.animais) ? db.animais : [];
@@ -113,7 +117,9 @@ export const calcLote = (db, loteId) => {
     };
   }
 
-  const animaisDoLote = animais.filter((item) => toNumber(item.lote_id) === toNumber(loteId));
+  const animaisDoLote = animais.filter(
+    (item) => toNumber(item.lote_id) === toNumber(loteId) && isAnimalAtivo(item)
+  );
   const custosDoLote = custos.filter((item) => toNumber(item.lote_id) === toNumber(loteId));
 
   const totalAnimais = animaisDoLote.reduce((sum, item) => sum + toNonNegativeNumber(item.qtd), 0);
@@ -127,24 +133,38 @@ export const calcLote = (db, loteId) => {
     outros: custosDoLote.filter((item) => item.cat === 'outros').reduce((sum, item) => sum + toNumber(item.val), 0),
   };
 
-  // Calcula o GMD (Ganho Médio Diário) para uma lista de animais
+  // Calcula o GMD (Ganho Médio Diário) para uma lista de animais.
+  // F-03: usa dias dinâmicos a partir de data_entrada do animal ou entrada do lote;
+  // cai para item.dias apenas quando nenhuma data estiver disponível.
   const calcGmd = (list) => {
     const quantity = list.reduce((sum, item) => sum + toNumber(item.qtd), 0);
     if (!quantity) return 0;
-    // Soma o ganho total de peso dividido pelos dias para cada animal, ponderado pela quantidade
     const totalGainPerDay = list.reduce((sum, item) => {
       const gain = toNumber(item.p_at) - toNumber(item.p_ini);
-      const days = Math.max(toNumber(item.dias), 1); // Evita divisão por zero
+      const dataEntrada = item.data_entrada || lote.entrada;
+      const days = dataEntrada
+        ? Math.max(calcularDiasNoLote(dataEntrada, referenceDate), 1)
+        : Math.max(toNumber(item.dias), 1);
       return sum + (gain / days) * toNumber(item.qtd);
     }, 0);
     return totalGainPerDay / quantity;
   };
 
-  const gainTotal = animaisDoLote.reduce((sum, item) => sum + (toNumber(item.p_at) - toNumber(item.p_ini)) * toNonNegativeNumber(item.qtd), 0);
-  const arrobasProduzidas = gainTotal / 15; // 1 arroba = 15 kg
+  // F-07: usa calcularArrobasProduzidas (indicadores.js) em vez de fórmula inline duplicada
+  const arrobasProduzidas = animaisDoLote.reduce(
+    (sum, item) => sum + calcularArrobasProduzidas(toNumber(item.p_ini), toNumber(item.p_at), toNonNegativeNumber(item.qtd)),
+    0
+  );
+  // F-03: dias médio ponderado calculado dinamicamente pelas datas reais
   const dias = totalAnimais
     ? safeDivide(
-        animaisDoLote.reduce((sum, item) => sum + toNumber(item.dias) * toNonNegativeNumber(item.qtd), 0),
+        animaisDoLote.reduce((sum, item) => {
+          const dataEntrada = item.data_entrada || lote.entrada;
+          const daysAnimal = dataEntrada
+            ? calcularDiasNoLote(dataEntrada, referenceDate)
+            : toNumber(item.dias);
+          return sum + daysAnimal * toNonNegativeNumber(item.qtd);
+        }, 0),
         totalAnimais
       )
     : 0;
@@ -251,13 +271,18 @@ export const computeAlerts = (db) => {
       });
     }
 
-    // Alerta: Margem projetada negativa (estimativa pelo preço-alvo, não financeiro realizado)
-    if (indicators.totalAnimais > 0 && indicators.margemProjetada < 0) {
-      alerts.push({
-        level: 'crit',
-        title: `Margem projetada negativa — ${lote.nome}`,
-        description: `Prejuízo estimado de ${formatCurrency(Math.abs(indicators.margemProjetada))}`,
-      });
+    // Alerta: Margem projetada negativa — usa custo real de movimentacoes_financeiras
+    // para que o alerta seja consistente com o painel financeiro do lote.
+    if (indicators.totalAnimais > 0) {
+      const custoReal = calcularCustoLote(db, lote.id).custoTotal;
+      const margemProjetadaReal = indicators.receitaProjetada - custoReal;
+      if (margemProjetadaReal < 0) {
+        alerts.push({
+          level: 'crit',
+          title: `Margem projetada negativa — ${lote.nome}`,
+          description: `Prejuízo estimado de ${formatCurrency(Math.abs(margemProjetadaReal))}`,
+        });
+      }
     }
   });
 

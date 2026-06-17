@@ -23,7 +23,7 @@ function buildInsights({ lote, totalAnimais, lucroTotal, gmdKgDia, custoPorArrob
   }
 
   if (custoPorArroba > 0 && margemPct < 10) {
-    insights.push('Custo por arroba elevado.');
+    insights.push('Custo/@ carcaça elevado.');
   }
 
   return insights;
@@ -52,7 +52,7 @@ export function getResumoLote(db, loteId) {
   const custoPorCabeca = safeDivide(custoTotal, totalAnimais);
   const custoPorArroba = safeDivide(custoTotal, arrobasProduzidas);
   const lucroPorCabeca = toNumber(financeiro?.lucroPorCabeca) || safeDivide(lucroTotal, totalAnimais);
-  const lucroPorArroba = toNumber(financeiro?.lucroPorArroba) || safeDivide(lucroTotal, arrobasProduzidas);
+  const lucroPorArroba = toNumber(financeiro?.lucroPorArroba) || safeDivide(lucroTotal, arrobasCarcaca);
 
   const classificacao = lucroTotal > 0 ? 'lucro' : lucroTotal < 0 ? 'prejuizo' : 'empate';
 

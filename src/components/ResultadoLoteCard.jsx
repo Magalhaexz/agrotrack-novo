@@ -45,7 +45,7 @@ export default function ResultadoLoteCard({ db, lote }) {
 
         <div className="kpi-grid-3" style={{ marginTop: 12 }}>
           <KpiItem label="Lucro por cabeça" value={lucroPorCabecaFormatted} />
-          <KpiItem label="Lucro por @" value={lucroPorArrobaFormatted} />
+          <KpiItem label="Lucro/@ carcaça" value={lucroPorArrobaFormatted} />
           <KpiItem label="Situação" value={situacao} valueSize="24px" />
         </div>
       </div>

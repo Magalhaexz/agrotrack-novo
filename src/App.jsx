@@ -78,6 +78,19 @@ const DashboardPremiumPage = lazy(() => import('./pages/DashboardPremiumPage'));
 const RelatoriosGerenciaisPage = lazy(() => import('./pages/RelatoriosGerenciaisPage'));
 const PlanejamentoPage = lazy(() => import('./pages/PlanejamentoPage'));
 const LoginPage = lazy(() => import('./pages/LoginPage'));
+const TermosPage = lazy(() => import('./pages/TermosPage'));
+const PrivacidadePage = lazy(() => import('./pages/PrivacidadePage'));
+const CobrancaPage = lazy(() => import('./pages/CobrancaPage'));
+const SuportePage = lazy(() => import('./pages/SuportePage'));
+const CustosCompartilhadosPage = lazy(() => import('./pages/CustosCompartilhadosPage'));
+
+const publicPageMap = {
+  termos: TermosPage,
+  privacidade: PrivacidadePage,
+  cobranca: CobrancaPage,
+  suporte: SuportePage,
+};
+
 const TODAY_BOOT_ISO = new Date().toISOString().slice(0, 10);
 const MENSAGEM_SEM_PERMISSAO = 'Você não tem permissão para executar esta ação.';
 const ALERTAS_RESOLVIDOS_STORAGE_KEY = 'herdon-alertas-resolvidos';
@@ -176,6 +189,7 @@ const pageMap = {
   pesagens: PesagensPage,
   acompanhamentoPeso: AcompanhamentoPesoPage,
   custos: CustosPage,
+  custosCompartilhados: CustosCompartilhadosPage,
   resultados: ResultadosPage,
   financeiro: FinanceiroPage,
   pastagens: PastagensPage,
@@ -820,6 +834,15 @@ export default function App() {
           ) : null}
         </div>
       </div>
+    );
+  }
+
+  if (Object.prototype.hasOwnProperty.call(publicPageMap, currentPage)) {
+    const PublicPage = publicPageMap[currentPage];
+    return (
+      <Suspense fallback={<div className="app-loading">Carregando...</div>}>
+        <PublicPage />
+      </Suspense>
     );
   }
 

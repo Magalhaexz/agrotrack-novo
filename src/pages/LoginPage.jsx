@@ -721,6 +721,12 @@ export default function LoginPage() {
 
             <div className="login-card-foot">
               HERDON centraliza o essencial da operacao sem tirar velocidade do dia a dia.
+              <div style={{ marginTop: 12, display: 'flex', gap: 12, justifyContent: 'center', flexWrap: 'wrap' }}>
+                <a href="/termos-de-uso" style={{ color: 'var(--color-text-secondary)', fontSize: 12, textDecoration: 'none' }}>Termos de Uso</a>
+                <a href="/politica-de-privacidade" style={{ color: 'var(--color-text-secondary)', fontSize: 12, textDecoration: 'none' }}>Privacidade</a>
+                <a href="/politica-de-cobranca" style={{ color: 'var(--color-text-secondary)', fontSize: 12, textDecoration: 'none' }}>Cobrança</a>
+                <a href="/suporte" style={{ color: 'var(--color-text-secondary)', fontSize: 12, textDecoration: 'none' }}>Suporte</a>
+              </div>
             </div>
           </div>
         </div>

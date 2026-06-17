@@ -155,6 +155,7 @@ export const permissoesPorPagina = {
   pesagens: 'pesagens:ver',
   acompanhamentoPeso: 'animais:ver',
   custos: 'financeiro:ver',
+  custosCompartilhados: 'financeiro:ver',
   resultados: 'resultados:ver',
   financeiro: 'financeiro:ver',
   tarefas: 'tarefas:ver',

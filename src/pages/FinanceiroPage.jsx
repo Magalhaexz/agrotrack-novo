@@ -79,7 +79,7 @@ export default function FinanceiroPage({ db, setDb }) {
         lucroTotal,
         margemPct: receitaLiquida ? (lucroTotal / receitaLiquida) * 100 : 0,
         lucroPorCabeca: resumo.totalAnimais ? lucroTotal / resumo.totalAnimais : 0,
-        lucroPorArroba: resumo.arrobasProduzidas ? lucroTotal / resumo.arrobasProduzidas : 0,
+        lucroPorArroba: resumo.arrobasCarcaca ? lucroTotal / resumo.arrobasCarcaca : 0,
         custoPorCabecaDia: custoTotal / Math.max(resumo.totalAnimais, 1) / Math.max(resumo.dias, 1),
         deducoes,
       };
@@ -206,7 +206,7 @@ export default function FinanceiroPage({ db, setDb }) {
             <p className={detalhe.lucroTotal >= 0 ? 'text-success' : 'text-danger'}><strong>Lucro/prejuizo: {formatCurrency(detalhe.lucroTotal)}</strong></p>
             <p>Margem: <strong>{formatNumber(detalhe.margemPct, 2)}%</strong></p>
             <p>Lucro por cabeca: <strong>{formatCurrency(detalhe.lucroPorCabeca)}</strong></p>
-            <p>Lucro por arroba: <strong>{formatCurrency(detalhe.lucroPorArroba)}</strong></p>
+            <p>Lucro/@ carcaça: <strong>{formatCurrency(detalhe.lucroPorArroba)}</strong></p>
             <p>Custo por cabeca/dia: <strong>{formatCurrency(detalhe.custoPorCabecaDia)}</strong></p>
           </div>
         </Card>
@@ -335,7 +335,7 @@ export default function FinanceiroPage({ db, setDb }) {
                     <th>Lucro</th>
                     <th>Margem (%)</th>
                     <th>Lucro/cab</th>
-                    <th>Lucro/@</th>
+                    <th>Lucro/@ carcaça</th>
                     <th>Custo/cab/dia</th>
                     <th>Acoes</th>
                   </tr>

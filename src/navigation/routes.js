@@ -1,6 +1,10 @@
 const pageRouteMap = {
   dashboard: '/',
   minhaAssinatura: '/minha-assinatura',
+  termos: '/termos-de-uso',
+  privacidade: '/politica-de-privacidade',
+  cobranca: '/politica-de-cobranca',
+  suporte: '/suporte',
 };
 
 const routePageMap = Object.entries(pageRouteMap).reduce((acc, [page, route]) => {

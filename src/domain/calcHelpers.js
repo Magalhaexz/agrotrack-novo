@@ -86,6 +86,19 @@ export function calculateEstimatedDays(pesoInicial, pesoAlvo, gmdEsperado) {
   return safeDivide(ganhoPlanejado, gmd);
 }
 
+export function isAnimalAtivo(animal) {
+  const status = String(animal?.status || 'ativo').toLowerCase();
+  return !['vendido', 'morte', 'descarte', 'transferencia', 'perda', 'inativo'].includes(status);
+}
+
+// Retorna dias >= 0 entre dataEntrada e dataReferencia (ou hoje).
+// Retorna 0 se dataEntrada for inválida ou referência for anterior à entrada.
+export function calcularDiasNoLote(dataEntrada, dataReferencia) {
+  const ref = dataReferencia || new Date().toISOString().slice(0, 10);
+  const dias = daysBetween(dataEntrada, ref);
+  return dias > 0 ? dias : 0;
+}
+
 export function calculateDailyConsumptionKg({ mode, heads, pesoInicial, pesoFinal, percentualPv, kgPorCabeca }) {
   const totalCabecas = toNonNegativeNumber(heads);
   if (!totalCabecas) return 0;
