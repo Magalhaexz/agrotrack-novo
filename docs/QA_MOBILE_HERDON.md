@@ -1,7 +1,7 @@
 # QA Mobile — HERDON
 
-**Sprint 15 · Etapa 4**
-**Gerado em:** 2026-06-17
+**Atualizado Sprint 19 · Beta Piloto** | Criado Sprint 15 · Etapa 4
+**Gerado em:** 2026-06-18
 **Observação:** Documentado a partir do código-fonte (sem dispositivo físico disponível). Verificar em browser com DevTools mobile (375px) antes do go-live.
 
 ---
@@ -110,3 +110,44 @@
 | Teclado virtual cobre campos de formulário em iOS | Médio | Problema comum em webapps |
 | Bottom nav + FAB — sobreposição de conteúdo | Baixo | Verificar padding-bottom |
 | Sidebar "Mais" — interação de abertura/fechamento | Baixo | Testar gesto de fechar |
+
+---
+
+## Sprint 19 — Classificação por tela (Beta Piloto)
+
+Classificação de prioridade mobile para o criador piloto. Telas do Golden Path têm maior prioridade.
+
+| Tela | No Golden Path | Prioridade mobile | Sprint de origem | Notas |
+|------|---------------|-------------------|-----------------|-------|
+| Login | ✔ | CRÍTICO | Sprint 1 | Formulário responsivo, campo senha |
+| Dashboard | ✔ | CRÍTICO | Sprint 1 | KPIs empilhados, alertas legíveis |
+| Fazendas | ✔ | CRÍTICO | Sprint 5 | Modal de criação em mobile |
+| Pastos | ✔ | CRÍTICO | Sprint 18 | Novo módulo — testar CRUD em 375px |
+| Lotes | ✔ | CRÍTICO | Sprint 12 | LoteForm com 6 blocos em mobile |
+| Pesagens | ✔ | ALTO | Sprint 18 | KPIs `.kpi-card--compact` — Sprint 18 |
+| Financeiro | ✔ | ALTO | Sprint 12 | Tabela de lançamentos |
+| Fluxo de Caixa | ✔ | ALTO | Sprint 18 | KPIs corrigidos Sprint 18 |
+| Resultado dos Lotes | ✔ | ALTO | Sprint 12 | Tabs + tabelas |
+| Simulador de Decisão | ✔ | MÉDIO | Sprint 14 | Form + resultados |
+| Indicadores | ✔ | MÉDIO | Sprint 14 | Gráficos responsivos |
+| Rateio de Custos | — | MÉDIO | Sprint 18 | KPIs corrigidos Sprint 18 |
+| Estoque | — | MÉDIO | Sprint 18 | KPIs corrigidos Sprint 18 |
+| Animais | — | MÉDIO | Sprint 10 | Lista de animais |
+| Sanidade | — | BAIXO | Sprint 11 | — |
+| Suplementação | — | BAIXO | Sprint 11 | — |
+| Relatórios | — | BAIXO | Sprint 14 | Tabelas gerenciais |
+| Comparativo | — | BAIXO | Sprint 12 | — |
+| Perfil | — | BAIXO | Sprint 3 | — |
+| Configurações | — | BAIXO | Sprint 3 | — |
+| Planos e Assinatura | — | INFO | Sprint 10 | Mostrará plano Fundador; sem botão de compra |
+
+### Telas novas desde Sprint 15 que precisam de QA mobile
+
+| Tela | Adicionada em | Risco |
+|------|--------------|-------|
+| Pastos (`PastagensPage`) | Sprint 18 | Modal com campo de fazenda e área |
+| LoteForm — bloco Pasto | Sprint 18 | Campo "Pasto atual" com select filtrado |
+| FluxoCaixaPage — KPIs | Sprint 18 | `.kpi-content` wrapper novo |
+| CustosCompartilhadosPage | Sprint 18 | `PageHeader` + `Card` migrados |
+| EstoquePage — KPIs | Sprint 18 | `.dashboard-strip` 3 colunas em 375px |
+| PesagensPage — KPIs | Sprint 18 | `.kpi-card--compact` em linha |
