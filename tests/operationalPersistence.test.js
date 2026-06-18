@@ -1,4 +1,4 @@
-import test from 'node:test';
+import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import {
   createAuditEvent,
@@ -36,147 +36,153 @@ function mockInsertSuccess(capture) {
   });
 }
 
-test('createOperationalRecord injeta owner_user_id da sessao e ignora owner vindo da UI', async () => {
-  const capture = {};
-  mockInsertSuccess(capture);
-  const result = await createOperationalRecord('tarefas', {
-    titulo: 'Tarefa',
-    owner_user_id: 'malicioso',
-  }, makeSession());
+// Wrap all tests in a sequential suite so shared state (supabase.from, localStorage)
+// is not corrupted by concurrent test execution (node:test runs top-level tests concurrently).
+test('operationalPersistence', { concurrency: 1 }, async (t) => {
 
-  assert.equal(result.persisted, true);
-  assert.equal(capture.payload.owner_user_id, 'user-1');
-  assert.equal(capture.payload.titulo, 'Tarefa');
-});
+  await t.test('createOperationalRecord injeta owner_user_id da sessao e ignora owner vindo da UI', async () => {
+    const capture = {};
+    mockInsertSuccess(capture);
+    const result = await createOperationalRecord('tarefas', {
+      titulo: 'Tarefa',
+      owner_user_id: 'malicioso',
+    }, makeSession());
 
-test('createOperationalRecord sem sessao retorna fallback seguro', async () => {
-  const result = await createOperationalRecord('tarefas', { titulo: 'Local only' }, null);
-  assert.equal(result.persisted, false);
-  assert.equal(result.data.titulo, 'Local only');
-});
-
-test('createOperationalRecord com erro do supabase retorna falha estruturada', async () => {
-  supabase.from = () => ({
-    insert: () => ({
-      select: () => ({
-        single: async () => ({ data: null, error: { message: 'erro remoto' } }),
-      }),
-    }),
+    assert.equal(result.persisted, true);
+    assert.equal(capture.payload.owner_user_id, 'user-1');
+    assert.equal(capture.payload.titulo, 'Tarefa');
   });
 
-  const result = await createOperationalRecord('tarefas', { titulo: 'x' }, makeSession(), { forceStrictWrite: true });
-  assert.equal(result.persisted, false);
-  assert.match(String(result.error), /Não foi possível confirmar o salvamento agora/i);
-  assert.equal(getPendingSyncQueueSnapshot(makeSession()).pendingCount, 0);
-});
-
-test('authenticated strict write does not fall back to local recovery', async () => {
-  supabase.from = () => ({
-    insert: () => ({
-      select: () => ({
-        single: async () => ({ data: null, error: { message: 'network fail' } }),
-      }),
-    }),
+  await t.test('createOperationalRecord sem sessao retorna fallback seguro', async () => {
+    const result = await createOperationalRecord('tarefas', { titulo: 'Local only' }, null);
+    assert.equal(result.persisted, false);
+    assert.equal(result.data.titulo, 'Local only');
   });
 
-  const result = await createOperationalRecord('tarefas', { titulo: 'x' }, makeSession(), { forceStrictWrite: true });
-  assert.equal(result.persisted, false);
-  assert.equal(result.syncStatus, 'error');
-  assert.equal(getPendingSyncQueueSnapshot(makeSession()).pendingCount, 0);
-});
+  await t.test('createOperationalRecord com erro do supabase retorna falha estruturada', async () => {
+    supabase.from = () => ({
+      insert: () => ({
+        select: () => ({
+          single: async () => ({ data: null, error: { message: 'erro remoto' } }),
+        }),
+      }),
+    });
 
-test('deleteOwnerScopedCollection aplica filtro owner_user_id da sessao', async () => {
-  const calls = [];
-  supabase.from = (table) => ({
-    delete: () => ({
-      eq: (col, value) => {
-        calls.push({ table, col, value });
-        if (calls.length === 1) {
-          return {
-            eq: (col2, value2) => {
-              calls.push({ table, col: col2, value: value2 });
-              return Promise.resolve({ error: null });
-            },
-          };
-        }
-        return Promise.resolve({ error: null });
+    const result = await createOperationalRecord('tarefas', { titulo: 'x' }, makeSession(), { forceStrictWrite: true });
+    assert.equal(result.persisted, false);
+    assert.match(String(result.error), /Não foi possível confirmar o salvamento agora/i);
+    assert.equal(getPendingSyncQueueSnapshot(makeSession()).pendingCount, 0);
+  });
+
+  await t.test('authenticated strict write does not fall back to local recovery', async () => {
+    supabase.from = () => ({
+      insert: () => ({
+        select: () => ({
+          single: async () => ({ data: null, error: { message: 'network fail' } }),
+        }),
+      }),
+    });
+
+    const result = await createOperationalRecord('tarefas', { titulo: 'x' }, makeSession(), { forceStrictWrite: true });
+    assert.equal(result.persisted, false);
+    assert.equal(result.syncStatus, 'error');
+    assert.equal(getPendingSyncQueueSnapshot(makeSession()).pendingCount, 0);
+  });
+
+  await t.test('deleteOwnerScopedCollection aplica filtro owner_user_id da sessao', async () => {
+    const calls = [];
+    supabase.from = (table) => ({
+      delete: () => ({
+        eq: (col, value) => {
+          calls.push({ table, col, value });
+          if (calls.length === 1) {
+            return {
+              eq: (col2, value2) => {
+                calls.push({ table, col: col2, value: value2 });
+                return Promise.resolve({ error: null });
+              },
+            };
+          }
+          return Promise.resolve({ error: null });
+        },
+      }),
+    });
+
+    const result = await deleteOwnerScopedCollection('tarefas', makeSession(), [{ column: 'status', value: 'pendente' }]);
+    assert.equal(result.persisted, true);
+    assert.equal(calls[0].col, 'owner_user_id');
+    assert.equal(calls[0].value, 'user-1');
+  });
+
+  await t.test('createAuditEvent remove campos sensiveis de detalhes e nao propaga secrets', async () => {
+    const capture = {};
+    mockInsertSuccess(capture);
+    const result = await createAuditEvent({
+      acao: 'teste',
+      entidade: 'auditoria',
+      detalhes: {
+        ok: true,
+        password: '123',
+        token: 'abc',
+        nested: { secret: 'x', visivel: 'sim' },
       },
-    }),
+    }, makeSession());
+
+    assert.equal(result.persisted, true);
+    assert.equal(capture.payload.detalhes.password, undefined);
+    assert.equal(capture.payload.detalhes.token, undefined);
+    assert.equal(capture.payload.detalhes.nested.secret, undefined);
+    assert.equal(capture.payload.detalhes.nested.visivel, 'sim');
   });
 
-  const result = await deleteOwnerScopedCollection('tarefas', makeSession(), [{ column: 'status', value: 'pendente' }]);
-  assert.equal(result.persisted, true);
-  assert.equal(calls[0].col, 'owner_user_id');
-  assert.equal(calls[0].value, 'user-1');
-});
+  await t.test('pending sync snapshot is user-scoped', () => {
+    localStorage.setItem('herdon-pending-sync-queue', JSON.stringify([
+      { id: '1', ownerUserId: 'user-1', table: 'animais', action: 'create', code: 'network_error' },
+      { id: '2', ownerUserId: 'user-2', table: 'lotes', action: 'update', code: 'schema_error' },
+    ]));
 
-test('createAuditEvent remove campos sensiveis de detalhes e nao propaga secrets', async () => {
-  const capture = {};
-  mockInsertSuccess(capture);
-  const result = await createAuditEvent({
-    acao: 'teste',
-    entidade: 'auditoria',
-    detalhes: {
-      ok: true,
-      password: '123',
-      token: 'abc',
-      nested: { secret: 'x', visivel: 'sim' },
-    },
-  }, makeSession());
+    const userOne = getPendingSyncQueueSnapshot({ user: { id: 'user-1' } });
+    const userTwo = getPendingSyncQueueSnapshot({ user: { id: 'user-2' } });
 
-  assert.equal(result.persisted, true);
-  assert.equal(capture.payload.detalhes.password, undefined);
-  assert.equal(capture.payload.detalhes.token, undefined);
-  assert.equal(capture.payload.detalhes.nested.secret, undefined);
-  assert.equal(capture.payload.detalhes.nested.visivel, 'sim');
-});
+    assert.equal(userOne.pendingCount, 1);
+    assert.equal(userOne.queue[0].ownerUserId, 'user-1');
+    assert.equal(userTwo.pendingCount, 1);
+    assert.equal(userTwo.queue[0].ownerUserId, 'user-2');
+  });
 
-test('pending sync snapshot is user-scoped', () => {
-  localStorage.setItem('herdon-pending-sync-queue', JSON.stringify([
-    { id: '1', ownerUserId: 'user-1', table: 'animais', action: 'create', code: 'network_error' },
-    { id: '2', ownerUserId: 'user-2', table: 'lotes', action: 'update', code: 'schema_error' },
-  ]));
+  await t.test('friendly persistence error messages stay neutral in Portuguese', () => {
+    const message = getFriendlySaveFailureMessage({ readinessCode: 'SESSION_MISSING' });
+    assert.match(message, /Não foi possível confirmar o salvamento agora/i);
+    assert.doesNotMatch(message.toLowerCase(), /sync|sync|cloud|fallback|schema|supabase|postgrest|fila|pendente|modo local/);
+  });
 
-  const userOne = getPendingSyncQueueSnapshot({ user: { id: 'user-1' } });
-  const userTwo = getPendingSyncQueueSnapshot({ user: { id: 'user-2' } });
+  await t.test('friendly persistence error message remains neutral for network failures', () => {
+    const message = getFriendlySaveFailureMessage({ readinessCode: 'NETWORK_ERROR' });
+    assert.match(message, /Não foi possível confirmar o salvamento agora/i);
+    assert.doesNotMatch(message.toLowerCase(), /sync|cloud|fallback|schema|supabase|postgrest|fila|pendente|modo local/);
+  });
 
-  assert.equal(userOne.pendingCount, 1);
-  assert.equal(userOne.queue[0].ownerUserId, 'user-1');
-  assert.equal(userTwo.pendingCount, 1);
-  assert.equal(userTwo.queue[0].ownerUserId, 'user-2');
-});
+  await t.test('strict write policy can be forced for production-like checks', () => {
+    assert.equal(canUseLocalRecoveryForWrite(makeSession(), { forceStrictWrite: true }), false);
+    assert.equal(canUseLocalRecoveryForWrite(null, { forceStrictWrite: true }), false);
+  });
 
-test('friendly persistence error messages stay neutral in Portuguese', () => {
-  const message = getFriendlySaveFailureMessage({ readinessCode: 'SESSION_MISSING' });
-  assert.match(message, /Não foi possível confirmar o salvamento agora/i);
-  assert.doesNotMatch(message.toLowerCase(), /sync|sync|cloud|fallback|schema|supabase|postgrest|fila|pendente|modo local/);
-});
-
-test('friendly persistence error message remains neutral for network failures', () => {
-  const message = getFriendlySaveFailureMessage({ readinessCode: 'NETWORK_ERROR' });
-  assert.match(message, /Não foi possível confirmar o salvamento agora/i);
-  assert.doesNotMatch(message.toLowerCase(), /sync|cloud|fallback|schema|supabase|postgrest|fila|pendente|modo local/);
-});
-
-test('strict write policy can be forced for production-like checks', () => {
-  assert.equal(canUseLocalRecoveryForWrite(makeSession(), { forceStrictWrite: true }), false);
-  assert.equal(canUseLocalRecoveryForWrite(null, { forceStrictWrite: true }), false);
-});
-
-test('repeated failed create does not duplicate pending queue for same user', async () => {
-  localStorage.clear();
-  supabase.from = () => ({
-    insert: () => ({
-      select: () => ({
-        single: async () => ({ data: null, error: { message: 'network fail' } }),
+  await t.test('repeated failed create does not duplicate pending queue for same user', async () => {
+    localStorage.clear();
+    supabase.from = () => ({
+      insert: () => ({
+        select: () => ({
+          single: async () => ({ data: null, error: { message: 'network fail' } }),
+        }),
       }),
-    }),
+    });
+
+    await createOperationalRecord('tarefas', { id: 'local-1', titulo: 'A' }, makeSession());
+    await createOperationalRecord('tarefas', { id: 'local-1', titulo: 'A' }, makeSession());
+
+    const snapshot = getPendingSyncQueueSnapshot(makeSession());
+    assert.equal(snapshot.pendingCount, 1);
+    assert.equal(snapshot.queue[0].localId, 'local-1');
   });
 
-  await createOperationalRecord('tarefas', { id: 'local-1', titulo: 'A' }, makeSession());
-  await createOperationalRecord('tarefas', { id: 'local-1', titulo: 'A' }, makeSession());
-
-  const snapshot = getPendingSyncQueueSnapshot(makeSession());
-  assert.equal(snapshot.pendingCount, 1);
-  assert.equal(snapshot.queue[0].localId, 'local-1');
 });

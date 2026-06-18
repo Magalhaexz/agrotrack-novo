@@ -280,12 +280,12 @@ export default function ImportacaoPage({ db, setDb, session: sessionProp, onConf
       if (!fazendaId || !row.nome) { tick('Pastos'); continue; }
       try {
         const res = await createOperationalRecord('pastagens', {
-          id: gerarNovoId(),
-          fazenda_id: fazendaId,
+          faz_id: Number(fazendaId),
           nome: row.nome,
           area_ha: parsePositiveNumber(row.area_ha) || null,
           status: 'ativo',
           observacoes: row.observacoes || null,
+          metadata: {},
         }, session);
         if (res.data) novosPastos.push(res.data);
         else falhas.push(`Pasto "${row.nome}" — não foi possível salvar`);

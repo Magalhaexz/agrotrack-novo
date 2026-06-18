@@ -2,199 +2,247 @@
 
 Este documento registra o roteiro de teste ponta a ponta da funcionalidade de importação, com dados fictícios representativos.
 
-## Cenário de teste
+**Última execução:** Sprint 20.1 — 2026-06-18  
+**Conta de teste:** `qa.sprint28.herdon@example.com` (Proprietário, UUID `59934aca-8a30-490b-900b-9bbbe9a7e506`)  
+**Resultado:** ✓ 17/17 registros criados, 0 falhas
+
+---
+
+## Cenário de teste (Sprint 20.1)
 
 | Categoria | Quantidade |
 |-----------|-----------|
 | Fazendas | 1 |
 | Pastos | 2 |
-| Lotes | 2 |
+| Lotes | 2 (1 pasto + 1 confinamento) |
 | Animais | 4 |
-| Pesagens por Lote | 3 |
+| Pesagens por Lote | 4 |
 | Pesagens por Animal | 4 |
 
 ---
 
-## Dados fictícios
+## Dados fictícios usados no Sprint 20.1
 
 ### Aba: Fazendas
 
 | nome | cidade | estado | area_total_ha | observacoes |
 |------|--------|--------|---------------|-------------|
-| Fazenda Teste E2E | Uberlândia | MG | 800 | Importação de teste |
+| Fazenda Modelo HERDON | Catalão | GO | 950 | Conta de teste Sprint 20.1 |
 
 ### Aba: Pastos
 
 | codigo_fazenda | nome | area_ha | observacoes |
 |----------------|------|---------|-------------|
-| Fazenda Teste E2E | Pasto Norte | 200 | |
-| Fazenda Teste E2E | Pasto Sul | 150 | |
+| Fazenda Modelo HERDON | Pasto Brejo Grande | 180 | |
+| Fazenda Modelo HERDON | Pasto Morro Azul | 220 | |
 
 ### Aba: Lotes
 
 | codigo_lote | codigo_fazenda | data_entrada | quantidade_cabecas | peso_inicial_kg | observacoes |
 |-------------|----------------|--------------|-------------------|-----------------|-------------|
-| LOTE-E2E-01 | Fazenda Teste E2E | 2024-01-10 | 2 | 300 | |
-| LOTE-E2E-02 | Fazenda Teste E2E | 2024-02-01 | 2 | 280 | |
+| HERDON-PASTO-01 | Fazenda Modelo HERDON | 2024-01-15 | 2 | 310 | Sistema pasto – Pasto Brejo Grande |
+| HERDON-CONF-02 | Fazenda Modelo HERDON | 2024-02-01 | 2 | 285 | Sistema confinamento |
 
 ### Aba: Animais
 
 | brinco | codigo_lote | sexo | peso_inicial_kg | observacoes |
 |--------|-------------|------|-----------------|-------------|
-| E2E-001 | LOTE-E2E-01 | macho | 310 | |
-| E2E-002 | LOTE-E2E-01 | macho | 290 | |
-| E2E-003 | LOTE-E2E-02 | fêmea | 285 | |
-| E2E-004 | LOTE-E2E-02 | fêmea | 275 | |
+| HRD-001 | HERDON-PASTO-01 | macho | 315 | |
+| HRD-002 | HERDON-PASTO-01 | macho | 305 | |
+| HRD-003 | HERDON-CONF-02 | fêmea | 290 | |
+| HRD-004 | HERDON-CONF-02 | fêmea | 280 | |
 
 ### Aba: Pesagens_Lotes
 
 | codigo_lote | data_pesagem | peso_medio_kg | quantidade_cabecas | observacoes |
 |-------------|--------------|---------------|-------------------|-------------|
-| LOTE-E2E-01 | 2024-02-10 | 340 | 2 | |
-| LOTE-E2E-01 | 2024-03-10 | 375 | 2 | |
-| LOTE-E2E-02 | 2024-03-10 | 315 | 2 | |
+| HERDON-PASTO-01 | 2024-03-01 | 345 | 2 | |
+| HERDON-PASTO-01 | 2024-04-01 | 378 | 2 | |
+| HERDON-PASTO-01 | 2024-05-01 | 412 | 2 | |
+| HERDON-CONF-02 | 2024-03-15 | 320 | 2 | |
 
 ### Aba: Pesagens_Animais
 
 | brinco | codigo_lote | data_pesagem | peso_kg | observacoes |
 |--------|-------------|--------------|---------|-------------|
-| E2E-001 | LOTE-E2E-01 | 2024-02-10 | 345 | |
-| E2E-002 | LOTE-E2E-01 | 2024-02-10 | 335 | |
-| E2E-003 | LOTE-E2E-02 | 2024-03-10 | 320 | |
-| E2E-004 | LOTE-E2E-02 | 2024-03-10 | 310 | |
+| HRD-001 | HERDON-PASTO-01 | 2024-03-01 | 348 | |
+| HRD-002 | HERDON-PASTO-01 | 2024-03-01 | 342 | |
+| HRD-003 | HERDON-CONF-02 | 2024-03-15 | 325 | |
+| HRD-004 | HERDON-CONF-02 | 2024-03-15 | 315 | |
 
 ---
 
-## Roteiro de execução
+## Resultado da execução (Sprint 20.1)
 
-### Etapa 1 — Primeira importação (deve criar tudo)
+### Primeira tentativa — bug identificado e corrigido
 
-1. Acesse **Importação** no menu lateral
-2. Baixe o modelo `.xlsx`
-3. Preencha as 6 abas com os dados acima
-4. Salve e envie o arquivo
-5. Verifique a tela de revisão:
-   - Aba Fazendas: 0 erros, 1 linha
-   - Aba Pastos: 0 erros, 2 linhas
-   - Aba Lotes: 0 erros, 2 linhas
-   - Aba Animais: 0 erros, 4 linhas
-   - Aba Pesagens_Lotes: 0 erros, 3 linhas
-   - Aba Pesagens_Animais: 0 erros, 4 linhas
-6. Confirme a importação
-7. Verifique o resultado:
-   - Fazendas criadas: **+1**
-   - Pastos criados: **+2**
-   - Lotes criados: **+2**
-   - Animais criados: **+4**
-   - Pesagens por Lote criadas: **+3**
-   - Pesagens por Animal criadas: **+4**
+A primeira importação criou 15/17 registros. Os 2 pastos falharam silenciosamente.
 
-**Verificação no banco (Supabase):**
-```sql
-SELECT nome FROM fazendas WHERE nome = 'Fazenda Teste E2E';
-SELECT nome FROM lotes WHERE nome IN ('LOTE-E2E-01', 'LOTE-E2E-02');
-SELECT identificacao FROM animais WHERE identificacao LIKE 'E2E-%';
-SELECT tipo, data, peso_medio FROM pesagens WHERE origem = 'importacao' ORDER BY tipo, data;
+**Causa raiz (dupla):**
+1. `ImportacaoPage.jsx` enviava `fazenda_id: fazendaId` (UUID) mas a coluna correta em `pastagens` é `faz_id` (bigint FK)
+2. O campo `metadata` é `NOT NULL jsonb` na tabela `pastagens`, mas o payload não o incluía
+
+**Correção aplicada em `src/pages/ImportacaoPage.jsx` (linhas 282–289):**
+```javascript
+// Antes (quebrado)
+const res = await createOperationalRecord('pastagens', {
+  id: gerarNovoId(),
+  fazenda_id: fazendaId,   // campo UUID, fazendaId é bigint
+  nome: row.nome,
+  // sem metadata — coluna NOT NULL
+}, session);
+
+// Depois (correto)
+const res = await createOperationalRecord('pastagens', {
+  faz_id: Number(fazendaId),  // campo bigint FK correto
+  nome: row.nome,
+  area_ha: parsePositiveNumber(row.area_ha) || null,
+  status: 'ativo',
+  observacoes: row.observacoes || null,
+  metadata: {},               // campo NOT NULL obrigatório
+}, session);
 ```
 
-Resultados esperados:
-- 1 fazenda, 2 lotes, 4 animais
-- 7 pesagens com `origem = 'importacao'` (3 tipo='lote', 4 tipo='animal')
+### Segunda tentativa — 17/17 ✓
+
+Após a correção, reimportação com dados limpos produziu resultado completo:
+
+```
+Importação concluída com sucesso
+17 registros criados no HERDON
+
+Fazendas:           +1
+Pastos:             +2
+Lotes:              +2
+Animais:            +4
+Pesagens por Lote:  +4
+Pesagens por Animal: +4
+```
 
 ---
 
-### Etapa 2 — Segunda importação com o mesmo arquivo (duplicatas devem ser bloqueadas)
+## Verificação nas telas
 
-1. Envie **o mesmo arquivo** novamente
-2. Na tela de revisão, verifique:
-   - Aba Pesagens_Lotes: **3 erros** — uma por linha, indicando conflito com data já cadastrada
-   - Aba Pesagens_Animais: **4 erros** — uma por linha, indicando conflito com data já cadastrada
-3. O botão "Avançar" deve estar **desabilitado**
-4. Não é possível confirmar a importação enquanto houver erros
-
-**Mensagem esperada (exemplo para Pesagens_Lotes, linha 2):**
-> Já existe uma pesagem do lote "LOTE-E2E-01" em 2024-02-10 cadastrada no HERDON. Remova esta linha ou ajuste a data.
-
----
-
-### Etapa 3 — Importação parcial (só cadastro, sem pesagens)
-
-1. Use o mesmo arquivo mas **apague todas as linhas** das abas Pesagens_Lotes e Pesagens_Animais (mantendo apenas os cabeçalhos)
-2. Envie o arquivo
-3. Na revisão: 0 erros em todas as abas
-4. Confirme a importação
-5. Resultado esperado:
-   - Fazendas: **+0** (já existe)
-   - Pastos: **+0** (já existem)
-   - Lotes: **+0** (já existem)
-   - Animais: **+0** (já existem)
-   - Pesagens: **+0** (abas vazias)
+| Tela | O que verificar | Resultado |
+|------|-----------------|-----------|
+| Painel Geral | 4 cabeças ativas, 2 lotes ativos | ✓ |
+| Fazendas | "Fazenda Modelo HERDON" visível (Catalão/GO, 950ha, 2 lotes) | ✓ |
+| Pastos | "Pasto Brejo Grande" e "Pasto Morro Azul" listados | ✓ |
+| Lotes e Rebanho | HERDON-PASTO-01 e HERDON-CONF-02 vinculados à fazenda correta | ✓ |
+| Animais (aba Individuais) | HRD-001/002 em HERDON-PASTO-01; HRD-003/004 em HERDON-CONF-02 | ✓ |
+| Pesagens (aba Histórico) | 8 pesagens históricas (4 lote + 4 animal) com datas e pesos corretos | ✓ |
+| Resultado dos Lotes | Ambos os lotes aparecem na tabela, status Ativo | ✓ |
 
 ---
 
-### Etapa 4 — Navegação pós-importação
+## Teste de duplicatas (Etapa 3)
 
-Após uma importação bem-sucedida, verifique que os atalhos do resultado funcionam:
-- Clique em **Fazendas** → deve abrir a lista de fazendas com "Fazenda Teste E2E" visível
-- Clique em **Lotes** → deve mostrar "LOTE-E2E-01" e "LOTE-E2E-02"
-- Clique em **Animais** → deve listar E2E-001 a E2E-004
-- Clique em **Pesagens** → deve mostrar as pesagens com origem 'importacao'
+Reimportando o mesmo arquivo com dados já existentes:
+
+| Resultado esperado | Resultado obtido |
+|-------------------|-----------------|
+| 8 erros detectados (4 lotes + 4 animais) | ✓ 8 erros |
+| Botão "Avançar" desabilitado | ✓ desabilitado |
+| Mensagem com aba, linha e campo | ✓ |
+
+**Exemplos de mensagens exibidas:**
+- `Linha 2(data_pesagem) — Já existe uma pesagem do lote "HERDON-PASTO-01" em 2024-03-01 cadastrada no HERDON. Remova esta linha ou ajuste a data.`
+- `Linha 2(data_pesagem) — Já existe uma pesagem do animal "HRD-001" em 2024-03-01 cadastrada no HERDON. Remova esta linha ou ajuste a data.`
 
 ---
 
-### Etapa 5 — Validações de erro (testes de rejeição)
+## Teste de erros intencionais (Etapa 3)
 
-Teste individualmente cada cenário de erro para garantir que o sistema bloqueia:
+Arquivo com 4 tipos de erro (um por aba):
 
-| Cenário | Aba | Campo | Mensagem esperada |
-|---------|-----|-------|-------------------|
-| Nome da fazenda em branco | Fazendas | nome | "O nome da fazenda é obrigatório" |
-| Fazenda não cadastrada no pasto | Pastos | codigo_fazenda | "Fazenda '...' não encontrada" |
-| Código de lote duplicado | Lotes | codigo_lote | "Código '...' já aparece na linha..." |
-| Data inválida no lote | Lotes | data_entrada | "Data inválida. Use o formato AAAA-MM-DD..." |
-| Quantidade de cabeças com decimal | Lotes | quantidade_cabecas | "não é uma quantidade válida. Use um número inteiro..." |
-| Brinco duplicado | Animais | brinco | "Brinco '...' já aparece na linha..." |
-| Lote não encontrado no animal | Animais | codigo_lote | "Lote '...' não encontrado" |
-| Peso zero na pesagem | Pesagens_Lotes | peso_medio_kg | "não é um peso válido. Use um número maior que zero" |
-| Pesagem duplicada no arquivo | Pesagens_Lotes | codigo_lote | "Já existe uma pesagem para o lote '...' na data..." |
+| Aba | Linha | Campo | Erro introduzido | Mensagem exibida |
+|-----|-------|-------|-----------------|-----------------|
+| Pastos | 3 | codigo_fazenda | Fazenda inexistente | Fazenda "Fazenda Inexistente" não encontrada — verifique se o nome está correto ou se está na aba Fazendas |
+| Lotes | 2 | peso_inicial_kg | Peso negativo (-50) | "-50" não é um peso válido. Use um número maior que zero |
+| Animais | 3 | brinco | Brinco duplicado | Brinco "ERR-DUP" já aparece na linha 2 — cada animal deve ter um brinco único |
+| Pesagens_Lotes | 2 | peso_medio_kg | Peso zero | "0" não é um peso válido. Use um número maior que zero |
+
+Todos os 4 erros bloquearam o avanço corretamente, sem salvar nenhum dado.
+
+---
+
+## Análise de falha parcial (Etapa 4)
+
+### Comportamento observado no código
+
+O salvamento é sequencial (Fazendas → Pastos → Lotes → Animais → Pesagens_Lotes → Pesagens_Animais). Cada `createOperationalRecord` roda em try/catch independente:
+
+```javascript
+try {
+  const res = await createOperationalRecord('pastagens', { ... }, session);
+  if (res.data?.id) { /* mapeia ID para uso posterior */ }
+  else { falhas.push('Pasto "..."'); }
+} catch { falhas.push('Pasto "..."'); }
+```
+
+**Consequências de falha parcial:**
+- Registros já gravados antes da falha ficam no banco (sem rollback)
+- Registros que dependem do registro que falhou também falham (ex: animais de um lote que não foi criado)
+- O resultado final mostra contagem de criados e falhas por categoria
+- Na reimportação: registros já existentes são bloqueados pelo validador como duplicata; os que falharam são tentados novamente
+
+**Cenário de maior risco:** Fazenda criada, mas os pastos falham. Os lotes são criados vinculados à fazenda (sem pastos). Fica consistente, mas incompleto.
+
+### Avaliação para o beta
+
+- Para volumes pequenos (o caso do Herdon no beta), o risco de falha parcial é baixo
+- O usuário tem visibilidade do que foi criado e o que falhou na tela de resultado
+- Reimportação do que falhou é segura — o validador detecta duplicatas
+- Risco residual: dados parciais que precisam de limpeza manual
+
+### Recomendação futura: RPC atômico
+
+Quando o volume crescer, a solução ideal é um `supabase.rpc('importar_dados', { payload })` que executa tudo dentro de uma transação PostgreSQL:
+
+```sql
+BEGIN;
+  INSERT INTO fazendas ...;
+  INSERT INTO pastagens ...;
+  INSERT INTO lotes ...;
+  INSERT INTO animais ...;
+  INSERT INTO pesagens ...;
+COMMIT;
+-- ou ROLLBACK em caso de qualquer falha
+```
+
+**Vantagens:** tudo-ou-nada, sem registros órfãos, 1 round-trip de rede  
+**Trade-off:** requer migration, lógica de validação duplicada no SQL, dificulta retorno de erros por linha/campo
+
+Não implementar agora — o benefício não compensa o custo para o volume do beta.
 
 ---
 
 ## Limpeza após os testes
 
-Para remover os dados de teste do ambiente:
+Para remover os dados de teste da conta QA (executar em ordem):
 
 ```sql
--- Execute na ordem correta (respeitar foreign keys)
-DELETE FROM pesagens WHERE origem = 'importacao' AND lote_id IN (
-  SELECT id FROM lotes WHERE nome IN ('LOTE-E2E-01', 'LOTE-E2E-02')
-);
-DELETE FROM animais WHERE identificacao LIKE 'E2E-%';
-DELETE FROM lotes WHERE nome IN ('LOTE-E2E-01', 'LOTE-E2E-02');
-DELETE FROM pastagens WHERE fazenda_id = (
-  SELECT id FROM fazendas WHERE nome = 'Fazenda Teste E2E'
-);
-DELETE FROM fazendas WHERE nome = 'Fazenda Teste E2E';
+-- Execute no Supabase SQL Editor, na ordem correta (respeita foreign keys)
+DELETE FROM pesagens
+  WHERE origem = 'importacao'
+    AND owner_user_id = '59934aca-8a30-490b-900b-9bbbe9a7e506';
+
+DELETE FROM animais
+  WHERE identificacao LIKE 'HRD-%'
+    AND owner_user_id = '59934aca-8a30-490b-900b-9bbbe9a7e506';
+
+DELETE FROM lotes
+  WHERE nome IN ('HERDON-PASTO-01', 'HERDON-CONF-02')
+    AND owner_user_id = '59934aca-8a30-490b-900b-9bbbe9a7e506';
+
+DELETE FROM pastagens
+  WHERE faz_id IN (
+    SELECT id FROM fazendas
+    WHERE nome = 'Fazenda Modelo HERDON'
+      AND owner_user_id = '59934aca-8a30-490b-900b-9bbbe9a7e506'
+  );
+
+DELETE FROM fazendas
+  WHERE nome = 'Fazenda Modelo HERDON'
+    AND owner_user_id = '59934aca-8a30-490b-900b-9bbbe9a7e506';
 ```
-
----
-
-## Estratégia de salvamento — perguntas técnicas
-
-**Atômico ou sequencial?**
-Sequencial. Cada registro é inserido individualmente via `createOperationalRecord`. Não há transação de banco envolvendo todos os registros de uma importação.
-
-**O que acontece em falha parcial?**
-Os registros já gravados ficam. Os que falharam são listados na tela de resultado. Nenhum rollback é feito. O usuário pode reimportar — registros já existentes são ignorados automaticamente.
-
-**Rollback manual:**
-Execute as queries de limpeza acima no painel Supabase (Table Editor ou SQL Editor).
-
-**Isolamento por usuário:**
-Toda gravação passa pelo `createOperationalRecord`, que injeta o `owner_user_id` da sessão autenticada. As políticas RLS do Supabase garantem que cada usuário acessa apenas seus próprios dados.
-
-**Segurança no frontend:**
-A chave de serviço do Supabase (`service_role_key`) **nunca** é usada no frontend. Todo acesso ao banco usa a `anon_key` com as políticas RLS ativas. O `createOperationalRecord` usa a sessão JWT do usuário autenticado.
-
-**Erros exibidos ao usuário:**
-Por linha e campo, em linguagem simples, com instrução de como corrigir. Nenhum jargão técnico ("RLS", "constraint", "foreign key") aparece na interface.

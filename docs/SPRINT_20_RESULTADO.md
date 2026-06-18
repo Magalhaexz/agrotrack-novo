@@ -62,13 +62,58 @@ Os registros são inseridos um a um via `createOperationalRecord`, na ordem: Faz
 
 ---
 
-## Gates
+## Gates (Sprint 20)
 
 | Gate | Resultado |
 |------|-----------|
 | `npm test` | ✓ 384 testes, 0 falhas |
 | `npm run lint` | ✓ Sem erros |
 | `npm run build` | ✓ Build completo em ~600ms |
+
+---
+
+## Sprint 20.1 — Validação E2E Real (2026-06-18)
+
+### Bug corrigido
+
+**`src/pages/ImportacaoPage.jsx` — pastagens não eram salvas**
+
+Causa dupla:
+1. Payload enviava `fazenda_id` (UUID) mas a coluna FK é `faz_id` (bigint)
+2. Campo `metadata` (NOT NULL jsonb) ausente do payload
+
+Correção: `faz_id: Number(fazendaId)` + `metadata: {}` nas linhas 282–289.
+
+### Resultado do teste E2E
+
+Conta: `qa.sprint28.herdon@example.com` — 17/17 registros criados (0 falhas) após a correção.
+
+| Categoria | Criados |
+|-----------|---------|
+| Fazendas | +1 |
+| Pastos | +2 |
+| Lotes | +2 |
+| Animais | +4 |
+| Pesagens por Lote | +4 |
+| Pesagens por Animal | +4 |
+
+Todos os dados verificados nas telas: Painel Geral, Fazendas, Pastos, Lotes e Rebanho, Animais, Pesagens, Resultado dos Lotes.
+
+### Bloqueio de duplicatas
+
+Reimportação do mesmo arquivo → 8 erros detectados (4 pesagens de lote + 4 de animal). Botão "Avançar" desabilitado. Nenhum dado gravado.
+
+### Validação de erros
+
+4 erros intencionais introduzidos (fazenda inexistente, peso negativo, brinco duplicado, peso zero) — todos detectados com mensagem de aba/linha/campo/orientação. Nenhum dado gravado.
+
+### Gates (Sprint 20.1)
+
+| Gate | Resultado |
+|------|-----------|
+| `npm test` | A executar na Etapa 6 |
+| `npm run lint` | A executar na Etapa 6 |
+| `npm run build` | A executar na Etapa 6 |
 
 ---
 
