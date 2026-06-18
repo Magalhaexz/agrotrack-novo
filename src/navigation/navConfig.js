@@ -16,6 +16,7 @@ import {
   Scale,
   Settings,
   Syringe,
+  Tractor,
   TrendingUp,
   User,
   Users,
@@ -32,6 +33,7 @@ export const navSections = [
     title: 'Operação',
     items: [
       { id: 'fazendas', label: 'Fazendas', icon: MapPin },
+      { id: 'pastagens', label: 'Pastos', icon: Tractor },
       { id: 'lotes', label: 'Lotes e Rebanho', icon: Beef },
       { id: 'animais', label: 'Animais', icon: ClipboardList },
       { id: 'pesagens', label: 'Pesagens', icon: Scale },

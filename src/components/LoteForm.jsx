@@ -198,7 +198,7 @@ function calcularPlanejamento(form) {
   };
 }
 
-function validarForm(form, planejamento) {
+function validarForm(form, planejamento, pastagensDisponiveis = []) {
   if (!form.nome.trim()) return 'Informe o nome do lote.';
   if (!form.faz_id) return 'Selecione a fazenda.';
   if (!form.entrada) return 'Informe a data de entrada.';
@@ -214,6 +214,9 @@ function validarForm(form, planejamento) {
   if (toNumber(form.supl_rkg) <= 0) return 'Informe o preço por kg.';
   if (toNumber(form.preco_arroba) <= 0) return 'Informe o valor manual da arroba.';
   if (!isWholePositiveInteger(form.supl_meta_dias)) return 'Informe um número inteiro de dias.';
+  if (form.sistema === 'pasto' && !form.pastagem_id && pastagensDisponiveis.length > 0) {
+    return 'Selecione o pasto vinculado ao lote (obrigatório para sistema a pasto).';
+  }
   return null;
 }
 
@@ -243,9 +246,15 @@ export default function LoteForm({ initialData, fazendas = [], pastagens = [], f
       }
 
       if (fazendaAtiva?.id) {
-        setForm((prev) => (String(prev.faz_id) === String(fazendaAtiva.id)
-          ? prev
-          : { ...prev, faz_id: String(fazendaAtiva.id) }));
+        setForm((prev) => {
+          if (String(prev.faz_id) === String(fazendaAtiva.id)) return prev;
+          const novaFazId = String(fazendaAtiva.id);
+          const pastoAindaValido = prev.pastagem_id && pastagens.some((p) => {
+            const fazId = p?.fazenda_id ?? p?.faz_id ?? null;
+            return String(p.id) === String(prev.pastagem_id) && (!fazId || String(fazId) === novaFazId);
+          });
+          return { ...prev, faz_id: novaFazId, pastagem_id: pastoAindaValido ? prev.pastagem_id : '' };
+        });
       }
     }, 0);
 
@@ -259,7 +268,7 @@ export default function LoteForm({ initialData, fazendas = [], pastagens = [], f
 
   function handleSubmit(event) {
     event.preventDefault();
-    const erroValidacao = validarForm(form, planejamento);
+    const erroValidacao = validarForm(form, planejamento, pastagensCompativeis);
 
     if (erroValidacao) {
       setErro(erroValidacao);
@@ -287,7 +296,7 @@ export default function LoteForm({ initialData, fazendas = [], pastagens = [], f
     onSave?.({
       nome: form.nome.trim(),
       faz_id: Number(form.faz_id),
-      pastagem_id: form.pastagem_id ? Number(form.pastagem_id) : null,
+      pastagem_id: form.pastagem_id || null,
       categoria_animal: form.categoria_animal || '',
       raca: form.raca || '',
       tipo: form.tipo,
@@ -331,8 +340,8 @@ export default function LoteForm({ initialData, fazendas = [], pastagens = [], f
     ? findPastagemLabel(pastagens, form.pastagem_id)
     : '';
   const helperPastagem = form.faz_id
-    ? 'Cadastre uma pastagem em Cadastros > Pastos para vincular ao lote.'
-    : 'Selecione a fazenda para listar os pastos compatíveis.';
+    ? 'Nenhum pasto cadastrado para esta fazenda. Cadastre os pastos antes de vincular o lote.'
+    : 'Selecione a fazenda para listar os pastos disponíveis.';
   const consumoLabel = form.consumo_tipo === 'percentual_pv'
     ? 'Consumo esperado por animal (% PV)'
     : 'Consumo esperado por animal (kg/cab/dia)';
@@ -394,7 +403,7 @@ export default function LoteForm({ initialData, fazendas = [], pastagens = [], f
               <Input
                 as="select"
                 name="pastagem_id"
-                label="Pastagem atual"
+                label="Pasto atual"
                 value={form.pastagem_id}
                 onChange={handleChange}
                 hint="Selecione a pastagem que está vinculada ao lote."
@@ -409,7 +418,7 @@ export default function LoteForm({ initialData, fazendas = [], pastagens = [], f
               </Input>
             ) : (
               <div className="ui-input-wrap">
-                <span className="ui-input-label">Pastagem atual</span>
+                <span className="ui-input-label">Pasto atual</span>
                 <div className="ui-input-shell" style={{ minHeight: 48 }}>
                   <span className="ui-input-affix">{helperPastagem}</span>
                 </div>

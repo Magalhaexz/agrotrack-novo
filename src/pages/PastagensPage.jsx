@@ -147,7 +147,6 @@ export default function PastagensPage({ db, setDb, session, onConfirmAction }) {
     }
 
     const payload = {
-      fazenda_id: Number(form.fazenda_id),
       faz_id: Number(form.fazenda_id),
       nome: String(form.nome || '').trim(),
       area_ha: toNumber(form.area_ha),
@@ -231,7 +230,7 @@ export default function PastagensPage({ db, setDb, session, onConfirmAction }) {
     <div className="page">
       <PageHeader
         title="Pastos"
-        subtitle="Cadastre pastagens vinculadas às fazendas para usar em lotes e planejamento."
+        subtitle="Cadastre e organize os pastos de cada fazenda."
       />
 
       <Card title={editando ? 'Editar pasto' : 'Cadastrar pasto'}>

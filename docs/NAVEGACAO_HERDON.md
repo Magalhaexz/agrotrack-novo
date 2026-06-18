@@ -11,6 +11,7 @@
 | ID | Label | Ícone |
 |----|-------|-------|
 | fazendas | Fazendas | MapPin |
+| pastagens | Pastos | Tractor |
 | lotes | Lotes e Rebanho | Beef |
 | animais | Animais | ClipboardList |
 | pesagens | Pesagens | Scale |
