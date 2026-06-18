@@ -7,6 +7,7 @@ import {
   ClipboardList,
   CreditCard,
   FileBarChart,
+  FileUp,
   Layers,
   Leaf,
   LayoutDashboard,
@@ -68,6 +69,7 @@ export const navSections = [
     items: [
       { id: 'funcionarios', label: 'Equipe', icon: Users },
       { id: 'minhaAssinatura', label: 'Planos e Assinatura', icon: CreditCard },
+      { id: 'importacao', label: 'Importação', icon: FileUp },
       { id: 'configuracoes', label: 'Configurações', icon: Settings },
       { id: 'perfil', label: 'Perfil', icon: User },
     ],

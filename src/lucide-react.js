@@ -315,3 +315,27 @@ export const Receipt = icon([
   createElement('path', { d: 'M4 2v22l4-2.5 4 2.5 4-2.5 4 2.5V2H4z' }),
   createElement('path', { d: 'M9 7h6m-6 5h4' }),
 ]);
+
+export const AlertCircle = icon([
+  createElement('circle', { cx: 12, cy: 12, r: 9 }),
+  createElement('path', { d: 'M12 8v4M12 16h.01' }),
+]);
+
+export const Download = icon([
+  createElement('path', { d: 'M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4' }),
+  createElement('path', { d: 'm7 10 5 5 5-5' }),
+  createElement('path', { d: 'M12 15V3' }),
+]);
+
+export const FileUp = icon([
+  createElement('path', { d: 'M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z' }),
+  createElement('path', { d: 'M14 2v6h6' }),
+  createElement('path', { d: 'M12 18v-6' }),
+  createElement('path', { d: 'm9 15 3-3 3 3' }),
+]);
+
+export const Upload = icon([
+  createElement('path', { d: 'M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4' }),
+  createElement('path', { d: 'm17 8-5-5-5 5' }),
+  createElement('path', { d: 'M12 3v12' }),
+]);

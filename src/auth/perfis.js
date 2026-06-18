@@ -170,6 +170,7 @@ export const permissoesPorPagina = {
   dashboardPremium: 'dashboard_premium:ver',
   relatoriosGerenciais: 'relatorios_gerenciais:ver',
   planejamento: 'planejamento:ver',
+  importacao: 'dados:importar',
 };
 
 export function normalizarPerfil(perfil) {

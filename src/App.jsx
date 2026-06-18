@@ -77,6 +77,7 @@ const CobrancaPage = lazy(() => import('./pages/CobrancaPage'));
 const SuportePage = lazy(() => import('./pages/SuportePage'));
 const CustosCompartilhadosPage = lazy(() => import('./pages/CustosCompartilhadosPage'));
 const FluxoCaixaPage = lazy(() => import('./pages/FluxoCaixaPage'));
+const ImportacaoPage = lazy(() => import('./pages/ImportacaoPage'));
 
 const publicPageMap = {
   termos: TermosPage,
@@ -194,6 +195,7 @@ const pageMap = {
   dashboardPremium: DashboardPremiumPage,
   relatoriosGerenciais: RelatoriosGerenciaisPage,
   planejamento: PlanejamentoPage,
+  importacao: ImportacaoPage,
 };
 
 export default function App() {
