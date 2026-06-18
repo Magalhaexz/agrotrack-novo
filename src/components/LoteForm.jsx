@@ -1,4 +1,4 @@
-﻿import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import Modal from './ui/Modal';
 import Button from './ui/Button';
 import Input from './ui/Input';
@@ -347,261 +347,294 @@ export default function LoteForm({ initialData, fazendas = [], pastagens = [], f
   return (
     <Modal open onClose={onCancel} title={titulo} footer={footer} size="lg">
       <form onSubmit={handleSubmit} style={{ display: 'grid', gap: 14 }}>
-        <label>
-          Nome do lote
-          <input
-            className="ui-input"
-            name="nome"
-            value={form.nome}
-            onChange={handleChange}
-            placeholder="Ex: Lote A - Confinamento"
-          />
-        </label>
 
-        <div className="grid-2">
-          <div className="ui-input-wrap">
-            <label className="ui-input-label">{modoFazenda}</label>
-            <div className="ui-input-shell" style={{ minHeight: 48 }}>
-              <span className="ui-input-affix">{fazendaSelecionada?.nome || 'Selecione uma fazenda ativa antes de cadastrar o lote.'}</span>
-            </div>
-          </div>
+        {/* ── Bloco 1: Identificação ── */}
+        <div className="section-card">
+          <div className="section-header"><h4>Identificação</h4></div>
 
           <label>
-            Data de entrada
+            Nome do lote
             <input
               className="ui-input"
-              name="entrada"
-              type="date"
-              max={new Date().toISOString().slice(0, 10)}
-              value={form.entrada}
+              name="nome"
+              value={form.nome}
               onChange={handleChange}
+              placeholder="Ex: Lote A - Confinamento"
             />
           </label>
-        </div>
 
-        <div className="grid-3">
-          {pastagensCompativeis.length > 0 ? (
-            <Input
-              as="select"
-              name="pastagem_id"
-              label="Pastagem atual"
-              value={form.pastagem_id}
-              onChange={handleChange}
-              hint="Selecione a pastagem que está vinculada ao lote."
-            >
-              <option value="">Selecione</option>
-              {pastagensCompativeis.map((pastagem) => (
-                <option key={pastagem.id} value={pastagem.id}>{pastagem.nome}</option>
-              ))}
-              {form.pastagem_id && !pastagemSelecionada ? (
-                <option value={form.pastagem_id}>Pastagem vinculada não encontrada</option>
-              ) : null}
-            </Input>
-          ) : (
+          <div className="grid-2">
             <div className="ui-input-wrap">
-              <span className="ui-input-label">Pastagem atual</span>
+              <label className="ui-input-label">{modoFazenda}</label>
               <div className="ui-input-shell" style={{ minHeight: 48 }}>
-                <span className="ui-input-affix">{helperPastagem}</span>
+                <span className="ui-input-affix">{fazendaSelecionada?.nome || 'Selecione uma fazenda ativa antes de cadastrar o lote.'}</span>
               </div>
             </div>
-          )}
 
-          <Input as="select" name="categoria_animal" label="Categoria animal" value={form.categoria_animal} onChange={handleChange}>
-            <option value="">Selecione</option>
-            {CATEGORIAS_ANIMAL.map((categoria) => (
-              <option key={categoria} value={categoria}>{categoria}</option>
-            ))}
-          </Input>
-
-          <Input as="select" name="raca" label="Raça" value={form.raca} onChange={handleChange}>
-            <option value="">Selecione</option>
-            {RACOES.map((raca) => (
-              <option key={raca} value={raca}>{raca}</option>
-            ))}
-          </Input>
+            <label>
+              Data de entrada
+              <input
+                className="ui-input"
+                name="entrada"
+                type="date"
+                max={new Date().toISOString().slice(0, 10)}
+                value={form.entrada}
+                onChange={handleChange}
+              />
+            </label>
+          </div>
         </div>
 
-        <div className="grid-3">
-          <label>
-            Tipo de operação
-            <select className="ui-input" name="tipo" value={form.tipo} onChange={handleChange}>
-              {TIPOS_OPERACAO.map((tipo) => (
-                <option key={tipo} value={tipo}>{tipo[0].toUpperCase() + tipo.slice(1)}</option>
+        {/* ── Bloco 2: Operação ── */}
+        <div className="section-card">
+          <div className="section-header"><h4>Operação</h4></div>
+
+          <div className="grid-3">
+            {pastagensCompativeis.length > 0 ? (
+              <Input
+                as="select"
+                name="pastagem_id"
+                label="Pastagem atual"
+                value={form.pastagem_id}
+                onChange={handleChange}
+                hint="Selecione a pastagem que está vinculada ao lote."
+              >
+                <option value="">Selecione</option>
+                {pastagensCompativeis.map((pastagem) => (
+                  <option key={pastagem.id} value={pastagem.id}>{pastagem.nome}</option>
+                ))}
+                {form.pastagem_id && !pastagemSelecionada ? (
+                  <option value={form.pastagem_id}>Pastagem vinculada não encontrada</option>
+                ) : null}
+              </Input>
+            ) : (
+              <div className="ui-input-wrap">
+                <span className="ui-input-label">Pastagem atual</span>
+                <div className="ui-input-shell" style={{ minHeight: 48 }}>
+                  <span className="ui-input-affix">{helperPastagem}</span>
+                </div>
+              </div>
+            )}
+
+            <Input as="select" name="categoria_animal" label="Categoria animal" value={form.categoria_animal} onChange={handleChange}>
+              <option value="">Selecione</option>
+              {CATEGORIAS_ANIMAL.map((categoria) => (
+                <option key={categoria} value={categoria}>{categoria}</option>
               ))}
-            </select>
-          </label>
+            </Input>
 
-          <label>
-            Sistema
-            <select className="ui-input" name="sistema" value={form.sistema} onChange={handleChange}>
-              {SISTEMAS.map((sistema) => (
-                <option key={sistema} value={sistema}>{sistema[0].toUpperCase() + sistema.slice(1)}</option>
+            <Input as="select" name="raca" label="Raça" value={form.raca} onChange={handleChange}>
+              <option value="">Selecione</option>
+              {RACOES.map((raca) => (
+                <option key={raca} value={raca}>{raca}</option>
               ))}
-            </select>
-          </label>
-
-          <label>
-            Cabeças
-            <input
-              className="ui-input"
-              name="qtd"
-              type="number"
-              min={0}
-              step="1"
-              value={form.qtd}
-              onChange={handleChange}
-              placeholder="Ex: 100"
-            />
-          </label>
-        </div>
-
-        <div className="grid-3">
-          <label>
-            Peso médio inicial (kg)
-            <input
-              className="ui-input"
-              name="p_ini"
-              type="number"
-              min={0}
-              step="0.01"
-              value={form.p_ini}
-              onChange={handleChange}
-              placeholder="Ex: 320"
-            />
-          </label>
-
-          <label>
-            Peso alvo final (kg)
-            <input
-              className="ui-input"
-              name="peso_alvo"
-              type="number"
-              min={0}
-              step="0.01"
-              value={form.peso_alvo}
-              onChange={handleChange}
-              placeholder="Ex: 520"
-            />
-          </label>
-
-          <label>
-            GMD esperado (kg/dia)
-            <input
-              className="ui-input"
-              name="gmd_meta"
-              type="number"
-              min={0}
-              step="0.001"
-              value={form.gmd_meta}
-              onChange={handleChange}
-              placeholder="Ex: 1,45"
-            />
-          </label>
-        </div>
-
-        <div className="grid-3">
-          <label>
-            Dieta / produto
-            <input
-              className="ui-input"
-              name="supl_nome"
-              value={form.supl_nome}
-              onChange={handleChange}
-              placeholder="Ex: Ração 18%"
-            />
-          </label>
-
-          <Input as="select" name="consumo_tipo" label="Modo de consumo esperado" value={form.consumo_tipo} onChange={handleChange}>
-            {TIPOS_CONSUMO.map((tipo) => (
-              <option key={tipo.value} value={tipo.value}>{tipo.label}</option>
-            ))}
-          </Input>
-
-          <label>
-            {consumoLabel}
-            <input
-              className="ui-input"
-              name="consumo_por_cabeca_dia"
-              type="number"
-              min={0}
-              step="0.001"
-              value={form.consumo_por_cabeca_dia}
-              onChange={handleChange}
-              placeholder={form.consumo_tipo === 'percentual_pv' ? 'Ex: 2,20' : 'Ex: 8,500'}
-            />
-          </label>
-        </div>
-
-        <div className="grid-3">
-          <label>
-            Preço do suplemento (R$/kg)
-            <input
-              className="ui-input"
-              name="supl_rkg"
-              type="number"
-              min={0}
-              step="0.01"
-              value={form.supl_rkg}
-              onChange={handleChange}
-              placeholder="Ex: 2,85"
-            />
-          </label>
-
-          <label>
-            Preço da arroba (R$)
-            <input
-              className="ui-input"
-              name="preco_arroba"
-              type="number"
-              min={0}
-              step="0.01"
-              value={form.preco_arroba}
-              onChange={handleChange}
-              placeholder="Ex: 250,00"
-            />
-          </label>
-
-          <label>
-            Investimento inicial (R$)
-            <input
-              className="ui-input"
-              name="investimento"
-              type="number"
-              min={0}
-              step="0.01"
-              value={form.investimento}
-              onChange={handleChange}
-              placeholder="Ex: 150000"
-            />
-          </label>
-        </div>
-
-        <div className="grid-3">
-          <label>
-            Dias estimados que o lote ficará no pasto
-            <input
-              className="ui-input"
-              name="supl_meta_dias"
-              type="number"
-              min={1}
-              step="1"
-              value={form.supl_meta_dias}
-              onChange={handleChange}
-              placeholder="Ex: 30"
-            />
-          </label>
-
-          <div className="ui-input-wrap">
-            <label className="ui-input-label">Dias estimados</label>
-            <div className="ui-input-shell" style={{ minHeight: 48 }}>
-              <span className="ui-input-affix">{planejamento.diasEstimados ? `${planejamento.diasEstimados} dias` : '—'}</span>
-            </div>
+            </Input>
           </div>
 
-          <div className="ui-input-wrap">
-            <label className="ui-input-label">Saída prevista</label>
-            <div className="ui-input-shell" style={{ minHeight: 48 }}>
-              <span className="ui-input-affix">{planejamento.dataPrevistaSaida ? formatDateBr(planejamento.dataPrevistaSaida) : '—'}</span>
+          <div className="grid-3">
+            <label>
+              Tipo de operação
+              <select className="ui-input" name="tipo" value={form.tipo} onChange={handleChange}>
+                {TIPOS_OPERACAO.map((tipo) => (
+                  <option key={tipo} value={tipo}>{tipo[0].toUpperCase() + tipo.slice(1)}</option>
+                ))}
+              </select>
+            </label>
+
+            <label>
+              Sistema
+              <select className="ui-input" name="sistema" value={form.sistema} onChange={handleChange}>
+                {SISTEMAS.map((sistema) => (
+                  <option key={sistema} value={sistema}>{sistema[0].toUpperCase() + sistema.slice(1)}</option>
+                ))}
+              </select>
+            </label>
+
+            <label>
+              Cabeças
+              <input
+                className="ui-input"
+                name="qtd"
+                type="number"
+                min={0}
+                step="1"
+                value={form.qtd}
+                onChange={handleChange}
+                placeholder="Ex: 100"
+              />
+            </label>
+          </div>
+        </div>
+
+        {/* ── Bloco 3: Metas zootécnicas ── */}
+        <div className="section-card">
+          <div className="section-header"><h4>Metas zootécnicas</h4></div>
+
+          <div className="grid-3">
+            <label>
+              Peso médio inicial (kg)
+              <input
+                className="ui-input"
+                name="p_ini"
+                type="number"
+                min={0}
+                step="0.01"
+                value={form.p_ini}
+                onChange={handleChange}
+                placeholder="Ex: 320"
+              />
+            </label>
+
+            <label>
+              Peso alvo final (kg)
+              <input
+                className="ui-input"
+                name="peso_alvo"
+                type="number"
+                min={0}
+                step="0.01"
+                value={form.peso_alvo}
+                onChange={handleChange}
+                placeholder="Ex: 520"
+              />
+            </label>
+
+            <label>
+              GMD esperado (kg/dia)
+              <input
+                className="ui-input"
+                name="gmd_meta"
+                type="number"
+                min={0}
+                step="0.001"
+                value={form.gmd_meta}
+                onChange={handleChange}
+                placeholder="Ex: 1,45"
+              />
+            </label>
+          </div>
+        </div>
+
+        {/* ── Bloco 4: Nutrição / manejo ── */}
+        <div className="section-card">
+          <div className="section-header"><h4>Nutrição / manejo</h4></div>
+
+          <div className="grid-3">
+            <label>
+              Dieta / produto
+              <input
+                className="ui-input"
+                name="supl_nome"
+                value={form.supl_nome}
+                onChange={handleChange}
+                placeholder="Ex: Ração 18%"
+              />
+            </label>
+
+            <Input as="select" name="consumo_tipo" label="Modo de consumo esperado" value={form.consumo_tipo} onChange={handleChange}>
+              {TIPOS_CONSUMO.map((tipo) => (
+                <option key={tipo.value} value={tipo.value}>{tipo.label}</option>
+              ))}
+            </Input>
+
+            <label>
+              {consumoLabel}
+              <input
+                className="ui-input"
+                name="consumo_por_cabeca_dia"
+                type="number"
+                min={0}
+                step="0.001"
+                value={form.consumo_por_cabeca_dia}
+                onChange={handleChange}
+                placeholder={form.consumo_tipo === 'percentual_pv' ? 'Ex: 2,20' : 'Ex: 8,500'}
+              />
+            </label>
+          </div>
+
+          <div className="grid-2">
+            <label>
+              Preço do suplemento (R$/kg)
+              <input
+                className="ui-input"
+                name="supl_rkg"
+                type="number"
+                min={0}
+                step="0.01"
+                value={form.supl_rkg}
+                onChange={handleChange}
+                placeholder="Ex: 2,85"
+              />
+            </label>
+
+            <label>
+              Duração estimada do ciclo (dias)
+              <input
+                className="ui-input"
+                name="supl_meta_dias"
+                type="number"
+                min={1}
+                step="1"
+                value={form.supl_meta_dias}
+                onChange={handleChange}
+                placeholder="Ex: 30"
+              />
+            </label>
+          </div>
+        </div>
+
+        {/* ── Bloco 5: Financeiro ── */}
+        <div className="section-card">
+          <div className="section-header"><h4>Financeiro</h4></div>
+
+          <div className="grid-2">
+            <label>
+              Preço da arroba (R$)
+              <input
+                className="ui-input"
+                name="preco_arroba"
+                type="number"
+                min={0}
+                step="0.01"
+                value={form.preco_arroba}
+                onChange={handleChange}
+                placeholder="Ex: 250,00"
+              />
+            </label>
+
+            <label>
+              Investimento inicial (R$)
+              <input
+                className="ui-input"
+                name="investimento"
+                type="number"
+                min={0}
+                step="0.01"
+                value={form.investimento}
+                onChange={handleChange}
+                placeholder="Ex: 150000"
+              />
+            </label>
+          </div>
+        </div>
+
+        {/* ── Bloco 6: Resumo / projeção ── */}
+        <div className="section-card">
+          <div className="section-header"><h4>Resumo / projeção</h4></div>
+
+          <div className="grid-2">
+            <div className="ui-input-wrap">
+              <label className="ui-input-label">Dias estimados</label>
+              <div className="ui-input-shell" style={{ minHeight: 48 }}>
+                <span className="ui-input-affix">{planejamento.diasEstimados ? `${planejamento.diasEstimados} dias` : '—'}</span>
+              </div>
+            </div>
+
+            <div className="ui-input-wrap">
+              <label className="ui-input-label">Saída prevista</label>
+              <div className="ui-input-shell" style={{ minHeight: 48 }}>
+                <span className="ui-input-affix">{planejamento.dataPrevistaSaida ? formatDateBr(planejamento.dataPrevistaSaida) : '—'}</span>
+              </div>
             </div>
           </div>
         </div>
@@ -611,6 +644,3 @@ export default function LoteForm({ initialData, fazendas = [], pastagens = [], f
     </Modal>
   );
 }
-
-
-

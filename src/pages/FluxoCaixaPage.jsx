@@ -49,8 +49,10 @@ function KpiCard({ label, value, destaque }) {
     : 'kpi-value';
   return (
     <div className="kpi-card">
-      <div className="kpi-label">{label}</div>
-      <div className={valueClass}>{value}</div>
+      <div className="kpi-content">
+        <div className="kpi-label">{label}</div>
+        <div className={valueClass}>{value}</div>
+      </div>
     </div>
   );
 }

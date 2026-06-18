@@ -1,4 +1,6 @@
 import { useMemo, useState } from 'react';
+import Card from '../components/ui/Card';
+import PageHeader from '../components/PageHeader';
 import { useAuth } from '../auth/useAuth';
 import { useToast } from '../hooks/useToast';
 import { aplicarRateioCustoCompartilhado } from '../services/custosCompartilhados';
@@ -164,137 +166,126 @@ export default function CustosCompartilhadosPage({ db, setDb }) {
     form.loteIds.length > 0;
 
   return (
-    <div className="page-container">
-      <div className="page-header">
-        <h1 className="page-title">Rateio de Custos</h1>
-        <p className="page-subtitle">
-          Lance um custo compartilhado entre lotes. O sistema distribui o valor e gera
-          uma despesa por lote automaticamente.
-        </p>
-      </div>
+    <div className="page">
+      <PageHeader
+        title="Rateio de Custos"
+        subtitle="Lance um custo compartilhado entre lotes. O sistema distribui o valor e gera uma despesa por lote automaticamente."
+      />
 
       <div className="dashboard-grid dashboard-grid--dual">
         {/* ── Formulário ── */}
-        <div className="ui-card">
-          <div className="card-header">
-            <span className="card-title">Dados do custo</span>
+        <Card title="Dados do custo">
+          <div className="form-group">
+            <label className="form-label">Descrição *</label>
+            <input
+              className="form-input"
+              type="text"
+              placeholder="Ex: Energia elétrica de junho"
+              value={form.descricao}
+              onChange={(e) => setField('descricao', e.target.value)}
+            />
           </div>
-          <div className="card-body">
-            <div className="form-group">
-              <label className="form-label">Descrição *</label>
-              <input
-                className="form-input"
-                type="text"
-                placeholder="Ex: Energia elétrica de junho"
-                value={form.descricao}
-                onChange={(e) => setField('descricao', e.target.value)}
-              />
-            </div>
 
-            <div className="form-group">
-              <label className="form-label">Valor total (R$) *</label>
-              <input
-                className="form-input"
-                type="number"
-                min="0"
-                step="0.01"
-                placeholder="0,00"
-                value={form.valor}
-                onChange={(e) => setField('valor', e.target.value)}
-              />
-            </div>
-
-            <div className="form-group">
-              <label className="form-label">Data *</label>
-              <input
-                className="form-input"
-                type="date"
-                value={form.data}
-                onChange={(e) => setField('data', e.target.value)}
-              />
-            </div>
-
-            <div className="form-group">
-              <label className="form-label">Categoria</label>
-              <select
-                className="form-input"
-                value={form.categoria}
-                onChange={(e) => setField('categoria', e.target.value)}
-              >
-                {CATEGORIAS.map((c) => (
-                  <option key={c.id} value={c.id}>{c.label}</option>
-                ))}
-              </select>
-            </div>
-
-            <div className="form-group">
-              <label className="form-label">Critério de rateio *</label>
-              <select
-                className="form-input"
-                value={form.criterio}
-                onChange={(e) => setField('criterio', e.target.value)}
-              >
-                {CRITERIOS.map((c) => (
-                  <option key={c.id} value={c.id}>{c.label}</option>
-                ))}
-              </select>
-            </div>
-
-            <div className="form-group">
-              <label className="form-label">
-                Lotes participantes *
-                <span style={{ marginLeft: 8 }}>
-                  <button
-                    type="button"
-                    className="btn btn-xs btn-outline"
-                    onClick={selecionarTodos}
-                    style={{ marginRight: 4 }}
-                  >
-                    Todos
-                  </button>
-                  <button
-                    type="button"
-                    className="btn btn-xs btn-outline"
-                    onClick={limparSelecao}
-                  >
-                    Limpar
-                  </button>
-                </span>
-              </label>
-
-              {lotesAtivos.length === 0 ? (
-                <p className="empty-state-text">Nenhum lote ativo encontrado.</p>
-              ) : (
-                <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-                  {lotesAtivos.map((lote) => (
-                    <label
-                      key={lote.id}
-                      style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer' }}
-                    >
-                      <input
-                        type="checkbox"
-                        checked={form.loteIds.includes(Number(lote.id))}
-                        onChange={() => toggleLote(lote.id)}
-                      />
-                      <span>{lote.nome}</span>
-                      <span className="badge badge-neutral" style={{ fontSize: 11 }}>
-                        {lote.qtd || 0} cab · {lote.p_at || 0} kg
-                      </span>
-                    </label>
-                  ))}
-                </div>
-              )}
-            </div>
+          <div className="form-group">
+            <label className="form-label">Valor total (R$) *</label>
+            <input
+              className="form-input"
+              type="number"
+              min="0"
+              step="0.01"
+              placeholder="0,00"
+              value={form.valor}
+              onChange={(e) => setField('valor', e.target.value)}
+            />
           </div>
-        </div>
+
+          <div className="form-group">
+            <label className="form-label">Data *</label>
+            <input
+              className="form-input"
+              type="date"
+              value={form.data}
+              onChange={(e) => setField('data', e.target.value)}
+            />
+          </div>
+
+          <div className="form-group">
+            <label className="form-label">Categoria</label>
+            <select
+              className="form-input"
+              value={form.categoria}
+              onChange={(e) => setField('categoria', e.target.value)}
+            >
+              {CATEGORIAS.map((c) => (
+                <option key={c.id} value={c.id}>{c.label}</option>
+              ))}
+            </select>
+          </div>
+
+          <div className="form-group">
+            <label className="form-label">Critério de rateio *</label>
+            <select
+              className="form-input"
+              value={form.criterio}
+              onChange={(e) => setField('criterio', e.target.value)}
+            >
+              {CRITERIOS.map((c) => (
+                <option key={c.id} value={c.id}>{c.label}</option>
+              ))}
+            </select>
+          </div>
+
+          <div className="form-group">
+            <label className="form-label">
+              Lotes participantes *
+              <span style={{ marginLeft: 8 }}>
+                <button
+                  type="button"
+                  className="btn btn-xs btn-outline"
+                  onClick={selecionarTodos}
+                  style={{ marginRight: 4 }}
+                >
+                  Todos
+                </button>
+                <button
+                  type="button"
+                  className="btn btn-xs btn-outline"
+                  onClick={limparSelecao}
+                >
+                  Limpar
+                </button>
+              </span>
+            </label>
+
+            {lotesAtivos.length === 0 ? (
+              <p className="empty-state-text">Nenhum lote ativo encontrado.</p>
+            ) : (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                {lotesAtivos.map((lote) => (
+                  <label
+                    key={lote.id}
+                    style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer' }}
+                  >
+                    <input
+                      type="checkbox"
+                      checked={form.loteIds.includes(Number(lote.id))}
+                      onChange={() => toggleLote(lote.id)}
+                    />
+                    <span>{lote.nome}</span>
+                    <span className="badge badge-neutral" style={{ fontSize: 11 }}>
+                      {lote.qtd || 0} cab · {lote.p_at || 0} kg
+                    </span>
+                  </label>
+                ))}
+              </div>
+            )}
+          </div>
+        </Card>
 
         {/* ── Prévia e confirmação ── */}
         <div>
-          <div className="ui-card" style={{ marginBottom: 16 }}>
-            <div className="card-header">
-              <span className="card-title">Prévia do rateio</span>
-            </div>
-            <div className="card-body">
+          <div style={{ marginBottom: 16 }}>
+            <Card title="Prévia do rateio">
               {previa.length === 0 ? (
                 <p className="empty-state-text">
                   Preencha o valor, o critério e selecione ao menos um lote para ver a prévia.
@@ -327,7 +318,7 @@ export default function CustosCompartilhadosPage({ db, setDb }) {
                   </tfoot>
                 </table>
               )}
-            </div>
+            </Card>
           </div>
 
           <button
@@ -350,11 +341,8 @@ export default function CustosCompartilhadosPage({ db, setDb }) {
 
       {/* ── Resultado do último rateio ── */}
       {resultado && (
-        <div className="ui-card" style={{ marginTop: 24 }}>
-          <div className="card-header">
-            <span className="card-title">Despesas geradas</span>
-          </div>
-          <div className="card-body">
+        <div style={{ marginTop: 24 }}>
+          <Card title="Despesas geradas">
             <table className="data-table">
               <thead>
                 <tr>
@@ -384,7 +372,7 @@ export default function CustosCompartilhadosPage({ db, setDb }) {
             <p style={{ marginTop: 8, color: 'var(--color-success)', fontSize: 13 }}>
               As despesas foram registradas em cada lote e já aparecem no financeiro.
             </p>
-          </div>
+          </Card>
         </div>
       )}
     </div>

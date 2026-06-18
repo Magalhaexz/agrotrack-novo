@@ -826,10 +826,46 @@ export default function PesagensPage({ db, setDb, onConfirmAction, navigationInt
 
   return (
     <div className="page page--pesagens page--kpi-compact"> 
-      <section className="animais-hero pesagens-hero"><div><h1>Pesagens</h1><p>Registre e acompanhe pesagens de forma guiada.</p></div><button className="primary-btn" onClick={() => abrirNovaPesagem(modoPesagem)}>Nova pesagem</button></section>
-      <div className="segmented-control tab-bar"><button type="button" className={`segment ${abaAtiva === 'nova' ? 'active' : ''}`} onClick={() => setAbaAtiva('nova')}>Nova pesagem</button><button type="button" className={`segment ${abaAtiva === 'historico' ? 'active' : ''}`} onClick={() => setAbaAtiva('historico')}>Histórico</button><button type="button" className={`segment ${abaAtiva === 'evolucao' ? 'active' : ''}`} onClick={() => setAbaAtiva('evolucao')}>Evolução</button><button type="button" className={`segment ${abaAtiva === 'alertas' ? 'active' : ''}`} onClick={() => setAbaAtiva('alertas')}>Alertas</button></div>
+      <section className="animais-hero pesagens-hero">
+        <div>
+          <h1>Pesagens</h1>
+          <p>Registre e acompanhe pesagens de forma guiada.</p>
+        </div>
+        <button className="primary-btn" onClick={() => abrirNovaPesagem(modoPesagem)}>Nova pesagem</button>
+      </section>
+      <div className="segmented-control tab-bar">
+        <button type="button" className={`segment ${abaAtiva === 'nova' ? 'active' : ''}`} onClick={() => setAbaAtiva('nova')}>Nova pesagem</button>
+        <button type="button" className={`segment ${abaAtiva === 'historico' ? 'active' : ''}`} onClick={() => setAbaAtiva('historico')}>Histórico</button>
+        <button type="button" className={`segment ${abaAtiva === 'evolucao' ? 'active' : ''}`} onClick={() => setAbaAtiva('evolucao')}>Evolução</button>
+        <button type="button" className={`segment ${abaAtiva === 'alertas' ? 'active' : ''}`} onClick={() => setAbaAtiva('alertas')}>Alertas</button>
+      </div>
 
-      <div className="dashboard-grid dashboard-grid--kpi-main"><Card title="Última pesagem">{formatarData(resumo.ultimaData)}</Card><Card title="Lotes sem pesagem recente">{alertas.lotesSemPesagem.length}</Card><Card title="Total de pesagens">{resumo.totalPesagens}</Card><Card title="GMD médio">{resumo.gmdMedioDisponivel ? `${formatarNumero(resumo.gmdMedio, 3)} kg/dia` : 'Sem dados suficientes'}</Card></div>
+      <div className="dashboard-grid dashboard-grid--kpi-main">
+        <div className="kpi-card kpi-card--compact">
+          <div className="kpi-content">
+            <div className="kpi-label">Última pesagem</div>
+            <div className="kpi-value">{formatarData(resumo.ultimaData)}</div>
+          </div>
+        </div>
+        <div className="kpi-card kpi-card--compact">
+          <div className="kpi-content">
+            <div className="kpi-label">Lotes sem pesagem recente</div>
+            <div className={alertas.lotesSemPesagem.length > 0 ? 'kpi-val rd' : 'kpi-value'}>{alertas.lotesSemPesagem.length}</div>
+          </div>
+        </div>
+        <div className="kpi-card kpi-card--compact">
+          <div className="kpi-content">
+            <div className="kpi-label">Total de pesagens</div>
+            <div className="kpi-value">{resumo.totalPesagens}</div>
+          </div>
+        </div>
+        <div className="kpi-card kpi-card--compact">
+          <div className="kpi-content">
+            <div className="kpi-label">GMD médio</div>
+            <div className="kpi-value">{resumo.gmdMedioDisponivel ? `${formatarNumero(resumo.gmdMedio, 3)} kg/dia` : 'Sem dados suficientes'}</div>
+          </div>
+        </div>
+      </div>
 
       {ultimoResumoBatch?.totalFalhas ? (
         <Card title="Pendencias da ultima pesagem" subtitle="Revise os registros que nao foram concluidos totalmente.">
@@ -846,12 +882,80 @@ export default function PesagensPage({ db, setDb, onConfirmAction, navigationInt
         </Card>
       ) : null}
 
-      {abaAtiva === 'nova' && <Card className="form-section-card" title="Nova pesagem" subtitle="Escolha o tipo e preencha os dados para registrar."><div className="segmented-control tab-bar"><button type="button" className={`segment ${modoPesagem === 'lote' ? 'active' : ''}`} onClick={() => setModoPesagem('lote')}>Por lote</button><button type="button" className={`segment ${modoPesagem === 'animal' ? 'active' : ''}`} onClick={() => setModoPesagem('animal')}>Por animal</button></div><div style={{ marginTop: 12 }}><Button onClick={() => abrirNovaPesagem(modoPesagem)}>Salvar pesagem</Button></div></Card>}
+      {abaAtiva === 'nova' && (
+        <Card className="form-section-card" title="Nova pesagem" subtitle="Escolha o tipo e preencha os dados para registrar.">
+          <div className="segmented-control tab-bar">
+            <button type="button" className={`segment ${modoPesagem === 'lote' ? 'active' : ''}`} onClick={() => setModoPesagem('lote')}>Por lote</button>
+            <button type="button" className={`segment ${modoPesagem === 'animal' ? 'active' : ''}`} onClick={() => setModoPesagem('animal')}>Por animal</button>
+          </div>
+          <div style={{ marginTop: 12 }}>
+            <Button onClick={() => abrirNovaPesagem(modoPesagem)}>Salvar pesagem</Button>
+          </div>
+        </Card>
+      )}
 
-      {abaAtiva === 'historico' && <div className="fazendas-card"><div className="fazendas-table-wrap">{dadosTabela.length===0?<div className="empty-box"><strong>Nenhuma pesagem cadastrada.</strong></div>:<table className="data-table herdon-table herdon-table--pesagens"><thead><tr><th>Data</th><th>Tipo</th><th>Lote</th><th>Animal</th><th>Peso</th><th>Observação</th><th>Ações</th></tr></thead><tbody>{dadosTabela.map((item)=><tr key={item.id}><td>{formatarData(item.data)}</td><td>{item.tipo==='animal'?'Animal':'Lote'}</td><td>{item.loteNome}</td><td>{item.tipo==='animal'?(item.animalNome||'Animal'):'-'}</td><td>{formatarNumero(item.peso_medio)} kg</td><td>{item.observacao||'-'}</td><td><div className="row-actions row-actions--tight"><button className="action-btn" onClick={()=>editarPesagem(item)}>Editar</button><button className="action-btn action-btn-danger" onClick={()=>excluirPesagem(item.id)}>Cancelar registro</button></div></td></tr>)}</tbody></table>}</div></div>}
+      {abaAtiva === 'historico' && (
+        <div className="fazendas-card">
+          <div className="fazendas-table-wrap">
+            {dadosTabela.length === 0 ? (
+              <div className="empty-box">
+                <strong>Nenhuma pesagem cadastrada.</strong>
+              </div>
+            ) : (
+              <table className="data-table herdon-table herdon-table--pesagens">
+                <thead>
+                  <tr>
+                    <th>Data</th>
+                    <th>Tipo</th>
+                    <th>Lote</th>
+                    <th>Animal</th>
+                    <th>Peso</th>
+                    <th>Observação</th>
+                    <th>Ações</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {dadosTabela.map((item) => (
+                    <tr key={item.id}>
+                      <td>{formatarData(item.data)}</td>
+                      <td>{item.tipo === 'animal' ? 'Animal' : 'Lote'}</td>
+                      <td>{item.loteNome}</td>
+                      <td>{item.tipo === 'animal' ? (item.animalNome || 'Animal') : '-'}</td>
+                      <td>{formatarNumero(item.peso_medio)} kg</td>
+                      <td>{item.observacao || '-'}</td>
+                      <td>
+                        <div className="row-actions row-actions--tight">
+                          <button className="action-btn" onClick={() => editarPesagem(item)}>Editar</button>
+                          <button className="action-btn action-btn-danger" onClick={() => excluirPesagem(item.id)}>Cancelar registro</button>
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            )}
+          </div>
+        </div>
+      )}
 
-      {abaAtiva === 'evolucao' && <div className="fazendas-card">{dadosTabela.length<2?<div className="empty-box"><strong>Sem dados suficientes para evolução.</strong></div>:<p>Peso médio por lote e GMD disponíveis no histórico de pesagens.</p>}</div>}
-      {abaAtiva === 'alertas' && <div className="fazendas-card"><p>Lotes sem pesagem ha mais de {alertas.diasSemPesagem} dias: {alertas.lotesSemPesagem.length}</p><p>Animais sem pesagem recente: {alertas.animaisSemPesagem.length}</p><button className="primary-btn" onClick={() => { setAbaAtiva('nova'); abrirNovaPesagem('lote'); }}>Registrar pesagem</button></div>}
+      {abaAtiva === 'evolucao' && (
+        <div className="fazendas-card">
+          {dadosTabela.length < 2 ? (
+            <div className="empty-box">
+              <strong>Sem dados suficientes para evolução.</strong>
+            </div>
+          ) : (
+            <p>Peso médio por lote e GMD disponíveis no histórico de pesagens.</p>
+          )}
+        </div>
+      )}
+      {abaAtiva === 'alertas' && (
+        <div className="fazendas-card">
+          <p>Lotes sem pesagem há mais de {alertas.diasSemPesagem} dias: {alertas.lotesSemPesagem.length}</p>
+          <p>Animais sem pesagem recente: {alertas.animaisSemPesagem.length}</p>
+          <button className="primary-btn" onClick={() => { setAbaAtiva('nova'); abrirNovaPesagem('lote'); }}>Registrar pesagem</button>
+        </div>
+      )}
 
       {abrirForm && (
         <PesagemForm initialData={pesagemEditando} lotes={lotes || []} animais={animais || []} pesagens={pesagens || []} onSave={salvarPesagem} onCancel={() => { setAbrirForm(false); setPesagemEditando(null); }} />

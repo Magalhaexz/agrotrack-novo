@@ -251,10 +251,25 @@ export default function EstoquePage({ db, setDb, onRegistrarSaidaEstoque }) {
         </div>
       </div>
 
-      <div className="dashboard-grid dashboard-grid--kpi-secondary">
-        <Card className="kpi-card" title="Total de itens">{resumo.total}</Card>
-        <Card className="kpi-card" title="Itens críticos">{resumo.criticos}</Card>
-        <Card className="kpi-card" title="Valor total em estoque">{formatCurrency(resumo.valorTotal)}</Card>
+      <div className="dashboard-strip">
+        <div className="kpi-card">
+          <div className="kpi-content">
+            <div className="kpi-label">Total de itens</div>
+            <div className="kpi-value">{resumo.total}</div>
+          </div>
+        </div>
+        <div className="kpi-card">
+          <div className="kpi-content">
+            <div className="kpi-label">Itens críticos</div>
+            <div className={resumo.criticos > 0 ? 'kpi-val rd' : 'kpi-value'}>{resumo.criticos}</div>
+          </div>
+        </div>
+        <div className="kpi-card">
+          <div className="kpi-content">
+            <div className="kpi-label">Valor total em estoque</div>
+            <div className="kpi-value">{formatCurrency(resumo.valorTotal)}</div>
+          </div>
+        </div>
       </div>
 
       <div className="lote-cards-grid">
