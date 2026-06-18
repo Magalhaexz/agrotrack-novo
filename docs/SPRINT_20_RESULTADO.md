@@ -111,9 +111,9 @@ Reimportação do mesmo arquivo → 8 erros detectados (4 pesagens de lote + 4 d
 
 | Gate | Resultado |
 |------|-----------|
-| `npm test` | A executar na Etapa 6 |
-| `npm run lint` | A executar na Etapa 6 |
-| `npm run build` | A executar na Etapa 6 |
+| `npm test` | ✓ 385 testes, 0 falhas |
+| `npm run lint` | ✓ Sem erros |
+| `npm run build` | ✓ Build completo em ~496ms |
 
 ---
 
