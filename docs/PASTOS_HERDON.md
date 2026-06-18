@@ -44,7 +44,7 @@ Definidas em `src/auth/perfis.js`:
 ```
 Fazendas
   └── Pastos (N pastagens por fazenda, via faz_id)
-        └── Lotes (1 pasto atual por lote, via pastagem_id text)
+        └── Lotes (1 pasto atual por lote, via pastagem_id uuid — FK formal)
 ```
 
 1. O usuário cadastra a fazenda
@@ -73,19 +73,49 @@ Ao trocar de fazenda, o pasto selecionado é automaticamente limpo se não perte
 
 ---
 
-## Migration aplicada — Sprint 18
+## Migrations aplicadas
 
-**Motivo**: `lotes.pastagem_id` era `bigint`, mas `pastagens.id` é `uuid`. O vínculo nunca funcionou.
+### Sprint 18 — correção de tipo inicial
+
+**Motivo**: `lotes.pastagem_id` era `bigint`, mas `pastagens.id` é `uuid`.
 
 ```sql
 ALTER TABLE public.lotes
 ALTER COLUMN pastagem_id TYPE text USING pastagem_id::text;
 ```
 
-Aplicada em: 2026-06-18. Segura porque:
-- `pastagem_id` não tinha FK
-- `pastagens` tinha 0 registros
-- Nenhum dado depende da coluna
+### Sprint 18.1 — tipo final + FK formal
+
+**Arquivo**: `supabase/migrations/20260618000000_lotes_pastagem_id_uuid.sql`
+
+**Motivo**: converter de `text` para `uuid` e estabelecer integridade referencial.
+
+```sql
+-- Idempotente: verifica tipo e FK antes de alterar
+ALTER TABLE public.lotes
+  ALTER COLUMN pastagem_id TYPE uuid USING pastagem_id::uuid;
+
+ALTER TABLE public.lotes
+  ADD CONSTRAINT lotes_pastagem_id_fkey
+  FOREIGN KEY (pastagem_id) REFERENCES public.pastagens (id)
+  ON DELETE SET NULL;
+```
+
+**Tipo final**: `lotes.pastagem_id uuid` (nullable)
+
+**Comportamento `ON DELETE SET NULL`**: se um pasto for removido, todos os lotes vinculados a ele têm `pastagem_id` automaticamente zerado — sem orphan reference, sem erro de integridade.
+
+**Testado em 2026-06-18**:
+- UUID inexistente → rejeitado com `23503 FK violation` ✔
+- UUID válido → aceito ✔
+- DELETE no pasto → `pastagem_id` do lote vira `NULL` ✔
+
+**Compatibilidade frontend**: `LoteForm` envia `pastagem_id` como string UUID ou `null`. PostgREST aceita string UUID para coluna `uuid` sem conversão adicional. Nenhuma mudança de código necessária.
+
+### Decisões de design
+
+- **`pastagens.faz_id` (bigint)**: mantido como vínculo operacional fazenda-pasto. Compatível com `lotes.faz_id` para filtragem no frontend.
+- **`pastagens.fazenda_id` (uuid)**: coluna existente no banco mas não utilizada pelo frontend. Candidata a remoção futura após auditoria completa.
 
 ---
 
@@ -111,7 +141,7 @@ CREATE TABLE lote_pastagens_historico (
   id            uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   owner_user_id uuid,
   lote_id       bigint NOT NULL,
-  pastagem_id   text NOT NULL,  -- UUID da pastagem
+  pastagem_id   uuid NOT NULL,  -- FK para pastagens.id
   data_entrada  date NOT NULL,
   data_saida    date,
   motivo        text,

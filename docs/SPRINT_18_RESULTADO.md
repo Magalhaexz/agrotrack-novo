@@ -52,5 +52,57 @@ ALTER TABLE public.lotes ALTER COLUMN pastagem_id TYPE text USING pastagem_id::t
 ### Pendências futuras
 
 - Histórico de movimentação lote-pasto (`lote_pastagens_historico`) — ver `docs/PASTOS_HERDON.md`
-- `lotes.pastagem_id` não tem FK formal com `pastagens.id` — pode ser adicionada em sprint futura
-- Campo `pastagens.fazenda_id` (uuid) existe no banco mas não é usado — candidato a remoção ou preenchimento em sprint futura
+- ~~`lotes.pastagem_id` não tem FK formal com `pastagens.id`~~ — resolvido na Sprint 18.1
+- Campo `pastagens.fazenda_id` (uuid) existe no banco mas não é usado — candidato a remoção após auditoria
+
+---
+
+## Sprint 18.1 — FK lote→pasto (commit `fix: enforce lot pasture relationship integrity`)
+
+### Diagnóstico antes da migration
+
+| Item | Valor |
+|------|-------|
+| `lotes.pastagem_id` tipo | `text` |
+| Lotes com `pastagem_id` ≠ NULL | 0 |
+| Valores inválidos (não-UUID) | 0 |
+| FK existente | Não |
+| Registros em `pastagens` | 0 |
+
+### Migration aplicada
+
+**Arquivo**: `supabase/migrations/20260618000000_lotes_pastagem_id_uuid.sql`
+
+Idempotente — usa `DO $$` com verificação de tipo e nome de constraint antes de alterar.
+
+```sql
+ALTER TABLE public.lotes
+  ALTER COLUMN pastagem_id TYPE uuid USING pastagem_id::uuid;
+
+ALTER TABLE public.lotes
+  ADD CONSTRAINT lotes_pastagem_id_fkey
+  FOREIGN KEY (pastagem_id) REFERENCES public.pastagens (id)
+  ON DELETE SET NULL;
+```
+
+### Testes de integridade referencial
+
+| Cenário | Resultado |
+|---------|-----------|
+| UUID inexistente → FK violation | ✔ `23503` |
+| UUID válido → aceito | ✔ |
+| DELETE pasto → `pastagem_id = NULL` no lote | ✔ ON DELETE SET NULL |
+
+### Arquivos alterados
+
+| Arquivo | Mudança |
+|---------|---------|
+| `supabase/migrations/20260618000000_lotes_pastagem_id_uuid.sql` | Novo — migration idempotente |
+| `docs/PASTOS_HERDON.md` | Atualizado — tipo final, FK, ON DELETE SET NULL, decisões de design |
+| `docs/SPRINT_18_RESULTADO.md` | Atualizado — registro Sprint 18.1 |
+
+### Tipo final
+
+`lotes.pastagem_id` → **`uuid` nullable** com FK `lotes_pastagem_id_fkey → pastagens(id) ON DELETE SET NULL`
+
+### Gates
