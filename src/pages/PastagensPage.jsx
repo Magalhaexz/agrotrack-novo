@@ -142,7 +142,7 @@ export default function PastagensPage({ db, setDb, session, onConfirmAction }) {
       return;
     }
     if (!String(form.nome || '').trim()) {
-      showToast({ type: 'warning', message: 'Informe o nome da pastagem.' });
+      showToast({ type: 'warning', message: 'Informe o nome do pasto.' });
       return;
     }
 
@@ -171,9 +171,9 @@ export default function PastagensPage({ db, setDb, session, onConfirmAction }) {
             item.id === editando.id ? merged : item
           )),
         }));
-        showToast({ type: 'success', message: 'Pastagem atualizada com sucesso.' });
+        showToast({ type: 'success', message: 'Pasto atualizado com sucesso.' });
       } else {
-        showToast({ type: 'error', message: persisted.error || 'Não foi possível atualizar a pastagem.' });
+        showToast({ type: 'error', message: persisted.error || 'Não foi possível atualizar o pasto.' });
         return;
       }
     } else {
@@ -190,9 +190,9 @@ export default function PastagensPage({ db, setDb, session, onConfirmAction }) {
             },
           ],
         }));
-        showToast({ type: 'success', message: 'Pastagem cadastrada com sucesso.' });
+        showToast({ type: 'success', message: 'Pasto cadastrado com sucesso.' });
       } else {
-        showToast({ type: 'error', message: persisted.error || 'Não foi possível cadastrar a pastagem.' });
+        showToast({ type: 'error', message: persisted.error || 'Não foi possível cadastrar o pasto.' });
         return;
       }
     }
@@ -207,7 +207,7 @@ export default function PastagensPage({ db, setDb, session, onConfirmAction }) {
     }
     const confirmado = typeof onConfirmAction === 'function'
       ? await onConfirmAction({
-          title: 'Excluir pastagem?',
+          title: 'Excluir pasto?',
           message: `Deseja excluir "${item.nome}"?`,
           tone: 'danger',
         })
@@ -223,7 +223,7 @@ export default function PastagensPage({ db, setDb, session, onConfirmAction }) {
       ...prev,
       pastagens: (prev.pastagens || []).filter((row) => row.id !== item.id),
     }));
-    showToast({ type: 'success', message: 'Pastagem excluída.' });
+    showToast({ type: 'success', message: 'Pasto excluído.' });
   }
 
   return (
@@ -291,10 +291,10 @@ export default function PastagensPage({ db, setDb, session, onConfirmAction }) {
       </Card>
 
       {!pastagens.length ? (
-        <Card title="Capacidade das pastagens">
+        <Card title="Capacidade dos pastos">
           <div className="empty-state">
-            <strong>Nenhuma pastagem cadastrada.</strong>
-            <span>Cadastre uma pastagem para calcular capacidade, lotação e necessidade de arrendamento.</span>
+            <strong>Nenhum pasto cadastrado.</strong>
+            <span>Cadastre um pasto para calcular capacidade, lotação e necessidade de arrendamento.</span>
           </div>
         </Card>
       ) : (
@@ -313,7 +313,7 @@ export default function PastagensPage({ db, setDb, session, onConfirmAction }) {
             <article className="metric-tile">
               <span className="metric-tile__label">Taxa de lotação</span>
               <strong className="metric-tile__value">{formatNumber(indicadores.taxaLotacaoUaHa, 3)} UA/ha</strong>
-              <span className="metric-tile__meta">Leitura consolidada da pressão de uso sobre a área de pastagem disponível.</span>
+              <span className="metric-tile__meta">Leitura consolidada da pressão de uso sobre a área de pasto disponível.</span>
             </article>
             <article className={`metric-tile ${indicadores.superlotacao ? 'metric-tile--warning' : 'metric-tile--success'}`}>
               <span className="metric-tile__label">Pasto a arrendar</span>
@@ -328,12 +328,12 @@ export default function PastagensPage({ db, setDb, session, onConfirmAction }) {
 
           <Card
             title="Diagnóstico de capacidade"
-            subtitle="Leitura operacional da área, capacidade instalada e pressão do rebanho sobre as pastagens."
+            subtitle="Leitura operacional da área, capacidade instalada e pressão do rebanho sobre os pastos."
           >
             <div className="summary-panel">
               <div className="summary-list">
                 <div className="summary-row">
-                  <span className="summary-row__label">Área total de pastagem</span>
+                  <span className="summary-row__label">Área total de pasto</span>
                   <strong className="summary-row__value">{formatNumber(indicadores.areaTotalPastagem, 2)} ha</strong>
                 </div>
                 <div className="summary-row">
@@ -397,8 +397,8 @@ export default function PastagensPage({ db, setDb, session, onConfirmAction }) {
       <Card title="Pastos cadastrados">
         {!pastagens.length ? (
           <div className="empty-state">
-            <strong>Nenhuma pastagem cadastrada.</strong>
-            <span>Cadastre uma pastagem vinculada à fazenda para liberar o vínculo com lotes e os indicadores de capacidade.</span>
+            <strong>Nenhum pasto cadastrado.</strong>
+            <span>Cadastre um pasto vinculado à fazenda para liberar o vínculo com lotes e os indicadores de capacidade.</span>
           </div>
         ) : (
           <div className="table-responsive">

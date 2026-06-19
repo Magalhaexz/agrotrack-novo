@@ -3,18 +3,24 @@ import {
   AlertTriangle,
   ArrowDown,
   ArrowUp,
+  Beef,
   Bell,
   BellRing,
   CheckCircle2,
   DollarSign,
+  FileUp,
+  MapPin,
   Package,
-  Plus,
+  Receipt,
+  Repeat,
+  Scale,
   Tractor,
   Users,
 } from 'lucide-react';
 import Card from '../components/ui/Card';
 import Button from '../components/ui/Button';
 import { getResumoLote } from '../domain/resumoLote';
+import { construirHojeNaFazenda } from '../domain/hojeNaFazenda';
 import { formatCurrency, formatDate, formatNumber } from '../utils/calculations';
 import { formatarMoeda } from '../utils/formatters';
 import { gerarNovoId } from '../utils/id';
@@ -24,6 +30,8 @@ import { useToast } from '../hooks/useToast';
 import '../styles/dashboard.css';
 
 const getTodayIso = () => new Date().toISOString().slice(0, 10);
+
+const NIVEL_PARA_PRIORIDADE = { critical: 'alta', warning: 'media', info: 'baixa' };
 
 const KPI_VARIANTS = {
   success: 'success',
@@ -44,6 +52,7 @@ export default function DashboardPage({
   onAlertNavigate = null,
   tabAtiva = 'geral',
   setTabAtiva,
+  fazendaSelecionada = null,
 }) {
   const { hasPermission } = useAuth();
   const { showToast } = useToast();
@@ -73,6 +82,19 @@ export default function DashboardPage({
   }, [pagamentosDiarios]);
 
   const lotesAtivos = useMemo(() => (db.lotes || []).filter((lote) => lote.status === 'ativo'), [db.lotes]);
+
+  const totalFazendas = Array.isArray(db.fazendas) ? db.fazendas.length : 0;
+
+  const pastagensFazendaAtiva = useMemo(() => {
+    const pastagens = Array.isArray(db.pastagens) ? db.pastagens : [];
+    if (!fazendaSelecionada?.id) return pastagens;
+    return pastagens.filter((item) => Number(item?.faz_id) === Number(fazendaSelecionada.id));
+  }, [db.pastagens, fazendaSelecionada]);
+
+  const hojeNaFazenda = useMemo(
+    () => construirHojeNaFazenda({ ...db, pastagens: pastagensFazendaAtiva }, { alerts }),
+    [db, pastagensFazendaAtiva, alerts]
+  );
 
   const lotesStats = useMemo(
     () =>
@@ -147,9 +169,9 @@ export default function DashboardPage({
         ...alert,
         id: alert.id || alert.ackKey || `alert-${index}`,
         titulo: alert.titulo || alert.title || 'Alerta do sistema',
-        descricao: alert.descricao || alert.description || 'Sem descrição',
-        prioridade: alert.prioridade || 'media',
-        acao: alert.acao || { label: 'Abrir', rota: alert.route || 'dashboard' },
+        descricao: alert.mensagem || alert.descricao || alert.description || 'Sem descrição',
+        prioridade: alert.prioridade || NIVEL_PARA_PRIORIDADE[alert.nivel] || 'media',
+        acao: alert.acao || { label: 'Abrir', rota: alert.route || alert.pagina || 'dashboard' },
       })),
     [alerts]
   );
@@ -165,44 +187,58 @@ export default function DashboardPage({
       && String(tarefa?.data_vencimento || '') === hoje
     ));
   }, [db.tarefas]);
-  const pesagensPendentes = useMemo(() => {
-    const hoje = new Date();
-    const limiteDias = 30;
-    return (lotesAtivos || []).filter((lote) => {
-      if (!lote?.ultima_pesagem) return true;
-      const diferencaDias = (hoje - new Date(lote.ultima_pesagem)) / (1000 * 60 * 60 * 24);
-      return diferencaDias > limiteDias;
-    });
-  }, [lotesAtivos]);
+  const pesagensPendentes = hojeNaFazenda.detalhes.lotesSemPesagem;
+  const totalAlertasCriticos = hojeNaFazenda.detalhes.alertasCriticosTotal.length;
 
   const kpisMain = [
     {
-      title: 'Cabeças ativas',
-      value: formatNumber(totalCabecasAtivas, 0),
-      variation: getVariation(totalCabecasAtivas, totalCabecasAtivas * 0.92),
-      icon: Users,
-      variant: KPI_VARIANTS.info,
+      title: 'Fazendas',
+      value: formatNumber(totalFazendas, 0),
+      variation: { direction: 'neutral', value: 'Cadastradas na conta' },
+      icon: MapPin,
+      variant: KPI_VARIANTS.neutral,
     },
     {
-      title: 'Lotes ativos',
-      value: formatNumber(lotesAtivos.length, 0),
-      variation: getVariation(lotesAtivos.length, Math.max(1, lotesAtivos.length - 1)),
+      title: 'Pastos',
+      value: formatNumber(hojeNaFazenda.pastos.totalPastos, 0),
+      variation: { direction: 'neutral', value: fazendaSelecionada ? 'Na fazenda ativa' : 'Em todas as fazendas' },
       icon: Tractor,
       variant: KPI_VARIANTS.neutral,
     },
     {
-      title: 'Resultado financeiro',
-      value: formatCurrency(resultadoMes),
-      variation: getVariation(resultadoMes, resultadoMes * 0.85),
-      icon: DollarSign,
-      variant: resultadoMes >= 0 ? KPI_VARIANTS.success : KPI_VARIANTS.danger,
+      title: 'Lotes ativos',
+      value: formatNumber(lotesAtivos.length, 0),
+      variation: { direction: 'neutral', value: 'Em produção agora' },
+      icon: Beef,
+      variant: KPI_VARIANTS.neutral,
     },
     {
-      title: 'Pagamentos pendentes',
-      value: formatNumber(pagamentosResumo.vencidos + pagamentosResumo.hoje + pagamentosResumo.proximos, 0),
-      variation: { direction: 'neutral', value: pagamentosResumo.totalPendente > 0 ? `Total pendente: ${formatCurrency(pagamentosResumo.totalPendente)}` : 'Nenhum pagamento pendente' },
-      icon: BellRing,
-      variant: pagamentosResumo.totalPendente > 0 ? KPI_VARIANTS.warning : KPI_VARIANTS.success,
+      title: 'Cabeças ativas',
+      value: formatNumber(totalCabecasAtivas, 0),
+      variation: { direction: 'neutral', value: 'Rebanho em lotes ativos' },
+      icon: Users,
+      variant: KPI_VARIANTS.info,
+    },
+    {
+      title: 'Peso médio',
+      value: `${formatNumber(pesoMedioAtual, 1)} kg`,
+      variation: { direction: 'neutral', value: 'Média do rebanho ativo' },
+      icon: Scale,
+      variant: KPI_VARIANTS.neutral,
+    },
+    {
+      title: 'Alertas críticos',
+      value: formatNumber(totalAlertasCriticos, 0),
+      variation: { direction: 'neutral', value: totalAlertasCriticos > 0 ? 'Exigem atenção agora' : 'Nenhum alerta crítico' },
+      icon: AlertTriangle,
+      variant: totalAlertasCriticos > 0 ? KPI_VARIANTS.danger : KPI_VARIANTS.success,
+    },
+    {
+      title: 'Resultado financeiro',
+      value: formatCurrency(resultadoMes),
+      variation: { direction: 'neutral', value: 'Lotes ativos no período' },
+      icon: DollarSign,
+      variant: resultadoMes >= 0 ? KPI_VARIANTS.success : KPI_VARIANTS.danger,
     },
   ];
 
@@ -260,70 +296,101 @@ export default function DashboardPage({
       <header className="dashboard-toolbar page-header">
         <div className="dashboard-toolbar-copy">
           <h1>Painel Geral</h1>
-          <p>Visão rápida da operação: rebanho, financeiro e prioridades do dia.</p>
-        </div>
-
-        <div className="dashboard-toolbar-actions page-actions">
-          <Button variant="outline" icon={<Plus size={14} />} onClick={() => onNavigate?.('lotes')}>
-            Novo lote
-          </Button>
-          <Button variant="outline" onClick={() => onNavigate?.('pesagens', { action: 'novo' })}>
-            Nova pesagem
-          </Button>
-          <Button variant="primary" onClick={() => onNavigate?.('suplementacao')}>
-            Registrar consumo
-          </Button>
+          <p>Hoje na fazenda: o que precisa de atenção, e o que fazer a seguir.</p>
         </div>
       </header>
 
-      {lotesAtivos.length === 0 && (
+      {totalFazendas === 0 ? (
+        <section className="dashboard-onboarding-banner">
+          <div className="dashboard-onboarding-content">
+            <strong>Comece cadastrando sua fazenda ou importando seus dados.</strong>
+            <span>Com a fazenda cadastrada, o HERDON já mostra prioridades, alertas e resultado financeiro automaticamente.</span>
+          </div>
+          <div className="dashboard-onboarding-actions">
+            <Button variant="primary" size="sm" onClick={() => onNavigate?.('fazendas')}>
+              Cadastrar fazenda
+            </Button>
+            <Button variant="outline" size="sm" onClick={() => onNavigate?.('importacao')}>
+              Importar dados
+            </Button>
+            <Button variant="ghost" size="sm" onClick={() => onNavigate?.('suporte')}>
+              Ver guia do criador piloto
+            </Button>
+          </div>
+        </section>
+      ) : lotesAtivos.length === 0 ? (
         <section className="dashboard-onboarding-banner">
           <div className="dashboard-onboarding-content">
             <strong>Você ainda não tem lotes ativos.</strong>
             <span>Cadastre seu primeiro lote para acompanhar GMD, custo e resultado financeiro da operação.</span>
           </div>
           <div className="dashboard-onboarding-actions">
-            <Button variant="primary" size="sm" onClick={() => onNavigate?.('fazendas')}>
-              Cadastrar fazenda
-            </Button>
-            <Button variant="outline" size="sm" onClick={() => onNavigate?.('lotes')}>
+            <Button variant="primary" size="sm" onClick={() => onNavigate?.('lotes')}>
               Criar primeiro lote
+            </Button>
+            <Button variant="outline" size="sm" onClick={() => onNavigate?.('importacao')}>
+              Importar dados
             </Button>
           </div>
         </section>
-      )}
+      ) : null}
 
       {tabAtiva === 'geral' && (
         <>
           <section className="section-card dashboard-hero-shell">
             <div className="section-header">
               <div>
-                <h3 className="dashboard-section-title">Visão geral</h3>
-                <p className="dashboard-section-subtitle">Resumo rápido para apoiar decisões imediatas.</p>
+                <h3 className="dashboard-section-title">Hoje na Fazenda</h3>
+                <p className="dashboard-section-subtitle">O que precisa da sua atenção agora.</p>
               </div>
               <div className="action-row">
-                <span className={`status-badge ${alertasCriticos.length > 0 ? 'status-badge--critico' : 'status-badge--sucesso'}`}>
-                  {alertasCriticos.length > 0 ? `${alertasCriticos.length} críticos` : 'Sem críticos'}
+                <span className={`status-badge ${hojeNaFazenda.detalhes.alertasCriticosTotal.length > 0 ? 'status-badge--critico' : 'status-badge--sucesso'}`}>
+                  {hojeNaFazenda.detalhes.alertasCriticosTotal.length > 0 ? `${hojeNaFazenda.detalhes.alertasCriticosTotal.length} críticos` : 'Sem críticos'}
                 </span>
               </div>
             </div>
 
-            <div className="dashboard-executive-strip dashboard-executive-strip--compact">
-              <article className="dashboard-executive-chip">
-                <span>Cabeças ativas</span>
-                <strong>{formatNumber(totalCabecasAtivas, 0)}</strong>
-                <small>Rebanho total em lotes ativos</small>
-              </article>
-              <article className="dashboard-executive-chip">
-                <span>Estoque crítico</span>
-                <strong>{formatNumber(estoqueCritico.length, 0)}</strong>
-                <small>Itens abaixo do mínimo</small>
-              </article>
-              <article className="dashboard-executive-chip">
-                <span>Pendências hoje</span>
-                <strong>{formatNumber(tarefasDoDia.length + pagamentosResumo.hoje, 0)}</strong>
-                <small>Tarefas e pagamentos com vencimento hoje</small>
-              </article>
+            {hojeNaFazenda.prioridades.length === 0 ? (
+              <div className="empty-state">
+                <p>Tudo certo por aqui — nenhuma prioridade pendente hoje.</p>
+              </div>
+            ) : (
+              <div className="dashboard-list">
+                {hojeNaFazenda.prioridades.map((item) => (
+                  <button
+                    key={item.id}
+                    type="button"
+                    className="dashboard-list-item dashboard-list-item--button"
+                    onClick={() => (item.rota === 'dashboard' ? setTabAtiva?.('alertas') : onNavigate?.(item.rota))}
+                  >
+                    <div className="dashboard-list-copy">
+                      <strong>{item.texto}</strong>
+                    </div>
+                    <span className={`status-badge ${item.tom === 'critico' ? 'status-badge--critico' : 'status-badge--atencao'}`}>
+                      {item.tom === 'critico' ? 'Crítico' : 'Atenção'}
+                    </span>
+                  </button>
+                ))}
+              </div>
+            )}
+          </section>
+
+          <section className="section-card">
+            <div className="section-header">
+              <div>
+                <h3 className="dashboard-section-title">Ações rápidas</h3>
+                <p className="dashboard-section-subtitle">Atalhos para as tarefas mais comuns do dia a dia.</p>
+              </div>
+            </div>
+            <div className="dashboard-action-grid dashboard-action-grid--quick">
+              <Button variant="outline" icon={<MapPin size={14} />} onClick={() => onNavigate?.('fazendas')}>Nova fazenda</Button>
+              <Button variant="outline" icon={<Tractor size={14} />} onClick={() => onNavigate?.('pastagens')}>Novo pasto</Button>
+              <Button variant="outline" icon={<Beef size={14} />} onClick={() => onNavigate?.('lotes')}>Novo lote</Button>
+              <Button variant="outline" icon={<Scale size={14} />} onClick={() => onNavigate?.('pesagens', { action: 'novo' })}>Registrar pesagem</Button>
+              <Button variant="outline" icon={<Receipt size={14} />} onClick={() => onNavigate?.('financeiro')}>Lançar custo/receita</Button>
+              <Button variant="outline" icon={<FileUp size={14} />} onClick={() => onNavigate?.('importacao')}>Importar dados</Button>
+              <Button variant="outline" icon={<Repeat size={14} />} onClick={() => onNavigate?.('lotes')}>Mover lote de pasto</Button>
+              <Button variant="outline" icon={<BellRing size={14} />} onClick={() => setTabAtiva?.('alertas')}>Ver alertas</Button>
             </div>
           </section>
 
@@ -394,6 +461,31 @@ export default function DashboardPage({
               )}
             </Card>
           </section>
+
+          <Card className="section-card" title="Pastos em uso" subtitle="Ocupação simples dos pastos cadastrados, sem cálculo de UA por animal.">
+            <div className="dashboard-list">
+              <div className="dashboard-list-item">
+                <div className="dashboard-list-copy"><strong>Pastos cadastrados</strong><p>{formatNumber(hojeNaFazenda.pastos.totalPastos, 0)}</p></div>
+              </div>
+              <div className="dashboard-list-item">
+                <div className="dashboard-list-copy"><strong>Pastos com lote ativo</strong><p>{formatNumber(hojeNaFazenda.pastos.pastosComLote, 0)}</p></div>
+              </div>
+              <div className="dashboard-list-item">
+                <div className="dashboard-list-copy"><strong>Pastos sem lote</strong><p>{formatNumber(hojeNaFazenda.pastos.pastosSemLote, 0)}</p></div>
+              </div>
+              <div className="dashboard-list-item">
+                <div className="dashboard-list-copy"><strong>Lotes sem pasto definido</strong><p>{formatNumber(hojeNaFazenda.pastos.lotesSemPasto, 0)}</p></div>
+              </div>
+            </div>
+            {hojeNaFazenda.pastos.pastosComIndicioDeExcesso.length > 0 ? (
+              <div className="empty-state" style={{ marginTop: 12 }}>
+                <p>
+                  Indício de excesso de cabeças n{hojeNaFazenda.pastos.pastosComIndicioDeExcesso.length === 1 ? 'o pasto' : 'os pastos'}:{' '}
+                  {hojeNaFazenda.pastos.pastosComIndicioDeExcesso.map((pasto) => pasto.nome).join(', ')}. Confira a capacidade cadastrada.
+                </p>
+              </div>
+            ) : null}
+          </Card>
 
           <section className="dashboard-task-board">
             <Card className="section-card" title="Quadro de tarefas" subtitle="Tarefas acionaveis do dia com status claro para a equipe.">
@@ -653,16 +745,10 @@ export default function DashboardPage({
 
 function KpiPanel({ title, value, variation, icon, variant = 'neutral', compact = false }) {
   const IconComp = icon;
-  const variationValue = typeof variation === 'number'
-    ? variation
-    : Number(variation?.value || 0);
   const variationDirection = typeof variation === 'object' ? String(variation?.direction || '') : '';
-  const variationLabel = typeof variation === 'object' && variation?.value
-    ? String(variation.value)
-    : `${formatNumber(Math.abs(variationValue), 1)}% vs. base recente`;
-  const directionUp = variationDirection
-    ? variationDirection !== 'down'
-    : variationValue >= 0;
+  const isNeutral = variationDirection === 'neutral' || !variationDirection;
+  const variationLabel = typeof variation === 'object' && variation?.value ? String(variation.value) : '';
+  const directionUp = variationDirection === 'up';
 
   return (
     <Card className={`kpi-panel kpi-panel--${variant} kpi-card ${compact ? 'kpi-panel--compact' : ''}`}>
@@ -675,16 +761,13 @@ function KpiPanel({ title, value, variation, icon, variant = 'neutral', compact 
 
       <strong>{value}</strong>
 
-      <div className={`kpi-variation ${directionUp ? 'up' : 'down'}`}>
-        {directionUp ? <ArrowUp size={14} /> : <ArrowDown size={14} />}
-        {variationLabel}
-      </div>
+      {variationLabel ? (
+        <div className={`kpi-variation ${isNeutral ? 'neutral' : directionUp ? 'up' : 'down'}`}>
+          {!isNeutral ? (directionUp ? <ArrowUp size={14} /> : <ArrowDown size={14} />) : null}
+          {variationLabel}
+        </div>
+      ) : null}
     </Card>
   );
-}
-
-function getVariation(current, previous) {
-  if (!previous) return 0;
-  return ((current - previous) / Math.abs(previous)) * 100;
 }
 

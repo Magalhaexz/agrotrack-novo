@@ -101,6 +101,7 @@ CSS: `.ui-table-wrap`, `.ui-table`
 | Baseline / Projeção | Comparar cenários |
 | Financeiro | Movimentações Financeiras |
 | Relatórios Gerenciais | Relatórios |
+| Pastagem | Pasto (Sprint 22 — varrido em toda a interface; tabela `pastagens` no banco não mudou) |
 
 ---
 
@@ -111,10 +112,13 @@ Quando não há dados, o HERDON orienta o produtor com mensagens ativas:
 | Tela | Mensagem principal | Orientação |
 |------|-------------------|------------|
 | Lotes e Rebanho | Nenhum lote encontrado. | Ajuste os filtros ou cadastre um novo lote para continuar. |
-| Painel Geral (sem lotes) | Você ainda não tem lotes ativos. | Cadastre seu primeiro lote para acompanhar GMD, custo e resultado financeiro da operação. |
+| Painel Geral (conta nova, sem fazenda) | Comece cadastrando sua fazenda ou importando seus dados. | Botões: Cadastrar fazenda, Importar dados, Ver guia do criador piloto (Sprint 22) |
+| Painel Geral (com fazenda, sem lotes ativos) | Você ainda não tem lotes ativos. | Cadastre seu primeiro lote para acompanhar GMD, custo e resultado financeiro da operação. |
+| Painel Geral — Hoje na Fazenda (sem prioridades) | Tudo certo por aqui — nenhuma prioridade pendente hoje. | — (Sprint 22) |
 | Movimentações Financeiras | Nenhuma movimentação financeira encontrada. | Registre receitas e despesas para acompanhar o resultado da operação. |
 | Simulador de Decisão | Nenhum cenário simulado ainda. | Crie um cenário para simular se vale a pena comprar, manter ou vender o lote. |
 | Indicadores | Sem dados suficientes. | Cadastre lotes e movimentações para visualizar os indicadores por lote. |
+| Pastos | Nenhum pasto cadastrado. | Cadastre um pasto para calcular capacidade, lotação e necessidade de arrendamento. (Sprint 22) |
 
 ---
 

@@ -339,3 +339,10 @@ export const Upload = icon([
   createElement('path', { d: 'm17 8-5-5-5 5' }),
   createElement('path', { d: 'M12 3v12' }),
 ]);
+
+export const Repeat = icon([
+  createElement('path', { d: 'm17 2 4 4-4 4' }),
+  createElement('path', { d: 'M3 11V9a4 4 0 0 1 4-4h14' }),
+  createElement('path', { d: 'm7 22-4-4 4-4' }),
+  createElement('path', { d: 'M21 13v2a4 4 0 0 1-4 4H3' }),
+]);

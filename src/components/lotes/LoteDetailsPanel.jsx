@@ -46,7 +46,7 @@ export default function LoteDetailsPanel({
           <p>
             Fazenda {lote.fazendaNome || 'não vinculada'}
             {' '}
-            • Pastagem {lote.pastagemNome || '—'}
+            • Pasto {lote.pastagemNome || '—'}
             {' '}
             • Categoria {lote.categoriaAnimal || '—'}
             {' '}

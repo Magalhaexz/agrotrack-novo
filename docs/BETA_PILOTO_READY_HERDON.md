@@ -3,6 +3,13 @@
 **Sprint 19 · Gerado em:** 2026-06-18
 **Decisão:** ✅ **PRONTO PARA O PILOTO**
 
+> **Atualização (Sprint 22):** desde esta decisão, a Sprint 21 adicionou
+> movimentação de lotes entre pastos com histórico, e a Sprint 22 reformulou
+> o Painel Geral ("Hoje na Fazenda") e corrigiu um bug que fazia alertas
+> críticos nunca aparecerem. Ver [SPRINT_22_RESULTADO.md](SPRINT_22_RESULTADO.md).
+> Pendência aberta: verificação visual real (mobile/desktop) do novo Painel
+> Geral com uma conta autenticada, ainda não feita.
+
 ---
 
 ## Critérios de aprovação

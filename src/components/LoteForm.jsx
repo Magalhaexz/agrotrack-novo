@@ -413,7 +413,7 @@ export default function LoteForm({ initialData, fazendas = [], pastagens = [], f
                   <option key={pastagem.id} value={pastagem.id}>{pastagem.nome}</option>
                 ))}
                 {form.pastagem_id && !pastagemSelecionada ? (
-                  <option value={form.pastagem_id}>Pastagem vinculada não encontrada</option>
+                  <option value={form.pastagem_id}>Pasto vinculado não encontrado</option>
                 ) : null}
               </Input>
             ) : (
