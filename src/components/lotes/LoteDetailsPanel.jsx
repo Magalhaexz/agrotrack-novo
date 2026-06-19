@@ -4,6 +4,7 @@ import LoteFinanceiroTab from './LoteFinanceiroTab';
 import LoteHistoricoTab from './LoteHistoricoTab';
 import LoteNutricaoTab from './LoteNutricaoTab';
 import LoteOverviewTab from './LoteOverviewTab';
+import LotePastagensTab from './LotePastagensTab';
 import LotePesagensTab from './LotePesagensTab';
 import LoteRetiradasTab from './LoteRetiradasTab';
 import LoteSanitarioTab from './LoteSanitarioTab';
@@ -24,12 +25,15 @@ export default function LoteDetailsPanel({
   onRegistrarSaida,
   onNovaPesagem,
   onEncerrar,
+  onMoverPasto,
   animais,
   pesagens,
   retiradas,
   sanitarios,
   financeiros,
   historico,
+  historicoPastos,
+  loadingHistoricoPastos,
   consumoNutricao,
   consumoAlerta,
   onDeleteHistoricoConsumo,
@@ -77,6 +81,15 @@ export default function LoteDetailsPanel({
 
       {activeTab === 'visao_geral' ? <LoteOverviewTab lote={lote} resumo={resumo} /> : null}
       {activeTab === 'animais' ? <LoteAnimaisTab animais={animais} /> : null}
+      {activeTab === 'pastagem' ? (
+        <LotePastagensTab
+          lote={lote}
+          historico={historicoPastos}
+          loadingHistorico={loadingHistoricoPastos}
+          canMove={canEdit && !lote.bloqueado}
+          onMoverPasto={onMoverPasto}
+        />
+      ) : null}
       {activeTab === 'pesagens' ? <LotePesagensTab pesagens={pesagens} onNovaPesagem={onNovaPesagem} canEditPesagem={canEditPesagem && !lote.bloqueado} /> : null}
       {activeTab === 'retiradas' ? <LoteRetiradasTab retiradas={retiradas} onNovaRetirada={onRegistrarVendaParcial} canMove={canMove && !lote.bloqueado} /> : null}
       {activeTab === 'nutricao' ? <LoteNutricaoTab lote={lote} consumo={consumoNutricao} alertaConsumo={consumoAlerta} /> : null}

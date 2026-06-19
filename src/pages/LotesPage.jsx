@@ -15,6 +15,8 @@ import LotesFilters from '../components/lotes/LotesFilters';
 import LotesPageHeader from '../components/lotes/LotesPageHeader';
 import RetiradaAnimaisModal from '../components/lotes/RetiradaAnimaisModal';
 import FechamentoLoteModal from '../components/lotes/FechamentoLoteModal';
+import MoverPastoModal from '../components/lotes/MoverPastoModal';
+import { moverLoteParaPasto, listarHistoricoPastos } from '../services/movimentacaoPastos';
 import {
   addDaysToDate,
   calculateDailyConsumptionKg,
@@ -191,7 +193,7 @@ const EMPTY_LIST = [];
 const LABEL_OR_DASH = '—';
 
 function resolvePastagemNome(pastagensMap, lote) {
-  const byId = lote?.pastagem_id ? pastagensMap.get(Number(lote.pastagem_id)) : null;
+  const byId = lote?.pastagem_id ? pastagensMap.get(String(lote.pastagem_id)) : null;
   return byId?.nome || lote?.pastagem_nome || lote?.pastagemAtualNome || LABEL_OR_DASH;
 }
 
@@ -207,6 +209,9 @@ export default function LotesPage({ db, setDb, onRegistrarSaidaAnimal, session, 
   const [openPesagem, setOpenPesagem] = useState(false);
   const [openNovoLote, setOpenNovoLote] = useState(false);
   const [loteEmEdicao, setLoteEmEdicao] = useState(null);
+  const [openMoverPasto, setOpenMoverPasto] = useState(false);
+  const [historicoPastos, setHistoricoPastos] = useState(EMPTY_LIST);
+  const [loadingHistoricoPastos, setLoadingHistoricoPastos] = useState(false);
   const lotes = Array.isArray(db?.lotes) ? db.lotes : EMPTY_LIST;
   const fazendas = Array.isArray(db?.fazendas) ? db.fazendas : EMPTY_LIST;
   const pastagens = Array.isArray(db?.pastagens) ? db.pastagens : EMPTY_LIST;
@@ -218,7 +223,28 @@ export default function LotesPage({ db, setDb, onRegistrarSaidaAnimal, session, 
   const consumoHistorico = Array.isArray(db?.consumo_suplementacao) ? db.consumo_suplementacao : EMPTY_LIST;
   const activeFarmId = useMemo(() => getActiveFarmId(fazendaSelecionada), [fazendaSelecionada]);
   const fazendaAtiva = useMemo(() => fazendas.find((fazenda) => Number(fazenda.id) === Number(activeFarmId)) || null, [fazendas, activeFarmId]);
-  const pastagensMap = useMemo(() => new Map(pastagens.map((item) => [Number(item.id), item])), [pastagens]);
+  const pastagensMap = useMemo(() => new Map(pastagens.map((item) => [String(item.id), item])), [pastagens]);
+
+  useEffect(() => {
+    if (!selectedLoteId) return undefined;
+    let cancelado = false;
+
+    async function carregarHistoricoPastos() {
+      setLoadingHistoricoPastos(true);
+      const resultado = await listarHistoricoPastos(selectedLoteId);
+      if (cancelado) return;
+      if (!resultado.success) {
+        showToast({ type: 'warning', message: resultado.error || 'Não foi possível carregar o histórico de pasto.' });
+      }
+      setHistoricoPastos(resultado.data);
+      setLoadingHistoricoPastos(false);
+    }
+
+    carregarHistoricoPastos();
+    return () => {
+      cancelado = true;
+    };
+  }, [selectedLoteId, showToast]);
 
   const lotesEnriquecidos = useMemo(() => lotes.map((lote) => {
     const lotePesagens = pesagens.filter((item) => Number(item.lote_id) === Number(lote.id));
@@ -397,6 +423,39 @@ export default function LotesPage({ db, setDb, onRegistrarSaidaAnimal, session, 
     setOpenFechamento(false);
   }
 
+  async function handleMoverPasto({ loteId, pastagemDestinoId, dataMovimentacao, quantidadeCabecas, motivo, observacoes }) {
+    if (!ensurePermission('lotes:editar')) return;
+    if (!selectedLote) return;
+    if (selectedLote.bloqueado) {
+      showToast({ type: 'warning', message: 'Lote encerrado ou vendido não aceita movimentação de pasto.' });
+      return;
+    }
+
+    const resultado = await moverLoteParaPasto({
+      loteId,
+      pastagemDestinoId,
+      dataMovimentacao,
+      quantidadeCabecas,
+      motivo,
+      observacoes,
+    });
+
+    if (!resultado.success) {
+      showToast({ type: 'warning', message: resultado.error || 'Não foi possível confirmar a movimentação agora.' });
+      return;
+    }
+
+    setDb((prev) => ({
+      ...prev,
+      lotes: (prev.lotes || []).map((l) => (
+        Number(l.id) === Number(loteId) ? { ...l, pastagem_id: pastagemDestinoId } : l
+      )),
+    }));
+    setHistoricoPastos((prev) => [resultado.data, ...prev]);
+    showToast({ type: 'success', message: 'Movimentação de pasto registrada com sucesso.' });
+    setOpenMoverPasto(false);
+  }
+
   async function handleSalvarPesagem({ data, pesoMedio, observacao }) {
     if (!ensurePermission('pesagens:editar')) return;
     if (!selectedLote) return;
@@ -516,12 +575,15 @@ export default function LotesPage({ db, setDb, onRegistrarSaidaAnimal, session, 
           onRegistrarSaida={() => abrirRetirada('exit')}
           onNovaPesagem={() => setOpenPesagem(true)}
           onEncerrar={() => setOpenFechamento(true)}
+          onMoverPasto={() => setOpenMoverPasto(true)}
           animais={loteAnimais}
           pesagens={lotePesagens}
           retiradas={loteRetiradas}
           sanitarios={loteSanitario}
           financeiros={loteFinanceiro}
           historico={historico}
+          historicoPastos={historicoPastos}
+          loadingHistoricoPastos={loadingHistoricoPastos}
           consumoNutricao={consumoNutricao}
           consumoAlerta={consumoAlerta}
           onDeleteHistoricoConsumo={handleExcluirHistoricoConsumo}
@@ -552,6 +614,15 @@ export default function LotesPage({ db, setDb, onRegistrarSaidaAnimal, session, 
           lote={selectedLote}
           onClose={() => setOpenPesagem(false)}
           onSubmit={handleSalvarPesagem}
+        />
+
+        <MoverPastoModal
+          key={`${selectedLote?.id ?? 'lote'}-${openMoverPasto}`}
+          open={openMoverPasto}
+          lote={selectedLote}
+          pastagens={pastagens}
+          onClose={() => setOpenMoverPasto(false)}
+          onSubmit={handleMoverPasto}
         />
       </>
     );

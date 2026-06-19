@@ -130,24 +130,43 @@ Adicionado em Sprint 18:
 
 ---
 
-## Pendência futura — Histórico de movimentação
+## Histórico de movimentação (Sprint 21)
 
-Nesta sprint, o sistema registra apenas o **pasto atual** do lote. Não há histórico de movimentação.
+Implementado. A proposta original desta seção (tabela com `data_entrada` /
+`data_saida` por pasto) foi substituída por um modelo de **log de
+movimentações** — uma linha por evento, com origem e destino explícitos —
+que é mais simples de auditar e não exige fechar/reabrir um intervalo a cada
+troca de pasto.
 
-### Proposta de tabela futura: `lote_pastagens_historico`
+### Tabela `lote_pastagens_historico`
 
 ```sql
 CREATE TABLE lote_pastagens_historico (
-  id            uuid PRIMARY KEY DEFAULT gen_random_uuid(),
-  owner_user_id uuid,
-  lote_id       bigint NOT NULL,
-  pastagem_id   uuid NOT NULL,  -- FK para pastagens.id
-  data_entrada  date NOT NULL,
-  data_saida    date,
-  motivo        text,
-  observacoes   text,
-  created_at    timestamptz DEFAULT now()
+  id                   uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  owner_user_id        uuid NOT NULL REFERENCES auth.users (id) ON DELETE CASCADE,
+  lote_id              bigint REFERENCES lotes (id) ON DELETE SET NULL,
+  faz_id               bigint REFERENCES fazendas (id) ON DELETE SET NULL,
+  pastagem_origem_id   uuid REFERENCES pastagens (id) ON DELETE SET NULL,
+  pastagem_destino_id  uuid REFERENCES pastagens (id) ON DELETE SET NULL,
+  data_movimentacao    date NOT NULL,
+  quantidade_cabecas   numeric,
+  motivo               text,
+  observacoes          text,
+  metadata             jsonb NOT NULL DEFAULT '{}'::jsonb,
+  created_at           timestamptz NOT NULL DEFAULT now(),
+  updated_at           timestamptz NOT NULL DEFAULT now()
 );
 ```
 
-**Quando implementar**: quando houver necessidade de rastrear rotação de pastos, descanso de pastagens ou planejamento de rotação. Não faz parte da Sprint 18.
+A movimentação em si — gravar o histórico e atualizar `lotes.pastagem_id` em
+uma única transação — é feita pela função `mover_lote_para_pasto`. Detalhes
+completos de validações, RLS e da interface em
+[MOVIMENTACAO_PASTOS_HERDON.md](MOVIMENTACAO_PASTOS_HERDON.md).
+
+### Pendências que continuam abertas
+
+- Rotação automática de pastos.
+- Ocupação/alerta de superlotação por pasto individual (hoje `PastagensPage`
+  só agrega UA no nível da fazenda).
+- Tempo médio de permanência por pasto.
+- Integração com mapa da fazenda.

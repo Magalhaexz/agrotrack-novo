@@ -1,6 +1,7 @@
 ﻿export const LOTE_TABS = [
   { id: 'visao_geral', label: 'Visão geral' },
   { id: 'animais', label: 'Animais' },
+  { id: 'pastagem', label: 'Pasto' },
   { id: 'pesagens', label: 'Pesagens' },
   { id: 'retiradas', label: 'Retiradas' },
   { id: 'nutricao', label: 'Nutrição' },
