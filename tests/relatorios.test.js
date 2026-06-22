@@ -98,7 +98,7 @@ test('buildRelatorioPastagens resume ocupação com lotes', () => {
 
   assert.equal(relatorio.totalPastos, 1);
   assert.equal(relatorio.pastosComLote, 1);
-  assert.equal(relatorio.ocupacaoPorPasto[0].cabecas, 5);
+  assert.equal(relatorio.ocupacaoPorPasto[0].cabecasEstimadas, 5);
 });
 
 test('buildRelatorioPastagens não quebra sem lotes vinculados', () => {
@@ -109,6 +109,31 @@ test('buildRelatorioPastagens não quebra sem lotes vinculados', () => {
 
   assert.equal(relatorio.pastosSemLote, 1);
   assert.equal(relatorio.lotesSemPasto, 1);
+  assert.deepEqual(relatorio.lotesSemPastoDetalhe.map((l) => l.id), [10]);
+  assert.equal(relatorio.ocupacaoPorPasto[0].status, 'vazio');
+});
+
+test('buildRelatorioPastagens expõe status acima_capacidade e percentual de ocupação', () => {
+  const db = makeBaseDb();
+  db.pastagens = [{ id: 1, fazenda_id: 1, nome: 'Pasto 1', area_ha: 10, capacidade_suporte_ua_ha: 1 }];
+  db.lotes[0].pastagem_id = 1;
+  db.lotes[0].qtd = 50;
+  db.animais = [{ id: 100, lote_id: 10, qtd: 50, p_at: 450 }];
+  const relatorio = buildRelatorioPastagens(db, {});
+
+  const [pasto] = relatorio.ocupacaoPorPasto;
+  assert.equal(pasto.status, 'acima_capacidade');
+  assert.equal(pasto.percentualOcupacao, 5);
+  assert.deepEqual(relatorio.pastosAcimaCapacidade.map((p) => p.id), [1]);
+});
+
+test('buildRelatorioPastagens classifica pasto sem área/capacidade como sem_dados', () => {
+  const db = makeBaseDb();
+  db.pastagens = [{ id: 1, fazenda_id: 1, nome: 'Pasto 1' }];
+  db.lotes[0].pastagem_id = 1;
+  const relatorio = buildRelatorioPastagens(db, {});
+
+  assert.equal(relatorio.ocupacaoPorPasto[0].status, 'sem_dados');
 });
 
 test('buildResumoGeralFazenda retorna totais finitos e listas válidas', () => {

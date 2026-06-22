@@ -1,6 +1,9 @@
 import { toNumber, toDateKey, daysBetween } from './calcHelpers.js';
 import { getResumoLote } from './resumoLote.js';
 import { isMovimentacaoCancelada, isMovimentacaoPaga, getDataVencimento } from './financeiroStatus.js';
+import { calcularOcupacaoPastos, listarLotesSemPasto } from './ocupacaoPastos.js';
+
+export { listarLotesSemPasto };
 
 const PESAGEM_LIMITE_DIAS = 30;
 const FINANCEIRO_PROXIMO_DIAS = 3;
@@ -32,10 +35,6 @@ export function listarLotesComGmdAbaixoDaMeta(db = {}) {
   });
 }
 
-export function listarLotesSemPasto(db = {}) {
-  return lotesAtivosDe(db).filter((lote) => !lote.pastagem_id);
-}
-
 export function listarContasFinanceiras(db = {}, diasProximo = FINANCEIRO_PROXIMO_DIAS) {
   const movimentos = Array.isArray(db?.movimentacoes_financeiras) ? db.movimentacoes_financeiras : [];
   const hoje = hojeIso();
@@ -64,10 +63,11 @@ export function listarEstoqueBaixo(db = {}) {
 }
 
 /**
- * Resumo de ocupação de pastos. Não calcula UA por animal — usa a contagem de
- * cabeças (lote.qtd) como indício simples de excesso, comparada com a
- * capacidade do pasto em UA (area_ha * capacidade_suporte_ua_ha). É uma
- * aproximação deliberada, não uma conversão correta de cabeças para UA.
+ * Resumo de ocupação de pastos. A lotação (`ocupacao`, `pastosEmAtencao`,
+ * `pastosAcimaCapacidade`) vem de `calcularOcupacaoPastos()` (Sprint 25),
+ * que compara UA estimada (peso vivo ÷ 450) com a capacidade do próprio
+ * pasto em UA — mesma unidade nos dois lados, sem cálculo zootécnico avançado.
+ * `pastosComIndicioDeExcesso` é mantido por compatibilidade com telas antigas.
  */
 export function construirResumoPastos(db = {}) {
   const pastagens = Array.isArray(db?.pastagens) ? db.pastagens : [];
@@ -87,12 +87,21 @@ export function construirResumoPastos(db = {}) {
     return cabecasNoPasto > capacidadeUa;
   });
 
+  const ocupacao = calcularOcupacaoPastos(db);
+  const pastosEmAtencao = ocupacao.filter((p) => p.status === 'atencao');
+  const pastosAcimaCapacidade = ocupacao.filter((p) => p.status === 'acima_capacidade');
+  const pastosSemDadosLotacao = ocupacao.filter((p) => p.status === 'sem_dados');
+
   return {
     totalPastos: pastagens.length,
     pastosComLote: pastosComLote.length,
     pastosSemLote: pastosSemLote.length,
     lotesSemPasto: lotesSemPasto.length,
     pastosComIndicioDeExcesso,
+    ocupacao,
+    pastosEmAtencao,
+    pastosAcimaCapacidade,
+    pastosSemDadosLotacao,
   };
 }
 
@@ -114,12 +123,23 @@ export function construirHojeNaFazenda(db = {}, { alerts = [] } = {}) {
   const { vencidas, proximas } = listarContasFinanceiras(db);
   const estoqueBaixo = listarEstoqueBaixo(db);
 
+  const resumoPastos = construirResumoPastos(db);
+  const { pastosEmAtencao, pastosAcimaCapacidade } = resumoPastos;
+
   const alertasCriticosTotal = (Array.isArray(alerts) ? alerts : []).filter((a) => a?.nivel === 'critical');
-  const tiposJaCobertos = new Set(['pesagem', 'financeiro', 'estoque']);
+  const tiposJaCobertos = new Set(['pesagem', 'financeiro', 'estoque', 'pasto']);
   const alertasCriticosOutros = alertasCriticosTotal.filter((a) => !tiposJaCobertos.has(a?.tipo));
 
   const prioridades = [];
 
+  if (pastosAcimaCapacidade.length > 0) {
+    prioridades.push({
+      id: 'pastos-acima-capacidade',
+      tom: 'critico',
+      texto: `${pastosAcimaCapacidade.length} ${pluralizar(pastosAcimaCapacidade.length, 'pasto está', 'pastos estão')} acima da capacidade`,
+      rota: 'pastagens',
+    });
+  }
   if (vencidas.length > 0) {
     prioridades.push({
       id: 'contas-vencidas',
@@ -150,6 +170,14 @@ export function construirHojeNaFazenda(db = {}, { alerts = [] } = {}) {
       tom: 'atencao',
       texto: `${lotesSemPasto.length} ${pluralizar(lotesSemPasto.length, 'lote está', 'lotes estão')} sem pasto definido`,
       rota: 'lotes',
+    });
+  }
+  if (pastosEmAtencao.length > 0) {
+    prioridades.push({
+      id: 'pastos-em-atencao',
+      tom: 'atencao',
+      texto: `${pastosEmAtencao.length} ${pluralizar(pastosEmAtencao.length, 'pasto precisa', 'pastos precisam')} de atenção na lotação`,
+      rota: 'pastagens',
     });
   }
   if (lotesGmdBaixo.length > 0) {
@@ -188,6 +216,6 @@ export function construirHojeNaFazenda(db = {}, { alerts = [] } = {}) {
       estoqueBaixo,
       alertasCriticosTotal,
     },
-    pastos: construirResumoPastos(db),
+    pastos: resumoPastos,
   };
 }

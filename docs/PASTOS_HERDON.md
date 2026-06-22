@@ -166,7 +166,13 @@ completos de validações, RLS e da interface em
 ### Pendências que continuam abertas
 
 - Rotação automática de pastos.
-- Ocupação/alerta de superlotação por pasto individual (hoje `PastagensPage`
-  só agrega UA no nível da fazenda).
 - Tempo médio de permanência por pasto.
 - Integração com mapa da fazenda.
+
+---
+
+## Ocupação e alertas de lotação por pasto (Sprint 25)
+
+A pendência "ocupação/alerta de superlotação por pasto individual" foi resolvida nesta sprint. Detalhes completos em [OCUPACAO_PASTOS_HERDON.md](OCUPACAO_PASTOS_HERDON.md).
+
+Resumo: `src/domain/ocupacaoPastos.js` calcula, por pasto, cabeças estimadas, peso estimado e status de lotação (vazio / sem dados suficientes / ok / atenção / acima da capacidade), comparando UA estimada (peso vivo ÷ 450) com a capacidade do próprio pasto em UA. Aparece em `PastagensPage`, no Dashboard ("Hoje na Fazenda"), em `buildAlerts()` e no Relatório de Pastos.

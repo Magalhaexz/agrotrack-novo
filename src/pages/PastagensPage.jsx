@@ -17,6 +17,7 @@ import {
   calcularDiagnosticoCapacidade,
   calcularUaPorLote,
 } from '../domain/unidadeAnimal';
+import { calcularOcupacaoPastos } from '../domain/ocupacaoPastos';
 
 function toNumber(value) {
   const parsed = Number(String(value ?? '').replace(',', '.'));
@@ -57,6 +58,18 @@ function getCapacityPresentation(indicadores) {
     rowClass: 'summary-row summary-row--success',
     helper: 'A capacidade instalada atende a demanda atual da fazenda.',
   };
+}
+
+const LOTACAO_BADGE_CLASS = {
+  vazio: 'summary-badge',
+  sem_dados: 'summary-badge',
+  ok: 'summary-badge summary-badge--success',
+  atencao: 'summary-badge summary-badge--warning',
+  acima_capacidade: 'summary-badge summary-badge--danger',
+};
+
+function getLotacaoBadgeClass(status) {
+  return LOTACAO_BADGE_CLASS[status] || LOTACAO_BADGE_CLASS.sem_dados;
 }
 
 export default function PastagensPage({ db, setDb, session, onConfirmAction }) {
@@ -112,6 +125,12 @@ export default function PastagensPage({ db, setDb, session, onConfirmAction }) {
     ),
     [db]
   );
+
+  const ocupacaoPorPastoMap = useMemo(() => {
+    const mapa = new Map();
+    calcularOcupacaoPastos(db).forEach((item) => mapa.set(String(item.id), item));
+    return mapa;
+  }, [db]);
 
   const capacityPresentation = getCapacityPresentation(indicadores);
 
@@ -411,12 +430,14 @@ export default function PastagensPage({ db, setDb, session, onConfirmAction }) {
                   <th>Suporte (UA/ha)</th>
                   <th>Capacidade (UA)</th>
                   <th>Status</th>
+                  <th>Lotação</th>
                   <th>Ações</th>
                 </tr>
               </thead>
               <tbody>
                 {pastagens.map((item) => {
                   const statusAtivo = String(item.status || 'ativo').toLowerCase() !== 'inativo';
+                  const ocupacao = ocupacaoPorPastoMap.get(String(item.id));
 
                   return (
                     <tr key={item.id}>
@@ -429,6 +450,22 @@ export default function PastagensPage({ db, setDb, session, onConfirmAction }) {
                         <span className={`summary-badge ${statusAtivo ? 'summary-badge--success' : 'summary-badge--warning'}`}>
                           {statusAtivo ? 'Ativo' : 'Inativo'}
                         </span>
+                      </td>
+                      <td>
+                        {ocupacao ? (
+                          <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+                            <span>
+                              {ocupacao.quantidadeLotes} {ocupacao.quantidadeLotes === 1 ? 'lote ativo' : 'lotes ativos'} · {formatNumber(ocupacao.cabecasEstimadas, 0)} cabeças estimadas
+                            </span>
+                            <span className={getLotacaoBadgeClass(ocupacao.status)}>{ocupacao.statusLabel}</span>
+                            {ocupacao.status === 'acima_capacidade' ? (
+                              <small style={{ color: 'var(--color-danger)' }}>Lotação acima da capacidade informada</small>
+                            ) : null}
+                            {ocupacao.status === 'sem_dados' ? (
+                              <small style={{ color: 'var(--color-text-secondary)' }}>Informe área e capacidade para acompanhar a lotação.</small>
+                            ) : null}
+                          </div>
+                        ) : '—'}
                       </td>
                       <td>
                         <div className="row-actions action-row">

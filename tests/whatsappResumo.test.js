@@ -56,6 +56,19 @@ test('gerarResumoPastagensTexto trata ausência de pastos (estado vazio)', () =>
   assert.match(texto, /Cadastre os pastos/);
 });
 
+test('gerarResumoPastagensTexto inclui pastos acima da capacidade e em atenção', () => {
+  const texto = gerarResumoPastagensTexto({
+    totalPastos: 3,
+    pastosComLote: 2,
+    pastosSemLote: 1,
+    lotesSemPasto: 1,
+    pastosAcimaCapacidade: [{ id: 1, nome: 'Pasto 1' }],
+    pastosEmAtencao: [{ id: 2, nome: 'Pasto 2' }],
+  });
+  assert.match(texto, /Pastos acima da capacidade: 1/);
+  assert.match(texto, /Pastos em atenção: 1/);
+});
+
 test('gerarResumoGeralTexto não quebra com dados nulos', () => {
   const texto = gerarResumoGeralTexto(null);
   assert.match(texto, /Sem dados suficientes/);

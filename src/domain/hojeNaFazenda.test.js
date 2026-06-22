@@ -208,3 +208,47 @@ test('construirResumoPastos não aponta excesso quando capacidade não está cad
   const resumo = construirResumoPastos(db);
   assert.deepEqual(resumo.pastosComIndicioDeExcesso, []);
 });
+
+// ─── ocupação de pastos (Sprint 25) ─────────────────────────────────────────
+
+test('construirResumoPastos expõe pastosEmAtencao e pastosAcimaCapacidade via calcularOcupacaoPastos', () => {
+  const db = {
+    pastagens: [{ id: 'p1', faz_id: 1, nome: 'Pasto 1', area_ha: 10, capacidade_suporte_ua_ha: 1 }],
+    lotes: [{ id: 1, status: 'ativo', pastagem_id: 'p1', qtd: 50 }],
+    animais: [{ id: 100, lote_id: 1, qtd: 50, p_at: 450 }],
+  };
+  const resumo = construirResumoPastos(db);
+  assert.deepEqual(resumo.pastosAcimaCapacidade.map((p) => p.id), ['p1']);
+  assert.deepEqual(resumo.pastosEmAtencao, []);
+});
+
+test('construirHojeNaFazenda gera prioridade crítica para pasto acima da capacidade', () => {
+  const db = {
+    pastagens: [{ id: 'p1', faz_id: 1, nome: 'Pasto 1', area_ha: 10, capacidade_suporte_ua_ha: 1 }],
+    lotes: [{ id: 1, status: 'ativo', pastagem_id: 'p1', qtd: 50 }],
+    animais: [{ id: 100, lote_id: 1, qtd: 50, p_at: 450 }],
+  };
+  const resultado = construirHojeNaFazenda(db, { alerts: [] });
+  const item = resultado.prioridades.find((p) => p.id === 'pastos-acima-capacidade');
+  assert.ok(item);
+  assert.equal(item.tom, 'critico');
+  assert.equal(item.texto, '1 pasto está acima da capacidade');
+});
+
+test('construirHojeNaFazenda gera prioridade de atenção para pasto em 80-100% da capacidade', () => {
+  const db = {
+    pastagens: [{ id: 'p1', faz_id: 1, nome: 'Pasto 1', area_ha: 10, capacidade_suporte_ua_ha: 1 }],
+    lotes: [{ id: 1, status: 'ativo', pastagem_id: 'p1', qtd: 10 }],
+    animais: [{ id: 100, lote_id: 1, qtd: 10, p_at: 405 }],
+  };
+  const resultado = construirHojeNaFazenda(db, { alerts: [] });
+  const item = resultado.prioridades.find((p) => p.id === 'pastos-em-atencao');
+  assert.ok(item);
+  assert.equal(item.tom, 'atencao');
+});
+
+test('construirHojeNaFazenda não quebra com pastagens/lotes/animais nulos', () => {
+  const resultado = construirHojeNaFazenda({ pastagens: null, lotes: null, animais: null }, { alerts: [] });
+  assert.deepEqual(resultado.prioridades, []);
+  assert.equal(resultado.pastos.totalPastos, 0);
+});

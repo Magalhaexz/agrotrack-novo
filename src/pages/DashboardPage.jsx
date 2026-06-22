@@ -477,11 +477,19 @@ export default function DashboardPage({
                 <div className="dashboard-list-copy"><strong>Lotes sem pasto definido</strong><p>{formatNumber(hojeNaFazenda.pastos.lotesSemPasto, 0)}</p></div>
               </div>
             </div>
-            {hojeNaFazenda.pastos.pastosComIndicioDeExcesso.length > 0 ? (
+            {hojeNaFazenda.pastos.pastosAcimaCapacidade.length > 0 ? (
               <div className="empty-state" style={{ marginTop: 12 }}>
                 <p>
-                  Indício de excesso de cabeças n{hojeNaFazenda.pastos.pastosComIndicioDeExcesso.length === 1 ? 'o pasto' : 'os pastos'}:{' '}
-                  {hojeNaFazenda.pastos.pastosComIndicioDeExcesso.map((pasto) => pasto.nome).join(', ')}. Confira a capacidade cadastrada.
+                  Lotação acima da capacidade informada n{hojeNaFazenda.pastos.pastosAcimaCapacidade.length === 1 ? 'o pasto' : 'os pastos'}:{' '}
+                  {hojeNaFazenda.pastos.pastosAcimaCapacidade.map((pasto) => pasto.nome).join(', ')}.
+                </p>
+              </div>
+            ) : null}
+            {hojeNaFazenda.pastos.pastosEmAtencao.length > 0 ? (
+              <div className="empty-state" style={{ marginTop: 12 }}>
+                <p>
+                  Em atenção n{hojeNaFazenda.pastos.pastosEmAtencao.length === 1 ? 'o pasto' : 'os pastos'}:{' '}
+                  {hojeNaFazenda.pastos.pastosEmAtencao.map((pasto) => pasto.nome).join(', ')}.
                 </p>
               </div>
             ) : null}

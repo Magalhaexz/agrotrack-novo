@@ -237,4 +237,59 @@ describe('buildAlerts', () => {
       assert.ok(a.pagina, `Alerta deve ter pagina`);
     }
   });
+
+  // --- Ocupação de Pastos (Sprint 25) ---
+
+  it('gera alerta crítico para pasto acima da capacidade', () => {
+    const db = {
+      pastagens: [{ id: 1, nome: 'Pasto 1', area_ha: 10, capacidade_suporte_ua_ha: 1 }],
+      lotes: [{ id: 10, status: 'ativo', pastagem_id: 1, qtd: 50 }],
+      animais: [{ id: 100, lote_id: 10, qtd: 50, p_at: 450 }],
+    };
+    const alerts = buildAlerts(db).filter((a) => a.tipo === 'pasto');
+    const alerta = alerts.find((a) => a.id === 'pasto-acima-capacidade-1');
+    assert.ok(alerta);
+    assert.equal(alerta.nivel, 'critical');
+    assert.ok(alerta.mensagem.includes('Pasto 1'));
+  });
+
+  it('gera alerta de aviso para pasto em atenção (80% a 100% da capacidade)', () => {
+    const db = {
+      pastagens: [{ id: 1, nome: 'Pasto 1', area_ha: 10, capacidade_suporte_ua_ha: 1 }],
+      lotes: [{ id: 10, status: 'ativo', pastagem_id: 1, qtd: 10 }],
+      animais: [{ id: 100, lote_id: 10, qtd: 10, p_at: 405 }],
+    };
+    const alerta = buildAlerts(db).find((a) => a.id === 'pasto-atencao-1');
+    assert.ok(alerta);
+    assert.equal(alerta.nivel, 'warning');
+  });
+
+  it('gera alerta informativo para pasto com lote mas sem área/capacidade', () => {
+    const db = {
+      pastagens: [{ id: 1, nome: 'Pasto 1' }],
+      lotes: [{ id: 10, status: 'ativo', pastagem_id: 1, qtd: 10 }],
+    };
+    const alerta = buildAlerts(db).find((a) => a.id === 'pasto-sem-dados-1');
+    assert.ok(alerta);
+    assert.equal(alerta.nivel, 'info');
+  });
+
+  it('não gera alerta de pasto para pasto vazio (sem lote ativo)', () => {
+    const db = {
+      pastagens: [{ id: 1, nome: 'Pasto 1' }],
+      lotes: [],
+    };
+    const alertasPasto = buildAlerts(db).filter((a) => a.tipo === 'pasto');
+    assert.deepEqual(alertasPasto, []);
+  });
+
+  it('gera alerta de aviso para lote ativo sem pasto definido', () => {
+    const db = {
+      lotes: [{ id: 10, nome: 'Lote A', status: 'ativo', pastagem_id: null }],
+    };
+    const alerta = buildAlerts(db).find((a) => a.id === 'lote-sem-pasto-10');
+    assert.ok(alerta);
+    assert.equal(alerta.nivel, 'warning');
+    assert.ok(alerta.mensagem.includes('Lote A'));
+  });
 });

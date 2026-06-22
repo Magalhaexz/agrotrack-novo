@@ -61,13 +61,16 @@ export default function RelatorioPastagensPage({ db }) {
             </p>
           </Card>
 
-          <Card title="Excesso de cabeças (estimativa)">
-            {!relatorio.pastosComIndicioDeExcesso?.length ? (
-              <EmptyState compact title="Nenhum pasto com indício de excesso." />
+          <Card title="Pastos que precisam de atenção">
+            {!relatorio.pastosEmAtencao?.length && !relatorio.pastosAcimaCapacidade?.length ? (
+              <EmptyState compact title="Nenhum pasto em atenção ou acima da capacidade." />
             ) : (
               <div className="summary-list">
-                {relatorio.pastosComIndicioDeExcesso.map((p) => (
-                  <Row key={p.id} label={p.nome} value="Acima da capacidade estimada" />
+                {relatorio.pastosAcimaCapacidade.map((p) => (
+                  <Row key={p.id} label={p.nome} value="Acima da capacidade" />
+                ))}
+                {relatorio.pastosEmAtencao.map((p) => (
+                  <Row key={p.id} label={p.nome} value="Atenção" />
                 ))}
               </div>
             )}
@@ -75,21 +78,49 @@ export default function RelatorioPastagensPage({ db }) {
         </div>
 
         <Card title="Ocupação por pasto">
+          <p className="empty-state-description" style={{ marginBottom: 12 }}>
+            Estimativa operacional baseada na capacidade informada do pasto. Não substitui cálculo técnico de lotação por UA.
+          </p>
           <div className="table-responsive">
             <table className="data-table">
-              <thead><tr><th>Pasto</th><th>Área (ha)</th><th>Cabeças</th><th>Lotes</th></tr></thead>
+              <thead>
+                <tr>
+                  <th>Pasto</th>
+                  <th>Área (ha)</th>
+                  <th>Lotes ativos</th>
+                  <th>Cabeças estimadas</th>
+                  <th>Peso médio estimado</th>
+                  <th>Ocupação</th>
+                  <th>Status</th>
+                </tr>
+              </thead>
               <tbody>
                 {relatorio.ocupacaoPorPasto.map((p) => (
                   <tr key={p.id}>
                     <td>{p.nome}</td>
                     <td>{p.areaHa != null ? formatNumber(p.areaHa, 1) : '—'}</td>
-                    <td>{formatNumber(p.cabecas, 0)}</td>
-                    <td>{p.lotesNoPasto.length ? p.lotesNoPasto.join(', ') : 'Sem lote'}</td>
+                    <td>{p.lotesAtivos.length ? p.lotesAtivos.map((l) => l.nome).join(', ') : 'Sem lote'}</td>
+                    <td>{formatNumber(p.cabecasEstimadas, 0)}</td>
+                    <td>{p.pesoMedioEstimado ? `${formatNumber(p.pesoMedioEstimado, 1)} kg` : '—'}</td>
+                    <td>{p.percentualOcupacao != null ? `${formatNumber(p.percentualOcupacao * 100, 0)}%` : '—'}</td>
+                    <td>{p.statusLabel}</td>
                   </tr>
                 ))}
               </tbody>
             </table>
           </div>
+        </Card>
+
+        <Card title="Lotes sem pasto definido">
+          {!relatorio.lotesSemPastoDetalhe?.length ? (
+            <EmptyState compact title="Todos os lotes ativos têm pasto definido." />
+          ) : (
+            <div className="summary-list">
+              {relatorio.lotesSemPastoDetalhe.map((l) => (
+                <Row key={l.id} label={l.nome || `Lote ${l.id}`} value="Sem pasto" />
+              ))}
+            </div>
+          )}
         </Card>
       </div>
     </div>

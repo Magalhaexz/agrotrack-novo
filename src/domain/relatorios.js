@@ -2,6 +2,7 @@ import { toDateKey, toNumber } from './calcHelpers.js';
 import { getResumoLote } from './resumoLote.js';
 import { calcularFluxoCaixa } from './fluxoCaixa.js';
 import { construirResumoPastos, listarContasFinanceiras, construirHojeNaFazenda } from './hojeNaFazenda.js';
+import { calcularOcupacaoPastos, listarLotesSemPasto } from './ocupacaoPastos.js';
 import { buildAlerts } from '../utils/alerts.js';
 
 function arr(value) {
@@ -178,38 +179,29 @@ export function buildRelatorioFinanceiro(db, { fazendaId, loteId, dataInicio, da
 
 /**
  * Relatório de ocupação de pastos, opcionalmente filtrado por fazenda.
- * Reaproveita construirResumoPastos() (estimativa simples por cabeças, sem cálculo de UA real).
+ * `ocupacaoPorPasto` vem de calcularOcupacaoPastos() (Sprint 25): cabeças
+ * estimadas, peso estimado e status de lotação (vazio / sem dados / ok /
+ * atenção / acima da capacidade), comparando UA estimada (peso ÷ 450) com a
+ * capacidade do próprio pasto em UA — estimativa operacional, não um cálculo
+ * técnico de lotação.
  */
 export function buildRelatorioPastagens(db, { fazendaId } = {}) {
-  const pastagens = fazendaId
-    ? arr(db?.pastagens).filter((p) => toNumber(p.fazenda_id) === toNumber(fazendaId))
-    : arr(db?.pastagens);
-  const lotes = fazendaId
-    ? arr(db?.lotes).filter((l) => toNumber(l.fazenda_id ?? l.faz_id) === toNumber(fazendaId))
-    : arr(db?.lotes);
+  const dbFiltrado = fazendaId
+    ? {
+      ...db,
+      pastagens: arr(db?.pastagens).filter((p) => toNumber(p.fazenda_id ?? p.faz_id) === toNumber(fazendaId)),
+      lotes: arr(db?.lotes).filter((l) => toNumber(l.fazenda_id ?? l.faz_id) === toNumber(fazendaId)),
+    }
+    : db;
 
-  const dbFiltrado = { ...db, pastagens, lotes };
   const resumo = construirResumoPastos(dbFiltrado);
-  const lotesAtivos = lotes.filter((l) => l.status === 'ativo');
-
-  const ocupacaoPorPasto = pastagens.map((pasto) => {
-    const lotesNoPasto = lotesAtivos.filter((l) => String(l.pastagem_id) === String(pasto.id));
-    const cabecas = lotesNoPasto.reduce((soma, l) => soma + toNumber(l.qtd), 0);
-    const capacidadeUa = toNumber(pasto.area_ha) * toNumber(pasto.capacidade_suporte_ua_ha) || null;
-    return {
-      id: pasto.id,
-      nome: pasto.nome,
-      areaHa: toNumber(pasto.area_ha) || null,
-      cabecas,
-      capacidadeUa,
-      lotesNoPasto: lotesNoPasto.map((l) => l.nome),
-      indicioDeExcesso: Boolean(capacidadeUa && cabecas > capacidadeUa),
-    };
-  });
+  const ocupacaoPorPasto = calcularOcupacaoPastos(db, { fazendaId });
+  const lotesSemPasto = listarLotesSemPasto(dbFiltrado);
 
   return {
     ...resumo,
     ocupacaoPorPasto,
+    lotesSemPastoDetalhe: lotesSemPasto,
   };
 }
 

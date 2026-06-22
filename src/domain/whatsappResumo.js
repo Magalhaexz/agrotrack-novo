@@ -75,6 +75,8 @@ export function gerarResumoPastagensTexto(relatorio) {
     linha('Total de pastos', formatNumber(relatorio.totalPastos, 0)),
     linha('Pastos com lote', formatNumber(relatorio.pastosComLote, 0)),
     linha('Pastos vazios', formatNumber(relatorio.pastosSemLote, 0)),
+    linha('Pastos acima da capacidade', formatNumber(relatorio.pastosAcimaCapacidade?.length || 0, 0)),
+    linha('Pastos em atenção', formatNumber(relatorio.pastosEmAtencao?.length || 0, 0)),
     linha('Lotes sem pasto', formatNumber(relatorio.lotesSemPasto, 0)),
   ].join('\n');
 }

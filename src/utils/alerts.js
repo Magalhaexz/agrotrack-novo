@@ -1,5 +1,6 @@
 import { daysBetween, toDateKey, toNumber } from '../domain/calcHelpers.js';
 import { normalizarStatusMovimentacao, getDataVencimento } from '../domain/financeiroStatus.js';
+import { calcularOcupacaoPastos, listarLotesSemPasto } from '../domain/ocupacaoPastos.js';
 
 const NIVEL_ORDEM = {
   critical: 0,
@@ -429,6 +430,67 @@ export function buildAlerts(db = {}) {
         data_sort: dataVencDate.getTime(),
       });
     }
+  });
+
+  // --- Alertas de Ocupação de Pastos (Sprint 25) ---
+  const ocupacaoPastos = calcularOcupacaoPastos(db);
+
+  ocupacaoPastos.forEach((pasto) => {
+    if (pasto.status === 'acima_capacidade') {
+      const chave = `pasto-acima-capacidade-${pasto.id}`;
+      alerts.push({
+        id: chave,
+        ackKey: chave,
+        tipo: 'pasto',
+        tipoLabel: 'Pasto',
+        nivel: 'critical',
+        titulo: 'Pasto acima da capacidade',
+        mensagem: `${pasto.nome} está com lotação acima da capacidade informada (${formatarNumeroSimples(pasto.percentualOcupacao * 100)}% da capacidade estimada).`,
+        pagina: 'pastagens',
+        data_sort: Number.MIN_SAFE_INTEGER + toNumber(pasto.id),
+      });
+    } else if (pasto.status === 'atencao') {
+      const chave = `pasto-atencao-${pasto.id}`;
+      alerts.push({
+        id: chave,
+        ackKey: chave,
+        tipo: 'pasto',
+        tipoLabel: 'Pasto',
+        nivel: 'warning',
+        titulo: 'Pasto em atenção na lotação',
+        mensagem: `${pasto.nome} está perto da capacidade informada (${formatarNumeroSimples(pasto.percentualOcupacao * 100)}% da capacidade estimada).`,
+        pagina: 'pastagens',
+        data_sort: Number.MIN_SAFE_INTEGER + 1000 + toNumber(pasto.id),
+      });
+    } else if (pasto.status === 'sem_dados') {
+      const chave = `pasto-sem-dados-${pasto.id}`;
+      alerts.push({
+        id: chave,
+        ackKey: chave,
+        tipo: 'pasto',
+        tipoLabel: 'Pasto',
+        nivel: 'info',
+        titulo: 'Pasto sem área ou capacidade informada',
+        mensagem: `${pasto.nome} tem lote vinculado, mas falta área e/ou capacidade para acompanhar a lotação.`,
+        pagina: 'pastagens',
+        data_sort: Number.MAX_SAFE_INTEGER - toNumber(pasto.id),
+      });
+    }
+  });
+
+  listarLotesSemPasto(db).forEach((lote) => {
+    const chave = `lote-sem-pasto-${lote.id}`;
+    alerts.push({
+      id: chave,
+      ackKey: chave,
+      tipo: 'pasto',
+      tipoLabel: 'Pasto',
+      nivel: 'warning',
+      titulo: 'Lote sem pasto definido',
+      mensagem: `${lote.nome || `Lote ${lote.id}`} está ativo, mas não tem pasto vinculado.`,
+      pagina: 'lotes',
+      data_sort: Number.MIN_SAFE_INTEGER + 2000 + toNumber(lote.id),
+    });
   });
 
   return alerts
