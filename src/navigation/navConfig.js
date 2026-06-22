@@ -63,7 +63,7 @@ export const navSections = [
       { id: 'resultados', label: 'Resultado dos Lotes', icon: BarChart3 },
       { id: 'cenarios', label: 'Simulador de Decisão', icon: Calculator },
       { id: 'indicadores', label: 'Indicadores', icon: Activity },
-      { id: 'relatoriosGerenciais', label: 'Relatórios Gerenciais', icon: FileBarChart },
+      { id: 'relatoriosGerenciais', label: 'Painel Gerencial', icon: FileBarChart },
     ],
   },
   {

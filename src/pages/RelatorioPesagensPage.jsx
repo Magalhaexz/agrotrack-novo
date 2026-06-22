@@ -1,5 +1,6 @@
 import { useMemo, useRef, useState } from 'react';
 import Card from '../components/ui/Card';
+import Button from '../components/ui/Button';
 import PageHeader from '../components/PageHeader';
 import EmptyState from '../components/EmptyState';
 import AcoesRelatorio from '../components/relatorios/AcoesRelatorio';
@@ -7,7 +8,7 @@ import { buildRelatorioPesagens } from '../domain/relatorios';
 import { gerarResumoPesagensTexto } from '../domain/whatsappResumo';
 import { formatDate, formatNumber } from '../utils/calculations';
 
-export default function RelatorioPesagensPage({ db }) {
+export default function RelatorioPesagensPage({ db, onNavigate }) {
   const fazendas = Array.isArray(db?.fazendas) ? db.fazendas : [];
   const lotes = Array.isArray(db?.lotes) ? db.lotes : [];
   const [fazendaId, setFazendaId] = useState('');
@@ -57,7 +58,11 @@ export default function RelatorioPesagensPage({ db }) {
       <div ref={containerRef}>
         <Card title="Pesagens no período">
           {!linhas.length ? (
-            <EmptyState title="Ainda não há pesagens para este lote." />
+            <EmptyState
+              title="Ainda não há pesagens para este período."
+              subtitle="Registre a primeira pesagem para acompanhar a evolução de peso."
+              action={<Button size="sm" onClick={() => onNavigate?.('pesagens')}>Ir para Pesagens</Button>}
+            />
           ) : (
             <div className="table-responsive">
               <table className="data-table">

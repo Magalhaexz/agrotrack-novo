@@ -100,7 +100,7 @@ CSS: `.ui-table-wrap`, `.ui-table`
 | Cenários | Simulador de Decisão |
 | Baseline / Projeção | Comparar cenários |
 | Financeiro | Movimentações Financeiras |
-| Relatórios Gerenciais | Relatórios |
+| Relatórios Gerenciais (menu, até Sprint 26) | Painel Gerencial (Sprint 27 — para não confundir com o hub "Relatórios" da Sprint 24) |
 | Pastagem | Pasto (Sprint 22 — varrido em toda a interface; tabela `pastagens` no banco não mudou) |
 
 ---
@@ -139,6 +139,16 @@ Quando não há dados, o HERDON orienta o produtor com mensagens ativas:
 ### Mobile Bottom Nav
 Itens fixos no rodapé mobile: Início, Rebanho, Financeiro, Estoque, Mais
 
+### Nota (Sprint 27): breakpoints reais são inconsistentes
+
+A tabela acima é o padrão pretendido, mas `src/styles/app.css` na prática usa breakpoints próximos porém distintos entre regras escritas em sprints diferentes (480/560/640/720/760/900/1024/1100/1280px). Não foi consolidado nesta sprint — ver `docs/POLIMENTO_VISUAL_HERDON.md` para detalhes e o caso concreto de regras conflitantes em `.header-tabs`.
+
+---
+
+## Correção de layout (Sprint 27): `.action-row` sem `display: flex`
+
+A classe `.action-row` (barra de botões de ação, usada em formulários, modais e relatórios) tinha `gap`/`flex-wrap` definidos em CSS mas **sem `display: flex`** em nenhuma regra — ou seja, essas propriedades não tinham efeito, e os botões ficavam sem espaçamento consistente entre si. Corrigido em `src/styles/app.css` (regra `.page-actions, .reports-page-actions, .action-row`). Detalhes e verificação em `docs/POLIMENTO_VISUAL_HERDON.md`.
+
 ---
 
 ## Arquivos CSS
@@ -157,8 +167,9 @@ Itens fixos no rodapé mobile: Início, Rebanho, Financeiro, Estoque, Mais
 
 - [ ] Padronizar uso de `EmptyState` component em vez de `<div className="empty-state">` inline
 - [ ] Unificar KpiCard vs. kpi-card direto nas páginas
-- [ ] Limpar CSS acumulado de sprints anteriores em `app.css` (10k+ linhas)
+- [ ] Limpar CSS acumulado de sprints anteriores em `app.css` (9k+ linhas) — inclui consolidar breakpoints e resolver a duplicidade de `.header-tabs` (Sprint 27)
 - [ ] Adicionar skeleton loading coerente entre páginas
 - [ ] Revisar responsividade das tabelas em mobile (scroll horizontal)
 - [ ] Tela de Indicadores: empty state mais específico por métrica
 - [ ] Animações de transição entre abas (suave, sem exagero)
+- [ ] Verificação visual real (mobile/desktop) com conta autenticada — nenhuma sprint até a 27 conseguiu fazer isso (sem credenciais de teste)

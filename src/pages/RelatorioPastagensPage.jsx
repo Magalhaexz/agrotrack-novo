@@ -1,5 +1,6 @@
 import { useMemo, useRef, useState } from 'react';
 import Card from '../components/ui/Card';
+import Button from '../components/ui/Button';
 import PageHeader from '../components/PageHeader';
 import EmptyState from '../components/EmptyState';
 import AcoesRelatorio from '../components/relatorios/AcoesRelatorio';
@@ -7,7 +8,7 @@ import { buildRelatorioPastagens } from '../domain/relatorios';
 import { gerarResumoPastagensTexto } from '../domain/whatsappResumo';
 import { formatNumber } from '../utils/calculations';
 
-export default function RelatorioPastagensPage({ db }) {
+export default function RelatorioPastagensPage({ db, onNavigate }) {
   const fazendas = Array.isArray(db?.fazendas) ? db.fazendas : [];
   const [fazendaId, setFazendaId] = useState('');
   const containerRef = useRef(null);
@@ -21,7 +22,11 @@ export default function RelatorioPastagensPage({ db }) {
     return (
       <div className="page reports-page">
         <PageHeader title="Relatório de Pastos" />
-        <EmptyState title="Cadastre os pastos da fazenda para acompanhar a ocupação." />
+        <EmptyState
+          title="Cadastre os pastos da fazenda para acompanhar a ocupação."
+          subtitle="Com os pastos cadastrados, você vê onde cada lote está e recebe alertas de lotação."
+          action={<Button size="sm" onClick={() => onNavigate?.('pastagens')}>Ir para Pastos</Button>}
+        />
       </div>
     );
   }

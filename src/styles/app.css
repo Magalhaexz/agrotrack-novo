@@ -10091,6 +10091,9 @@ html, body, #root, .app, .main, .main-content, .page { max-width: 100%; }
 .page-actions,
 .reports-page-actions,
 .action-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
   gap: 10px;
 }
 

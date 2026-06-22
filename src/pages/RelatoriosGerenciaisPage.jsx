@@ -57,7 +57,7 @@ export default function RelatoriosGerenciaisPage({ db }) {
   return (
     <div className="page reports-page">
       <PageHeader
-        title="Relatórios"
+        title="Painel Gerencial"
         subtitle="Resumo executivo consolidado para leitura estratégica da operação."
       />
 

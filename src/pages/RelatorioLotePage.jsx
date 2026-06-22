@@ -1,5 +1,6 @@
 import { useMemo, useRef, useState } from 'react';
 import Card from '../components/ui/Card';
+import Button from '../components/ui/Button';
 import PageHeader from '../components/PageHeader';
 import EmptyState from '../components/EmptyState';
 import AcoesRelatorio from '../components/relatorios/AcoesRelatorio';
@@ -7,7 +8,7 @@ import { buildRelatorioLote } from '../domain/relatorios';
 import { gerarResumoLoteTexto } from '../domain/whatsappResumo';
 import { formatCurrency, formatDate, formatNumber } from '../utils/calculations';
 
-export default function RelatorioLotePage({ db }) {
+export default function RelatorioLotePage({ db, onNavigate }) {
   const lotes = Array.isArray(db?.lotes) ? db.lotes : [];
   const [loteId, setLoteId] = useState(lotes[0]?.id ?? '');
   const containerRef = useRef(null);
@@ -18,7 +19,11 @@ export default function RelatorioLotePage({ db }) {
     return (
       <div className="page reports-page">
         <PageHeader title="Relatório do Lote" />
-        <EmptyState title="Cadastre um lote para gerar este relatório." />
+        <EmptyState
+          title="Cadastre um lote para gerar este relatório."
+          subtitle="Cada lote representa um grupo de animais acompanhado em conjunto — peso, custo e resultado."
+          action={<Button size="sm" onClick={() => onNavigate?.('lotes')}>Ir para Lotes</Button>}
+        />
       </div>
     );
   }
@@ -105,7 +110,10 @@ export default function RelatorioLotePage({ db }) {
           </div>
         </>
       ) : (
-        <EmptyState title="Cadastre um lote para gerar este relatório." />
+        <EmptyState
+          title="Selecione um lote para ver o relatório."
+          subtitle="Escolha um lote no campo acima para ver peso, desempenho, custos e resultado."
+        />
       )}
     </div>
   );

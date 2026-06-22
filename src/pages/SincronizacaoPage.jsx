@@ -167,6 +167,7 @@ export default function SincronizacaoPage({ db, setDb, session }) {
         {status.itens.length === 0 ? (
           <div className="empty-state">
             <p>Nenhum registro salvo neste aparelho ainda.</p>
+            <span>Os registros aparecem aqui quando você usar o modo offline, mesmo sem internet.</span>
           </div>
         ) : (
           <div className="dashboard-list">

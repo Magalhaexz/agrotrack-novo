@@ -1,5 +1,6 @@
 import { useMemo, useRef, useState } from 'react';
 import Card from '../components/ui/Card';
+import Button from '../components/ui/Button';
 import PageHeader from '../components/PageHeader';
 import EmptyState from '../components/EmptyState';
 import AcoesRelatorio from '../components/relatorios/AcoesRelatorio';
@@ -7,7 +8,7 @@ import { buildRelatorioFinanceiro } from '../domain/relatorios';
 import { gerarResumoFinanceiroTexto } from '../domain/whatsappResumo';
 import { formatCurrency, formatDate } from '../utils/calculations';
 
-export default function RelatorioFinanceiroPage({ db }) {
+export default function RelatorioFinanceiroPage({ db, onNavigate }) {
   const fazendas = Array.isArray(db?.fazendas) ? db.fazendas : [];
   const lotes = Array.isArray(db?.lotes) ? db.lotes : [];
   const [fazendaId, setFazendaId] = useState('');
@@ -48,7 +49,11 @@ export default function RelatorioFinanceiroPage({ db }) {
       </Card>
 
       {semLancamentos ? (
-        <EmptyState title="Ainda não há lançamentos financeiros no período." />
+        <EmptyState
+          title="Ainda não há lançamentos financeiros no período."
+          subtitle="Lance custos e receitas para entender o resultado dos lotes."
+          action={<Button size="sm" onClick={() => onNavigate?.('financeiro')}>Ir para Financeiro</Button>}
+        />
       ) : (
         <>
           <AcoesRelatorio

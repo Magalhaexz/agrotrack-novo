@@ -473,6 +473,7 @@ export default function AnimaisPage({ db, setDb, onConfirmAction, subscription =
         {abaAtiva === 'grupos' && grupos.length === 0 ? (
           <div className="animais-empty-state empty-state">
             <strong>Nenhum grupo cadastrado.</strong>
+            <span>Cadastre um grupo de animais para acompanhar peso e quantidade em conjunto.</span>
             <Button size="sm" onClick={() => abrirNovoPorModo('grupo')}>Cadastrar grupo</Button>
           </div>
         ) : null}
@@ -480,6 +481,7 @@ export default function AnimaisPage({ db, setDb, onConfirmAction, subscription =
         {abaAtiva === 'individuais' && individuais.length === 0 ? (
           <div className="animais-empty-state empty-state">
             <strong>Nenhum animal individual cadastrado.</strong>
+            <span>Cadastre um animal individual quando precisar acompanhar peso e histórico separadamente.</span>
           </div>
         ) : null}
 

@@ -20,6 +20,19 @@
 > aberta: a mesma verificação visual real com conta autenticada, ainda não
 > feita (sem credenciais de teste disponíveis).
 
+> **Atualização (Sprint 27):** polimento visual e mobile geral. Corrigido um
+> bug real de layout (`.action-row` sem `display: flex`, afetando o
+> espaçamento de botões em toda a aplicação), desambiguado o menu
+> ("Painel Gerencial" vs. "Relatórios") e melhorados estados vazios em 6
+> telas. Auditoria de código não encontrou tabelas sem proteção responsiva,
+> modais sem proteção de altura/largura mobile, ou jargão técnico vazando
+> para a interface — pontos já endereçados em sprints anteriores. Ver
+> [SPRINT_27_RESULTADO.md](SPRINT_27_RESULTADO.md). Pendência aberta (a
+> mesma desde a Sprint 22): verificação visual real com conta autenticada,
+> ainda não feita por falta de credenciais de teste. Também ficou pendente
+> a consolidação dos breakpoints CSS e a duplicidade de regras
+> `.header-tabs` no cabeçalho mobile (ver `docs/POLIMENTO_VISUAL_HERDON.md`).
+
 ---
 
 ## Critérios de aprovação
