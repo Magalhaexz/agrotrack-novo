@@ -10,6 +10,16 @@
 > Pendência aberta: verificação visual real (mobile/desktop) do novo Painel
 > Geral com uma conta autenticada, ainda não feita.
 
+> **Atualização (Sprint 26):** o app agora tem orientação interna para o
+> criador: página "Guia do Criador" (menu Ajuda), checklist de primeiros
+> passos no Dashboard, ajuda contextual curta nas telas principais e a
+> página de Suporte foi adicionada ao menu (antes só era alcançável por um
+> banner). Reduz a dependência do `docs/GUIA_CRIADOR_PILOTO_HERDON.md`
+> (documento interno) para orientar o piloto — agora o próprio app explica o
+> básico. Ver [SPRINT_26_RESULTADO.md](SPRINT_26_RESULTADO.md). Pendência
+> aberta: a mesma verificação visual real com conta autenticada, ainda não
+> feita (sem credenciais de teste disponíveis).
+
 ---
 
 ## Critérios de aprovação

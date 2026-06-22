@@ -461,7 +461,7 @@ export default function ImportacaoPage({ db, setDb, session: sessionProp, onConf
       <div className="page-content">
         <PageHeader
           title="Importação Inicial de Dados e Pesagens"
-          subtitle="Cadastre fazendas, pastos, lotes, animais e pesagens a partir de uma planilha"
+          subtitle="Use o modelo oficial do HERDON para trazer fazendas, pastos, lotes, animais e pesagens de uma só vez."
         />
         <div style={{ maxWidth: 680, display: 'grid', gap: 24 }}>
           <StepBar passoAtual="template" />

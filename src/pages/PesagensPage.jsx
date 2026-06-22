@@ -829,7 +829,7 @@ export default function PesagensPage({ db, setDb, onConfirmAction, navigationInt
       <section className="animais-hero pesagens-hero">
         <div>
           <h1>Pesagens</h1>
-          <p>Registre e acompanhe pesagens de forma guiada.</p>
+          <p>Registre pesagens para acompanhar ganho de peso, desempenho e resultado.</p>
         </div>
         <button className="primary-btn" onClick={() => abrirNovaPesagem(modoPesagem)}>Nova pesagem</button>
       </section>
@@ -900,6 +900,7 @@ export default function PesagensPage({ db, setDb, onConfirmAction, navigationInt
             {dadosTabela.length === 0 ? (
               <div className="empty-box">
                 <strong>Nenhuma pesagem cadastrada.</strong>
+                <span>Registre a primeira pesagem para calcular evolução e desempenho.</span>
               </div>
             ) : (
               <table className="data-table herdon-table herdon-table--pesagens">

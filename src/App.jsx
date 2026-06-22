@@ -77,6 +77,7 @@ const RelatorioPesagensPage = lazy(() => import('./pages/RelatorioPesagensPage')
 const RelatorioFinanceiroPage = lazy(() => import('./pages/RelatorioFinanceiroPage'));
 const RelatorioPastagensPage = lazy(() => import('./pages/RelatorioPastagensPage'));
 const RelatorioResumoGeralPage = lazy(() => import('./pages/RelatorioResumoGeralPage'));
+const GuiaCriadorPage = lazy(() => import('./pages/GuiaCriadorPage'));
 const PlanejamentoPage = lazy(() => import('./pages/PlanejamentoPage'));
 const LoginPage = lazy(() => import('./pages/LoginPage'));
 const TermosPage = lazy(() => import('./pages/TermosPage'));
@@ -209,6 +210,7 @@ const pageMap = {
   relatorioFinanceiro: RelatorioFinanceiroPage,
   relatorioPastagens: RelatorioPastagensPage,
   relatorioResumoGeral: RelatorioResumoGeralPage,
+  guiaCriador: GuiaCriadorPage,
   planejamento: PlanejamentoPage,
   importacao: ImportacaoPage,
   sincronizacao: SincronizacaoPage,

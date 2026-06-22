@@ -254,7 +254,7 @@ export default function FinanceiroPage({ db, setDb }) {
       <div className="rebanho-header financeiro-header">
         <div>
           <h1>Movimentações Financeiras</h1>
-          <p className="financeiro-subtitle">Receitas, despesas e pagamentos em leitura rápida para decisão operacional.</p>
+          <p className="financeiro-subtitle">Lance custos e receitas para entender o resultado dos lotes.</p>
         </div>
         <div className="lote-actions">
           <Button variant="outline" onClick={() => { if (!podeEditarFinanceiro()) return; setOpenLanc(true); }}>Nova receita</Button>

@@ -127,7 +127,7 @@ export default function SincronizacaoPage({ db, setDb, session }) {
     <div className="page">
       <PageHeader
         title="Sincronização"
-        subtitle="Registros salvos neste aparelho aguardando envio para a nuvem."
+        subtitle="Quando estiver sem internet, alguns registros ficam salvos neste aparelho e serão enviados quando a conexão voltar."
       />
 
       <Card>

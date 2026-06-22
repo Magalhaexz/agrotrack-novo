@@ -652,7 +652,7 @@ export default function LotesPage({ db, setDb, onRegistrarSaidaAnimal, session, 
         {lotesFiltrados.length === 0 ? (
           <div className="empty-state">
             <strong>{activeFarmId ? 'Nenhum lote encontrado.' : 'Selecione uma fazenda ativa.'}</strong>
-            <span>{activeFarmId ? 'Ajuste os filtros ou cadastre um novo lote para continuar.' : 'Os lotes são exibidos por fazenda ativa.'}</span>
+            <span>{activeFarmId ? 'Cadastre seu primeiro lote para acompanhar peso, custos e resultado.' : 'Os lotes são exibidos por fazenda ativa.'}</span>
           </div>
         ) : lotesFiltrados.map((lote) => (
           <LoteCard

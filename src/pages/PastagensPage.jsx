@@ -249,7 +249,7 @@ export default function PastagensPage({ db, setDb, session, onConfirmAction }) {
     <div className="page">
       <PageHeader
         title="Pastos"
-        subtitle="Cadastre e organize os pastos de cada fazenda."
+        subtitle="Cadastre os pastos da fazenda para acompanhar onde cada lote está e receber alertas de lotação."
       />
 
       <Card title={editando ? 'Editar pasto' : 'Cadastrar pasto'}>
@@ -313,7 +313,7 @@ export default function PastagensPage({ db, setDb, session, onConfirmAction }) {
         <Card title="Capacidade dos pastos">
           <div className="empty-state">
             <strong>Nenhum pasto cadastrado.</strong>
-            <span>Cadastre um pasto para calcular capacidade, lotação e necessidade de arrendamento.</span>
+            <span>Cadastre os pastos para organizar a ocupação e acompanhar a lotação.</span>
           </div>
         </Card>
       ) : (
@@ -417,7 +417,7 @@ export default function PastagensPage({ db, setDb, session, onConfirmAction }) {
         {!pastagens.length ? (
           <div className="empty-state">
             <strong>Nenhum pasto cadastrado.</strong>
-            <span>Cadastre um pasto vinculado à fazenda para liberar o vínculo com lotes e os indicadores de capacidade.</span>
+            <span>Cadastre os pastos para organizar a ocupação e acompanhar a lotação.</span>
           </div>
         ) : (
           <div className="table-responsive">

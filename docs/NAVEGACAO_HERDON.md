@@ -44,6 +44,14 @@
 | configuracoes | Configurações | Settings |
 | perfil | Perfil | User |
 
+### Ajuda (Sprint 26)
+| ID | Label | Ícone |
+|----|-------|-------|
+| guiaCriador | Guia do Criador | HelpCircle |
+| suporte | Suporte | LifeBuoy |
+
+`suporte` já existia (rota `/suporte`), mas só era alcançável pelo banner do Dashboard. A partir da Sprint 26 também aparece no menu principal. `guiaCriador` é uma página nova — ver [GUIA_CRIADOR_APP_HERDON.md](GUIA_CRIADOR_APP_HERDON.md).
+
 ---
 
 ## Sprint 24 — Hub de Relatórios
@@ -137,3 +145,6 @@ Os ícones abaixo foram adicionados ao arquivo `src/lucide-react.js` para uso no
 - `Calculator` — Simulador de Decisão
 - `Layers` — Rateio de Custos
 - `Receipt` — Movimentações Financeiras
+- `HelpCircle` — Guia do Criador (Sprint 26)
+- `LifeBuoy` — Suporte (Sprint 26)
+- `Circle` — checklist de primeiros passos, item pendente (Sprint 26)

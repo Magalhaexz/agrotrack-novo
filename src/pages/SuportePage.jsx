@@ -33,8 +33,14 @@ export default function SuportePage() {
 
         <div style={LEGAL_STYLES.contactCard}>
           <div style={LEGAL_STYLES.contactLabel}>Canal de suporte</div>
-          <div style={LEGAL_STYLES.contactValue}>herdonapp@gmail.com</div>
+          <a href="mailto:herdonapp@gmail.com" style={{ ...LEGAL_STYLES.contactValue, textDecoration: 'none' }}>
+            herdonapp@gmail.com
+          </a>
           <div style={LEGAL_STYLES.contactNote}>Resposta em até 48 horas úteis</div>
+          <p style={{ ...LEGAL_STYLES.p, marginTop: 16, marginBottom: 0 }}>
+            Ao enviar feedback, informe o que você estava tentando fazer, o que aconteceu e, se possível,
+            envie um print da tela.
+          </p>
         </div>
 
         <div style={LEGAL_STYLES.section}>

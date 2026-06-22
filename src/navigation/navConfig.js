@@ -8,9 +8,11 @@ import {
   CreditCard,
   FileBarChart,
   FileUp,
+  HelpCircle,
   Layers,
   Leaf,
   LayoutDashboard,
+  LifeBuoy,
   MapPin,
   Package,
   Receipt,
@@ -75,6 +77,14 @@ export const navSections = [
       { id: 'sincronizacao', label: 'Sincronização', icon: RefreshCw },
       { id: 'configuracoes', label: 'Configurações', icon: Settings },
       { id: 'perfil', label: 'Perfil', icon: User },
+    ],
+  },
+  {
+    id: 'ajuda',
+    title: 'Ajuda',
+    items: [
+      { id: 'guiaCriador', label: 'Guia do Criador', icon: HelpCircle },
+      { id: 'suporte', label: 'Suporte', icon: LifeBuoy },
     ],
   },
 ];

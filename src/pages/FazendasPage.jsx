@@ -690,7 +690,7 @@ export default function FazendasPage({ db, setDb, onConfirmAction, session: sess
       {cards.length === 0 ? (
         <EmptyState
           title="Nenhuma fazenda cadastrada."
-          subtitle="Cadastre a primeira fazenda para organizar lotes, animais e operação."
+          subtitle="Comece cadastrando sua primeira fazenda ou importando seus dados."
           action={
             <Button
               variant="primary"

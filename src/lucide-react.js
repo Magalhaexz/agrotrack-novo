@@ -362,3 +362,20 @@ export const Copy = icon([
   createElement('rect', { x: 9, y: 9, width: 13, height: 13, rx: 2 }),
   createElement('path', { d: 'M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1' }),
 ]);
+
+export const Circle = icon([circle]);
+
+export const HelpCircle = icon([
+  circle,
+  createElement('path', { d: 'M9.5 9a2.5 2.5 0 1 1 3.5 2.3c-.7.4-1 .9-1 1.7' }),
+  createElement('path', { d: 'M12 17h.01' }),
+]);
+
+export const LifeBuoy = icon([
+  circle,
+  createElement('circle', { cx: 12, cy: 12, r: 4 }),
+  createElement('path', { d: 'm4.9 4.9 4.2 4.2' }),
+  createElement('path', { d: 'm14.9 14.9 4.2 4.2' }),
+  createElement('path', { d: 'm14.9 9.1 4.2-4.2' }),
+  createElement('path', { d: 'm4.9 19.1 4.2-4.2' }),
+]);

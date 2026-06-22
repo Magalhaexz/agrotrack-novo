@@ -21,6 +21,8 @@ const MODULES_BASIC = [
   'relatorioFinanceiro',
   'relatorioPastagens',
   'relatorioResumoGeral',
+  'guiaCriador',
+  'suporte',
 ];
 
 const MODULES_PRO = [

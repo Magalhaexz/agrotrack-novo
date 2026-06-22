@@ -21,6 +21,7 @@ import Card from '../components/ui/Card';
 import Button from '../components/ui/Button';
 import { getResumoLote } from '../domain/resumoLote';
 import { construirHojeNaFazenda } from '../domain/hojeNaFazenda';
+import { construirChecklistPrimeirosPassos } from '../domain/guiaCriador';
 import { formatCurrency, formatDate, formatNumber } from '../utils/calculations';
 import { formatarMoeda } from '../utils/formatters';
 import { gerarNovoId } from '../utils/id';
@@ -95,6 +96,8 @@ export default function DashboardPage({
     () => construirHojeNaFazenda({ ...db, pastagens: pastagensFazendaAtiva }, { alerts }),
     [db, pastagensFazendaAtiva, alerts]
   );
+
+  const checklist = useMemo(() => construirChecklistPrimeirosPassos(db), [db]);
 
   const lotesStats = useMemo(
     () =>
@@ -313,8 +316,8 @@ export default function DashboardPage({
             <Button variant="outline" size="sm" onClick={() => onNavigate?.('importacao')}>
               Importar dados
             </Button>
-            <Button variant="ghost" size="sm" onClick={() => onNavigate?.('suporte')}>
-              Ver guia do criador piloto
+            <Button variant="ghost" size="sm" onClick={() => onNavigate?.('guiaCriador')}>
+              Ver guia do criador
             </Button>
           </div>
         </section>
@@ -333,6 +336,24 @@ export default function DashboardPage({
             </Button>
           </div>
         </section>
+      ) : null}
+
+      {!checklist.concluido ? (
+        <Card className="section-card" title="Primeiros passos no HERDON" subtitle={`${checklist.totalConcluido} de ${checklist.totalItens} concluídos`}>
+          <p style={{ margin: '0 0 12px' }}>
+            {checklist.proximoPasso ? `Próximo passo: ${checklist.proximoPasso.texto.toLowerCase()}.` : 'Continue explorando o HERDON.'}
+          </p>
+          <div className="action-row" style={{ gap: 8, flexWrap: 'wrap' }}>
+            <Button size="sm" onClick={() => onNavigate?.('guiaCriador')}>Ver guia</Button>
+            <Button size="sm" variant="outline" onClick={() => onNavigate?.('importacao')}>Importar dados</Button>
+            {totalFazendas === 0 ? (
+              <Button size="sm" variant="outline" onClick={() => onNavigate?.('fazendas')}>Cadastrar fazenda</Button>
+            ) : null}
+            {lotesAtivos.length === 0 ? (
+              <Button size="sm" variant="outline" onClick={() => onNavigate?.('lotes')}>Cadastrar lote</Button>
+            ) : null}
+          </div>
+        </Card>
       ) : null}
 
       {tabAtiva === 'geral' && (

@@ -1,7 +1,9 @@
+import { useMemo } from 'react';
 import { BarChart3, Beef, FileBarChart, Scale, Tractor } from 'lucide-react';
 import Card from '../components/ui/Card';
 import Button from '../components/ui/Button';
 import PageHeader from '../components/PageHeader';
+import { construirChecklistPrimeirosPassos } from '../domain/guiaCriador';
 
 const RELATORIOS = [
   {
@@ -36,13 +38,24 @@ const RELATORIOS = [
   },
 ];
 
-export default function RelatoriosPage({ onNavigate }) {
+export default function RelatoriosPage({ db, onNavigate }) {
+  const checklist = useMemo(() => construirChecklistPrimeirosPassos(db), [db]);
+  const relatoriosProntos = checklist.itens.find((item) => item.id === 'relatorios')?.concluido;
+
   return (
     <div className="page reports-page">
       <PageHeader
         title="Relatórios"
-        subtitle="Relatórios simples e prontos para baixar em PDF ou enviar por WhatsApp."
+        subtitle="Gere resumos para salvar em PDF ou compartilhar pelo WhatsApp."
       />
+
+      {!relatoriosProntos ? (
+        <Card>
+          <p style={{ margin: 0 }}>
+            Os relatórios aparecem melhor depois que você tiver lotes, pesagens e financeiro registrados.
+          </p>
+        </Card>
+      ) : null}
 
       <div className="report-kpi-grid">
         {RELATORIOS.map((item) => {
