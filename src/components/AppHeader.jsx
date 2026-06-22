@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from 'react';
 import { obterLabelPerfil } from '../auth/perfis';
 import { getNavLabel } from '../navigation/navConfig';
 import UserAvatar from './ui/UserAvatar';
+import ConnectionIndicator from './ConnectionIndicator';
 
 const ALERTAS_RESOLVIDOS_STORAGE_KEY = 'herdon-alertas-resolvidos';
 const ALERTAS_ADIADOS_STORAGE_KEY = 'herdon-alertas-adiados';
@@ -59,6 +60,7 @@ export default function AppHeader({
   hideSyncTechnicalStatus = false,
   getAlertAckKey = (alert) => alert?.ackKey || alert?.id || 'alerta-sem-chave',
   alertDebugState = null,
+  onOpenSincronizacao = null,
 }) {
   const [userMenuRef, openUserMenu, setOpenUserMenu] = useDropdown(false);
   const [openNotif, setOpenNotif] = useState(false);
@@ -380,6 +382,18 @@ export default function AppHeader({
       </nav>
 
       <div className="top-header-actions">
+        {(!syncStatus?.offlineOnline || syncStatus?.offlinePendentes > 0) ? (
+          <button
+            type="button"
+            className="connection-indicator-btn"
+            onClick={() => onOpenSincronizacao?.()}
+          >
+            <ConnectionIndicator online={syncStatus?.offlineOnline !== false} pendentes={syncStatus?.offlinePendentes || 0} />
+          </button>
+        ) : (
+          <ConnectionIndicator online={syncStatus?.offlineOnline !== false} pendentes={syncStatus?.offlinePendentes || 0} />
+        )}
+
         {!hideSyncTechnicalStatus ? (
           <button
             type="button"

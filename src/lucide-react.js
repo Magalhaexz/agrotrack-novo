@@ -346,3 +346,10 @@ export const Repeat = icon([
   createElement('path', { d: 'm7 22-4-4 4-4' }),
   createElement('path', { d: 'M21 13v2a4 4 0 0 1-4 4H3' }),
 ]);
+
+export const RefreshCw = icon([
+  createElement('path', { d: 'M21 12a9 9 0 0 0-15-6.7L3 8' }),
+  createElement('path', { d: 'M3 4v4h4' }),
+  createElement('path', { d: 'M3 12a9 9 0 0 0 15 6.7L21 16' }),
+  createElement('path', { d: 'M21 20v-4h-4' }),
+]);

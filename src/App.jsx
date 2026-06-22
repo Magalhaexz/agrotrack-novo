@@ -13,6 +13,8 @@ import Button from './components/ui/Button';
 import { useOperationalData } from './hooks/useOperationalData';
 import { useToast } from './hooks/useToast';
 import { useCloudControls } from './hooks/useCloudControls';
+import { useOfflineQueueStatus } from './hooks/useOfflineQueueStatus';
+import { useOfflineAutoSync } from './hooks/useOfflineAutoSync';
 import AssinaturaBloqueadaPage from './pages/AssinaturaBloqueadaPage';
 import {
   limparPersistenciaSessao,
@@ -78,6 +80,7 @@ const SuportePage = lazy(() => import('./pages/SuportePage'));
 const CustosCompartilhadosPage = lazy(() => import('./pages/CustosCompartilhadosPage'));
 const FluxoCaixaPage = lazy(() => import('./pages/FluxoCaixaPage'));
 const ImportacaoPage = lazy(() => import('./pages/ImportacaoPage'));
+const SincronizacaoPage = lazy(() => import('./pages/SincronizacaoPage'));
 
 const publicPageMap = {
   termos: TermosPage,
@@ -196,6 +199,7 @@ const pageMap = {
   relatoriosGerenciais: RelatoriosGerenciaisPage,
   planejamento: PlanejamentoPage,
   importacao: ImportacaoPage,
+  sincronizacao: SincronizacaoPage,
 };
 
 export default function App() {
@@ -256,6 +260,8 @@ export default function App() {
   });
   const deniedToastRef = useRef({ permission: '', timestamp: 0 });
   const cloudControls = useCloudControls({ db, setDb, session, hasPermission, showToast, dismissToast: removeToast, forceLocalSignOut });
+  const offlineQueueStatus = useOfflineQueueStatus(session);
+  useOfflineAutoSync(session, setDb);
   const showAuthDebug = useMemo(() => {
     try {
       return localStorage.getItem('HERDON_SHOW_AUTH_DEBUG') === 'true';
@@ -936,6 +942,8 @@ export default function App() {
             cloudVerified: cloudDiagnosticState.verified,
             cloudVerifiedAt: cloudDiagnosticState.checkedAt,
             cloudVerifiedMessage: cloudDiagnosticState.message,
+            offlineOnline: offlineQueueStatus.online,
+            offlinePendentes: offlineQueueStatus.pendentes,
           }}
           hideSyncTechnicalStatus
           onResolveAlert={marcarAlertaComoFeito}
@@ -951,6 +959,7 @@ export default function App() {
           onSignOut={handleLogout}
           onNavigateProfile={() => navigateWithPermission('perfil')}
           onNavigateSettings={() => navigateWithPermission('configuracoes')}
+          onOpenSincronizacao={() => navigateWithPermission('sincronizacao')}
           onConfirmAction={onConfirmAction}
           onOpenMenu={() => window.dispatchEvent(new CustomEvent('agrotrack-open-drawer'))}
           usuarioLogado={usuarioLogado}

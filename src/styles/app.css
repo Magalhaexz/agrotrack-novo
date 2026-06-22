@@ -10501,3 +10501,66 @@ html, body, #root, .app, .main, .main-content, .page { max-width: 100%; }
     gap: 14px;
   }
 }
+
+/* --- Sprint 23: indicador de conexão (Modo Campo) --- */
+.connection-indicator-btn {
+  border: none;
+  background: none;
+  padding: 0;
+  cursor: pointer;
+  display: inline-flex;
+  max-width: 280px;
+}
+
+.connection-indicator {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 7px 12px;
+  border-radius: var(--radius-full, 999px);
+  font-size: 0.78rem;
+  font-weight: 600;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 280px;
+}
+
+.connection-indicator::before {
+  content: "";
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.connection-indicator--online {
+  color: var(--color-success, #22c55e);
+  background: color-mix(in srgb, var(--color-success, #22c55e) 12%, transparent);
+}
+.connection-indicator--online::before {
+  background: var(--color-success, #22c55e);
+}
+
+.connection-indicator--offline {
+  color: var(--color-danger, #ef4444);
+  background: color-mix(in srgb, var(--color-danger, #ef4444) 12%, transparent);
+}
+.connection-indicator--offline::before {
+  background: var(--color-danger, #ef4444);
+}
+
+.connection-indicator--pending {
+  color: var(--color-warning, #f59e0b);
+  background: color-mix(in srgb, var(--color-warning, #f59e0b) 14%, transparent);
+}
+.connection-indicator--pending::before {
+  background: var(--color-warning, #f59e0b);
+}
+
+@media (max-width: 760px) {
+  .connection-indicator,
+  .connection-indicator-btn {
+    max-width: 160px;
+  }
+}
