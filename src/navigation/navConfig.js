@@ -61,13 +61,14 @@ export const navSections = [
       { id: 'resultados', label: 'Resultado dos Lotes', icon: BarChart3 },
       { id: 'cenarios', label: 'Simulador de Decisão', icon: Calculator },
       { id: 'indicadores', label: 'Indicadores', icon: Activity },
-      { id: 'relatoriosGerenciais', label: 'Relatórios', icon: FileBarChart },
+      { id: 'relatoriosGerenciais', label: 'Relatórios Gerenciais', icon: FileBarChart },
     ],
   },
   {
     id: 'gestao',
     title: 'Gestão',
     items: [
+      { id: 'relatorios', label: 'Relatórios', icon: FileBarChart },
       { id: 'funcionarios', label: 'Equipe', icon: Users },
       { id: 'minhaAssinatura', label: 'Planos e Assinatura', icon: CreditCard },
       { id: 'importacao', label: 'Importação', icon: FileUp },

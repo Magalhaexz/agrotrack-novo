@@ -15,6 +15,12 @@ const MODULES_BASIC = [
   'configuracoes',
   'resultados',
   'comparativo',
+  'relatorios',
+  'relatorioLote',
+  'relatorioPesagens',
+  'relatorioFinanceiro',
+  'relatorioPastagens',
+  'relatorioResumoGeral',
 ];
 
 const MODULES_PRO = [

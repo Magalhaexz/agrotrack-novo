@@ -33,15 +33,30 @@
 | resultados | Resultado dos Lotes | BarChart3 |
 | cenarios | Simulador de Decisão | Calculator |
 | indicadores | Indicadores | Activity |
-| relatoriosGerenciais | Relatórios | FileBarChart |
+| relatoriosGerenciais | Relatórios Gerenciais | FileBarChart |
 
 ### Gestão
 | ID | Label | Ícone |
 |----|-------|-------|
+| relatorios | Relatórios | FileBarChart |
 | funcionarios | Equipe | Users |
 | minhaAssinatura | Planos e Assinatura | CreditCard |
 | configuracoes | Configurações | Settings |
 | perfil | Perfil | User |
+
+---
+
+## Sprint 24 — Hub de Relatórios
+
+A partir da Sprint 24, `relatoriosGerenciais` (resumo executivo já existente) foi renomeado de "Relatórios" para "Relatórios Gerenciais" para não conflitar com o novo hub `relatorios`, adicionado na seção Gestão. O novo hub leva a 5 páginas sem rota própria (acessadas só por `pageId`, via `onNavigate`):
+
+| ID | Label |
+|----|-------|
+| relatorioLote | Relatório do Lote |
+| relatorioPesagens | Relatório de Pesagens |
+| relatorioFinanceiro | Relatório Financeiro |
+| relatorioPastagens | Relatório de Pastos |
+| relatorioResumoGeral | Resumo Geral da Fazenda |
 
 ---
 

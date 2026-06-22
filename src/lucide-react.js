@@ -353,3 +353,12 @@ export const RefreshCw = icon([
   createElement('path', { d: 'M3 12a9 9 0 0 0 15 6.7L21 16' }),
   createElement('path', { d: 'M21 20v-4h-4' }),
 ]);
+
+export const MessageCircle = icon([
+  createElement('path', { d: 'M21 12a8.5 8.5 0 1 0-3.8 7.1L21 20l-1.1-3.3A8.4 8.4 0 0 0 21 12Z' }),
+]);
+
+export const Copy = icon([
+  createElement('rect', { x: 9, y: 9, width: 13, height: 13, rx: 2 }),
+  createElement('path', { d: 'M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1' }),
+]);
