@@ -1,20 +1,26 @@
-# Segurança HERDON — Visão Geral (Sprint 30)
+# Segurança HERDON — Visão Geral (Sprint 30, validada ao vivo na Sprint 30.1)
 
 Este documento resume a auditoria de segurança final antes do QA autenticado e da liberação ao criador piloto. Detalhamento por área em documentos específicos (linkados abaixo).
 
+> **Sprint 30.1:** com acesso real ao Supabase (MCP reconectado), a auditoria de RLS foi **revalidada no banco de produção**, não só nos arquivos `.sql` versionados. Isso encontrou duas falhas reais que a Sprint 30 não conseguiu ver (por falta de acesso) — corrigidas nesta sprint. Ver `docs/SUPABASE_PREVIEW_RECONCILIACAO.md` para a reconciliação de migrations que motivou esta revisão.
+
 ## Resultado geral
 
-**Postura de segurança: sólida.** Não foi encontrada nenhuma vulnerabilidade crítica (chave exposta, RLS ausente, endpoint sem autenticação). Foram encontradas e corrigidas duas lacunas reais de menor severidade, e documentadas pendências de defesa em profundidade que exigem decisão/teste humano antes de serem implementadas.
+**Postura de segurança: sólida, com duas falhas reais corrigidas nesta sprint.** Não há vulnerabilidade crítica restante conhecida (chave exposta, RLS ausente, endpoint sem autenticação). Foram corrigidas: (a) duas policies de INSERT sem restrição (`cenario_eventos`, `suplementacao`) que permitiam escrita entre contas — a falha mais séria encontrada em todo o projeto até agora — e (b) inconsistência de `forcerowsecurity` em 4 tabelas. Pendências de defesa em profundidade continuam documentadas para decisão humana.
 
 ## 1. Supabase / RLS
 
-Todas as 28 tabelas do schema têm RLS habilitado e forçado (`enable` + `force row level security`). Isolamento por conta via `app_is_same_account(owner_user_id)`, função `security definer` com `search_path` fixo (sem risco de *search path hijacking*). Detalhes completos, tabela por tabela: **[docs/RLS_AUDITORIA_HERDON.md](RLS_AUDITORIA_HERDON.md)**.
+Todas as 30 tabelas do banco real (não 28 — duas existiam fora do bundle versionado) têm RLS habilitado. Isolamento por conta via `app_is_same_account(owner_user_id)`, função `security definer` com `search_path` fixo. Detalhes completos, validados ao vivo: **[docs/RLS_AUDITORIA_HERDON.md](RLS_AUDITORIA_HERDON.md)**.
 
-**Achado corrigido:** o script-fonte `docs/supabase-production-rls.sql` recriava policies de UPDATE/DELETE em `auditoria` (trilha de auditoria deveria ser só leitura/inserção — corrigido manualmente na Sprint 2, mas o script não tinha sido atualizado). Corrigido nesta sprint para nunca mais regredir isso se o script for re-executado. **Ação humana necessária:** confirmar no painel do Supabase que essas policies não existem hoje no banco vivo.
+**Achado real corrigido (Sprint 30.1):** `cenario_eventos_insert_same_account` e `suplementacao_insert_same_account` tinham `with_check: true` — sem filtro nenhum, anulando a policy correta ao lado. Qualquer usuário autenticado podia inserir uma linha nessas 2 tabelas com o `owner_user_id` de outra conta. Corrigido e confirmado no banco real via migration `20260623220539_fix_insecure_insert_policies`.
+
+**Achado corrigido (Sprint 30, confirmado ao vivo na 30.1):** o script-fonte `docs/supabase-production-rls.sql` recriava policies de UPDATE/DELETE em `auditoria` se re-executado. Confirmado agora diretamente no banco: essas policies **não existem** hoje — o risco era só preventivo (script), nunca foi um problema ativo em produção.
+
+**Achado corrigido (Sprint 30.1):** `forcerowsecurity = false` em 4 tabelas (`cenario_eventos`, `eventos_operacionais`, `lote_pastagens_historico`, `suplementacao`), inconsistente com as outras 26. Corrigido na mesma migration.
 
 ## 2. Isolamento entre contas
 
-Confirmado por leitura de código (não testado em banco real — sem acesso). `owner_user_id` é o padrão único e consistente em todas as tabelas operacionais. RLS impede que uma conta veja ou escreva dados de outra. **Lacuna documentada (não corrigida):** RLS isola por conta, não por papel — um `visualizador` poderia, em teoria, escrever diretamente via API REST do Supabase contornando os botões desabilitados da interface (a interface já bloqueia isso corretamente; é uma lacuna de defesa em profundidade no banco, não uma falha ativa). Ver `docs/RLS_AUDITORIA_HERDON.md`.
+Confirmado **ao vivo no banco real** (Sprint 30.1, via `pg_policies`) — não só por leitura de código. `owner_user_id` é o padrão único e consistente. RLS impede que uma conta veja ou escreva dados de outra, **exceto pela falha do item 1 acima, agora corrigida**. **Lacuna documentada (não corrigida):** RLS isola por conta, não por papel — um `visualizador` poderia, em teoria, escrever diretamente via API REST do Supabase contornando os botões desabilitados da interface. Ver `docs/RLS_AUDITORIA_HERDON.md`.
 
 ## 3. Service role
 
@@ -54,17 +60,24 @@ Dados fictícios ("Fazenda Modelo HERDON", "HRD-001" etc.) existem apenas em scr
 
 Documentado em **[docs/BACKUP_RECUPERACAO_HERDON.md](BACKUP_RECUPERACAO_HERDON.md)** (novo nesta sprint).
 
-## Resumo do que foi corrigido nesta sprint
+## Resumo do que foi corrigido
 
-| # | Achado | Severidade | Correção |
-|---|---|---|---|
-| 1 | Script RLS recriava UPDATE/DELETE em `auditoria` se re-executado | Baixa-média (regressão preventiva) | `docs/supabase-production-rls.sql` corrigido |
-| 2 | `cloud-diagnostic.js` expunha contagem agregada entre contas | Baixa (não é PII, mas é vazamento de dado agregado da plataforma) | `api/cloud-diagnostic.js` corrigido + teste |
+| # | Achado | Severidade | Sprint | Correção |
+|---|---|---|---|---|
+| 1 | INSERT sem restrição em `cenario_eventos`/`suplementacao` — escrita entre contas | **Alta** (falha ativa em produção) | 30.1 | Migration `20260623220539` aplicada no banco real |
+| 2 | `forcerowsecurity = false` em 4 tabelas | Baixa | 30.1 | Mesma migration |
+| 3 | Script RLS recriava UPDATE/DELETE em `auditoria` se re-executado | Baixa-média (preventivo; confirmado nunca ativo) | 30 / confirmado 30.1 | `docs/supabase-production-rls.sql` corrigido + confirmado no banco real |
+| 4 | `cloud-diagnostic.js` expunha contagem agregada entre contas | Baixa | 30 | `api/cloud-diagnostic.js` corrigido + teste |
+
+## Migrations — reconciliação (Sprint 30.1)
+
+O check "Supabase Preview" do GitHub falhava com `Remote migration versions not found in local migrations directory` — 2 arquivos locais tinham conteúdo já aplicado no remoto mas com prefixo de versão diferente, e 1 migration local nunca foi registrada no remoto (aplicada via SQL direto). Reconciliado nesta sprint — detalhes completos em **[docs/SUPABASE_PREVIEW_RECONCILIACAO.md](SUPABASE_PREVIEW_RECONCILIACAO.md)**.
 
 ## Pendências para Sprint 31 (exigem decisão/ambiente humano)
 
-- Confirmar no banco vivo que as policies de `auditoria` estão corretas (item 1 acima).
+- Rodar `supabase migration repair --status applied 20260618000000` com o CLI autenticado (não disponível nesta sessão) — última peça da reconciliação de migrations.
 - Avaliar RLS por papel/perfil (defesa em profundidade) — requer mapeamento cuidadoso por tabela e teste em ambiente real antes de aplicar.
-- Testar manualmente isolamento entre duas contas reais (login como conta A, confirmar que dados da conta B nunca aparecem).
+- Avaliar os avisos do `get_advisors` (funções `security definer` expostas via RPC para `anon`/`authenticated`, funções de trigger sem `search_path` fixo, proteção contra senha vazada desativada no Auth) — nenhum crítico, mas merecem revisão dedicada.
+- Testar manualmente isolamento entre duas contas reais (login como conta A, confirmar que dados da conta B nunca aparecem) — agora ainda mais importante validar visualmente, já que a falha do item 1 era exatamente esse tipo de vazamento.
 - Verificar e, se necessário, limpar dados de QA manual remanescentes no banco de produção (ver checklist).
 - Testar restauração de um backup do Supabase (nunca testado, só documentado).

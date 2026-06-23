@@ -1,8 +1,10 @@
-# Auditoria de RLS e Isolamento entre Contas (Sprint 30)
+# Auditoria de RLS e Isolamento entre Contas (Sprint 30, validada ao vivo na Sprint 30.1)
 
 ## Método
 
-Sem acesso às ferramentas de Supabase nesta sessão (MCP desconectado) e sem credenciais de conta autenticada, esta auditoria foi feita por leitura completa de `docs/supabase-production-schema.sql` e `docs/supabase-production-rls.sql` — os dois arquivos que compõem o "bundle" que deveria ser executado para provisionar um ambiente Supabase do zero. Não foi possível consultar o estado real do banco em produção; as conclusões valem para o que está documentado/versionado, não necessariamente para o que está de fato aplicado no banco vivo (ver "Ação humana necessária" no final).
+**Sprint 30:** sem acesso às ferramentas de Supabase (MCP desconectado) e sem credenciais de conta autenticada, a auditoria original foi feita só por leitura de `docs/supabase-production-schema.sql`/`docs/supabase-production-rls.sql` — sem confirmar o estado real do banco.
+
+**Sprint 30.1 (esta revisão):** com o MCP do Supabase reconectado, toda a auditoria abaixo foi **revalidada consultando o banco de produção real** (`pg_policies`, `pg_class.relrowsecurity`/`relforcerowsecurity`, `supabase_migrations.schema_migrations`, `get_advisors`). Duas conclusões da Sprint 30 estavam **erradas** porque foram baseadas só nos arquivos `.sql` versionados, que não refletiam o banco real — corrigidas abaixo.
 
 ## Função de isolamento
 
@@ -12,43 +14,50 @@ app_is_same_account(target_owner_user_id) -- true se o usuário logado pertence 
 app_can_manage_account(target_owner_user_id) -- app_is_same_account() + perfil in ('proprietario','gerente')
 ```
 
-Todas com `security definer` e `set search_path = public` (boa prática — evita *search path hijacking*). A lógica está correta: isolamento por **conta** (`owner_user_id`), não por usuário individual — múltiplos usuários da mesma conta (proprietário, gerente, operador, visualizador) compartilham o mesmo `owner_user_id` e veem os mesmos dados.
+Confirmado ao vivo: todas com `security definer` e `search_path` fixo. Isolamento por **conta** (`owner_user_id`), não por usuário individual.
 
-## Tabelas e RLS — situação confirmada
+## Tabelas e RLS — situação confirmada no banco real
 
-**28 tabelas no schema, todas com `enable row level security` + `force row level security`:** `profiles`, `invites`, `subscription_plans`, `customer_subscriptions`, `billing_events`, `checkout_sessions`, `fazendas`, `pastagens`, `lotes`, `animais`, `pesagens`, `sanitario`, `estoque`, `movimentacoes_estoque`, `movimentacoes_financeiras`, `movimentacoes_animais`, `custos`, `funcionarios`, `rotinas`, `tarefas`, `usuarios`, `configuracoes`, `cenarios`, `auditoria`, `alertas_resolvidos`, `alertas_adiados`, `consumo_suplementacao`, `lote_pastagens_historico`.
+**30 tabelas em `public`, todas com `rowsecurity = true` (RLS habilitado).** Lista completa consultada via `pg_class`: `alertas_adiados`, `alertas_resolvidos`, `animais`, `auditoria`, `billing_events`, `cenario_eventos`, `cenarios`, `checkout_sessions`, `configuracoes`, `consumo_suplementacao`, `customer_subscriptions`, `custos`, `estoque`, `eventos_operacionais`, `fazendas`, `funcionarios`, `invites`, `lote_pastagens_historico`, `lotes`, `movimentacoes_animais`, `movimentacoes_estoque`, `movimentacoes_financeiras`, `pastagens`, `pesagens`, `profiles`, `rotinas`, `sanitario`, `subscription_plans`, `suplementacao`, `tarefas`, `usuarios`.
 
-**Nenhuma tabela sem RLS encontrada.**
+**Duas tabelas existem no banco real e não estavam em `docs/supabase-production-schema.sql`/`docs/supabase-production-rls.sql`:** `cenario_eventos` e `eventos_operacionais`. Foram criadas diretamente no banco (SQL editor ou MCP), fora do bundle versionado — por isso a Sprint 30 não as encontrou e concluiu (errado) que "cenario_eventos não existe". O mesmo vale para `suplementacao`, que **não é** o mesmo que `consumo_suplementacao` (são duas tabelas diferentes, ambas reais) — a Sprint 30 também errou ao assumir que eram a mesma coisa.
 
-### Padrão de policies (a maioria das tabelas operacionais)
+### Padrão real de policies (confirmado, a maioria das tabelas operacionais)
 
-Bloco `do $$ ... foreach table_name in array owner_tables loop ... end $$` em `docs/supabase-production-rls.sql` aplica, para cada tabela, 4 policies idênticas: `select`/`insert`/`update`/`delete` para `authenticated`, todas usando `app_is_same_account(owner_user_id)`. Idempotente (`drop policy if exists` antes de cada `create`).
+Cada tabela operacional tem **8 policies** (não 4 como o script genérico sugeria): `_own` (filtro direto `owner_user_id = auth.uid()`) e `_same_account` (filtro `app_is_same_account(owner_user_id)`) para cada um dos 4 comandos (select/insert/update/delete) — uma combinação mais explícita do que o bundle versionado documentava, mas equivalente em efeito (`_own` é um caso particular de `_same_account`).
 
-### Exceções com lógica própria
+## Achado real #1 (corrigido nesta sprint): INSERT sem restrição em `cenario_eventos` e `suplementacao`
 
-| Tabela | Particularidade |
-|---|---|
-| `profiles` | `owner_user_id` pode ser nulo (proprietário: `owner_user_id = id`); SELECT também permite `auth.uid() = id` |
-| `invites`, `customer_subscriptions`, `billing_events`, `checkout_sessions` | INSERT/UPDATE/DELETE exigem `app_can_manage_account()` (só proprietário/gerente) — correto, convites e assinatura não devem ser editáveis por operador/visualizador |
-| `subscription_plans` | SELECT com `using (true)` para qualquer `authenticated` — **intencional**: é o catálogo de planos (preços/limites), não há dado de cliente ali |
-| `auditoria` | Ver achado abaixo |
+**Confirmado ao vivo, não suposição:** as policies `cenario_eventos_insert_same_account` e `suplementacao_insert_same_account` tinham `with_check: true` — sem filtro nenhum. Como policies permissivas do mesmo comando são combinadas com `OR`, isso anulava a policy `_insert_own` correta que existia ao lado. **Qualquer usuário autenticado podia inserir uma linha em `cenario_eventos` ou `suplementacao` com o `owner_user_id` de qualquer outra conta** — uma falha real de isolamento entre contas, ativa em produção até esta correção.
 
-## Achado e correção: `auditoria` podia ter UPDATE/DELETE recriados
+**Correção aplicada (Sprint 30.1, migration `20260623220539_fix_insecure_insert_policies`, aplicada via MCP `apply_migration` direto no banco real):**
+```sql
+drop policy if exists cenario_eventos_insert_same_account on public.cenario_eventos;
+create policy cenario_eventos_insert_same_account on public.cenario_eventos
+  for insert to authenticated
+  with check (public.app_is_same_account(owner_user_id));
 
-**Problema encontrado:** `docs/PLANO_LIMPEZA_HERDON.md` (Sprint 2, 2026-06-15) registra que as policies `auditoria_update_*`/`auditoria_delete_*` foram removidas manualmente — uma trilha de auditoria que a própria conta auditada pode editar/apagar não serve para nada. Mas `docs/supabase-production-rls.sql` (último tocado em 2026-06-11, **antes** da correção da Sprint 2) ainda incluía `auditoria` no loop genérico que cria as 4 policies, incluindo update/delete. Se esse arquivo bundle fosse re-executado no futuro (ex.: provisionar um ambiente novo, ou re-rodar achando que é idempotente — e ele É escrito para ser idempotente), **as policies de update/delete em `auditoria` seriam recriadas**, regredindo a correção da Sprint 2.
+drop policy if exists suplementacao_insert_same_account on public.suplementacao;
+create policy suplementacao_insert_same_account on public.suplementacao
+  for insert to authenticated
+  with check (public.app_is_same_account(owner_user_id));
+```
 
-**Correção aplicada nesta sprint:** `auditoria` foi removida do loop genérico em `docs/supabase-production-rls.sql` e ganhou um bloco próprio, explícito, que cria apenas `select`/`insert` e **garante** (via `drop policy if exists`) que `update`/`delete` nunca existem, mesmo que o script seja re-executado no futuro.
+**Confirmado depois da correção** (consulta direta a `pg_policies`): as duas policies agora exigem `app_is_same_account(owner_user_id)`. Nenhum dado existente foi alterado ou apagado — a correção só muda a regra para inserções futuras.
 
-**Ação humana necessária:** esta correção foi feita no arquivo-fonte (script), não no banco de produção — não tenho acesso para verificar ou alterar o banco vivo nesta sessão. Alguém com acesso ao Supabase deve:
-1. Confirmar no painel (Database → Policies → `auditoria`) que **não existem** policies de update/delete hoje.
-2. Se existirem, executar manualmente: `drop policy if exists auditoria_update_same_account on public.auditoria; drop policy if exists auditoria_delete_same_account on public.auditoria;`
+## Achado real #2 (corrigido nesta sprint): `forcerowsecurity = false` em 4 tabelas
 
-## Outras observações (sem ação necessária)
+Confirmado ao vivo: `cenario_eventos`, `eventos_operacionais`, `lote_pastagens_historico` e `suplementacao` tinham `forcerowsecurity = false`, diferente das outras 26 tabelas (`true`). Isso não afeta as conexões normais do app (que sempre usam o papel `authenticated`, que já respeita RLS independente do `force`); o `force` só importa para o papel *owner* da tabela, que o app nunca usa diretamente. Risco baixo, mas corrigido para consistência — `alter table ... force row level security` aplicado às 4 tabelas na mesma migration acima. Confirmado depois: as 4 tabelas agora têm `forcerowsecurity = true`, igual às demais.
 
-- **RLS garante isolamento de conta, não de papel/perfil.** Qualquer membro autenticado da conta (mesmo `visualizador`) pode, em teoria, fazer `insert`/`update`/`delete` diretamente via API REST do Supabase com seu próprio token, contornando os botões desabilitados da interface — porque a policy só verifica "mesma conta", não "tem permissão de editar". A interface já impede isso corretamente (perfis.js: `visualizador` só tem permissões `:ver`, nenhuma `:editar`/`:excluir`/`:movimentar`), mas a *defesa em profundidade* no banco não distingue papéis para a maioria das tabelas (só para convites/assinatura, que exigem `app_can_manage_account`). **Não corrigido nesta sprint** — exigiria mapear, tabela por tabela, qual perfil pode editar o quê (operador edita lotes/animais/pesagens mas não fazendas/funcionários, por exemplo), e qualquer erro nesse mapeamento bloquearia acesso legítimo. Fica como pendência para uma sprint dedicada, com acesso a um ambiente de teste real para validar antes de aplicar.
-- **`cenario_eventos`** (mencionada em `docs/PLANO_LIMPEZA_HERDON.md` item 6) não existe no schema/RLS atual — provavelmente uma tabela planejada e nunca criada, ou removida depois. Não é risco (tabela inexistente não precisa de RLS), só uma nota de doc desatualizada.
-- **`suplementacao`** (mencionada no item 7 do mesmo plano) hoje corresponde a `consumo_suplementacao`, que já está corretamente protegida no loop genérico — provável renomeação não refletida na doc antiga.
+## `auditoria` — confirmado imutável no banco real
+
+A Sprint 30 tinha corrigido só o **script-fonte** (`docs/supabase-production-rls.sql`), sem poder confirmar o banco vivo. Agora confirmado diretamente: `auditoria` só tem policies `auditoria_select_owner`, `auditoria_select_same_account`, `auditoria_insert_owner`, `auditoria_insert_same_account` — **nenhuma policy de UPDATE ou DELETE existe hoje**. A preocupação da Sprint 30 (que o script poderia recriar essas policies se re-executado) continua válida como prevenção, mas **não havia problema ativo no banco** — confirmado antes e depois da migration desta sprint (a migration não toca em `auditoria`).
+
+## Outras observações (sem ação nesta sprint — fora do escopo aprovado)
+
+- **RLS garante isolamento de conta, não de papel/perfil** — mesma observação da Sprint 30, ainda válida e não corrigida (ver pendências).
+- **`get_advisors(type: 'security')` retornou avisos pré-existentes, não relacionados a esta correção:** funções de trigger (`set_updated_at`, `set_cenarios_owner`, `set_cenario_eventos_owner`, `set_current_timestamp_updated_at`, `set_pastagens_owner`) sem `search_path` fixo; extensão `citext` instalada no schema `public`; várias funções `security definer` (`app_is_same_account`, `app_can_manage_account`, `handle_new_user`, etc.) expostas como RPC pública para `anon`/`authenticated`; proteção contra senha vazada (HaveIBeenPwned) desativada no Auth. Nenhum desses é crítico e nenhum foi introduzido por esta sprint — documentados como pendência para avaliação dedicada (alguns, como revogar EXECUTE de funções RPC, exigem teste cuidadoso para não quebrar o uso interno dessas funções dentro das próprias policies RLS).
 
 ## Conclusão
 
-Isolamento entre contas está correto e consistente em todas as 28 tabelas, com uma correção preventiva aplicada (auditoria) e uma lacuna de defesa em profundidade documentada como pendência (papel/perfil no nível do banco). Recomendo testar manualmente, com duas contas reais, que dados de uma conta nunca aparecem para a outra — ver `docs/SEGURANCA_TESTE_MANUAL.md`.
+Isolamento entre contas confirmado correto em 30 tabelas reais (não 28 — a Sprint 30 não via 2 delas), com **duas falhas reais corrigidas** nesta sprint (INSERT sem restrição em 2 tabelas, `forcerowsecurity` inconsistente em 4) e a imutabilidade de `auditoria` confirmada diretamente no banco, não só no script-fonte. Pendências de defesa em profundidade (RLS por papel/perfil) e os avisos do `get_advisors` ficam para a Sprint 31.

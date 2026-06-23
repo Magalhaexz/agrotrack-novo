@@ -1,6 +1,14 @@
 -- Sprint 10: Add optional financial status fields to movimentacoes_financeiras
 -- Safe migration: all columns are optional (nullable), no existing data is altered.
 -- Backward compatibility: code treats NULL status as 'realizado' (legacy behavior).
+--
+-- SPRINT 30.1 — arquivo renomeado de 20260616000000_financial_status_fields.sql
+-- para 20260617020950_financial_status_fields.sql. O conteúdo é o mesmo já
+-- aplicado em produção; só o prefixo de versão foi corrigido para bater
+-- exatamente com supabase_migrations.schema_migrations no remoto (o
+-- arquivo local original usava um timestamp "redondo" escolhido na hora de
+-- escrever o arquivo, diferente do timestamp real de quando foi aplicado).
+-- Nenhuma alteração de schema nesta sprint — reconciliação de histórico.
 
 ALTER TABLE movimentacoes_financeiras
   ADD COLUMN IF NOT EXISTS status TEXT

@@ -4,6 +4,11 @@
 -- função mover_lote_para_pasto, que registra o histórico e atualiza
 -- lotes.pastagem_id em uma única operação transacional.
 -- Idempotente: seguro para rodar mais de uma vez.
+--
+-- SPRINT 30.1 — arquivo renomeado de 20260619000000_lote_pastagens_historico.sql
+-- para 20260619113446_lote_pastagens_historico.sql, para bater exatamente
+-- com supabase_migrations.schema_migrations no remoto. Mesmo motivo do
+-- arquivo de financial_status_fields — nenhuma alteração de schema aqui.
 
 -- 1. Tabela de histórico
 CREATE TABLE IF NOT EXISTS public.lote_pastagens_historico (

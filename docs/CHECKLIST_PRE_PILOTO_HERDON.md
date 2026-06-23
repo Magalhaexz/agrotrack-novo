@@ -1,6 +1,11 @@
-# Checklist Pré-Piloto (Sprint 30)
+# Checklist Pré-Piloto (Sprint 30, atualizado na Sprint 30.1)
 
-Itens objetivos para confirmar antes de liberar o acesso ao criador piloto. `[x]` = confirmado nesta sprint por auditoria de código · `[ ]` = exige ação/verificação humana (não pude confirmar sem acesso a banco/produção/credenciais).
+Itens objetivos para confirmar antes de liberar o acesso ao criador piloto. `[x]` = confirmado (Sprint 30 por auditoria de código; Sprint 30.1 com acesso real ao Supabase) · `[ ]` = exige ação/verificação humana.
+
+## CI/GitHub
+
+- [x] Divergência de migrations (causa do erro "Remote migration versions not found in local migrations directory") reconciliada (Sprint 30.1).
+- [ ] Confirmar que o check "Supabase Preview" do GitHub passa após "Re-run checks" (não pude disparar isso eu mesmo).
 
 ## Infraestrutura e deploy
 
@@ -10,10 +15,13 @@ Itens objetivos para confirmar antes de liberar o acesso ao criador piloto. `[x]
 
 ## Segurança e RLS
 
-- [x] RLS revisado — todas as 28 tabelas com `enable`/`force row level security` (ver `docs/RLS_AUDITORIA_HERDON.md`).
-- [x] `docs/supabase-production-rls.sql` corrigido (auditoria não fica mais editável/apagável se o script for re-executado).
-- [ ] Confirmar no painel do Supabase que as policies de UPDATE/DELETE em `auditoria` realmente não existem no banco vivo.
+- [x] RLS revisado e **validado ao vivo** — todas as 30 tabelas reais com RLS habilitado (Sprint 30.1, consulta direta a `pg_class`/`pg_policies`; ver `docs/RLS_AUDITORIA_HERDON.md`).
+- [x] Falha real de INSERT sem restrição em `cenario_eventos`/`suplementacao` corrigida e confirmada no banco real (Sprint 30.1, migration `20260623220539`).
+- [x] `forcerowsecurity` padronizado nas 4 tabelas que estavam divergentes (Sprint 30.1).
+- [x] Confirmado no banco real (não só no script): `auditoria` não tem policies de UPDATE/DELETE (Sprint 30.1).
 - [ ] Testar manualmente com duas contas reais: login como conta A, confirmar que nenhum dado da conta B aparece em nenhuma tela.
+- [ ] Rodar `supabase migration repair --status applied 20260618000000` com CLI autenticado (pendência da reconciliação de migrations, ver `docs/SUPABASE_PREVIEW_RECONCILIACAO.md`).
+- [ ] Avaliar avisos do `get_advisors` do Supabase (funções RPC expostas, search_path de triggers, proteção de senha vazada) — nenhum crítico, mas pendente de revisão dedicada.
 - [x] Service role nunca aparece em código frontend (auditado).
 
 ## Asaas / cobrança

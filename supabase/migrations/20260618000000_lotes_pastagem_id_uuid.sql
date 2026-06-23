@@ -4,6 +4,18 @@
 -- Safe: verifica o tipo atual antes de converter e verifica a FK antes de criar.
 -- ON DELETE SET NULL: se um pasto for removido, o lote fica sem pasto vinculado,
 --   sem orphan reference e sem erro de integridade.
+--
+-- SPRINT 30.1 — esta migration já está aplicada no banco real (confirmado:
+-- lotes.pastagem_id já é uuid em produção), mas nunca foi registrada em
+-- supabase_migrations.schema_migrations — foi aplicada via SQL direto, não
+-- via `supabase db push`. O comando recomendado para reconciliar isso é:
+--   supabase migration repair --status applied 20260618000000
+-- Esta sessão não tem o Supabase CLI instalado/autenticado para rodar esse
+-- comando, e a instrução do projeto é não editar
+-- supabase_migrations.schema_migrations manualmente sem autorização
+-- explícita — então o arquivo foi mantido como está (idempotente, sem
+-- necessidade de reaplicação) e a reconciliação do registro fica pendente
+-- para quem tiver acesso ao CLI. Ver docs/SUPABASE_PREVIEW_RECONCILIACAO.md.
 
 -- 1. Converter pastagem_id para uuid, somente se ainda for text
 DO $$
