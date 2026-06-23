@@ -46,6 +46,19 @@
 > aberta (mesma desde a Sprint 22): verificação visual/funcional real com
 > conta autenticada e ambiente Asaas sandbox configurado.
 
+> **Atualização (Sprint 29):** identificado e corrigido, com medição
+> concreta (não só leitura de código), o bug estrutural real do "Menu Mais
+> opções cortado": `src/styles/layout.css` reservava espaço de sidebar fixa
+> em qualquer modal do app, sem media query — no mobile isso espremia o
+> modal a ~78px de largura. Corrigido restringindo a regra ao desktop;
+> medido que o desktop não regrediu. Como a correção é compartilhada
+> (`Modal.jsx`), todos os modais de cadastro do app (Fazenda, Pasto, Lote,
+> Pesagem) se beneficiam. Também corrigido o indicador de conexão do header
+> mobile (colapsa para um ponto, antes competia por espaço com a marca
+> HERDON) e portalizado o painel "⋯" do header por segurança estrutural.
+> Ver [SPRINT_29_RESULTADO.md](SPRINT_29_RESULTADO.md). Pendência aberta
+> (mesma desde a Sprint 22): verificação visual real com conta autenticada.
+
 ---
 
 ## Critérios de aprovação

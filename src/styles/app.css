@@ -8433,17 +8433,42 @@ body {
     display: grid;
     gap: 12px;
     position: fixed;
+    box-sizing: border-box;
     top: calc(var(--herdon-mobile-header-height) + env(safe-area-inset-top) + 8px);
-    right: 10px;
-    width: min(360px, calc(100vw - 20px));
-    max-height: calc(100dvh - var(--herdon-mobile-header-height) - env(safe-area-inset-top) - 20px);
+    right: calc(10px + env(safe-area-inset-right));
+    left: auto;
+    width: min(360px, calc(100vw - 20px - env(safe-area-inset-right)));
+    max-width: calc(100vw - 20px);
+    max-height: calc(100dvh - var(--herdon-mobile-header-height) - env(safe-area-inset-top) - env(safe-area-inset-bottom) - 20px);
     overflow-y: auto;
+    overflow-x: hidden;
     padding: 12px;
     border-radius: 14px;
     border: 1px solid color-mix(in srgb, var(--color-border) 86%, #9ca3af 14%);
     background: rgba(7, 11, 9, 0.98);
     box-shadow: 0 18px 38px rgba(0, 0, 0, 0.48);
     z-index: 1650;
+  }
+
+  .mobile-header-panel-list,
+  .mobile-header-tabs,
+  .mobile-header-account-actions {
+    min-width: 0;
+  }
+
+  .mobile-header-panel .header-farm-item,
+  .mobile-header-panel .header-tab,
+  .mobile-header-panel .user-dropdown-item {
+    min-width: 0;
+    max-width: 100%;
+  }
+
+  .mobile-header-panel .header-farm-item span,
+  .mobile-header-panel .header-farm-item small {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    max-width: 100%;
   }
 
   .mobile-header-panel-section {
@@ -10565,5 +10590,33 @@ html, body, #root, .app, .main, .main-content, .page { max-width: 100%; }
   .connection-indicator,
   .connection-indicator-btn {
     max-width: 160px;
+  }
+}
+
+/* SPRINT29 - indicador de conexão compacto (só o ponto) no header mobile,
+   para não disputar espaço com a marca HERDON e os botões de ação. O texto
+   completo continua acessível para leitores de tela (role="status"). */
+@media (max-width: 900px) {
+  .mobile-header-core ~ .top-header-actions .connection-indicator-btn,
+  .top-header-actions .connection-indicator-btn {
+    max-width: 32px;
+  }
+
+  .top-header-actions .connection-indicator {
+    max-width: 32px;
+    width: 32px;
+    height: 32px;
+    padding: 0;
+    justify-content: center;
+    gap: 0;
+  }
+
+  .top-header-actions .connection-indicator__label {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip: rect(0, 0, 0, 0);
+    white-space: nowrap;
   }
 }

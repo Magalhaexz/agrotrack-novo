@@ -163,13 +163,20 @@ A classe `.action-row` (barra de botões de ação, usada em formulários, modai
 
 ---
 
+## Correção de layout (Sprint 29): modais espremidos no mobile
+
+`src/styles/layout.css` tinha regras (`.app-shell .ui-modal-overlay`/`.ui-modal`, e variantes `--sidebar-collapsed`) que reservavam espaço de sidebar fixa em **qualquer modal**, sem media query. No mobile (sidebar é um *drawer* fora da tela) isso espremia o modal a ~78px de largura — a causa real do "Menu Mais opções cortado". Corrigido restringindo essas regras a `@media (min-width: 901px)`; confirmado por medição (`getComputedStyle`) que o desktop não regrediu. Detalhes em `docs/MOBILE_POLISH_HERDON.md`.
+
+---
+
 ## Pendências visuais (futuras sprints)
 
 - [ ] Padronizar uso de `EmptyState` component em vez de `<div className="empty-state">` inline
 - [ ] Unificar KpiCard vs. kpi-card direto nas páginas
-- [ ] Limpar CSS acumulado de sprints anteriores em `app.css` (9k+ linhas) — inclui consolidar breakpoints e resolver a duplicidade de `.header-tabs` (Sprint 27)
+- [ ] Limpar CSS acumulado de sprints anteriores em `app.css` (9k+ linhas) — inclui consolidar breakpoints e resolver a duplicidade de `.header-tabs` (Sprint 27) e de `.ui-modal-overlay`/`.mobile-fab` (Sprint 29)
 - [ ] Adicionar skeleton loading coerente entre páginas
 - [ ] Revisar responsividade das tabelas em mobile (scroll horizontal)
 - [ ] Tela de Indicadores: empty state mais específico por métrica
 - [ ] Animações de transição entre abas (suave, sem exagero)
+- [ ] Decidir se modais mobile devem ser bottom sheet (`align-items: flex-end`) — uma regra já escrita para isso é sobreposta por outra sem media query (Sprint 29)
 - [ ] Verificação visual real (mobile/desktop) com conta autenticada — nenhuma sprint até a 27 conseguiu fazer isso (sem credenciais de teste)

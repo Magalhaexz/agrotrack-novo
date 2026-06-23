@@ -319,15 +319,21 @@ body {
   border-bottom: 1px solid rgba(255, 255, 255, 0.06);
 }
 
-.app-shell .ui-modal-overlay {
-  box-sizing: border-box;
-  padding-left: calc(var(--layout-sidebar-width) + var(--layout-page-padding-inline));
-  padding-right: var(--layout-page-padding-inline);
-}
+/* SPRINT29 - estas regras reservam espaço para a sidebar fixa do desktop.
+   No mobile a sidebar é um drawer fora da tela (translateX), então aplicar
+   esse padding/largura ali espremia qualquer modal (ex.: "Mais opções") a
+   poucos pixels de largura, colado na borda direita. Ver docs/MOBILE_POLISH_HERDON.md. */
+@media (min-width: 901px) {
+  .app-shell .ui-modal-overlay {
+    box-sizing: border-box;
+    padding-left: calc(var(--layout-sidebar-width) + var(--layout-page-padding-inline));
+    padding-right: var(--layout-page-padding-inline);
+  }
 
-.app-shell .ui-modal {
-  width: min(960px, calc(100vw - var(--layout-sidebar-width) - (var(--layout-page-padding-inline) * 2)));
-  max-width: calc(100vw - var(--layout-sidebar-width) - (var(--layout-page-padding-inline) * 2));
+  .app-shell .ui-modal {
+    width: min(960px, calc(100vw - var(--layout-sidebar-width) - (var(--layout-page-padding-inline) * 2)));
+    max-width: calc(100vw - var(--layout-sidebar-width) - (var(--layout-page-padding-inline) * 2));
+  }
 }
 
 .app-shell--sidebar-collapsed .header.top-header {
@@ -446,14 +452,16 @@ body {
   display: none !important;
 }
 
-.app-shell--sidebar-collapsed .ui-modal-overlay {
-  padding-left: calc(var(--layout-sidebar-collapsed-width) + var(--layout-page-padding-inline));
-  padding-right: var(--layout-page-padding-inline);
-}
+@media (min-width: 901px) {
+  .app-shell--sidebar-collapsed .ui-modal-overlay {
+    padding-left: calc(var(--layout-sidebar-collapsed-width) + var(--layout-page-padding-inline));
+    padding-right: var(--layout-page-padding-inline);
+  }
 
-.app-shell--sidebar-collapsed .ui-modal {
-  width: min(960px, calc(100vw - var(--layout-sidebar-collapsed-width) - (var(--layout-page-padding-inline) * 2)));
-  max-width: calc(100vw - var(--layout-sidebar-collapsed-width) - (var(--layout-page-padding-inline) * 2));
+  .app-shell--sidebar-collapsed .ui-modal {
+    width: min(960px, calc(100vw - var(--layout-sidebar-collapsed-width) - (var(--layout-page-padding-inline) * 2)));
+    max-width: calc(100vw - var(--layout-sidebar-collapsed-width) - (var(--layout-page-padding-inline) * 2));
+  }
 }
 
 .app-shell.app-shell--sidebar-collapsed .sidebar-content,

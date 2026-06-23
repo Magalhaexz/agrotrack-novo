@@ -433,78 +433,81 @@ export default function AppHeader({
             <MoreHorizontal size={16} />
           </button>
 
-          {openMobilePanel ? (
-            <>
-              <button
-                type="button"
-                className="mobile-header-panel-overlay"
-                aria-label="Fechar painel"
-                onClick={() => setOpenMobilePanel(false)}
-              />
-              <div id="mobile-header-panel" className="mobile-header-panel">
-                <section className="mobile-header-panel-section">
-                  <p className="mobile-header-panel-title">Fazenda ativa</p>
-                  <div className="mobile-header-panel-list">
-                    {fazendas.length === 0 ? (
-                      <div className="header-farm-item-empty">Nenhuma fazenda cadastrada.</div>
-                    ) : (
-                      fazendas.map((fazenda) => (
+          {openMobilePanel
+            ? createPortal(
+              <>
+                <button
+                  type="button"
+                  className="mobile-header-panel-overlay"
+                  aria-label="Fechar painel"
+                  onClick={() => setOpenMobilePanel(false)}
+                />
+                <div id="mobile-header-panel" className="mobile-header-panel">
+                  <section className="mobile-header-panel-section">
+                    <p className="mobile-header-panel-title">Fazenda ativa</p>
+                    <div className="mobile-header-panel-list">
+                      {fazendas.length === 0 ? (
+                        <div className="header-farm-item-empty">Nenhuma fazenda cadastrada.</div>
+                      ) : (
+                        fazendas.map((fazenda) => (
+                          <button
+                            key={`mobile-farm-${fazenda.id}`}
+                            type="button"
+                            className={`header-farm-item ${Number(fazendaSelecionada?.id) === Number(fazenda.id) ? 'active' : ''}`}
+                            onClick={() => {
+                              onSelectFazenda?.(fazenda);
+                              setOpenMobilePanel(false);
+                            }}
+                          >
+                            <span>{fazenda.nome}</span>
+                            <small>{fazenda.cidade} / {fazenda.estado}</small>
+                          </button>
+                        ))
+                      )}
+                    </div>
+                  </section>
+
+                  <section className="mobile-header-panel-section">
+                    <p className="mobile-header-panel-title">Visao</p>
+                    <div className="mobile-header-tabs">
+                      {['geral', 'estoque', 'alertas'].map((tab) => (
                         <button
-                          key={`mobile-farm-${fazenda.id}`}
+                          key={`mobile-tab-${tab}`}
                           type="button"
-                          className={`header-farm-item ${Number(fazendaSelecionada?.id) === Number(fazenda.id) ? 'active' : ''}`}
+                          className={`header-tab ${tabAtiva === tab ? 'active' : ''}`}
                           onClick={() => {
-                            onSelectFazenda?.(fazenda);
+                            onTabChange?.(tab);
                             setOpenMobilePanel(false);
                           }}
                         >
-                          <span>{fazenda.nome}</span>
-                          <small>{fazenda.cidade} / {fazenda.estado}</small>
+                          {tab[0].toUpperCase() + tab.slice(1)}
                         </button>
-                      ))
-                    )}
-                  </div>
-                </section>
+                      ))}
+                    </div>
+                  </section>
 
-                <section className="mobile-header-panel-section">
-                  <p className="mobile-header-panel-title">Visao</p>
-                  <div className="mobile-header-tabs">
-                    {['geral', 'estoque', 'alertas'].map((tab) => (
-                      <button
-                        key={`mobile-tab-${tab}`}
-                        type="button"
-                        className={`header-tab ${tabAtiva === tab ? 'active' : ''}`}
-                        onClick={() => {
-                          onTabChange?.(tab);
-                          setOpenMobilePanel(false);
-                        }}
-                      >
-                        {tab[0].toUpperCase() + tab.slice(1)}
+                  <section className="mobile-header-panel-section">
+                    <p className="mobile-header-panel-title">Conta</p>
+                    <div className="mobile-header-account-actions">
+                      <button type="button" className="user-dropdown-item" onClick={() => { onNavigateProfile?.(); setOpenMobilePanel(false); }}>
+                        <User size={15} />
+                        Meu Perfil
                       </button>
-                    ))}
-                  </div>
-                </section>
-
-                <section className="mobile-header-panel-section">
-                  <p className="mobile-header-panel-title">Conta</p>
-                  <div className="mobile-header-account-actions">
-                    <button type="button" className="user-dropdown-item" onClick={() => { onNavigateProfile?.(); setOpenMobilePanel(false); }}>
-                      <User size={15} />
-                      Meu Perfil
-                    </button>
-                    <button type="button" className="user-dropdown-item" onClick={() => { onNavigateSettings?.(); setOpenMobilePanel(false); }}>
-                      <Settings size={15} />
-                      Configuracoes
-                    </button>
-                    <button type="button" className="user-dropdown-item logout" onClick={handleLogout}>
-                      <LogOut size={15} />
-                      Sair da conta
-                    </button>
-                  </div>
-                </section>
-              </div>
-            </>
-          ) : null}
+                      <button type="button" className="user-dropdown-item" onClick={() => { onNavigateSettings?.(); setOpenMobilePanel(false); }}>
+                        <Settings size={15} />
+                        Configuracoes
+                      </button>
+                      <button type="button" className="user-dropdown-item logout" onClick={handleLogout}>
+                        <LogOut size={15} />
+                        Sair da conta
+                      </button>
+                    </div>
+                  </section>
+                </div>
+              </>,
+              document.body
+            )
+            : null}
         </div>
 
         <div className="user-menu-wrap" ref={userMenuRef}>
