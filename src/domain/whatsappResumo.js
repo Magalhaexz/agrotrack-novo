@@ -9,9 +9,9 @@ export function gerarResumoLoteTexto(relatorio) {
     return 'HERDON — Resumo do Lote\n\nLote não encontrado.';
   }
 
-  const { lote, totalAnimais, pesoAtualMedio, gmdMedio, lucroTotal, situacao, fazendaNome } = relatorio;
+  const { lote, totalAnimais, pesoAtualMedio, gmdMedio, lucroTotal, situacao, fazendaNome, custoPorArroba, lucroPorArroba, decisaoVenda } = relatorio;
 
-  return [
+  const linhas = [
     'HERDON — Resumo do Lote',
     '',
     linha('Lote', lote?.nome || '—'),
@@ -21,7 +21,13 @@ export function gerarResumoLoteTexto(relatorio) {
     linha('GMD', `${formatNumber(gmdMedio, 2)} kg/dia`),
     linha('Resultado estimado', formatCurrency(lucroTotal)),
     linha('Status', situacao),
-  ].join('\n');
+  ];
+
+  if (decisaoVenda) {
+    linhas.push(`Custo/@: ${formatCurrency(custoPorArroba)} · Lucro/@: ${formatCurrency(lucroPorArroba)} · Status: ${decisaoVenda.statusLabel}`);
+  }
+
+  return linhas.join('\n');
 }
 
 export function gerarResumoPesagensTexto(linhas, { loteNome } = {}) {

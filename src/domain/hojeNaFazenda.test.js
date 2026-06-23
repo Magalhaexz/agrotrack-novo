@@ -6,6 +6,7 @@ import {
   listarContasFinanceiras,
   listarEstoqueBaixo,
   listarLotesComGmdAbaixoDaMeta,
+  listarLotesPorStatusDecisaoVenda,
   listarLotesSemPasto,
   listarLotesSemPesagemRecente,
 } from './hojeNaFazenda.js';
@@ -251,4 +252,48 @@ test('construirHojeNaFazenda não quebra com pastagens/lotes/animais nulos', () 
   const resultado = construirHojeNaFazenda({ pastagens: null, lotes: null, animais: null }, { alerts: [] });
   assert.deepEqual(resultado.prioridades, []);
   assert.equal(resultado.pastos.totalPastos, 0);
+});
+
+// ─── decisão de venda (Sprint 32) ───────────────────────────────────────────
+
+test('listarLotesPorStatusDecisaoVenda classifica lote pronto para avaliar venda', () => {
+  const db = {
+    lotes: [{ id: 1, status: 'ativo', preco_arroba: 270, gmd_meta: 1 }],
+    animais: [{ id: 1, lote_id: 1, qtd: 10, p_ini: 300, p_at: 480, data_entrada: diasAtras(45), status: 'ativo' }],
+    movimentacoes_financeiras: [
+      { id: 1, tipo: 'despesa', categoria: 'compra_animal', lote_id: 1, valor: 10000 },
+      { id: 2, tipo: 'receita', categoria: 'venda_animal', lote_id: 1, valor: 40000 },
+    ],
+  };
+  const resultado = listarLotesPorStatusDecisaoVenda(db);
+  assert.deepEqual(resultado.prontosParaAvaliar.map((item) => item.lote.id), [1]);
+  assert.deepEqual(resultado.custoAlto, []);
+});
+
+test('listarLotesPorStatusDecisaoVenda classifica lote com custo alto por arroba', () => {
+  const db = {
+    lotes: [{ id: 1, status: 'ativo', preco_arroba: 270 }],
+    animais: [{ id: 1, lote_id: 1, qtd: 10, p_ini: 300, p_at: 480, data_entrada: diasAtras(45), status: 'ativo' }],
+    movimentacoes_financeiras: [
+      { id: 1, tipo: 'despesa', categoria: 'compra_animal', lote_id: 1, valor: 40000 },
+    ],
+  };
+  const resultado = listarLotesPorStatusDecisaoVenda(db);
+  assert.deepEqual(resultado.custoAlto.map((item) => item.lote.id), [1]);
+  assert.deepEqual(resultado.prontosParaAvaliar, []);
+});
+
+test('construirHojeNaFazenda gera prioridade de avaliação de venda quando há lote pronto', () => {
+  const db = {
+    lotes: [{ id: 1, status: 'ativo', preco_arroba: 270, gmd_meta: 1 }],
+    animais: [{ id: 1, lote_id: 1, qtd: 10, p_ini: 300, p_at: 480, data_entrada: diasAtras(45), status: 'ativo' }],
+    movimentacoes_financeiras: [
+      { id: 1, tipo: 'despesa', categoria: 'compra_animal', lote_id: 1, valor: 10000 },
+      { id: 2, tipo: 'receita', categoria: 'venda_animal', lote_id: 1, valor: 40000 },
+    ],
+  };
+  const resultado = construirHojeNaFazenda(db, { alerts: [] });
+  const item = resultado.prioridades.find((p) => p.id === 'lotes-prontos-venda');
+  assert.equal(item.texto, '1 lote precisa de avaliação de venda');
+  assert.equal(item.rota, 'resultados');
 });

@@ -6,7 +6,7 @@ Um hub "Relatórios" (menu **Gestão**) com 5 relatórios simples, pensados para
 
 | Relatório | Página | O que mostra |
 |---|---|---|
-| Relatório do Lote | `RelatorioLotePage.jsx` | Identificação, peso, GMD, custo/receita/lucro, ROI, últimas pesagens de um lote selecionado |
+| Relatório do Lote | `RelatorioLotePage.jsx` | Identificação, peso, GMD, custo/receita/lucro, ROI, **decisão de venda e custo por arroba (Sprint 32)**, últimas pesagens de um lote selecionado |
 | Relatório de Pesagens | `RelatorioPesagensPage.jsx` | Histórico de pesagens filtrável por fazenda/lote/período, com variação e GMD entre pesagens |
 | Relatório Financeiro | `RelatorioFinanceiroPage.jsx` | Entrou / saiu / saldo, maiores custos, contas vencidas e próximas do vencimento |
 | Relatório de Pastos | `RelatorioPastagensPage.jsx` | Pastos com/sem lote, lotes sem pasto, status de lotação, cabeças/peso estimados e percentual de ocupação por pasto (Sprint 25) |
@@ -23,8 +23,9 @@ Todo o cálculo já existia no app antes desta sprint. O arquivo novo `src/domai
 - `listarContasFinanceiras()`, `construirResumoPastos()`, `construirHojeNaFazenda()` (`src/domain/hojeNaFazenda.js`) — contas vencidas/próximas, ocupação de pastos, pendências do dia.
 - `calcularOcupacaoPastos()` (`src/domain/ocupacaoPastos.js`, Sprint 25) — status de lotação por pasto. Ver [OCUPACAO_PASTOS_HERDON.md](OCUPACAO_PASTOS_HERDON.md).
 - `buildAlerts()` (`src/utils/alerts.js`) — alertas críticos.
+- `classificarDecisaoVenda()`, `compararVenderOuManter()`, `montarDadosDecisaoVenda()` (`src/domain/decisaoVenda.js`, Sprint 32) — custo/lucro por arroba, ponto de equilíbrio, status de decisão e simulação "vender hoje vs manter por mais dias". Ver [DECISAO_VENDA_HERDON.md](DECISAO_VENDA_HERDON.md) e [CUSTO_POR_ARROBA_HERDON.md](CUSTO_POR_ARROBA_HERDON.md).
 
-Os textos de WhatsApp ficam em `src/domain/whatsappResumo.js`, separados da montagem dos relatórios.
+Os textos de WhatsApp ficam em `src/domain/whatsappResumo.js`, separados da montagem dos relatórios. Desde a Sprint 32, `gerarResumoLoteTexto` também inclui uma linha com custo/@, lucro/@ e status de decisão de venda, quando o relatório tiver esses dados.
 
 ## Limitações conhecidas
 

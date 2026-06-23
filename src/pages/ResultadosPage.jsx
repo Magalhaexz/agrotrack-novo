@@ -22,6 +22,7 @@ import Input from '../components/ui/Input';
 import Table from '../components/ui/Table';
 import { calcLote, formatCurrency, formatDate, formatNumber } from '../utils/calculations';
 import { getResumoLote } from '../domain/resumoLote';
+import { classificarDecisaoVenda, PRECO_ARROBA_PADRAO } from '../domain/decisaoVenda';
 import { exportarCsvCompatExcel, exportarExcelXmlCompat } from '../utils/exportadores';
 import '../styles/relatorios.css';
 
@@ -633,18 +634,36 @@ function buildReportBundle(db, filters) {
     };
   });
 
-  const lotReportRows = visibleLotes.map((item) => ({
-    id: item.lote.id,
-    lote: item.lote.nome,
-    fazenda: item.fazenda?.nome || '-',
-    status: item.lote.status || 'ativo',
-    animais: Number(item.indicadores.totalAnimais || 0),
-    gmd: Number(item.indicadores.gmdMedio || 0),
-    pesoAtual: Number(item.indicadores.pesoAtualMedio || 0),
-    custoPeriodo: item.custosPeriodo.reduce((total, custo) => total + Number(custo.valor || 0), 0),
-    margem: Number(item.indicadores.margem || 0),
-    sanidadePendente: item.sanitarioPeriodo.filter((registro) => resolveSanitaryStatus(registro) !== 'Em dia').length,
-  }));
+  const lotReportRows = visibleLotes.map((item) => {
+    const decisaoVenda = classificarDecisaoVenda({
+      qtdCabecas: Number(item.indicadores.totalAnimais || 0),
+      pesoAtual: Number(item.indicadores.pesoAtualMedio || 0),
+      arrobas: Number(item.indicadores.arrobasCarcaca || 0),
+      custoTotal: Number(item.indicadores.custoTotalLote || 0),
+      lucroTotal: Number(item.indicadores.margem || 0),
+      custoPorArroba: Number(item.indicadores.custoPorArroba || 0),
+      gmdAtual: Number(item.indicadores.gmdMedio || 0),
+      gmdMeta: Number(item.lote.gmd_meta || 0),
+      precoArroba: Number(item.lote.preco_arroba || PRECO_ARROBA_PADRAO),
+      dias: Number(item.indicadores.dias || 0),
+    });
+
+    return {
+      id: item.lote.id,
+      lote: item.lote.nome,
+      fazenda: item.fazenda?.nome || '-',
+      status: item.lote.status || 'ativo',
+      animais: Number(item.indicadores.totalAnimais || 0),
+      gmd: Number(item.indicadores.gmdMedio || 0),
+      pesoAtual: Number(item.indicadores.pesoAtualMedio || 0),
+      custoPeriodo: item.custosPeriodo.reduce((total, custo) => total + Number(custo.valor || 0), 0),
+      margem: Number(item.indicadores.margem || 0),
+      custoPorArroba: Number(item.indicadores.custoPorArroba || 0),
+      lucroPorArroba: Number(item.indicadores.lucroPorArroba || 0),
+      decisaoVenda,
+      sanidadePendente: item.sanitarioPeriodo.filter((registro) => resolveSanitaryStatus(registro) !== 'Em dia').length,
+    };
+  });
 
   const stockCriticalCount = stockItemRows.filter((item) => item.status === 'Crítico').length;
   const lotMarginTotal = lotReportRows.reduce((total, item) => total + item.margem, 0);
@@ -701,6 +720,12 @@ function buildReportBundle(db, filters) {
             { key: 'pesoAtual', label: 'Peso médio', render: (row) => `${formatNumber(row.pesoAtual, 1)} kg` },
             { key: 'custoPeriodo', label: 'Custos', render: (row) => formatCurrency(row.custoPeriodo) },
             { key: 'margem', label: 'Margem', render: (row) => <span className={row.margem >= 0 ? 'text-success' : 'text-danger'}>{formatCurrency(row.margem)}</span> },
+            { key: 'custoPorArroba', label: 'Custo/@', render: (row) => formatCurrency(row.custoPorArroba) },
+            {
+              key: 'decisao',
+              label: 'Decisão de venda',
+              render: (row) => <Badge variant={decisaoVendaBadgeVariant(row.decisaoVenda?.status)}>{row.decisaoVenda?.statusLabel}</Badge>,
+            },
             { key: 'status', label: 'Status', render: (row) => <Badge variant={row.status === 'ativo' ? 'success' : 'neutral'}>{capitalize(row.status)}</Badge> },
           ],
           rows: lotReportRows,
@@ -1463,6 +1488,13 @@ function capitalize(value) {
     return '-';
   }
   return String(value).charAt(0).toUpperCase() + String(value).slice(1);
+}
+
+function decisaoVendaBadgeVariant(status) {
+  if (status === 'pronto_avaliar') return 'success';
+  if (status === 'abaixo_meta_gmd' || status === 'custo_alto') return 'warning';
+  if (status === 'dados_insuficientes') return 'neutral';
+  return 'info';
 }
 
 function sanitizeBadge(status) {

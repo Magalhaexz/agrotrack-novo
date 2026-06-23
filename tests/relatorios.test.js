@@ -21,6 +21,29 @@ test('buildRelatorioLote retorna dados completos quando o lote existe', () => {
   assert.equal(Array.isArray(relatorio.ultimasPesagens), true);
 });
 
+test('buildRelatorioLote inclui decisão de venda e simulação (Sprint 32)', () => {
+  const db = makeBaseDb();
+  const relatorio = buildRelatorioLote(db, 10);
+
+  assert.equal(relatorio.precoArroba, 270);
+  assert.ok(relatorio.decisaoVenda);
+  assert.ok(relatorio.decisaoVenda.statusLabel);
+  assert.ok(relatorio.decisaoVenda.mensagem);
+  assert.ok(relatorio.simulacaoVenda);
+  assert.equal(typeof relatorio.simulacaoVenda.diferenca, 'number');
+  assert.match(relatorio.simulacaoVenda.aviso, /Simulação estimada/);
+});
+
+test('buildRelatorioLote não gera simulação de venda quando faltam dados financeiros', () => {
+  const db = makeBaseDb();
+  db.movimentacoes_financeiras = [];
+  db.custos = [];
+  const relatorio = buildRelatorioLote(db, 10);
+
+  assert.equal(relatorio.decisaoVenda.status, 'dados_insuficientes');
+  assert.equal(relatorio.simulacaoVenda, null);
+});
+
 test('buildRelatorioLote retorna encontrado=false para lote inexistente', () => {
   const db = makeBaseDb();
   const relatorio = buildRelatorioLote(db, 999);

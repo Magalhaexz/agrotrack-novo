@@ -20,6 +20,31 @@ test('gerarResumoLoteTexto inclui nome do lote e status', () => {
   assert.match(texto, /Status:/);
 });
 
+test('gerarResumoLoteTexto inclui linha de custo/lucro por arroba e status de decisão de venda (Sprint 32)', () => {
+  const db = makeBaseDb();
+  const relatorio = buildRelatorioLote(db, 10);
+  const texto = gerarResumoLoteTexto(relatorio);
+
+  assert.match(texto, /Custo\/@: R\$ \d/);
+  assert.match(texto, /Lucro\/@: R\$ -?\d/);
+  assert.match(texto, /Status: (Pronto para avaliar venda|Acompanhar por mais alguns dias|Abaixo da meta de ganho|Custo alto por arroba|Dados insuficientes)$/m);
+});
+
+test('gerarResumoLoteTexto não quebra quando relatório não tem decisaoVenda (compatibilidade)', () => {
+  const texto = gerarResumoLoteTexto({
+    encontrado: true,
+    lote: { nome: 'Lote X' },
+    totalAnimais: 5,
+    pesoAtualMedio: 300,
+    gmdMedio: 1,
+    lucroTotal: 100,
+    situacao: 'Em lucro',
+    fazendaNome: 'Fazenda X',
+  });
+  assert.match(texto, /Lote X/);
+  assert.doesNotMatch(texto, /Custo\/@/);
+});
+
 test('gerarResumoLoteTexto trata lote inexistente sem quebrar', () => {
   const texto = gerarResumoLoteTexto({ encontrado: false });
   assert.match(texto, /não encontrado/);

@@ -2,6 +2,7 @@ import { toNumber, toDateKey, daysBetween } from './calcHelpers.js';
 import { getResumoLote } from './resumoLote.js';
 import { isMovimentacaoCancelada, isMovimentacaoPaga, getDataVencimento } from './financeiroStatus.js';
 import { calcularOcupacaoPastos, listarLotesSemPasto } from './ocupacaoPastos.js';
+import { montarDadosDecisaoVenda, classificarDecisaoVenda, STATUS_DECISAO } from './decisaoVenda.js';
 
 export { listarLotesSemPasto };
 
@@ -33,6 +34,19 @@ export function listarLotesComGmdAbaixoDaMeta(db = {}) {
     if (resumo.totalAnimais <= 0 || resumo.dias <= 0) return false;
     return resumo.gmdMedio < meta;
   });
+}
+
+/** Lotes em cada categoria de decisão de venda, a partir de `decisaoVenda.js`. */
+export function listarLotesPorStatusDecisaoVenda(db = {}) {
+  const lotesComStatus = lotesAtivosDe(db).map((lote) => ({
+    lote,
+    decisao: classificarDecisaoVenda(montarDadosDecisaoVenda(db, lote.id)),
+  }));
+
+  return {
+    prontosParaAvaliar: lotesComStatus.filter((item) => item.decisao.status === STATUS_DECISAO.PRONTO_AVALIAR),
+    custoAlto: lotesComStatus.filter((item) => item.decisao.status === STATUS_DECISAO.CUSTO_ALTO),
+  };
 }
 
 export function listarContasFinanceiras(db = {}, diasProximo = FINANCEIRO_PROXIMO_DIAS) {
@@ -120,6 +134,7 @@ export function construirHojeNaFazenda(db = {}, { alerts = [] } = {}) {
   const lotesSemPesagem = listarLotesSemPesagemRecente(db);
   const lotesGmdBaixo = listarLotesComGmdAbaixoDaMeta(db);
   const lotesSemPasto = listarLotesSemPasto(db);
+  const { prontosParaAvaliar: lotesProntosParaVenda, custoAlto: lotesCustoAltoArroba } = listarLotesPorStatusDecisaoVenda(db);
   const { vencidas, proximas } = listarContasFinanceiras(db);
   const estoqueBaixo = listarEstoqueBaixo(db);
 
@@ -196,6 +211,22 @@ export function construirHojeNaFazenda(db = {}, { alerts = [] } = {}) {
       rota: 'estoque',
     });
   }
+  if (lotesProntosParaVenda.length > 0) {
+    prioridades.push({
+      id: 'lotes-prontos-venda',
+      tom: 'atencao',
+      texto: `${lotesProntosParaVenda.length} ${pluralizar(lotesProntosParaVenda.length, 'lote precisa', 'lotes precisam')} de avaliação de venda`,
+      rota: 'resultados',
+    });
+  }
+  if (lotesCustoAltoArroba.length > 0) {
+    prioridades.push({
+      id: 'lotes-custo-alto-arroba',
+      tom: 'atencao',
+      texto: `${lotesCustoAltoArroba.length} ${pluralizar(lotesCustoAltoArroba.length, 'lote está', 'lotes estão')} com custo por arroba alto`,
+      rota: 'resultados',
+    });
+  }
   if (alertasCriticosOutros.length > 0) {
     prioridades.push({
       id: 'alertas-criticos',
@@ -215,6 +246,8 @@ export function construirHojeNaFazenda(db = {}, { alerts = [] } = {}) {
       contasProximas: proximas,
       estoqueBaixo,
       alertasCriticosTotal,
+      lotesProntosParaVenda,
+      lotesCustoAltoArroba,
     },
     pastos: resumoPastos,
   };

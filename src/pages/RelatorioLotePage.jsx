@@ -85,6 +85,27 @@ export default function RelatorioLotePage({ db, onNavigate }) {
               </Card>
             </div>
 
+            <Card title="Decisão de venda e custo por arroba">
+              <div className="summary-list">
+                <Row label="Arrobas estimadas" value={`${formatNumber(relatorio.arrobasCarcaca, 1)} @`} />
+                <Row label="Custo por arroba" value={formatCurrency(relatorio.custoPorArroba)} />
+                <Row label="Lucro por arroba" value={formatCurrency(relatorio.lucroPorArroba)} />
+                <Row label="Ponto de equilíbrio da arroba" value={formatCurrency(relatorio.custoPorArroba)} />
+                <Row label="Preço-alvo da arroba" value={formatCurrency(relatorio.precoArroba)} />
+                <Row label="Status" value={relatorio.decisaoVenda?.statusLabel} />
+              </div>
+              <p className="ui-input-hint">{relatorio.decisaoVenda?.mensagem}</p>
+
+              {relatorio.simulacaoVenda ? (
+                <div className="summary-list">
+                  <Row label="Se vender hoje" value={`Lucro estimado de ${formatCurrency(relatorio.simulacaoVenda.vendaHoje.lucro)}`} />
+                  <Row label="Se manter por 30 dias" value={`Lucro estimado de ${formatCurrency(relatorio.simulacaoVenda.manter.lucroProjetado)}`} />
+                  <Row label="Diferença estimada" value={formatCurrency(relatorio.simulacaoVenda.diferenca)} />
+                  <Row label="Aviso" value={relatorio.simulacaoVenda.aviso} />
+                </div>
+              ) : null}
+            </Card>
+
             <Card title="Últimas pesagens">
               {!relatorio.ultimasPesagens?.length ? (
                 <EmptyState compact title="Ainda não há pesagens para este lote." />

@@ -4,6 +4,7 @@ import { calcularFluxoCaixa } from './fluxoCaixa.js';
 import { construirResumoPastos, listarContasFinanceiras, construirHojeNaFazenda } from './hojeNaFazenda.js';
 import { calcularOcupacaoPastos, listarLotesSemPasto } from './ocupacaoPastos.js';
 import { buildAlerts } from '../utils/alerts.js';
+import { classificarDecisaoVenda, compararVenderOuManter, montarDadosDecisaoVenda, STATUS_DECISAO } from './decisaoVenda.js';
 
 function arr(value) {
   return Array.isArray(value) ? value : [];
@@ -45,6 +46,22 @@ export function buildRelatorioLote(db, loteId) {
     .slice()
     .sort((a, b) => (toDateKey(b.data) || '').localeCompare(toDateKey(a.data) || ''));
 
+  const dadosDecisaoVenda = montarDadosDecisaoVenda(db, loteId);
+  const decisaoVenda = classificarDecisaoVenda(dadosDecisaoVenda);
+  // Custo diário por cabeça estimado a partir do histórico do próprio lote —
+  // só para dar um número de partida à simulação de "manter por mais dias";
+  // não é um cadastro novo, é uma média do que já foi gasto até agora.
+  const custoDiarioPorCabecaEstimado = dadosDecisaoVenda.dias > 0 && dadosDecisaoVenda.qtdCabecas > 0
+    ? dadosDecisaoVenda.custoTotal / dadosDecisaoVenda.dias / dadosDecisaoVenda.qtdCabecas
+    : 0;
+  const simulacaoVenda = decisaoVenda.status === STATUS_DECISAO.DADOS_INSUFICIENTES
+    ? null
+    : compararVenderOuManter(dadosDecisaoVenda, {
+        diasAdicionais: 30,
+        gmdEsperado: dadosDecisaoVenda.gmdAtual,
+        custoDiarioPorCabeca: custoDiarioPorCabecaEstimado,
+      });
+
   return {
     encontrado: true,
     ...resumo,
@@ -55,6 +72,9 @@ export function buildRelatorioLote(db, loteId) {
     gmdMeta: toNumber(lote.gmd_meta) || null,
     situacao: situacaoLote(resumo.classificacao),
     ultimasPesagens: pesagensLote.slice(0, 5),
+    precoArroba: dadosDecisaoVenda.precoArroba,
+    decisaoVenda,
+    simulacaoVenda,
   };
 }
 

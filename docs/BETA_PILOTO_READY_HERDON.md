@@ -84,6 +84,19 @@
 > credenciais de teste; ver
 > [MODO_CURRAL_TESTE_MANUAL.md](MODO_CURRAL_TESTE_MANUAL.md).
 
+> **Atualização (Sprint 32):** criada a Decisão de Venda e Custo por
+> Arroba — leitura prática de "este lote já está no ponto de venda?" e
+> "quanto custa produzir uma arroba neste lote?", reaproveitando
+> inteiramente os cálculos de GMD/arrobas/custo/lucro já existentes desde
+> sprints anteriores. Aparece no Relatório do Lote, em Resultado dos
+> Lotes, no resumo WhatsApp e como prioridade no Dashboard. Nenhuma regra
+> comercial, Asaas, plano, RLS ou migration foi alterada. Ver
+> [SPRINT_32_RESULTADO.md](SPRINT_32_RESULTADO.md) e
+> [DECISAO_VENDA_HERDON.md](DECISAO_VENDA_HERDON.md). Pendência aberta
+> (mesma desde a Sprint 22): verificação visual real com conta
+> autenticada — não foi possível nesta sessão; ver
+> [DECISAO_VENDA_TESTE_MANUAL.md](DECISAO_VENDA_TESTE_MANUAL.md).
+
 ---
 
 ## Critérios de aprovação
