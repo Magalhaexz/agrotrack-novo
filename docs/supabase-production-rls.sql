@@ -276,7 +276,6 @@ declare
     'usuarios',
     'configuracoes',
     'cenarios',
-    'auditoria',
     'alertas_resolvidos',
     'alertas_adiados',
     'consumo_suplementacao'
@@ -315,3 +314,26 @@ begin
     );
   end loop;
 end $$;
+
+-- SPRINT 30 — auditoria deve ser somente leitura/inserção (trilha imutável).
+-- Removido do loop genérico acima de propósito: um audit trail que pode ser
+-- alterado/apagado pela própria conta que ele audita não serve para nada.
+-- Esta correção já tinha sido aplicada manualmente na Sprint 2
+-- (docs/PLANO_LIMPEZA_HERDON.md, item 5), mas o bundle .sql não tinha sido
+-- atualizado para refletir isso — reexecutar o arquivo antigo regrediria a
+-- correção. Agora o próprio bundle remove update/delete e nunca as recria.
+alter table public.auditoria enable row level security;
+alter table public.auditoria force row level security;
+
+drop policy if exists auditoria_select_same_account on public.auditoria;
+create policy auditoria_select_same_account on public.auditoria
+  for select to authenticated
+  using (public.app_is_same_account(owner_user_id));
+
+drop policy if exists auditoria_insert_same_account on public.auditoria;
+create policy auditoria_insert_same_account on public.auditoria
+  for insert to authenticated
+  with check (public.app_is_same_account(owner_user_id));
+
+drop policy if exists auditoria_update_same_account on public.auditoria;
+drop policy if exists auditoria_delete_same_account on public.auditoria;

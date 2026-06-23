@@ -25,11 +25,18 @@ function classify(error) {
   return 'Falha ao conectar o servidor à nuvem.';
 }
 
-async function runTableCheck(client, table, userId = null) {
+export async function runTableCheck(client, table, userId = null) {
   let query = client.from(table).select('id', { count: 'exact', head: false }).limit(1);
   if (userId) query = query.eq('owner_user_id', userId);
 
   const { data, error, count } = await query;
+  // SPRINT 30: este client usa service_role (ignora RLS) só para checar se a
+  // tabela responde. Quando userId não é informado, a contagem é de TODAS as
+  // contas da plataforma — nunca devolver esse número ao usuário autenticado,
+  // mesmo sendo "só uma contagem": é dado agregado entre contas, e o frontend
+  // não usa esse campo (só status/message importam para o diagnóstico).
+  const safeCount = userId ? (Number(count) || (Array.isArray(data) ? data.length : 0)) : null;
+
   if (error) {
     return {
       name: `table_${table}`,
@@ -38,7 +45,7 @@ async function runTableCheck(client, table, userId = null) {
       httpStatus: Number(error?.status) || null,
       code: String(error?.code || '').toUpperCase() || null,
       message: classify(error),
-      count: 0,
+      count: userId ? 0 : null,
     };
   }
 
@@ -49,7 +56,7 @@ async function runTableCheck(client, table, userId = null) {
     httpStatus: 200,
     code: null,
     message: 'Nuvem conectada pelo servidor.',
-    count: Number(count) || (Array.isArray(data) ? data.length : 0),
+    count: safeCount,
   };
 }
 

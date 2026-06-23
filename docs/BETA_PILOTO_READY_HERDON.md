@@ -59,6 +59,19 @@
 > Ver [SPRINT_29_RESULTADO.md](SPRINT_29_RESULTADO.md). Pendência aberta
 > (mesma desde a Sprint 22): verificação visual real com conta autenticada.
 
+> **Atualização (Sprint 30):** auditoria final de segurança antes do piloto.
+> Confirmado: RLS habilitado e forçado em todas as 28 tabelas, service role
+> nunca exposto ao frontend, Asaas continua em sandbox sem cobrança real
+> ativa, nenhuma chave commitada. Dois achados reais corrigidos (ambos
+> baixa-média severidade): o script-fonte de RLS recriava policies de
+> UPDATE/DELETE em `auditoria` se re-executado (corrigido no arquivo, banco
+> vivo precisa de confirmação humana); e `cloud-diagnostic.js` expunha
+> contagem de registros agregada entre contas (corrigido + testado).
+> Documentado backup/recuperação e um checklist objetivo pré-piloto. Ver
+> [SPRINT_30_RESULTADO.md](SPRINT_30_RESULTADO.md) e
+> [SEGURANCA_HERDON.md](SEGURANCA_HERDON.md). Pendência aberta (mesma desde
+> a Sprint 22): nenhuma verificação em ambiente real foi possível.
+
 ---
 
 ## Critérios de aprovação

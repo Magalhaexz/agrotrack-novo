@@ -1,8 +1,10 @@
-# Auditoria Asaas (Sprint 28)
+# Auditoria Asaas (Sprint 28, revalidada na Sprint 30)
 
 ## Resumo
 
 A integração com o Asaas **já existe, é real (commitada em `main` há várias sprints) e está bem mais madura do que o diagnóstico inicial da sprint sugeria**. Esta sprint foi de auditoria — confirmar que está segura e documentar — sem alterar o fluxo de cobrança.
+
+> **Revalidação (Sprint 30):** auditoria de segurança final confirmou, novamente por leitura de código, que nada mudou desde a Sprint 28 — `ASAAS_ENV` continua sem valor de produção em qualquer arquivo do repositório, nenhuma chave foi exposta, e o webhook continua validando token antes de processar. Ver `docs/SEGURANCA_HERDON.md` para o resumo geral da auditoria.
 
 ## Arquivos envolvidos
 
