@@ -1,4 +1,3 @@
-import { useState } from 'react';
 import Card from '../components/ui/Card';
 import Button from '../components/ui/Button';
 import PageHeader from '../components/PageHeader';
@@ -6,12 +5,10 @@ import ConnectionIndicator from '../components/ConnectionIndicator';
 import { useAuth } from '../auth/useAuth';
 import { useToast } from '../hooks/useToast';
 import { useOfflineQueueStatus } from '../hooks/useOfflineQueueStatus';
-import { adicionarOperacaoOffline, getFriendlyPendingMessage } from '../services/offlineQueue';
+import { useRegistroRapido } from '../hooks/useRegistroRapido';
+import { getFriendlyPendingMessage } from '../services/offlineQueue';
 import { formatDate } from '../utils/calculations';
-import RegistrarPesagemOfflineModal from '../components/offline/RegistrarPesagemOfflineModal';
-import RegistrarMovimentacaoPastoOfflineModal from '../components/offline/RegistrarMovimentacaoPastoOfflineModal';
-import RegistrarDespesaOfflineModal from '../components/offline/RegistrarDespesaOfflineModal';
-import RegistrarOcorrenciaOfflineModal from '../components/offline/RegistrarOcorrenciaOfflineModal';
+import RegistroRapidoModais from '../components/curral/RegistroRapidoModais';
 
 const TIPO_LABELS = {
   pesagem_lote: 'Pesagem de lote',
@@ -27,14 +24,6 @@ const STATUS_LABELS = {
   erro: 'Não foi possível sincronizar ainda',
 };
 
-const PERMISSAO_POR_TIPO = {
-  pesagem_lote: 'pesagens:editar',
-  pesagem_animal: 'pesagens:editar',
-  movimentacao_pasto: 'lotes:editar',
-  despesa_simples: 'financeiro:editar',
-  ocorrencia_manejo: 'sanitario:editar',
-};
-
 function resumoItem(item) {
   const tipoLabel = TIPO_LABELS[item.tipo_operacao] || item.tipo_operacao;
   const data = item.payload?.data || item.payload?.dataMovimentacao || '';
@@ -45,38 +34,11 @@ export default function SincronizacaoPage({ db, setDb, session }) {
   const { hasPermission } = useAuth();
   const { showToast } = useToast();
   const status = useOfflineQueueStatus(session, setDb);
-  const [modalAberto, setModalAberto] = useState(null);
+  const { modalAberto, abrirModal, fecharModal, registrar } = useRegistroRapido(session, status);
 
   const fazendas = Array.isArray(db?.fazendas) ? db.fazendas : [];
   const lotes = Array.isArray(db?.lotes) ? db.lotes : [];
   const pastagens = Array.isArray(db?.pastagens) ? db.pastagens : [];
-
-  function registrar(tipoOperacao, payload, mensagemSucesso) {
-    const permissaoNecessaria = PERMISSAO_POR_TIPO[tipoOperacao];
-    if (permissaoNecessaria && !hasPermission(permissaoNecessaria)) {
-      showToast({ type: 'error', message: 'Você não tem permissão para executar esta ação.' });
-      return;
-    }
-
-    const resultado = adicionarOperacaoOffline(tipoOperacao, payload, session);
-    if (!resultado.ok) {
-      showToast({ type: 'error', message: resultado.error || 'Não foi possível salvar este registro neste aparelho.' });
-      return;
-    }
-
-    setModalAberto(null);
-    status.atualizarResumo();
-
-    if (resultado.duplicado) {
-      showToast({ type: 'info', message: 'Este registro já estava aguardando sincronização.' });
-      return;
-    }
-
-    showToast({
-      type: 'success',
-      message: status.online ? `${mensagemSucesso} Sincronizando agora.` : getFriendlyPendingMessage(),
-    });
-  }
 
   async function handleSincronizarItem(idLocal) {
     const resultado = await status.sincronizarItemAgora(idLocal);
@@ -154,12 +116,12 @@ export default function SincronizacaoPage({ db, setDb, session }) {
         </article>
       </div>
 
-      <Card title="Registrar offline" subtitle="Funciona com ou sem internet. O registro some da lista assim que sincronizar.">
+      <Card title="Registrar offline" subtitle="Funciona com ou sem internet. O registro some da lista assim que sincronizar. Para um atalho mais rápido no campo, use o Modo Curral.">
         <div className="dashboard-action-grid dashboard-action-grid--quick">
-          <Button variant="outline" onClick={() => setModalAberto('pesagem')} disabled={!hasPermission('pesagens:editar')}>Registrar pesagem</Button>
-          <Button variant="outline" onClick={() => setModalAberto('movimentacao')} disabled={!hasPermission('lotes:editar')}>Mover lote de pasto</Button>
-          <Button variant="outline" onClick={() => setModalAberto('despesa')} disabled={!hasPermission('financeiro:editar')}>Lançar despesa</Button>
-          <Button variant="outline" onClick={() => setModalAberto('ocorrencia')} disabled={!hasPermission('sanitario:editar')}>Registrar ocorrência</Button>
+          <Button variant="outline" onClick={() => abrirModal('pesagem')} disabled={!hasPermission('pesagens:editar')}>Registrar pesagem</Button>
+          <Button variant="outline" onClick={() => abrirModal('movimentacao')} disabled={!hasPermission('lotes:editar')}>Mover lote de pasto</Button>
+          <Button variant="outline" onClick={() => abrirModal('despesa')} disabled={!hasPermission('financeiro:editar')}>Lançar despesa</Button>
+          <Button variant="outline" onClick={() => abrirModal('ocorrencia')} disabled={!hasPermission('sanitario:editar')}>Registrar ocorrência</Button>
         </div>
       </Card>
 
@@ -193,33 +155,13 @@ export default function SincronizacaoPage({ db, setDb, session }) {
         )}
       </Card>
 
-      <RegistrarPesagemOfflineModal
-        open={modalAberto === 'pesagem'}
-        fazendas={fazendas}
-        lotes={lotes}
-        onClose={() => setModalAberto(null)}
-        onSubmit={(payload) => registrar('pesagem_lote', payload, 'Pesagem registrada.')}
-      />
-      <RegistrarMovimentacaoPastoOfflineModal
-        open={modalAberto === 'movimentacao'}
+      <RegistroRapidoModais
+        modalAberto={modalAberto}
         fazendas={fazendas}
         lotes={lotes}
         pastagens={pastagens}
-        onClose={() => setModalAberto(null)}
-        onSubmit={(payload) => registrar('movimentacao_pasto', payload, 'Movimentação registrada.')}
-      />
-      <RegistrarDespesaOfflineModal
-        open={modalAberto === 'despesa'}
-        fazendas={fazendas}
-        onClose={() => setModalAberto(null)}
-        onSubmit={(payload) => registrar('despesa_simples', payload, 'Despesa registrada.')}
-      />
-      <RegistrarOcorrenciaOfflineModal
-        open={modalAberto === 'ocorrencia'}
-        fazendas={fazendas}
-        lotes={lotes}
-        onClose={() => setModalAberto(null)}
-        onSubmit={(payload) => registrar('ocorrencia_manejo', payload, 'Ocorrência registrada.')}
+        onClose={fecharModal}
+        registrar={registrar}
       />
     </div>
   );

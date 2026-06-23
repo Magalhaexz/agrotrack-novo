@@ -379,3 +379,28 @@ export const LifeBuoy = icon([
   createElement('path', { d: 'm14.9 9.1 4.2-4.2' }),
   createElement('path', { d: 'm4.9 19.1 4.2-4.2' }),
 ]);
+
+/* Sprint 31 — Modo Curral */
+
+export const Warehouse = icon([
+  createElement('path', { d: 'M3 9.5 12 4l9 5.5V20a1 1 0 0 1-1 1h-4v-7H9v7H4a1 1 0 0 1-1-1z' }),
+  createElement('path', { d: 'M3 9.5 12 4l9 5.5' }),
+]);
+
+export const ClipboardPlus = icon([
+  createElement('rect', { x: 5, y: 4, width: 14, height: 16, rx: 2 }),
+  createElement('path', { d: 'M9 2h6v3H9z' }),
+  createElement('path', { d: 'M12 11v6M9 14h6' }),
+]);
+
+export const ListChecks = icon([
+  createElement('path', { d: 'm3 7 1.5 1.5L7 6' }),
+  createElement('path', { d: 'm3 14 1.5 1.5L7 13' }),
+  createElement('path', { d: 'M11 7h10M11 14h10M11 21h10' }),
+]);
+
+export const MapPinned = icon([
+  createElement('path', { d: 'M12 21s7-6.2 7-11a7 7 0 1 0-14 0c0 4.8 7 11 7 11z' }),
+  createElement('circle', { cx: 12, cy: 10, r: 2.5 }),
+  createElement('path', { d: 'M4 21h16' }),
+]);

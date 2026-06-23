@@ -72,6 +72,18 @@
 > [SEGURANCA_HERDON.md](SEGURANCA_HERDON.md). Pendência aberta (mesma desde
 > a Sprint 22): nenhuma verificação em ambiente real foi possível.
 
+> **Atualização (Sprint 31):** criado o Modo Curral — uma página dedicada
+> de registro rápido (pesagem, movimentação de pasto, despesa, ocorrência)
+> reaproveitando inteiramente os formulários e a fila offline já existentes
+> desde a Sprint 23. Nenhuma regra de negócio nova, nenhuma tabela nova,
+> nada em Asaas/planos foi alterado. Ver
+> [SPRINT_31_RESULTADO.md](SPRINT_31_RESULTADO.md) e
+> [MODO_CURRAL_HERDON.md](MODO_CURRAL_HERDON.md). Pendência aberta (mesma
+> desde a Sprint 22): verificação visual real com conta autenticada — não
+> foi possível abrir o Modo Curral logado nesta sessão por falta de
+> credenciais de teste; ver
+> [MODO_CURRAL_TESTE_MANUAL.md](MODO_CURRAL_TESTE_MANUAL.md).
+
 ---
 
 ## Critérios de aprovação

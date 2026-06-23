@@ -24,6 +24,7 @@ import {
   TrendingUp,
   User,
   Users,
+  Warehouse,
 } from 'lucide-react';
 
 export const navSections = [
@@ -36,6 +37,7 @@ export const navSections = [
     id: 'operacao',
     title: 'Operação',
     items: [
+      { id: 'modoCurral', label: 'Modo Curral', icon: Warehouse },
       { id: 'fazendas', label: 'Fazendas', icon: MapPin },
       { id: 'pastagens', label: 'Pastos', icon: Tractor },
       { id: 'lotes', label: 'Lotes e Rebanho', icon: Beef },

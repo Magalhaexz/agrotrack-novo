@@ -10,6 +10,7 @@
 ### Operação
 | ID | Label | Ícone |
 |----|-------|-------|
+| modoCurral | Modo Curral | Warehouse |
 | fazendas | Fazendas | MapPin |
 | pastagens | Pastos | Tractor |
 | lotes | Lotes e Rebanho | Beef |
@@ -129,6 +130,22 @@ Estas páginas existem em `pageMap` mas não aparecem na nav principal. Continua
 
 ---
 
+## Sprint 31 — Modo Curral
+
+`modoCurral` é uma página nova, primeira da seção Operação, pensada como
+ponto de entrada rápido para registro no campo/curral (pesagem,
+movimentação de pasto, despesa, ocorrência). Permissão: `dashboard:ver`
+(mesmo padrão de `sincronizacao` — qualquer perfil logado acessa a tela; as
+4 ações dentro dela continuam protegidas individualmente por
+`pesagens:editar`/`lotes:editar`/`financeiro:editar`/`sanitario:editar`).
+Não foi adicionada a nenhuma lista de módulos por plano (`MODULES_BASIC`
+etc.) em `src/services/subscriptions.js` — mesmo tratamento de
+`sincronizacao`, que também não está nessas listas; decisão de plano fica
+fora do escopo desta sprint. Ver
+[MODO_CURRAL_HERDON.md](MODO_CURRAL_HERDON.md).
+
+---
+
 ## Arquivo de configuração
 
 `src/navigation/navConfig.js`
@@ -148,3 +165,5 @@ Os ícones abaixo foram adicionados ao arquivo `src/lucide-react.js` para uso no
 - `HelpCircle` — Guia do Criador (Sprint 26)
 - `LifeBuoy` — Suporte (Sprint 26)
 - `Circle` — checklist de primeiros passos, item pendente (Sprint 26)
+- `Warehouse` — Modo Curral (Sprint 31)
+- `ClipboardPlus`, `ListChecks`, `MapPinned` — cards de ação dentro do Modo Curral (Sprint 31)

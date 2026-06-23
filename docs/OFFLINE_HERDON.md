@@ -1,7 +1,21 @@
 # Offline — Arquitetura HERDON
 
 Sprint 23. Documento técnico de arquitetura. Para a visão de produto/uso,
-ver [MODO_CAMPO_OFFLINE_HERDON.md](MODO_CAMPO_OFFLINE_HERDON.md).
+ver [MODO_CAMPO_OFFLINE_HERDON.md](MODO_CAMPO_OFFLINE_HERDON.md). Para o
+novo ponto de entrada rápido que reaproveita esta fila, ver
+[MODO_CURRAL_HERDON.md](MODO_CURRAL_HERDON.md) e
+[REGISTRO_RAPIDO_HERDON.md](REGISTRO_RAPIDO_HERDON.md) (Sprint 31).
+
+> **Atualização (Sprint 31):** nenhuma mudança na fila em si
+> (`src/services/offlineQueue.js`, formato do item, tipos suportados,
+> sincronização automática/manual — tudo abaixo continua válido sem
+> alteração). O que mudou foi só a porta de entrada: a lógica de
+> "registrar offline" (permissão + `adicionarOperacaoOffline` + toast) que
+> antes só existia dentro de `SincronizacaoPage.jsx` foi extraída para
+> `src/hooks/useRegistroRapido.js`, e os 4 modais de captura foram agrupados
+> em `src/components/curral/RegistroRapidoModais.jsx` — para serem
+> reaproveitados tanto pela Sincronização quanto pela nova página Modo
+> Curral, sem duplicar formulário, validação ou regra de negócio.
 
 ## Auditoria do que já existia (Etapa 1)
 

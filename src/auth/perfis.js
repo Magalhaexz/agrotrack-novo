@@ -167,6 +167,7 @@ export const permissoesPorPagina = {
   minhaAssinatura: 'perfil:ver',
   configuracoes: 'configuracoes:ver',
   sincronizacao: 'dashboard:ver',
+  modoCurral: 'dashboard:ver',
   pastagens: 'pastagens:ver',
   evolucaoRebanho: 'evolucao_rebanho:ver',
   indicadores: 'indicadores:ver',

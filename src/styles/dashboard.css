@@ -1208,3 +1208,82 @@
     flex: 1;
   }
 }
+
+/* Sprint 31 - Modo Curral / Registro Rápido */
+.modo-curral-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.modo-curral-card {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 6px;
+  min-height: 120px;
+  padding: 16px;
+  border-radius: 16px;
+  border: 1px solid var(--dash-card-border);
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.05), rgba(255, 255, 255, 0.02)),
+    var(--dash-card-bg-soft);
+  color: #e9f1ed;
+  text-align: left;
+  cursor: pointer;
+  transition: transform .15s ease, border-color .2s ease;
+}
+
+.modo-curral-card:hover:not(:disabled) {
+  transform: translateY(-2px);
+  border-color: color-mix(in srgb, var(--color-primary) 34%, rgba(255, 255, 255, 0.12));
+}
+
+.modo-curral-card:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+.modo-curral-card__icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 44px;
+  height: 44px;
+  border-radius: 12px;
+  background: color-mix(in srgb, var(--color-primary) 16%, transparent);
+  color: var(--color-primary);
+}
+
+.modo-curral-card__label {
+  font-weight: 650;
+  font-size: 1rem;
+  color: #f5fff8;
+}
+
+.modo-curral-card__desc {
+  font-size: 0.82rem;
+  color: var(--dash-helper);
+}
+
+.modo-curral-card--secondary {
+  background: var(--dash-card-bg-soft);
+}
+
+@media (max-width: 480px) {
+  .modo-curral-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .modo-curral-card {
+    min-height: 92px;
+    flex-direction: row;
+    align-items: center;
+    gap: 12px;
+  }
+
+  .modo-curral-card__label,
+  .modo-curral-card__desc {
+    display: block;
+  }
+}
