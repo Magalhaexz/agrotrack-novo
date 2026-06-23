@@ -67,7 +67,7 @@ test('internal_test subscription allows access', () => {
   assert.equal(access.canEnterApp, true);
   assert.equal(access.blocked, false);
   assert.equal(getSubscriptionStatusLabel(subscription.status), 'Acesso de teste ativo');
-  assert.equal(access.message, 'Acesso de teste ativo.');
+  assert.equal(access.message, 'Você está usando o HERDON em acesso piloto. A cobrança ainda não está ativa.');
 });
 
 test('past_due shows warning behavior', () => {
@@ -130,7 +130,7 @@ test('active and internal_test subscriptions do not surface regularize CTA', () 
   assert.notEqual(trialing.primaryLabel, 'Regularizar assinatura');
   assert.notEqual(internalTest.primaryLabel, 'Regularizar assinatura');
   assert.equal(active.helperText, 'Checkout em preparação');
-  assert.equal(internalTest.message, 'Acesso de teste ativo.');
+  assert.equal(internalTest.message, 'Você está usando o HERDON em acesso piloto. A cobrança ainda não está ativa.');
   assert.equal(pastDue.primaryLabel, 'Regularizar assinatura');
   assert.equal(canceled.primaryLabel, 'Regularizar assinatura');
   assert.equal(blocked.primaryLabel, 'Regularizar assinatura');
@@ -141,7 +141,7 @@ test('missing subscription surfaces choose-plan state with preparation helper', 
 
   assert.equal(copy.primaryLabel, 'Escolher plano');
   assert.equal(copy.helperText, 'Checkout em preparação');
-  assert.equal(copy.message, 'Sua assinatura está em preparação.');
+  assert.equal(copy.message, 'Escolha um plano para continuar usando o HERDON.');
 });
 
 test('plan prices and billing labels are formatted for the customer surface', () => {

@@ -33,6 +33,19 @@
 > a consolidação dos breakpoints CSS e a duplicidade de regras
 > `.header-tabs` no cabeçalho mobile (ver `docs/POLIMENTO_VISUAL_HERDON.md`).
 
+> **Atualização (Sprint 28):** auditoria completa de planos e Asaas — a
+> integração já existia e é mais madura do que o esperado (commitada há
+> várias sprints). Confirmado que **a cobrança real continua desativada**
+> (sandbox por padrão, nenhuma URL/chave de produção configurada) e que
+> contas `internal_test`/piloto nunca são bloqueadas pelo fluxo de
+> assinatura. Mensagens de limite e de módulo bloqueado foram reescritas
+> para serem mais corretas e amigáveis. Nenhum plano, preço ou limite real
+> foi alterado — a sprint sugeriu nomes/limites novos, documentados em
+> `docs/PLANOS_HERDON.md` como sugestão, não aplicados sem confirmação
+> humana. Ver [SPRINT_28_RESULTADO.md](SPRINT_28_RESULTADO.md). Pendência
+> aberta (mesma desde a Sprint 22): verificação visual/funcional real com
+> conta autenticada e ambiente Asaas sandbox configurado.
+
 ---
 
 ## Critérios de aprovação

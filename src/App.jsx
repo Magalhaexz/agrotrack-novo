@@ -38,7 +38,9 @@ import {
   buildSubscriptionAccessState,
   getCurrentSubscription,
   canAccessModule,
+  getModuleBlockedMessage,
 } from './services/subscriptions';
+import { obterResumoUso } from './domain/planos';
 import { buildAlerts } from './utils/alerts';
 import './styles/app.css';
 import './styles/ui.css';
@@ -247,15 +249,10 @@ export default function App() {
     () => buildSubscriptionAccessState(currentSubscription),
     [currentSubscription]
   );
-  const subscriptionUsage = useMemo(() => ({
-    farms: Array.isArray(db?.fazendas) ? db.fazendas.length : 0,
-    animals: Array.isArray(db?.animais)
-      ? db.animais.reduce((acc, animal) => acc + Number(animal?.qtd || 1), 0)
-      : 0,
-    users: Array.isArray(db?.usuarios)
-      ? db.usuarios.filter((item) => String(item?.status || 'ativo') === 'ativo').length
-      : 0,
-  }), [db]);
+  const subscriptionUsage = useMemo(
+    () => obterResumoUso(db, currentSubscription).uso,
+    [db, currentSubscription]
+  );
   const [usuarioLogado, setUsuarioLogado] = useState(null);
   const [menuExtraAberto, setMenuExtraAberto] = useState(false);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(() => readSidebarCollapsedState());
@@ -728,7 +725,7 @@ export default function App() {
       if (!canAccessModule(currentSubscription, pagina)) {
         showToast({
           type: 'warning',
-          message: 'Este recurso não está disponível no seu plano. Fale com o suporte para ajustar seu plano.',
+          message: getModuleBlockedMessage(),
         });
         return false;
       }

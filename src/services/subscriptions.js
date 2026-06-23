@@ -257,7 +257,9 @@ export function getSubscriptionDisplayCopy(subscription, options = {}) {
   const checkoutReady = options.checkoutReady ?? hasSubscriptionBillingReady(normalized);
   const plan = normalized?.plan || getPlanLimits(normalized?.plan_code);
 
-  let message = 'Sua assinatura está em preparação.';
+  let message = normalized
+    ? 'Sua assinatura está em preparação.'
+    : 'Escolha um plano para continuar usando o HERDON.';
   let primaryLabel = 'Escolher plano';
   let secondaryLabel = 'Falar com o suporte';
   let helperText = checkoutReady ? null : 'Checkout em preparação';
@@ -269,7 +271,7 @@ export function getSubscriptionDisplayCopy(subscription, options = {}) {
     message = 'Sua assinatura está ativa.';
     primaryLabel = checkoutReady ? 'Gerenciar assinatura' : 'Ver planos';
   } else if (status === SUBSCRIPTION_STATUSES.INTERNAL_TEST) {
-    message = 'Acesso de teste ativo.';
+    message = 'Você está usando o HERDON em acesso piloto. A cobrança ainda não está ativa.';
     primaryLabel = checkoutReady ? 'Gerenciar assinatura' : 'Ver planos';
   } else if (status === SUBSCRIPTION_STATUSES.PAST_DUE) {
     message = 'Sua assinatura está pendente.';
@@ -483,17 +485,32 @@ export function canInviteUser(subscription, currentCount = 0) {
 }
 
 export function getSubscriptionLimitMessage(kind, evaluation) {
-  const labels = {
-    farms: 'fazendas',
-    animals: 'animais',
-    users: 'usuários',
-  };
-
   if (!evaluation || evaluation.allowed) return null;
 
-  const limitText = evaluation.limit === null || evaluation.limit === undefined
-    ? 'Ilimitado'
-    : String(evaluation.limit);
+  if (evaluation.reason === 'subscription_blocked') {
+    return 'Regularize sua assinatura para continuar usando o HERDON.';
+  }
 
-  return `Seu plano permite até ${limitText} ${labels[kind] || kind}. Regularize sua assinatura para continuar usando o HERDON.`;
+  const limit = evaluation.limit;
+  const limitText = limit === null || limit === undefined ? 'ilimitado' : String(limit);
+
+  if (kind === 'farms') {
+    const plural = limit === 1 ? 'fazenda' : 'fazendas';
+    return `Seu plano atual permite ${limitText} ${plural}. Para cadastrar mais fazendas, escolha um plano superior.`;
+  }
+
+  if (kind === 'animals') {
+    return 'Seu plano atual atingiu o limite de cabeças ativas. Para continuar cadastrando animais, escolha um plano superior.';
+  }
+
+  if (kind === 'users') {
+    const plural = limit === 1 ? 'usuário' : 'usuários';
+    return `Seu plano atual permite até ${limitText} ${plural}. Para convidar mais pessoas, escolha um plano superior.`;
+  }
+
+  return `Seu plano atual permite até ${limitText} ${kind}. Escolha um plano superior para continuar.`;
+}
+
+export function getModuleBlockedMessage() {
+  return 'Este recurso está disponível em outro plano. Veja Planos e Assinatura para escolher um plano superior.';
 }
