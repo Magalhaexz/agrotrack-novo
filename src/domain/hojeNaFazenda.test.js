@@ -6,6 +6,7 @@ import {
   listarContasFinanceiras,
   listarEstoqueBaixo,
   listarLotesComGmdAbaixoDaMeta,
+  listarLotesParaRevisaoManejo,
   listarLotesPorStatusDecisaoVenda,
   listarLotesSemPasto,
   listarLotesSemPesagemRecente,
@@ -295,5 +296,50 @@ test('construirHojeNaFazenda gera prioridade de avaliação de venda quando há 
   const resultado = construirHojeNaFazenda(db, { alerts: [] });
   const item = resultado.prioridades.find((p) => p.id === 'lotes-prontos-venda');
   assert.equal(item.texto, '1 lote precisa de avaliação de venda');
+  assert.equal(item.rota, 'resultados');
+});
+
+// ─── manejo, sanidade e suplementação (Sprint 33) ──────────────────────────
+
+test('listarLotesParaRevisaoManejo inclui lote com ocorrência sanitária crítica recente', () => {
+  const db = {
+    lotes: [{ id: 1, status: 'ativo' }],
+    animais: [{ id: 1, lote_id: 1, qtd: 10, p_ini: 300, p_at: 480, data_entrada: diasAtras(45), status: 'ativo' }],
+    movimentacoes_financeiras: [{ id: 1, tipo: 'despesa', categoria: 'compra_animal', lote_id: 1, valor: 10000 }],
+    sanitario: [{ lote_id: 1, data_aplic: diasAtras(5), tipo: 'mortalidade' }],
+  };
+  assert.deepEqual(listarLotesParaRevisaoManejo(db).map((l) => l.id), [1]);
+});
+
+test('listarLotesParaRevisaoManejo inclui lote com custo de suplemento alto', () => {
+  const db = {
+    lotes: [{ id: 1, status: 'ativo', preco_arroba: 270 }],
+    animais: [{ id: 1, lote_id: 1, qtd: 10, p_ini: 300, p_at: 480, data_entrada: diasAtras(45), status: 'ativo' }],
+    movimentacoes_financeiras: [{ id: 1, tipo: 'despesa', categoria: 'compra_animal', lote_id: 1, valor: 1000 }],
+    consumo_suplementacao: [{ lote_id: 1, custo_total: 5000, data: diasAtras(10) }],
+  };
+  assert.deepEqual(listarLotesParaRevisaoManejo(db).map((l) => l.id), [1]);
+});
+
+test('listarLotesParaRevisaoManejo não inclui lote sem nenhum problema de manejo', () => {
+  const db = {
+    lotes: [{ id: 1, status: 'ativo' }],
+    animais: [{ id: 1, lote_id: 1, qtd: 10, p_ini: 300, p_at: 480, data_entrada: diasAtras(45), status: 'ativo' }],
+    movimentacoes_financeiras: [{ id: 1, tipo: 'despesa', categoria: 'compra_animal', lote_id: 1, valor: 1000 }],
+    sanitario: [{ lote_id: 1, data_aplic: diasAtras(5), tipo: 'vacina' }],
+  };
+  assert.deepEqual(listarLotesParaRevisaoManejo(db), []);
+});
+
+test('construirHojeNaFazenda gera prioridade combinada de revisão de manejo/suplementação', () => {
+  const db = {
+    lotes: [{ id: 1, status: 'ativo' }],
+    animais: [{ id: 1, lote_id: 1, qtd: 10, p_ini: 300, p_at: 480, data_entrada: diasAtras(45), status: 'ativo' }],
+    movimentacoes_financeiras: [{ id: 1, tipo: 'despesa', categoria: 'compra_animal', lote_id: 1, valor: 1000 }],
+    sanitario: [{ lote_id: 1, data_aplic: diasAtras(5), tipo: 'mortalidade' }],
+  };
+  const resultado = construirHojeNaFazenda(db, { alerts: [] });
+  const item = resultado.prioridades.find((p) => p.id === 'lotes-revisao-manejo');
+  assert.equal(item.texto, '1 lote precisa de revisão de manejo ou suplementação');
   assert.equal(item.rota, 'resultados');
 });

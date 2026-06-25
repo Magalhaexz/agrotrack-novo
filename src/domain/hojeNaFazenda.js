@@ -3,6 +3,7 @@ import { getResumoLote } from './resumoLote.js';
 import { isMovimentacaoCancelada, isMovimentacaoPaga, getDataVencimento } from './financeiroStatus.js';
 import { calcularOcupacaoPastos, listarLotesSemPasto } from './ocupacaoPastos.js';
 import { montarDadosDecisaoVenda, classificarDecisaoVenda, STATUS_DECISAO } from './decisaoVenda.js';
+import { montarDadosManejoResultado, STATUS_SANIDADE, STATUS_SUPLEMENTACAO } from './manejoResultado.js';
 
 export { listarLotesSemPasto };
 
@@ -33,6 +34,21 @@ export function listarLotesComGmdAbaixoDaMeta(db = {}) {
     const resumo = getResumoLote(db, lote.id);
     if (resumo.totalAnimais <= 0 || resumo.dias <= 0) return false;
     return resumo.gmdMedio < meta;
+  });
+}
+
+/**
+ * Lotes que precisam de revisão de manejo sanitário ou de suplementação,
+ * a partir de `manejoResultado.js` (Sprint 33) — combinados num único
+ * critério para não poluir o Dashboard com várias prioridades parecidas.
+ */
+export function listarLotesParaRevisaoManejo(db = {}) {
+  return lotesAtivosDe(db).filter((lote) => {
+    const dados = montarDadosManejoResultado(db, lote.id);
+    if (!dados.encontrado) return false;
+    const sanidadeRevisar = dados.sanidade?.status === STATUS_SANIDADE.REVISAR_MANEJO;
+    const suplementoCustoAlto = dados.suplementacao?.status === STATUS_SUPLEMENTACAO.CUSTO_ALTO;
+    return sanidadeRevisar || suplementoCustoAlto;
   });
 }
 
@@ -135,6 +151,7 @@ export function construirHojeNaFazenda(db = {}, { alerts = [] } = {}) {
   const lotesGmdBaixo = listarLotesComGmdAbaixoDaMeta(db);
   const lotesSemPasto = listarLotesSemPasto(db);
   const { prontosParaAvaliar: lotesProntosParaVenda, custoAlto: lotesCustoAltoArroba } = listarLotesPorStatusDecisaoVenda(db);
+  const lotesParaRevisaoManejo = listarLotesParaRevisaoManejo(db);
   const { vencidas, proximas } = listarContasFinanceiras(db);
   const estoqueBaixo = listarEstoqueBaixo(db);
 
@@ -211,6 +228,14 @@ export function construirHojeNaFazenda(db = {}, { alerts = [] } = {}) {
       rota: 'estoque',
     });
   }
+  if (lotesParaRevisaoManejo.length > 0) {
+    prioridades.push({
+      id: 'lotes-revisao-manejo',
+      tom: 'atencao',
+      texto: `${lotesParaRevisaoManejo.length} ${pluralizar(lotesParaRevisaoManejo.length, 'lote precisa', 'lotes precisam')} de revisão de manejo ou suplementação`,
+      rota: 'resultados',
+    });
+  }
   if (lotesProntosParaVenda.length > 0) {
     prioridades.push({
       id: 'lotes-prontos-venda',
@@ -248,6 +273,7 @@ export function construirHojeNaFazenda(db = {}, { alerts = [] } = {}) {
       alertasCriticosTotal,
       lotesProntosParaVenda,
       lotesCustoAltoArroba,
+      lotesParaRevisaoManejo,
     },
     pastos: resumoPastos,
   };

@@ -97,6 +97,21 @@
 > autenticada — não foi possível nesta sessão; ver
 > [DECISAO_VENDA_TESTE_MANUAL.md](DECISAO_VENDA_TESTE_MANUAL.md).
 
+> **Atualização (Sprint 33):** sanidade e suplementação foram conectadas
+> ao resultado do lote — status sanitário, custo de suplemento por
+> cabeça/arroba e relação com o GMD, lendo dados que já existiam
+> (`sanitario`, `consumo_suplementacao`) sem criar tabela nova. Aparece no
+> Relatório do Lote, como sinal complementar na Decisão de Venda, no
+> resumo WhatsApp e como prioridade combinada no Dashboard. Avaliado e
+> **não** adicionado: atalho de sanidade/suplemento no Modo Curral (os
+> formulários atuais não são offline-safe) — documentado como pendência.
+> Nenhuma regra comercial, Asaas, plano, RLS ou migration foi alterada.
+> Ver [SPRINT_33_RESULTADO.md](SPRINT_33_RESULTADO.md) e
+> [MANEJO_RESULTADO_HERDON.md](MANEJO_RESULTADO_HERDON.md). Pendência
+> aberta (mesma desde a Sprint 22): verificação visual real com conta
+> autenticada — não foi possível nesta sessão; ver
+> [MANEJO_RESULTADO_TESTE_MANUAL.md](MANEJO_RESULTADO_TESTE_MANUAL.md).
+
 ---
 
 ## Critérios de aprovação

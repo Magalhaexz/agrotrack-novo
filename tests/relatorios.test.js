@@ -44,6 +44,30 @@ test('buildRelatorioLote não gera simulação de venda quando faltam dados fina
   assert.equal(relatorio.simulacaoVenda, null);
 });
 
+test('buildRelatorioLote traz manejoResultado com status "sem registro" quando não há sanidade/suplementação (Sprint 33)', () => {
+  const db = makeBaseDb();
+  const relatorio = buildRelatorioLote(db, 10);
+
+  assert.ok(relatorio.manejoResultado);
+  assert.equal(relatorio.manejoResultado.encontrado, true);
+  assert.equal(relatorio.manejoResultado.sanidade.status, 'sem_registro');
+  assert.equal(relatorio.manejoResultado.suplementacao.status, 'sem_registro');
+  assert.deepEqual(relatorio.sinaisComplementaresVenda, []);
+});
+
+test('buildRelatorioLote integra sanidade e suplementação reais do lote (Sprint 33)', () => {
+  const db = makeBaseDb();
+  const hoje = new Date().toISOString().slice(0, 10);
+  db.sanitario = [{ lote_id: 10, data_aplic: hoje, tipo: 'vacina' }];
+  db.consumo_suplementacao = [{ lote_id: 10, custo_total: 500, quantidade_total: 100, data: hoje }];
+  const relatorio = buildRelatorioLote(db, 10);
+
+  assert.equal(relatorio.manejoResultado.sanidade.status, 'em_dia');
+  assert.equal(relatorio.manejoResultado.suplementacao.temRegistro, true);
+  assert.equal(relatorio.manejoResultado.suplementacao.custoSuplementoTotal, 500);
+  assert.ok(relatorio.manejoResultado.insights.length > 0);
+});
+
 test('buildRelatorioLote retorna encontrado=false para lote inexistente', () => {
   const db = makeBaseDb();
   const relatorio = buildRelatorioLote(db, 999);

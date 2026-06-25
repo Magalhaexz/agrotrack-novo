@@ -104,6 +104,36 @@ export default function RelatorioLotePage({ db, onNavigate }) {
                   <Row label="Aviso" value={relatorio.simulacaoVenda.aviso} />
                 </div>
               ) : null}
+
+              {relatorio.sinaisComplementaresVenda?.length ? (
+                <div className="summary-list">
+                  {relatorio.sinaisComplementaresVenda.map((sinal) => (
+                    <p key={sinal} className="ui-input-hint">{sinal}</p>
+                  ))}
+                </div>
+              ) : null}
+            </Card>
+
+            <Card title="Manejo, sanidade e suplementação">
+              {!relatorio.manejoResultado?.encontrado || (!relatorio.manejoResultado.sanidade?.totalOcorrenciasPeriodo && !relatorio.manejoResultado.suplementacao?.temRegistro) ? (
+                <EmptyState compact title="Ainda não há registros suficientes de sanidade ou suplementação para este lote." />
+              ) : (
+                <>
+                  <div className="summary-list">
+                    <Row label="Sanidade" value={relatorio.manejoResultado.sanidade?.statusLabel} />
+                    <Row label="Suplementação" value={relatorio.manejoResultado.suplementacao?.temRegistro ? `${formatCurrency(relatorio.manejoResultado.suplementacao.custoSuplementoTotal)} no período` : 'Sem registro no período'} />
+                    {relatorio.manejoResultado.suplementacao?.temRegistro ? (
+                      <>
+                        <Row label="Custo de suplemento/cabeça" value={formatCurrency(relatorio.manejoResultado.suplementacao.custoPorCabeca)} />
+                        <Row label="Custo de suplemento/@" value={formatCurrency(relatorio.manejoResultado.suplementacao.custoPorArroba)} />
+                      </>
+                    ) : null}
+                  </div>
+                  {relatorio.manejoResultado.insights.map((insight) => (
+                    <p key={insight} className="ui-input-hint">{insight}</p>
+                  ))}
+                </>
+              )}
             </Card>
 
             <Card title="Últimas pesagens">

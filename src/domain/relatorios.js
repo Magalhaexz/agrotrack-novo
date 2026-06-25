@@ -5,6 +5,7 @@ import { construirResumoPastos, listarContasFinanceiras, construirHojeNaFazenda 
 import { calcularOcupacaoPastos, listarLotesSemPasto } from './ocupacaoPastos.js';
 import { buildAlerts } from '../utils/alerts.js';
 import { classificarDecisaoVenda, compararVenderOuManter, montarDadosDecisaoVenda, STATUS_DECISAO } from './decisaoVenda.js';
+import { gerarSinaisComplementaresVenda, montarDadosManejoResultado } from './manejoResultado.js';
 
 function arr(value) {
   return Array.isArray(value) ? value : [];
@@ -62,6 +63,9 @@ export function buildRelatorioLote(db, loteId) {
         custoDiarioPorCabeca: custoDiarioPorCabecaEstimado,
       });
 
+  const manejoResultado = montarDadosManejoResultado(db, loteId);
+  const sinaisComplementaresVenda = gerarSinaisComplementaresVenda(manejoResultado);
+
   return {
     encontrado: true,
     ...resumo,
@@ -75,6 +79,8 @@ export function buildRelatorioLote(db, loteId) {
     precoArroba: dadosDecisaoVenda.precoArroba,
     decisaoVenda,
     simulacaoVenda,
+    sinaisComplementaresVenda,
+    manejoResultado,
   };
 }
 

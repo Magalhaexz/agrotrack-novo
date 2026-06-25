@@ -114,4 +114,9 @@ Lógica em `src/domain/modoCurral.js` (`obterMensagemEstadoVazio`).
 - Modo PWA real (instalável, cache de assets).
 - Comandos por voz.
 - Integração com balança (entrada automática de peso).
-- Atalho dedicado para manejo sanitário estruturado e consumo de suplemento.
+- Atalho dedicado para manejo sanitário estruturado e consumo de suplemento
+  — reavaliado na Sprint 33 e mantido como pendência: os formulários atuais
+  (`SanitarioForm.jsx`, `SuplementacaoConsumoModal.jsx`) gravam direto no
+  Supabase, sem fila offline, e adicioná-los ao Modo Curral sem essa fila
+  quebraria a garantia de "tudo aqui funciona offline". Ver
+  [MANEJO_RESULTADO_HERDON.md](MANEJO_RESULTADO_HERDON.md#modo-curral--decisão-de-não-adicionar-atalho-nesta-sprint).

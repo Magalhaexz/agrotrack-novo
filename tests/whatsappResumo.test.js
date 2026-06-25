@@ -30,6 +30,25 @@ test('gerarResumoLoteTexto inclui linha de custo/lucro por arroba e status de de
   assert.match(texto, /Status: (Pronto para avaliar venda|Acompanhar por mais alguns dias|Abaixo da meta de ganho|Custo alto por arroba|Dados insuficientes)$/m);
 });
 
+test('gerarResumoLoteTexto inclui linha "Manejo: sem registros suficientes." quando não há sanidade nem suplementação (Sprint 33)', () => {
+  const db = makeBaseDb();
+  const relatorio = buildRelatorioLote(db, 10);
+  const texto = gerarResumoLoteTexto(relatorio);
+
+  assert.match(texto, /Manejo: sem registros suficientes\.$/m);
+});
+
+test('gerarResumoLoteTexto inclui custo de suplemento por cabeça quando há registro (Sprint 33)', () => {
+  const db = makeBaseDb();
+  const hoje = new Date().toISOString().slice(0, 10);
+  db.sanitario = [{ lote_id: 10, data_aplic: hoje, tipo: 'vacina' }];
+  db.consumo_suplementacao = [{ lote_id: 10, custo_total: 720, quantidade_total: 100, data: hoje }];
+  const relatorio = buildRelatorioLote(db, 10);
+  const texto = gerarResumoLoteTexto(relatorio);
+
+  assert.match(texto, /Manejo: Sanidade em dia · Suplemento: R\$ \d.*\/cab/);
+});
+
 test('gerarResumoLoteTexto não quebra quando relatório não tem decisaoVenda (compatibilidade)', () => {
   const texto = gerarResumoLoteTexto({
     encontrado: true,

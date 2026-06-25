@@ -4,6 +4,32 @@ function linha(rotulo, valor) {
   return `${rotulo}: ${valor}`;
 }
 
+function minusculaInicial(texto) {
+  if (!texto) return texto;
+  return texto.charAt(0).toLowerCase() + texto.slice(1);
+}
+
+/** Linha compacta de manejo/sanidade/suplementação para o resumo do lote (Sprint 33). */
+function linhaManejoResultado(manejo) {
+  if (!manejo?.encontrado) {
+    return 'Manejo: sem registros suficientes.';
+  }
+
+  const temSanidade = manejo.sanidade?.status && manejo.sanidade.status !== 'sem_registro';
+  const temSuplemento = Boolean(manejo.suplementacao?.temRegistro);
+
+  if (!temSanidade && !temSuplemento) {
+    return 'Manejo: sem registros suficientes.';
+  }
+
+  const partes = [];
+  if (temSanidade) partes.push(`Sanidade ${minusculaInicial(manejo.sanidade.statusLabel)}`);
+  if (temSuplemento) partes.push(`Suplemento: ${formatCurrency(manejo.suplementacao.custoPorCabeca)}/cab`);
+  if (manejo.insights?.[0]) partes.push(`Insight: ${manejo.insights[0]}`);
+
+  return `Manejo: ${partes.join(' · ')}`;
+}
+
 export function gerarResumoLoteTexto(relatorio) {
   if (!relatorio?.encontrado) {
     return 'HERDON — Resumo do Lote\n\nLote não encontrado.';
@@ -25,6 +51,10 @@ export function gerarResumoLoteTexto(relatorio) {
 
   if (decisaoVenda) {
     linhas.push(`Custo/@: ${formatCurrency(custoPorArroba)} · Lucro/@: ${formatCurrency(lucroPorArroba)} · Status: ${decisaoVenda.statusLabel}`);
+  }
+
+  if (relatorio.manejoResultado !== undefined) {
+    linhas.push(linhaManejoResultado(relatorio.manejoResultado));
   }
 
   return linhas.join('\n');
