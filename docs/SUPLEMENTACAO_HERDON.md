@@ -1,27 +1,37 @@
 # Suplementação ligada ao Resultado — HERDON (Sprint 33)
 
-> **Atualização crítica (Sprint 35 — QA com conta real):** a página
-> **Suplementação não persiste nada no banco real.** Cadastrar um
-> produto nutricional, uma dieta ou registrar um consumo funciona na
-> tela (o modal fecha, o item some/aparece, sem erro visível), mas
-> `src/pages/SuplementacaoPage.jsx` **nunca chama**
-> `createOperationalRecord`/`updateOperationalRecord` — todo o estado é
-> mantido só em memória via `setDb(...)`. Confirmado ao vivo: criei um
-> produto "Ração QA 18%" e um consumo de 50kg vinculado a um lote real; a
-> UI mostrou sucesso, mas consultas diretas ao Supabase (`estoque`,
-> `consumo_suplementacao`, `movimentacoes_financeiras`) confirmaram
-> **zero linhas gravadas**. Isso significa que tudo descrito abaixo sobre
-> "Onde aparece" (Manejo, Relatório, WhatsApp, Hoje na Fazenda) **funciona
-> corretamente com os dados que existirem em `db.consumo_suplementacao`**,
-> mas hoje **nenhum dado real chega a essa tabela** pela própria tela de
-> Suplementação — qualquer consumo "registrado" se perde ao recarregar a
-> página, fazer logout, ou trocar de aparelho. Não corrigido nesta sprint
-> (exigiria conectar 3 fluxos — produto, dieta, consumo — à persistência
-> real, incluinda o efeito colateral de baixa de estoque e geração de
-> despesa financeira automaticamente, o que é "módulo grande" pelo
-> critério da própria sprint). **Pendência de prioridade alta para a
-> Sprint 36.** Ver
-> [SPRINT_35_RESULTADO.md](SPRINT_35_RESULTADO.md).
+> **Corrigido na Sprint 36 — persistência real implementada.** A Sprint 35
+> encontrou o bug crítico: `src/pages/SuplementacaoPage.jsx` nunca chamava
+> `createOperationalRecord`/`updateOperationalRecord` — todo o estado era
+> mantido só em memória via `setDb(...)`, então qualquer produto/consumo
+> "salvo" se perdia ao recarregar a página. A causa raiz tinha duas
+> partes: (1) a página nunca recebia/usava `session` nem `fazendaSelecionada`,
+> que o `App.jsx` já passa para todas as páginas; (2) mesmo se chamasse a
+> persistência, os builders de payload em `operationalPersistence.js`
+> estavam incompletos (`estoque`) ou inexistentes (`consumo_suplementacao`)
+> e quebrariam o insert real. As duas causas foram corrigidas nesta
+> sprint. Ver [SPRINT_36_RESULTADO.md](SPRINT_36_RESULTADO.md) e
+> [SUPLEMENTACAO_TESTE_MANUAL.md](SUPLEMENTACAO_TESTE_MANUAL.md) para o
+> teste real feito contra o Supabase de produção.
+>
+> **O que passou a persistir de verdade:**
+> - **Produto nutricional** (`ProdutoNutricionalModal`) → tabela `estoque`,
+>   via `createOperationalRecord`/`updateOperationalRecord('estoque', ...)`.
+> - **Consumo de suplementação** (`SuplementacaoConsumoModal.jsx`) → tabela
+>   `consumo_suplementacao`, mais a baixa de estoque (`estoque.quantidade_atual`)
+>   e a despesa automática (`movimentacoes_financeiras`), todas via
+>   `createOperationalRecord`/`updateOperationalRecord`.
+>
+> **O que segue como pendência (não persiste):** **Dietas**
+> (`DietaModal`) continuam só em `setDb` — não existe tabela `dietas` no
+> Supabase real, e criar uma exigiria modelagem e migration, fora do
+> escopo desta sprint (que tratou só de persistência, não de features
+> novas). A UI agora avisa isso claramente: o modal de Dieta mostra "Dietas
+> ficam salvas apenas neste dispositivo por enquanto — não sincronizam com
+> a nuvem nem aparecem em outro aparelho", e o modal de Consumo mostra
+> "Dietas ainda são um recurso em preparação. Para o piloto, registre o
+> consumo diretamente pelo produto nutricional." quando "Dieta" é
+> selecionado como origem do consumo.
 
 Leitura simples de custo de suplementação por lote, comparado ao custo por
 arroba do lote (Sprint 32) e ao GMD realizado x meta. Não promete

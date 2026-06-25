@@ -266,4 +266,111 @@ test('operationalPersistence', { concurrency: 1 }, async (t) => {
     assert.equal(capture.payload.qtd, 20);
   });
 
+  // ─── regressão: Suplementação passa a persistir de fato (Sprint 36) ───
+
+  await t.test('createOperationalRecord em estoque envia produto, fazenda_id, subcategoria e quantidade_atual (regressão Sprint 36)', async () => {
+    const capture = {};
+    mockInsertSuccess(capture);
+
+    const result = await createOperationalRecord('estoque', {
+      produto: 'Sal mineral QA',
+      fazenda_id: 641,
+      categoria: 'Nutrição / Alimentação',
+      subcategoria: 'Sal mineral',
+      unidade_medida: 'kg',
+      quantidade_atual: 500,
+      valor_unitario: 3.5,
+      validade: '2026-12-31',
+      fornecedor: 'Fornecedor QA',
+      obs: 'Lote QA',
+    }, makeSession());
+
+    assert.equal(result.persisted, true);
+    assert.equal(capture.payload.produto, 'Sal mineral QA');
+    assert.equal(capture.payload.fazenda_id, 641);
+    assert.equal(capture.payload.subcategoria, 'Sal mineral');
+    assert.equal(capture.payload.quantidade_atual, 500);
+    assert.equal(capture.payload.data_validade, '2026-12-31');
+    assert.equal(capture.payload.obs, 'Lote QA');
+  });
+
+  await t.test('createOperationalRecord em estoque não descarta o id local — guarda em metadata.local_id', async () => {
+    const capture = {};
+    mockInsertSuccess(capture);
+
+    await createOperationalRecord('estoque', { id: 'local-9', produto: 'Ração QA', quantidade_atual: 10 }, makeSession());
+
+    assert.equal(capture.payload.id, undefined);
+    assert.equal(capture.payload.metadata.local_id, 'local-9');
+  });
+
+  await t.test('updateOperationalRecord em estoque só envia os campos do patch, sem zerar o resto (regressão Sprint 36)', async () => {
+    const capture = {};
+    mockUpdateSuccess(capture);
+
+    await updateOperationalRecord('estoque', 5, { quantidade_atual: 420, quantidade: 420 }, makeSession());
+
+    assert.deepEqual(Object.keys(capture.payload).sort(), ['quantidade', 'quantidade_atual']);
+    assert.equal(capture.payload.produto, undefined);
+    assert.equal(capture.payload.fazenda_id, undefined);
+  });
+
+  await t.test('createOperationalRecord em consumo_suplementacao envia lote_id, produto_nome, qtd_total e custo_total', async () => {
+    const capture = {};
+    mockInsertSuccess(capture);
+
+    const result = await createOperationalRecord('consumo_suplementacao', {
+      data: '2026-06-25',
+      fazenda_id: 641,
+      lote_id: 20,
+      item_estoque_id: 5,
+      origem_tipo: 'produto',
+      ref_id: 5,
+      produto_nome: 'Sal mineral QA',
+      modo: 'manual_total',
+      quantidade_total: 50,
+      unidade: 'kg',
+      custo_total: 175,
+      obs: 'Consumo QA',
+      cabecas_lote: 30,
+    }, makeSession());
+
+    assert.equal(result.persisted, true);
+    assert.equal(capture.payload.lote_id, 20);
+    assert.equal(capture.payload.produto_nome, 'Sal mineral QA');
+    assert.equal(capture.payload.qtd_total, 50);
+    assert.equal(capture.payload.quantidade_total, 50);
+    assert.equal(capture.payload.custo_total, 175);
+    assert.equal(capture.payload.metadata.cabecas_lote, 30);
+  });
+
+  await t.test('createOperationalRecord em consumo_suplementacao não envia campo inexistente (cabeças com acento)', async () => {
+    const capture = {};
+    mockInsertSuccess(capture);
+
+    await createOperationalRecord('consumo_suplementacao', {
+      data: '2026-06-25',
+      lote_id: 20,
+      'cabeças_lote': 30,
+      quantidade_total: 50,
+    }, makeSession());
+
+    assert.equal(capture.payload['cabeças_lote'], undefined);
+  });
+
+  await t.test('updateOperationalRecord em consumo_suplementacao só envia os campos do patch, sem zerar o resto', async () => {
+    const capture = {};
+    mockUpdateSuccess(capture);
+
+    await updateOperationalRecord('consumo_suplementacao', 9, {
+      quantidade_total: 80,
+      qtd_total: 80,
+      custo_total: 280,
+    }, makeSession());
+
+    assert.deepEqual(Object.keys(capture.payload).sort(), ['custo_total', 'qtd_total', 'quantidade_total']);
+    assert.equal(capture.payload.lote_id, undefined);
+    assert.equal(capture.payload.produto_nome, undefined);
+  });
+
 });

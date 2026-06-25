@@ -9,8 +9,14 @@ import { useToast } from '../hooks/useToast';
 import { useAuth } from '../auth/useAuth';
 import { gerarNovoId } from '../utils/id';
 import { formatNumber } from '../utils/calculations';
+import { createOperationalRecord, updateOperationalRecord } from '../services/operationalPersistence';
 
-const getTodayIso = () => new Date().toISOString().slice(0, 10);
+function getActiveFarmId(fazendaSelecionada) {
+  const direct = fazendaSelecionada?.id ?? fazendaSelecionada?.fazenda_id ?? fazendaSelecionada?.fazendaSelecionadaId ?? null;
+  const value = Number(direct);
+  return Number.isFinite(value) && value > 0 ? value : null;
+}
+
 const CATEGORIAS_NUTRICIONAIS = [
   'Ração',
   'Sal mineral',
@@ -68,173 +74,10 @@ function getDietaEditData(dieta) {
   };
 }
 
-function normalizeConsumptionSelection(db, form, fallbackRecord = null) {
-  const produtos = getProdutosNutricionais(db);
-  const dietas = getDietasNormalizadas(db);
-  const origem = String(form?.origem || fallbackRecord?.origem_tipo || (fallbackRecord?.dieta_nome ? 'dieta' : 'produto')).toLowerCase();
-
-  if (origem === 'dieta') {
-    const dieta =
-      dietas.find((item) => Number(item.id) === Number(form?.ref_id))
-      || dietas.find((item) => Number(item.id) === Number(fallbackRecord?.dieta_id))
-      || dietas.find((item) => String(item.nome || '').toLowerCase() === String(fallbackRecord?.dieta_nome || '').toLowerCase())
-      || null;
-
-    const produtoId = dieta?.itens?.[0]?.item_estoque_id ?? fallbackRecord?.item_estoque_id ?? null;
-    const produto =
-      produtos.find((item) => Number(item.id) === Number(produtoId))
-      || produtos.find((item) => String(item.produto || '').toLowerCase() === String(fallbackRecord?.produto_nome || '').toLowerCase())
-      || null;
-
-    return {
-      origem: 'dieta',
-      dieta,
-      produto,
-      refId: dieta?.id ?? form?.ref_id ?? fallbackRecord?.dieta_id ?? '',
-      unidadePadrao: produto?.unidade_medida || produto?.unidade || 'kg',
-    };
-  }
-
-  const produto =
-    produtos.find((item) => Number(item.id) === Number(form?.ref_id))
-    || produtos.find((item) => Number(item.id) === Number(fallbackRecord?.item_estoque_id))
-    || produtos.find((item) => String(item.produto || '').toLowerCase() === String(fallbackRecord?.produto_nome || '').toLowerCase())
-    || null;
-
-  return {
-    origem: 'produto',
-    dieta: null,
-    produto,
-    refId: produto?.id ?? form?.ref_id ?? fallbackRecord?.item_estoque_id ?? '',
-    unidadePadrao: produto?.unidade_medida || produto?.unidade || 'kg',
-  };
-}
-
-function buildConsumptionInitialData(db, record = null) {
-  if (!record) {
-    return {
-      data: getTodayIso(),
-      lote_id: '',
-      origem: 'produto',
-      ref_id: '',
-      quantidade: '',
-      unidade: 'kg',
-      obs: '',
-    };
-  }
-
-  const selection = normalizeConsumptionSelection(
-    db,
-    {
-      origem: record?.origem_tipo || (record?.dieta_nome ? 'dieta' : 'produto'),
-      ref_id: record?.dieta_id || record?.item_estoque_id || '',
-    },
-    record
-  );
-
-  return {
-    data: record?.data || getTodayIso(),
-    lote_id: record?.lote_id ?? '',
-    origem: selection.origem,
-    ref_id: selection.refId,
-    quantidade: record?.qtd_total ?? record?.quantidade ?? '',
-    unidade: record?.unidade || selection.unidadePadrao || 'kg',
-    obs: record?.obs || '',
-  };
-}
-
-function getConsumptionCost(quantity, produto) {
-  return Number(quantity || 0) * Number(produto?.valor_unitario || produto?.custo_unitario || produto?.preco_unitario || 0);
-}
-
-function applyConsumptionChange(prev, existingRecord, nextValues) {
-  const currentSelection = normalizeConsumptionSelection(prev, {}, existingRecord);
-  const nextSelection = normalizeConsumptionSelection(prev, nextValues, existingRecord);
-  const currentQty = Number(existingRecord?.qtd_total || existingRecord?.quantidade || 0);
-  const nextQty = Number(nextValues?.quantidade || 0);
-  const currentCost = getConsumptionCost(currentQty, currentSelection.produto);
-  const nextCost = getConsumptionCost(nextQty, nextSelection.produto);
-
-  const restoredStockId = currentSelection.produto?.id != null ? Number(currentSelection.produto.id) : null;
-  const consumedStockId = nextSelection.produto?.id != null ? Number(nextSelection.produto.id) : null;
-
-  const estoqueAtualizado = (prev.estoque || []).map((item) => {
-    const itemId = Number(item.id);
-    let saldo = Number(item.quantidade_atual || 0);
-    let touched = false;
-
-    if (restoredStockId !== null && itemId === restoredStockId) {
-      saldo += currentQty;
-      touched = true;
-    }
-
-    if (consumedStockId !== null && itemId === consumedStockId) {
-      saldo -= nextQty;
-      touched = true;
-    }
-
-    return touched ? { ...item, quantidade_atual: saldo } : item;
-  });
-
-  const consumoAtualizado = {
-    ...existingRecord,
-    data: nextValues.data,
-    lote_id: nextValues.lote_id,
-    origem_tipo: nextSelection.origem,
-    item_estoque_id: consumedStockId,
-    dieta_id: nextSelection.dieta?.id ?? null,
-    produto_nome: nextSelection.produto?.produto || existingRecord?.produto_nome || null,
-    dieta_nome: nextSelection.dieta?.nome || null,
-    qtd_total: nextQty,
-    unidade: nextValues.unidade || nextSelection.unidadePadrao || 'kg',
-    custo_total: nextCost,
-    obs: nextValues.obs || '',
-  };
-
-  const consumoId = Number(existingRecord?.id);
-  const movimentacoesFinanceiras = Array.isArray(prev.movimentacoes_financeiras) ? prev.movimentacoes_financeiras : [];
-  const financeIndex = movimentacoesFinanceiras.findIndex(
-    (mov) => String(mov?.origem_tipo || '') === 'consumo_suplementacao' && Number(mov?.origem_id) === consumoId
-  );
-  const descricaoFinanceira = `Consumo nutricional - ${nextSelection.produto?.produto || nextSelection.dieta?.nome || 'Item'}`;
-  const movimentoFinanceiroBase = {
-    tipo: 'despesa',
-    categoria: 'nutricao',
-    subcategoria: 'alimentacao',
-    lote_id: nextValues.lote_id ? Number(nextValues.lote_id) : null,
-    valor: nextCost,
-    data: nextValues.data,
-    descricao: descricaoFinanceira,
-    origem_tipo: 'consumo_suplementacao',
-    origem_id: consumoId,
-  };
-
-  const movimentacoesFinanceirasAtualizadas = financeIndex >= 0
-    ? movimentacoesFinanceiras.map((mov, index) => (index === financeIndex ? { ...mov, ...movimentoFinanceiroBase } : mov))
-    : [
-        ...movimentacoesFinanceiras,
-        {
-          id: gerarNovoId(movimentacoesFinanceiras),
-          ...movimentoFinanceiroBase,
-        },
-      ];
-
-  return {
-    estoqueAtualizado,
-    consumoAtualizado,
-    movimentacoesFinanceirasAtualizadas,
-    currentSelection,
-    nextSelection,
-    currentQty,
-    nextQty,
-    currentCost,
-    nextCost,
-  };
-}
-
-export default function SuplementacaoPage({ db, setDb }) {
+export default function SuplementacaoPage({ db, setDb, session, fazendaSelecionada = null }) {
   const { showToast } = useToast();
   const { hasPermission } = useAuth();
+  const activeFarmId = useMemo(() => getActiveFarmId(fazendaSelecionada), [fazendaSelecionada]);
   const [aba, setAba] = useState('produtos');
   const [openProduto, setOpenProduto] = useState(false);
   const [openDieta, setOpenDieta] = useState(false);
@@ -538,6 +381,8 @@ export default function SuplementacaoPage({ db, setDb }) {
           key={produtoEmEdicao?.id ?? 'novo-produto'}
           db={db}
           setDb={setDb}
+          session={session}
+          activeFarmId={activeFarmId}
           initialData={produtoEmEdicao}
           onClose={() => {
             setOpenProduto(false);
@@ -566,6 +411,8 @@ export default function SuplementacaoPage({ db, setDb }) {
           key={consumoEmEdicao?.id ?? 'novo-consumo'}
           db={db}
           setDb={setDb}
+          session={session}
+          activeFarmId={activeFarmId}
           initialData={consumoEmEdicao}
           onClose={() => {
             setOpenConsumo(false);
@@ -578,9 +425,10 @@ export default function SuplementacaoPage({ db, setDb }) {
   );
 }
 
-function ProdutoNutricionalModal({ db, setDb, onClose, showToast, initialData = null }) {
+function ProdutoNutricionalModal({ db, setDb, session, activeFarmId, onClose, showToast, initialData = null }) {
   const [form, setForm] = useState(() => getProdutoEditData(initialData));
   const [erro, setErro] = useState('');
+  const [salvando, setSalvando] = useState(false);
 
   /* eslint-disable react-hooks/set-state-in-effect */
   useEffect(() => {
@@ -593,7 +441,7 @@ function ProdutoNutricionalModal({ db, setDb, onClose, showToast, initialData = 
   const custoTotal = totalEstoque * Number(form.valor_unitario || 0);
   const isEdit = Boolean(initialData?.id);
 
-  function salvar() {
+  async function salvar() {
     if (!String(form.produto || '').trim()) {
       setErro('Informe o nome do produto.');
       return;
@@ -611,6 +459,12 @@ function ProdutoNutricionalModal({ db, setDb, onClose, showToast, initialData = 
       return;
     }
 
+    const existente = isEdit
+      ? initialData
+      : (db.estoque || []).find((item) => String(item.produto || item.nome || '').toLowerCase() === String(form.produto || '').trim().toLowerCase());
+
+    const quantidadeFinal = existente && !isEdit ? Number(existente.quantidade_atual || 0) + totalEstoque : totalEstoque;
+
     const payload = {
       produto: String(form.produto || '').trim(),
       nome: String(form.produto || '').trim(),
@@ -618,8 +472,9 @@ function ProdutoNutricionalModal({ db, setDb, onClose, showToast, initialData = 
       subcategoria: form.subcategoria,
       unidade_medida: form.unidade_medida,
       unidade: form.unidade_medida,
-      quantidade_atual: totalEstoque,
-      quantidade: totalEstoque,
+      fazenda_id: existente?.fazenda_id ?? activeFarmId,
+      quantidade_atual: quantidadeFinal,
+      quantidade: quantidadeFinal,
       valor_unitario: Number(form.valor_unitario || 0),
       custo_unitario: Number(form.valor_unitario || 0),
       preco_unitario: Number(form.valor_unitario || 0),
@@ -629,7 +484,7 @@ function ProdutoNutricionalModal({ db, setDb, onClose, showToast, initialData = 
       obs: form.obs,
       observacoes: form.obs,
       metadata: {
-        ...(initialData?.metadata || {}),
+        ...(existente?.metadata || {}),
         modulo: 'nutricao',
         tipo_embalagem: form.tipo_embalagem,
         conteudo_por_embalagem: Number(form.conteudo_por_embalagem || 0),
@@ -638,27 +493,32 @@ function ProdutoNutricionalModal({ db, setDb, onClose, showToast, initialData = 
       },
     };
 
-    const existente = isEdit
-      ? initialData
-      : (db.estoque || []).find((item) => String(item.produto || item.nome || '').toLowerCase() === String(form.produto || '').trim().toLowerCase());
+    setSalvando(true);
+    const persisted = existente
+      ? await updateOperationalRecord('estoque', Number(existente.id), payload, session)
+      : await createOperationalRecord('estoque', payload, session);
+    setSalvando(false);
+
+    if (!persisted?.persisted) {
+      setErro('Não foi possível salvar a suplementação. Verifique os dados e tente novamente.');
+      showToast({ type: 'warning', message: persisted?.error || 'Não foi possível salvar a suplementação. Verifique os dados e tente novamente.' });
+      return;
+    }
+
+    const registroFinal = persisted.data || { id: existente?.id ?? gerarNovoId(db.estoque || []), ...payload };
 
     setDb((prev) => ({
       ...prev,
       estoque: existente
         ? (prev.estoque || []).map((item) => (
-            Number(item.id) === Number(existente.id)
-              ? { ...item, ...payload, quantidade_atual: isEdit ? totalEstoque : Number(item.quantidade_atual || 0) + totalEstoque }
-              : item
+            Number(item.id) === Number(existente.id) ? { ...item, ...registroFinal } : item
           ))
-        : [
-            ...(prev.estoque || []),
-            { id: gerarNovoId(prev.estoque || []), ...payload },
-          ],
+        : [...(prev.estoque || []), registroFinal],
     }));
 
     showToast({
       type: 'success',
-      message: isEdit ? 'Produto nutricional atualizado com sucesso.' : (existente ? 'Produto vinculado e estoque atualizado.' : 'Produto nutricional cadastrado.'),
+      message: 'Suplementação registrada com sucesso.',
     });
     onClose();
   }
@@ -668,7 +528,7 @@ function ProdutoNutricionalModal({ db, setDb, onClose, showToast, initialData = 
       open
       onClose={onClose}
       title={isEdit ? 'Editar produto nutricional' : 'Cadastrar produto nutricional'}
-      footer={<Button onClick={salvar}>{isEdit ? 'Salvar alterações' : 'Salvar produto'}</Button>}
+      footer={<Button onClick={salvar} disabled={salvando}>{salvando ? 'Salvando...' : (isEdit ? 'Salvar alterações' : 'Salvar produto')}</Button>}
       size="lg"
     >
       <div className="form-grid two">
@@ -830,206 +690,8 @@ function DietaModal({ db, setDb, onClose, showToast, initialData = null }) {
         </label>
         <Input label="Observação" value={form.obs} onChange={(e) => setForm((p) => ({ ...p, obs: e.target.value }))} />
       </div>
-      {erro ? <p style={{ margin: 0, color: 'var(--color-danger)', fontSize: '0.85rem' }}>{erro}</p> : null}
-    </Modal>
-  );
-}
-
-function ConsumoModal({ db, setDb, onClose, showToast, initialData = null }) {
-  const [form, setForm] = useState(() => buildConsumptionInitialData(db, initialData));
-  const [erro, setErro] = useState('');
-
-  const currentSelection = useMemo(
-    () => normalizeConsumptionSelection(db, {}, initialData),
-    [db, initialData]
-  );
-
-  const previewSelection = useMemo(
-    () => normalizeConsumptionSelection(db, form, initialData),
-    [db, form, initialData]
-  );
-
-  const custoEstimado = useMemo(
-    () => getConsumptionCost(form.quantidade, previewSelection.produto),
-    [form.quantidade, previewSelection.produto]
-  );
-
-  function validar() {
-    if (!form.data) return 'Informe a data.';
-    if (!form.lote_id && form.lote_id !== '') {
-      return 'Informe o lote.';
-    }
-    if (!form.ref_id) return 'Selecione o produto ou dieta.';
-    if (Number(form.quantidade || 0) <= 0) return 'Informe a quantidade consumida.';
-    return null;
-  }
-
-  function salvar() {
-    const erroValidacao = validar();
-    if (erroValidacao) {
-      setErro(erroValidacao);
-      return;
-    }
-
-    if (!previewSelection.produto) {
-      setErro(previewSelection.origem === 'dieta'
-        ? 'A dieta vinculada não possui produto nutricional válido.'
-        : 'O produto selecionado não foi encontrado.');
-      return;
-    }
-
-    const sameProduct = Boolean(
-      initialData?.id
-      && currentSelection.produto
-      && previewSelection.produto
-      && Number(currentSelection.produto.id) === Number(previewSelection.produto.id)
-    );
-    const saldoDisponivel = Number(previewSelection.produto.quantidade_atual || 0) + (sameProduct ? Number(initialData?.qtd_total || 0) : 0);
-    const quantidadeConsumida = Number(form.quantidade || 0);
-    if (quantidadeConsumida > saldoDisponivel && !window.confirm('Consumo maior que estoque disponível. Deseja continuar com saldo negativo?')) {
-      return;
-    }
-
-    const payloadBase = {
-      data: form.data,
-      lote_id: form.lote_id ? Number(form.lote_id) : null,
-      origem_tipo: previewSelection.origem,
-      ref_id: previewSelection.refId,
-      quantidade: quantidadeConsumida,
-      unidade: form.unidade || previewSelection.unidadePadrao || 'kg',
-      obs: form.obs || '',
-    };
-
-    setDb((prev) => {
-      const existingRecord = initialData
-        || (prev.consumo_suplementacao || []).find((item) => Number(item.id) === Number(initialData?.id))
-        || null;
-
-      if (existingRecord) {
-        const result = applyConsumptionChange(prev, existingRecord, payloadBase);
-        return {
-          ...prev,
-          estoque: result.estoqueAtualizado,
-          consumo_suplementacao: (prev.consumo_suplementacao || []).map((item) => (
-            Number(item.id) === Number(existingRecord.id) ? result.consumoAtualizado : item
-          )),
-          movimentacoes_financeiras: result.movimentacoesFinanceirasAtualizadas,
-        };
-      }
-
-      const consumoId = gerarNovoId(prev.consumo_suplementacao || []);
-      const novoConsumo = {
-        id: consumoId,
-        data: payloadBase.data,
-        lote_id: payloadBase.lote_id,
-        origem_tipo: payloadBase.origem_tipo,
-        item_estoque_id: previewSelection.produto?.id ?? null,
-        dieta_id: previewSelection.dieta?.id ?? null,
-        produto_nome: previewSelection.produto?.produto || null,
-        dieta_nome: previewSelection.dieta?.nome || null,
-        qtd_total: payloadBase.quantidade,
-        unidade: payloadBase.unidade,
-        custo_total: custoEstimado,
-        obs: payloadBase.obs,
-      };
-
-      const estoqueAtualizado = (prev.estoque || []).map((item) => (
-        Number(item.id) === Number(previewSelection.produto.id)
-          ? { ...item, quantidade_atual: Number(item.quantidade_atual || 0) - payloadBase.quantidade }
-          : item
-      ));
-
-      const movimentacoesFinanceiras = [
-        ...(prev.movimentacoes_financeiras || []),
-        {
-          id: gerarNovoId(prev.movimentacoes_financeiras || []),
-          tipo: 'despesa',
-          categoria: 'nutricao',
-          subcategoria: 'alimentacao',
-          lote_id: payloadBase.lote_id,
-          valor: custoEstimado,
-          data: payloadBase.data,
-          descricao: `Consumo nutricional - ${previewSelection.produto?.produto || previewSelection.dieta?.nome || 'Item'}`,
-          origem_tipo: 'consumo_suplementacao',
-          origem_id: consumoId,
-        },
-      ];
-
-      return {
-        ...prev,
-        estoque: estoqueAtualizado,
-        consumo_suplementacao: [...(prev.consumo_suplementacao || []), novoConsumo],
-        movimentacoes_financeiras: movimentacoesFinanceiras,
-      };
-    });
-
-    showToast({
-      type: 'success',
-      message: initialData ? 'Consumo atualizado com sucesso.' : 'Consumo registrado com baixa de estoque e custo financeiro.',
-    });
-    onClose();
-  }
-
-  const isEdit = Boolean(initialData?.id);
-
-  return (
-    <Modal
-      open
-      onClose={onClose}
-      title={isEdit ? 'Editar consumo diário' : 'Registrar consumo diário'}
-      footer={<Button onClick={salvar}>{isEdit ? 'Salvar alterações' : 'Salvar consumo'}</Button>}
-    >
-      <div className="form-grid two">
-        <Input label="Data" type="date" value={form.data} onChange={(e) => setForm((p) => ({ ...p, data: e.target.value }))} />
-        <label className="ui-input-wrap">
-          <span className="ui-input-label">Lote</span>
-          <select className="ui-input" value={form.lote_id} onChange={(e) => setForm((p) => ({ ...p, lote_id: e.target.value }))}>
-            <option value="">Sem lote</option>
-            {(db.lotes || []).map((lote) => <option key={lote.id} value={lote.id}>{lote.nome}</option>)}
-          </select>
-        </label>
-        <label className="ui-input-wrap">
-          <span className="ui-input-label">Produto ou dieta</span>
-          <select className="ui-input" value={form.origem} onChange={(e) => setForm((p) => ({ ...p, origem: e.target.value, ref_id: '' }))}>
-            <option value="produto">Produto</option>
-            <option value="dieta">Dieta</option>
-          </select>
-        </label>
-        <label className="ui-input-wrap">
-          <span className="ui-input-label">Seleção</span>
-          <select className="ui-input" value={form.ref_id} onChange={(e) => setForm((p) => ({ ...p, ref_id: e.target.value }))}>
-            <option value="">Selecione</option>
-            {(form.origem === 'produto' ? getProdutosNutricionais(db) : getDietasNormalizadas(db)).map((item) => (
-              <option key={item.id} value={item.id}>{item.produto || item.nome}</option>
-            ))}
-            {form.ref_id && !previewSelection.produto ? (
-              <option value={form.ref_id}>
-                {form.origem === 'produto' ? 'Produto vinculado não encontrado' : 'Dieta vinculada não encontrada'}
-              </option>
-            ) : null}
-          </select>
-        </label>
-        <Input label="Quantidade consumida" type="number" value={form.quantidade} onChange={(e) => setForm((p) => ({ ...p, quantidade: e.target.value }))} />
-        <label className="ui-input-wrap">
-          <span className="ui-input-label">Unidade</span>
-          <select className="ui-input" value={form.unidade} onChange={(e) => setForm((p) => ({ ...p, unidade: e.target.value }))}>
-            <option>kg</option>
-            <option>g</option>
-            <option>litro</option>
-            <option>unidade</option>
-          </select>
-        </label>
-        <Input label="Observação" value={form.obs} onChange={(e) => setForm((p) => ({ ...p, obs: e.target.value }))} />
-      </div>
-      <p>
-        Produto base:
-        {' '}
-        <strong>{previewSelection.produto?.produto || currentSelection.produto?.produto || '—'}</strong>
-      </p>
-      <p>
-        Custo estimado:
-        {' '}
-        <strong>R$ {formatNumber(custoEstimado, 2)}</strong>
+      <p style={{ margin: '12px 0 0', color: 'var(--color-warning, #c48f00)', fontSize: '0.85rem' }}>
+        Dietas ficam salvas apenas neste dispositivo por enquanto — não sincronizam com a nuvem nem aparecem em outro aparelho.
       </p>
       {erro ? <p style={{ margin: 0, color: 'var(--color-danger)', fontSize: '0.85rem' }}>{erro}</p> : null}
     </Modal>

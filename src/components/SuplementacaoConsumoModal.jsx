@@ -6,6 +6,7 @@ import { getResumoLote } from '../domain/resumoLote';
 import { gerarNovoId } from '../utils/id';
 import { formatNumber } from '../utils/calculations';
 import { toNumber } from '../domain/calcHelpers.js';
+import { createOperationalRecord, updateOperationalRecord } from '../services/operationalPersistence';
 
 function getTodayIso() {
   return new Date().toISOString().slice(0, 10);
@@ -192,18 +193,21 @@ function getModeLabel(mode) {
   return 'Total manual';
 }
 
-export default function SuplementacaoConsumoModal({ db, setDb, onClose, showToast, initialData = null }) {
+export default function SuplementacaoConsumoModal({ db, setDb, session, activeFarmId = null, onClose, showToast, initialData = null }) {
   const [form, setForm] = useState(() => buildInitialData(db, initialData));
   const [erro, setErro] = useState('');
+  const [salvando, setSalvando] = useState(false);
 
   const currentSelection = useMemo(() => normalizeConsumptionSelection(db, {}, initialData), [db, initialData]);
   const preview = useMemo(() => buildPreview({ db, form, initialData }), [db, form, initialData]);
   const custoEstimado = useMemo(() => getConsumptionCost(preview.total, preview.selectedProduct), [preview.total, preview.selectedProduct]);
 
   function validar() {
-    if (!form.data) return 'Informe a data.';
-    if (!form.lote_id) return 'Selecione o lote.';
-    if (!form.ref_id) return 'Selecione o produto ou dieta.';
+    if (!getProdutosNutricionais(db).length) return 'Cadastre um produto nutricional antes de registrar consumo.';
+    if (!(db.lotes || []).length) return 'Cadastre um lote antes de registrar consumo de suplemento.';
+    if (!form.data || !form.lote_id || !form.ref_id) {
+      return 'Preencha produto, lote, data e quantidade para registrar o consumo.';
+    }
     if (!preview.context.lote) return 'O lote selecionado não foi encontrado.';
     if (!preview.selectedProduct) {
       return preview.selection.origem === 'dieta'
@@ -217,24 +221,24 @@ export default function SuplementacaoConsumoModal({ db, setDb, onClose, showToas
       return 'O lote selecionado precisa ter cabeças para calcular por cabeça ou por peso.';
     }
     if (String(form.modo) === 'por_cabeca' && Number(form.consumo_por_cabeca_dia || 0) <= 0) {
-      return 'Informe o consumo por cabeça/dia.';
+      return 'Preencha produto, lote, data e quantidade para registrar o consumo.';
     }
     if (String(form.modo) === 'percentual_peso' && Number(form.percentual_peso_vivo || 0) <= 0) {
-      return 'Informe o percentual do peso vivo.';
+      return 'Preencha produto, lote, data e quantidade para registrar o consumo.';
     }
     if (String(form.modo) === 'percentual_peso' && !preview.context.hasPesoMedio) {
       return 'O lote selecionado não possui peso médio para calcular com percentual do peso vivo.';
     }
     if (String(form.modo) === 'manual_total' && Number(form.quantidade_total || 0) <= 0) {
-      return 'Informe a quantidade total consumida.';
+      return 'Preencha produto, lote, data e quantidade para registrar o consumo.';
     }
     if (preview.total <= 0) {
-      return 'Não foi possível calcular o consumo total.';
+      return 'Preencha produto, lote, data e quantidade para registrar o consumo.';
     }
     return null;
   }
 
-  function salvar() {
+  async function salvar() {
     const erroValidacao = validar();
     if (erroValidacao) {
       setErro(erroValidacao);
@@ -245,170 +249,102 @@ export default function SuplementacaoConsumoModal({ db, setDb, onClose, showToas
       return;
     }
 
+    const isEdit = Boolean(initialData?.id);
     const quantidadeConsumida = preview.total;
     const payloadBase = {
       data: form.data,
+      fazenda_id: activeFarmId,
       lote_id: Number(form.lote_id),
       modo: form.modo,
       origem_tipo: preview.selection.origem,
       ref_id: preview.selection.refId,
+      item_estoque_id: preview.selectedProduct?.id ?? null,
+      dieta_id: preview.selection.dieta?.id ?? null,
+      produto_nome: preview.selectedProduct?.produto || null,
+      dieta_nome: preview.selection.dieta?.nome || null,
       quantidade_total: quantidadeConsumida,
+      qtd_total: quantidadeConsumida,
       quantidade: quantidadeConsumida,
       consumo_por_cabeca_dia: String(form.modo) === 'por_cabeca' ? toNumberSafe(form.consumo_por_cabeca_dia, 0) : null,
       percentual_peso_vivo: String(form.modo) === 'percentual_peso' ? toNumberSafe(form.percentual_peso_vivo, 0) : null,
       unidade: form.unidade || preview.selection.unidadePadrao || 'kg',
+      custo_total: custoEstimado,
       obs: form.obs || '',
-      cabeças_lote: preview.context.heads,
+      cabecas_lote: preview.context.heads,
       peso_medio_usado: preview.context.pesoMedio,
     };
 
+    setSalvando(true);
+    const consumoPersist = isEdit
+      ? await updateOperationalRecord('consumo_suplementacao', Number(initialData.id), payloadBase, session)
+      : await createOperationalRecord('consumo_suplementacao', payloadBase, session);
+
+    if (!consumoPersist?.persisted) {
+      setSalvando(false);
+      setErro('Não foi possível salvar a suplementação. Verifique os dados e tente novamente.');
+      showToast({ type: 'warning', message: consumoPersist?.error || 'Não foi possível salvar a suplementação. Verifique os dados e tente novamente.' });
+      return;
+    }
+
+    const currentSelectionBase = isEdit ? normalizeConsumptionSelection(db, {}, initialData) : null;
+    const restoredQty = isEdit && currentSelectionBase?.produto?.id != null && Number(currentSelectionBase.produto.id) === Number(preview.selectedProduct?.id)
+      ? toNumberSafe(initialData?.qtd_total ?? initialData?.quantidade_total ?? initialData?.quantidade, 0)
+      : 0;
+    const novoSaldoEstoque = preview.selectedProduct
+      ? toNumberSafe(preview.selectedProduct.quantidade_atual, 0) + restoredQty - quantidadeConsumida
+      : null;
+    if (preview.selectedProduct) {
+      await updateOperationalRecord('estoque', Number(preview.selectedProduct.id), { quantidade_atual: novoSaldoEstoque, quantidade: novoSaldoEstoque }, session);
+    }
+
+    const consumoIdReal = consumoPersist.data?.id ?? initialData?.id;
+    const movimentoExistente = (db.movimentacoes_financeiras || []).find(
+      (mov) => String(mov?.origem_tipo || '') === 'consumo_suplementacao' && Number(mov?.origem_id) === Number(consumoIdReal)
+    );
+    const movimentoFinanceiroBase = {
+      tipo: 'despesa',
+      categoria: 'nutricao',
+      subcategoria: 'alimentacao',
+      lote_id: payloadBase.lote_id,
+      valor: custoEstimado,
+      data: payloadBase.data,
+      descricao: `Consumo nutricional - ${preview.selectedProduct?.produto || preview.selection.dieta?.nome || 'Item'}`,
+      origem_tipo: 'consumo_suplementacao',
+      origem_id: consumoIdReal,
+    };
+    const movFinanceiroPersist = movimentoExistente
+      ? await updateOperationalRecord('movimentacoes_financeiras', movimentoExistente.id, movimentoFinanceiroBase, session)
+      : await createOperationalRecord('movimentacoes_financeiras', movimentoFinanceiroBase, session);
+
+    setSalvando(false);
+
     setDb((prev) => {
-      const existingRecord = initialData
-        || (prev.consumo_suplementacao || []).find((item) => Number(item.id) === Number(initialData?.id))
-        || null;
-
-      if (existingRecord) {
-        const currentSelectionBase = normalizeConsumptionSelection(prev, {}, existingRecord);
-        const currentQty = toNumberSafe(existingRecord?.qtd_total ?? existingRecord?.quantidade_total ?? existingRecord?.quantidade, 0);
-        const nextQty = quantidadeConsumida;
-              const nextCost = getConsumptionCost(nextQty, preview.selectedProduct);
-        const restoredStockId = currentSelectionBase.produto?.id != null ? Number(currentSelectionBase.produto.id) : null;
-        const consumedStockId = preview.selectedProduct?.id != null ? Number(preview.selectedProduct.id) : null;
-
-        const estoqueAtualizado = (prev.estoque || []).map((item) => {
-          const itemId = Number(item.id);
-          let saldo = Number(item.quantidade_atual || 0);
-          let touched = false;
-
-          if (restoredStockId !== null && itemId === restoredStockId) {
-            saldo += currentQty;
-            touched = true;
-          }
-
-          if (consumedStockId !== null && itemId === consumedStockId) {
-            saldo -= nextQty;
-            touched = true;
-          }
-
-          return touched ? { ...item, quantidade_atual: saldo } : item;
-        });
-
-        const consumoAtualizado = {
-          ...existingRecord,
-          data: payloadBase.data,
-          lote_id: payloadBase.lote_id,
-          modo: payloadBase.modo,
-          origem_tipo: payloadBase.origem_tipo,
-          item_estoque_id: consumedStockId,
-          dieta_id: preview.selection.dieta?.id ?? null,
-          produto_nome: preview.selectedProduct?.produto || existingRecord?.produto_nome || null,
-          dieta_nome: preview.selection.dieta?.nome || null,
-          qtd_total: nextQty,
-          quantidade_total: nextQty,
-          quantidade: nextQty,
-          consumo_por_cabeca_dia: payloadBase.consumo_por_cabeca_dia,
-          percentual_peso_vivo: payloadBase.percentual_peso_vivo,
-          cabeças_lote: payloadBase.cabeças_lote,
-          peso_medio_usado: payloadBase.peso_medio_usado,
-          unidade: payloadBase.unidade,
-          custo_total: nextCost,
-          obs: payloadBase.obs,
-        };
-
-        const consumoId = Number(existingRecord.id);
-        const movimentacoesFinanceiras = Array.isArray(prev.movimentacoes_financeiras) ? prev.movimentacoes_financeiras : [];
-        const financeIndex = movimentacoesFinanceiras.findIndex(
-          (mov) => String(mov?.origem_tipo || '') === 'consumo_suplementacao' && Number(mov?.origem_id) === consumoId
-        );
-        const descricaoFinanceira = `Consumo nutricional - ${preview.selectedProduct?.produto || preview.selection.dieta?.nome || 'Item'}`;
-        const movimentoFinanceiroBase = {
-          tipo: 'despesa',
-          categoria: 'nutricao',
-          subcategoria: 'alimentacao',
-          lote_id: payloadBase.lote_id,
-          valor: nextCost,
-          data: payloadBase.data,
-          descricao: descricaoFinanceira,
-          origem_tipo: 'consumo_suplementacao',
-          origem_id: consumoId,
-        };
-
-        const movimentacoesFinanceirasAtualizadas = financeIndex >= 0
-          ? movimentacoesFinanceiras.map((mov, index) => (index === financeIndex ? { ...mov, ...movimentoFinanceiroBase } : mov))
-          : [
-              ...movimentacoesFinanceiras,
-              {
-                id: gerarNovoId(movimentacoesFinanceiras),
-                ...movimentoFinanceiroBase,
-              },
-            ];
-
-        return {
-          ...prev,
-          estoque: estoqueAtualizado,
-          consumo_suplementacao: (prev.consumo_suplementacao || []).map((item) => (
-            Number(item.id) === Number(existingRecord.id) ? consumoAtualizado : item
-          )),
-          movimentacoes_financeiras: movimentacoesFinanceirasAtualizadas,
-        };
-      }
-
-      const consumoId = gerarNovoId(prev.consumo_suplementacao || []);
-      const novoConsumo = {
-        id: consumoId,
-        data: payloadBase.data,
-        lote_id: payloadBase.lote_id,
-        modo: payloadBase.modo,
-        origem_tipo: payloadBase.origem_tipo,
-        item_estoque_id: preview.selectedProduct?.id ?? null,
-        dieta_id: preview.selection.dieta?.id ?? null,
-        produto_nome: preview.selectedProduct?.produto || null,
-        dieta_nome: preview.selection.dieta?.nome || null,
-        qtd_total: payloadBase.quantidade_total,
-        quantidade_total: payloadBase.quantidade_total,
-        quantidade: payloadBase.quantidade_total,
-        consumo_por_cabeca_dia: payloadBase.consumo_por_cabeca_dia,
-        percentual_peso_vivo: payloadBase.percentual_peso_vivo,
-        cabeças_lote: payloadBase.cabeças_lote,
-        peso_medio_usado: payloadBase.peso_medio_usado,
-        unidade: payloadBase.unidade,
-        custo_total: custoEstimado,
-        obs: payloadBase.obs,
-      };
-
-      const estoqueAtualizado = (prev.estoque || []).map((item) => (
-        Number(item.id) === Number(preview.selectedProduct.id)
-          ? { ...item, quantidade_atual: Number(item.quantidade_atual || 0) - quantidadeConsumida }
-          : item
-      ));
-
-      const movimentacoesFinanceiras = [
-        ...(prev.movimentacoes_financeiras || []),
-        {
-          id: gerarNovoId(prev.movimentacoes_financeiras || []),
-          tipo: 'despesa',
-          categoria: 'nutricao',
-          subcategoria: 'alimentacao',
-          lote_id: payloadBase.lote_id,
-          valor: custoEstimado,
-          data: payloadBase.data,
-          descricao: `Consumo nutricional - ${preview.selectedProduct?.produto || preview.selection.dieta?.nome || 'Item'}`,
-          origem_tipo: 'consumo_suplementacao',
-          origem_id: consumoId,
-        },
-      ];
+      const consumoFinal = consumoPersist.data || { id: consumoIdReal ?? gerarNovoId(prev.consumo_suplementacao || []), ...payloadBase };
+      const estoqueAtualizado = preview.selectedProduct
+        ? (prev.estoque || []).map((item) => (
+            Number(item.id) === Number(preview.selectedProduct.id)
+              ? { ...item, quantidade_atual: novoSaldoEstoque, quantidade: novoSaldoEstoque }
+              : item
+          ))
+        : (prev.estoque || []);
+      const movFinanceiroFinal = movFinanceiroPersist?.data || { id: movimentoExistente?.id ?? gerarNovoId(prev.movimentacoes_financeiras || []), ...movimentoFinanceiroBase };
+      const movimentacoesFinanceirasAtualizadas = movimentoExistente
+        ? (prev.movimentacoes_financeiras || []).map((mov) => (Number(mov.id) === Number(movimentoExistente.id) ? movFinanceiroFinal : mov))
+        : [...(prev.movimentacoes_financeiras || []), movFinanceiroFinal];
 
       return {
         ...prev,
         estoque: estoqueAtualizado,
-        consumo_suplementacao: [...(prev.consumo_suplementacao || []), novoConsumo],
-        movimentacoes_financeiras: movimentacoesFinanceiras,
+        consumo_suplementacao: isEdit
+          ? (prev.consumo_suplementacao || []).map((item) => (Number(item.id) === Number(initialData.id) ? consumoFinal : item))
+          : [...(prev.consumo_suplementacao || []), consumoFinal],
+        movimentacoes_financeiras: movimentacoesFinanceirasAtualizadas,
       };
     });
 
     showToast({
       type: 'success',
-      message: initialData ? 'Consumo atualizado com sucesso.' : 'Consumo registrado com baixa de estoque e custo financeiro.',
+      message: 'Suplementação registrada com sucesso.',
     });
     onClose();
   }
@@ -431,7 +367,7 @@ export default function SuplementacaoConsumoModal({ db, setDb, onClose, showToas
       open
       onClose={onClose}
       title={isEdit ? 'Editar consumo diário' : 'Registrar consumo diário'}
-      footer={<Button onClick={salvar}>{isEdit ? 'Salvar alterações' : 'Salvar consumo'}</Button>}
+      footer={<Button onClick={salvar} disabled={salvando}>{salvando ? 'Salvando...' : (isEdit ? 'Salvar alterações' : 'Salvar consumo')}</Button>}
     >
       <div style={{ display: 'grid', gap: 16 }}>
         <section className="section-card" style={{ padding: 16 }}>
@@ -516,6 +452,11 @@ export default function SuplementacaoConsumoModal({ db, setDb, onClose, showToas
               ) : null}
             </select>
           </label>
+          {form.origem === 'dieta' ? (
+            <p style={{ margin: 0, gridColumn: '1 / -1', color: 'var(--color-warning, #c48f00)', fontSize: '0.85rem' }}>
+              Dietas ainda são um recurso em preparação. Para o piloto, registre o consumo diretamente pelo produto nutricional.
+            </p>
+          ) : null}
           <label className="ui-input-wrap">
             <span className="ui-input-label">Modo de cálculo</span>
             <select className="ui-input" value={form.modo} onChange={(e) => setForm((p) => ({ ...p, modo: e.target.value }))}>

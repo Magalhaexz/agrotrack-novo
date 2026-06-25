@@ -774,19 +774,65 @@ function buildOperationalCreatePayload(table, record, userId) {
     const safe = sanitizeRecord(record);
     const localId = safe?.id ?? safe?.metadata?.local_id ?? null;
     const payload = {
-      nome: toNullableString(safe?.nome),
+      produto: toNullableString(safe?.produto ?? safe?.nome),
+      nome: toNullableString(safe?.nome ?? safe?.produto),
       categoria: toNullableString(safe?.categoria),
-      unidade: toNullableString(safe?.unidade),
-      quantidade: toNullableNumber(safe?.quantidade),
+      subcategoria: toNullableString(safe?.subcategoria),
+      fazenda_id: toNullableNumber(safe?.fazenda_id),
+      unidade: toNullableString(safe?.unidade ?? safe?.unidade_medida),
+      unidade_medida: toNullableString(safe?.unidade_medida ?? safe?.unidade),
+      quantidade: toNullableNumber(safe?.quantidade ?? safe?.quantidade_atual),
+      quantidade_atual: toNullableNumber(safe?.quantidade_atual ?? safe?.quantidade),
       quantidade_minima: toNullableNumber(safe?.quantidade_minima),
-      custo_unitario: toNullableNumber(safe?.custo_unitario),
+      valor_unitario: toNullableNumber(safe?.valor_unitario ?? safe?.custo_unitario ?? safe?.preco_unitario),
+      custo_unitario: toNullableNumber(safe?.custo_unitario ?? safe?.valor_unitario),
+      preco_unitario: toNullableNumber(safe?.preco_unitario ?? safe?.valor_unitario),
       valor_total: toNullableNumber(safe?.valor_total),
-      validade: toNullableDateString(safe?.validade),
+      validade: toNullableDateString(safe?.validade ?? safe?.data_validade),
+      data_validade: toNullableDateString(safe?.data_validade ?? safe?.validade),
+      origem: toNullableString(safe?.origem),
+      numero_nf: toNullableString(safe?.numero_nf),
+      data_entrada: toNullableDateString(safe?.data_entrada),
+      alerta_dias_antes: toNullableInteger(safe?.alerta_dias_antes),
       fornecedor: toNullableString(safe?.fornecedor),
-      observacoes: toNullableString(safe?.observacoes),
+      observacoes: toNullableString(safe?.observacoes ?? safe?.obs),
+      obs: toNullableString(safe?.obs ?? safe?.observacoes),
       metadata: isObject(safe?.metadata) ? { ...safe.metadata, local_id: localId } : { local_id: localId },
     };
     if (tableSupportsOwnerScope('estoque') && userId) payload.owner_user_id = userId;
+    return Object.fromEntries(Object.entries(payload).filter(([, value]) => value !== undefined));
+  }
+  if (normalizedTable === 'consumo_suplementacao') {
+    const safe = sanitizeRecord(record);
+    const localId = safe?.id ?? safe?.metadata?.local_id ?? null;
+    const metadata = isObject(safe?.metadata) ? { ...safe.metadata } : {};
+    metadata.local_id = localId;
+    if (safe?.cabecas_lote !== undefined) metadata.cabecas_lote = toNullableNumber(safe.cabecas_lote);
+    const quantidadeTotal = toNullableNumber(safe?.quantidade_total ?? safe?.qtd_total ?? safe?.quantidade);
+    const payload = {
+      owner_user_id: userId || null,
+      fazenda_id: toNullableNumber(safe?.fazenda_id),
+      lote_id: toNullableNumber(safe?.lote_id),
+      item_estoque_id: toNullableNumber(safe?.item_estoque_id),
+      dieta_id: toNullableNumber(safe?.dieta_id),
+      origem_tipo: toNullableString(safe?.origem_tipo),
+      ref_id: toNullableNumber(safe?.ref_id),
+      produto_nome: toNullableString(safe?.produto_nome),
+      dieta_nome: toNullableString(safe?.dieta_nome),
+      modo: toNullableString(safe?.modo),
+      quantidade: toNullableNumber(safe?.quantidade ?? quantidadeTotal),
+      qtd_total: quantidadeTotal,
+      quantidade_total: quantidadeTotal,
+      consumo_por_cabeca_dia: toNullableNumber(safe?.consumo_por_cabeca_dia),
+      percentual_peso_vivo: toNullableNumber(safe?.percentual_peso_vivo),
+      peso_medio_usado: toNullableNumber(safe?.peso_medio_usado),
+      unidade: toNullableString(safe?.unidade),
+      custo_total: toNullableNumber(safe?.custo_total),
+      data: toNullableDateString(safe?.data),
+      obs: toNullableString(safe?.obs),
+      metadata,
+    };
+    delete payload.id;
     return Object.fromEntries(Object.entries(payload).filter(([, value]) => value !== undefined));
   }
   if (normalizedTable === 'pesagens') {

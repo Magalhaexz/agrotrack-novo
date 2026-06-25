@@ -1,7 +1,24 @@
 # Beta Piloto — Decisão de Prontidão
 
 **Sprint 19 · Gerado em:** 2026-06-18
-**Decisão:** ✅ **PRONTO PARA O PILOTO** — com 1 ressalva (ver Sprint 35)
+**Decisão:** ✅ **PRONTO PARA O PILOTO** — ressalva da Sprint 35 corrigida (ver Sprint 36); QA geral fica para a próxima sprint
+
+> **Atualização (Sprint 36 — persistência real de Suplementação):**
+> corrigido o achado crítico da Sprint 35 — produto nutricional e consumo
+> de suplementação agora persistem de verdade no Supabase (`estoque` e
+> `consumo_suplementacao`), incluindo baixa de estoque e despesa
+> financeira automática, confirmado por consulta direta ao banco e por
+> reload de página. Causa raiz: a página nunca usava `session`/
+> `fazendaSelecionada` (já disponíveis para todas as páginas), e os
+> builders de payload em `operationalPersistence.js` estavam incompletos
+> para essas duas tabelas. Dietas seguem sem tabela real no Supabase —
+> documentado como pendência, com aviso explícito na UI em vez de
+> persistência silenciosamente ausente. Por escopo explícito desta
+> sprint, **QA geral de segurança e funcionalidade não foi feito** e fica
+> para uma sprint dedicada antes do piloto começar de fato. Ver
+> [SPRINT_36_RESULTADO.md](SPRINT_36_RESULTADO.md),
+> [SUPLEMENTACAO_HERDON.md](SUPLEMENTACAO_HERDON.md) e
+> [SUPLEMENTACAO_TESTE_MANUAL.md](SUPLEMENTACAO_TESTE_MANUAL.md).
 
 > **Atualização (Sprint 35 — fechamento de fluxo piloto):** resolvido o
 > gap `lotes.qtd` × `animais` encontrado na Sprint 34 (criação automática
