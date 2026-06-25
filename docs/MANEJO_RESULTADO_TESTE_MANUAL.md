@@ -1,6 +1,22 @@
 # Manejo, Sanidade e Suplementação — Teste Manual (Sprint 33)
 
-## O que foi possível testar nesta sessão
+> **Atualização (Sprint 34):** testado com conta autenticada real. Card
+> "Manejo, sanidade e suplementação" confirmado no Relatório do Lote:
+> registrei 1 ocorrência tipo "Manejo" via Modo Curral (sincronizada para
+> `sanitario`) e o card mostrou corretamente "Sanidade: Em dia" com o
+> insight "Este lote possui registro sanitário recente."; sem nenhum
+> registro em `consumo_suplementacao`, mostrou "Suplementação: Sem
+> registro no período" e "Ainda faltam dados de pesagem para relacionar
+> suplementação e ganho de peso." — nenhuma quebra, nenhum `R$0,00`
+> enganoso. **Não testado nesta sessão:** registro de suplementação real
+> (`consumo_suplementacao`), status "Custo de suplemento elevado",
+> "Suplementação com desempenho positivo", prioridade combinada de
+> revisão de manejo no Dashboard, e Modo Curral autenticado para ações
+> de sanidade (que de qualquer forma não têm atalho, por decisão da
+> própria Sprint 33). Detalhes completos da sessão:
+> [QA_PILOTO_HERDON.md](QA_PILOTO_HERDON.md).
+
+## O que foi possível testar nesta sessão (Sprint 33, sem conta autenticada)
 
 - Servidor de desenvolvimento iniciado com sucesso, sem erros de build.
 - Tela de login carrega sem erros de console ou de servidor.

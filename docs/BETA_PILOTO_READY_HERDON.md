@@ -3,6 +3,28 @@
 **Sprint 19 · Gerado em:** 2026-06-18
 **Decisão:** ✅ **PRONTO PARA O PILOTO**
 
+> **Atualização (Sprint 34 — QA com conta real):** primeira sessão desde
+> a Sprint 22 com teste autenticado de fato contra o Supabase de
+> produção (não só a tela de login). Resultado: **5 bugs críticos
+> encontrados e corrigidos** que bloqueavam ou corrompiam silenciosamente
+> o fluxo principal — criar lote (validação excessiva bloqueava o
+> cadastro básico), registrar pesagem (recálculo do lote tentava zerar
+> `nome`/`faz_id`/etc. e só não corrompia por sorte da constraint
+> `NOT NULL`), lançar despesa (campo inexistente quebrava 100% dos
+> lançamentos), relatório do lote (pasto errado por bug de comparação de
+> UUID), e cadastro de lote perdendo silenciosamente pasto/categoria/
+> cabeças/suplementação. Com as correções, o ciclo completo (fazenda →
+> pasto → lote → pesagem → despesa → resultado → decisão de venda →
+> manejo → relatório) foi validado ponta a ponta contra dados reais.
+> **Achado importante não corrigido:** gap entre `lotes.qtd` e a tabela
+> `animais` — um lote sem registro em "Animais" mostra "Dados
+> insuficientes" em Resultado/Decisão de Venda mesmo com pesagens e
+> despesas reais, sem nenhuma mensagem explicando o passo que falta.
+> Recomendado para Sprint 35 antes da landing. Cabeçalho mobile sobreposto
+> em 375px (já conhecido desde a Sprint 27) também confirmado, ainda sem
+> correção. Ver [QA_PILOTO_HERDON.md](QA_PILOTO_HERDON.md) e
+> [SPRINT_34_RESULTADO.md](SPRINT_34_RESULTADO.md).
+
 > **Atualização (Sprint 22):** desde esta decisão, a Sprint 21 adicionou
 > movimentação de lotes entre pastos com histórico, e a Sprint 22 reformulou
 > o Painel Geral ("Hoje na Fazenda") e corrigiu um bug que fazia alertas

@@ -19,7 +19,10 @@ export function buscarFazendaNome(db, fazendaId) {
 
 export function buscarPastagemNome(db, pastagemId) {
   if (pastagemId == null) return null;
-  const pastagem = arr(db?.pastagens).find((item) => toNumber(item.id) === toNumber(pastagemId));
+  // `pastagens.id` é uuid, não numérico — comparar com toNumber() faz tudo
+  // virar 0 e sempre casar com o primeiro pasto da lista, independente do
+  // pasto real do lote.
+  const pastagem = arr(db?.pastagens).find((item) => String(item.id) === String(pastagemId));
   return pastagem?.nome || null;
 }
 

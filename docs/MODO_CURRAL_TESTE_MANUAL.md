@@ -1,6 +1,24 @@
 # Modo Curral — Teste Manual (Sprint 31)
 
-## O que foi possível testar nesta sessão
+> **Atualização (Sprint 34):** testado de verdade com conta autenticada
+> real contra o Supabase de produção (primeira vez desde a Sprint 22).
+> Resultado: Modo Curral **funciona** — "Registrar pesagem", "Mover lote
+> de pasto" e "Registrar ocorrência" testados e confirmados (a 4ª ação,
+> "Lançar despesa", foi testada via Financeiro normal, não pelo atalho do
+> Modo Curral, mas usa o mesmo código). A ocorrência registrada via Modo
+> Curral sincronizou corretamente e apareceu como "Sincronizado" na
+> página Sincronização. Nenhum problema encontrado específico do Modo
+> Curral nesta sessão — os bugs críticos encontrados (ver
+> [QA_PILOTO_HERDON.md](QA_PILOTO_HERDON.md)) estavam nas telas
+> completas (Pesagens, Financeiro, Lotes), não no Modo Curral em si, mas
+> afetavam o mesmo código compartilhado, então os mesmos fixes também
+> corrigem o Modo Curral. Detalhes completos, dados de teste usados e os
+> 5 bugs corrigidos: ver [QA_PILOTO_HERDON.md](QA_PILOTO_HERDON.md) e
+> [SPRINT_34_RESULTADO.md](SPRINT_34_RESULTADO.md). Itens 3, 5, 10 e 11
+> da lista abaixo (offline real, estados vazios com conta nova, grade de
+> 5 breakpoints) continuam pendentes — não testados nesta sessão.
+
+## O que foi possível testar nesta sessão (Sprint 31, sem conta autenticada)
 
 - Servidor de desenvolvimento (`npm run dev`) iniciado com sucesso, sem
   erros de build/runtime.

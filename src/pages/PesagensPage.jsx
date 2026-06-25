@@ -724,7 +724,7 @@ export default function PesagensPage({ db, setDb, onConfirmAction, navigationInt
       return;
     }
 
-    if (pesagemEditando) {
+    if (pesagemEditando?.id) {
       const pesagemPersistida = await updateOperationalRecord('pesagens', pesagemEditando.id, dados, session);
       const registroAtualizado = { ...pesagemEditando, ...(pesagemPersistida.data || dados) };
 

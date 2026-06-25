@@ -209,10 +209,6 @@ function validarForm(form, planejamento, pastagensDisponiveis = []) {
   if (toNumber(form.gmd_meta) <= 0) return 'Informe o GMD esperado.';
   if (planejamento.diasEstimados <= 0) return 'Não foi possível calcular os dias estimados com os dados informados.';
   if (!planejamento.dataPrevistaSaida) return 'Não foi possível calcular a data prevista de saída.';
-  if (!form.supl_nome.trim()) return 'Informe a dieta ou produto.';
-  if (toNumber(form.consumo_por_cabeca_dia) <= 0) return 'Informe o consumo diário por animal.';
-  if (toNumber(form.supl_rkg) <= 0) return 'Informe o preço por kg.';
-  if (toNumber(form.preco_arroba) <= 0) return 'Informe o valor manual da arroba.';
   if (!isWholePositiveInteger(form.supl_meta_dias)) return 'Informe um número inteiro de dias.';
   if (form.sistema === 'pasto' && !form.pastagem_id && pastagensDisponiveis.length > 0) {
     return 'Selecione o pasto vinculado ao lote (obrigatório para sistema a pasto).';
@@ -526,11 +522,14 @@ export default function LoteForm({ initialData, fazendas = [], pastagens = [], f
 
         {/* ── Bloco 4: Nutrição / manejo ── */}
         <div className="section-card">
-          <div className="section-header"><h4>Nutrição / manejo</h4></div>
+          <div className="section-header">
+            <h4>Nutrição / manejo</h4>
+            <p className="ui-input-hint">Opcional — preencha se já tiver um plano de suplementação definido. Pode deixar em branco e registrar o consumo real depois, em Suplementação.</p>
+          </div>
 
           <div className="grid-3">
             <label>
-              Dieta / produto
+              Dieta / produto (opcional)
               <input
                 className="ui-input"
                 name="supl_nome"
@@ -547,7 +546,7 @@ export default function LoteForm({ initialData, fazendas = [], pastagens = [], f
             </Input>
 
             <label>
-              {consumoLabel}
+              {consumoLabel} (opcional)
               <input
                 className="ui-input"
                 name="consumo_por_cabeca_dia"
@@ -563,7 +562,7 @@ export default function LoteForm({ initialData, fazendas = [], pastagens = [], f
 
           <div className="grid-2">
             <label>
-              Preço do suplemento (R$/kg)
+              Preço do suplemento (R$/kg) (opcional)
               <input
                 className="ui-input"
                 name="supl_rkg"
@@ -598,7 +597,7 @@ export default function LoteForm({ initialData, fazendas = [], pastagens = [], f
 
           <div className="grid-2">
             <label>
-              Preço da arroba (R$)
+              Preço da arroba (R$) (opcional — usamos R$ 270,00 se não informado)
               <input
                 className="ui-input"
                 name="preco_arroba"

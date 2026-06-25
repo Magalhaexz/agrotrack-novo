@@ -176,7 +176,7 @@ export default function AnimalForm({ initialData, lotes = [], fazendas = [], onS
     });
   }
 
-  const titulo = initialData ? 'Editar animal' : 'Novo cadastro de animal';
+  const titulo = initialData?.id ? 'Editar animal' : 'Novo cadastro de animal';
   const identificacaoLabel = form.tipo_registro === 'individual'
     ? 'Identificação / brinco / nome'
     : 'Nome do lote / grupo';

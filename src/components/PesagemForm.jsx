@@ -309,7 +309,7 @@ export default function PesagemForm({
     });
   }
 
-  const titulo = initialData ? 'Editar pesagem' : 'Nova pesagem';
+  const titulo = initialData?.id ? 'Editar pesagem' : 'Nova pesagem';
 
   const footer = (
     <div className="modal-footer action-row" style={{ width: '100%' }}>

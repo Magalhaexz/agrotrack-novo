@@ -240,7 +240,7 @@ export default function AnimaisPage({ db, setDb, onConfirmAction, subscription =
   }
 
   async function salvarAnimal(dados) {
-    const currentQuantity = animalEditando ? Number(animalEditando.qtd || 0) || 0 : 0;
+    const currentQuantity = animalEditando?.id ? Number(animalEditando.qtd || 0) || 0 : 0;
     const nextQuantity = Number(dados?.qtd ?? animalEditando?.qtd ?? 1) || 1;
     const evaluation = canCreateAnimal(subscription, Math.max(resumo.totalCabecas - currentQuantity, 0), nextQuantity);
     if (!evaluation.allowed) {
@@ -251,7 +251,7 @@ export default function AnimaisPage({ db, setDb, onConfirmAction, subscription =
       return;
     }
 
-    if (animalEditando) {
+    if (animalEditando?.id) {
       const persisted = await updateOperationalRecord('animais', animalEditando.id, dados, session);
       const mergedAnimal = {
         ...animalEditando,

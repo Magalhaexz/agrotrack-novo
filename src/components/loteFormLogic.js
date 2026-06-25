@@ -194,10 +194,6 @@ export function validarForm(form, planejamento) {
   if (toNumber(form.gmd_meta) <= 0) return 'Informe o GMD esperado.';
   if (planejamento.diasEstimados <= 0) return 'Não foi possível calcular os dias estimados com os dados informados.';
   if (!planejamento.dataPrevistaSaida) return 'Não foi possível calcular a data prevista de saída.';
-  if (!form.supl_nome.trim()) return 'Informe a dieta ou produto.';
-  if (toNumber(form.consumo_por_cabeca_dia) <= 0) return 'Informe o consumo diário por animal.';
-  if (toNumber(form.supl_rkg) <= 0) return 'Informe o preço por kg.';
-  if (toNumber(form.preco_arroba) <= 0) return 'Informe o valor manual da arroba.';
   if (!isWholePositiveInteger(form.supl_meta_dias)) return 'Informe um número inteiro de dias.';
   return null;
 }

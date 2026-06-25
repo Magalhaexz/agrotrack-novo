@@ -847,6 +847,10 @@ function buildOperationalCreatePayload(table, record, userId) {
       owner_user_id: userId || null,
       nome: toNullableString(safe?.nome),
       faz_id: toNullableNumber(safe?.faz_id),
+      pastagem_id: toNullableString(safe?.pastagem_id),
+      categoria_animal: toNullableString(safe?.categoria_animal),
+      raca: toNullableString(safe?.raca),
+      qtd: toNullableNumber(safe?.qtd),
       entrada: toNullableDateString(safe?.entrada),
       saida: toNullableDateString(safe?.saida),
       status: toNullableString(safe?.status),
@@ -856,6 +860,8 @@ function buildOperationalCreatePayload(table, record, userId) {
       preco_arroba: toNullableNumber(safe?.preco_arroba),
       rendimento_carcaca: toNullableNumber(safe?.rendimento_carcaca),
       investimento: toNullableNumber(safe?.investimento),
+      custo_fixo_mensal: toNullableNumber(safe?.custo_fixo_mensal),
+      outras_desp_pc_mes: toNullableNumber(safe?.outras_desp_pc_mes),
       peso_alvo: toNullableNumber(safe?.peso_alvo),
       obs: toNullableString(safe?.obs),
       p_ini: toNullableNumber(safe?.p_ini),
@@ -863,6 +869,23 @@ function buildOperationalCreatePayload(table, record, userId) {
       ultima_pesagem: toNullableDateString(safe?.ultima_pesagem),
       data_saida: toNullableDateString(safe?.data_saida),
       fechamento: isObject(safe?.fechamento) ? safe.fechamento : null,
+      dias_estimados: toNullableInteger(safe?.dias_estimados),
+      consumo_tipo: toNullableString(safe?.consumo_tipo),
+      consumo_por_cabeca_dia: toNullableNumber(safe?.consumo_por_cabeca_dia),
+      consumo_total_estimado: toNullableNumber(safe?.consumo_total_estimado),
+      custo_total_estimado: toNullableNumber(safe?.custo_total_estimado),
+      preco_kg: toNullableNumber(safe?.preco_kg),
+      supl_nome: toNullableString(safe?.supl_nome),
+      supl_rkg: toNullableNumber(safe?.supl_rkg),
+      supl_pv_pct: toNullableNumber(safe?.supl_pv_pct),
+      supl_estoque_kg: toNullableNumber(safe?.supl_estoque_kg),
+      supl_meta_dias: toNullableInteger(safe?.supl_meta_dias),
+      tem_recria: typeof safe?.tem_recria === 'boolean' ? safe.tem_recria : null,
+      tem_engorda: typeof safe?.tem_engorda === 'boolean' ? safe.tem_engorda : null,
+      dias_recria: toNullableInteger(safe?.dias_recria),
+      p_ini_recria: toNullableNumber(safe?.p_ini_recria),
+      p_fim_recria: toNullableNumber(safe?.p_fim_recria),
+      dias_engorda: toNullableInteger(safe?.dias_engorda),
       metadata,
       cloud_id: cloudUuid || undefined,
     };
@@ -901,7 +924,18 @@ function buildOperationalUpdatePayload(table, patch, userId) {
   const safe = sanitizeRecord(patch);
   const payload = buildOperationalCreatePayload(table, safe, userId);
   if (!payload || typeof payload !== 'object') return payload;
-  return payload;
+  // Update parcial: só envia os campos que o chamador realmente informou.
+  // buildOperationalCreatePayload normaliza a tabela inteira (com null nos
+  // campos ausentes) porque foi feito para criação, onde o registro completo
+  // é conhecido. Reaplicado direto numa atualização parcial (ex.: recálculo
+  // de peso do lote após uma pesagem, que só envia p_at/ultima_pesagem),
+  // isso apagaria qualquer coluna não informada — já violou a constraint
+  // NOT NULL de `lotes.nome` em produção. Mantém só as chaves presentes
+  // no patch original.
+  const patchKeys = new Set(Object.keys(safe || {}));
+  return Object.fromEntries(
+    Object.entries(payload).filter(([key]) => patchKeys.has(key))
+  );
 }
 
 async function tryInsertPayloadVariants(table, payloadOrVariants) {
@@ -1063,6 +1097,15 @@ function toNullableNumber(value) {
   if (value === undefined || value === null || value === '') return null;
   const n = Number(value);
   return Number.isFinite(n) ? n : null;
+}
+
+// Algumas colunas de `lotes` (dias_estimados, dias_recria, dias_engorda) são
+// `integer` no banco, mas os cálculos de planejamento produzem dias
+// fracionários (ex.: (peso_alvo - p_ini) / gmd_meta) — enviar o valor cru
+// quebra a gravação com "invalid input syntax for type integer".
+function toNullableInteger(value) {
+  const n = toNullableNumber(value);
+  return n === null ? null : Math.round(n);
 }
 
 function isObject(value) {

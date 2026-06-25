@@ -551,8 +551,10 @@ function NovoLancamentoModal({ db, setDb, onClose, hasPermission, showToast, ses
         lote_id: form.lote_id ? Number(form.lote_id) : null,
         fornecedor: form.tipo === 'despesa' ? form.pessoa : '',
         comprador: form.tipo === 'receita' ? form.pessoa : '',
-        nota_fiscal: form.nf,
-        observacao: form.obs,
+        // `movimentacoes_financeiras` não tem coluna `nota_fiscal` — guardamos
+        // o número informado dentro de `observacao` para não perder o dado
+        // (enviar `nota_fiscal` direto quebrava o salvamento com 400/PGRST204).
+        observacao: [form.obs, form.nf ? `NF: ${form.nf}` : null].filter(Boolean).join(' · '),
       };
     });
 

@@ -82,7 +82,7 @@ test('new lote form bootstraps the active farm id', () => {
   assert.equal(form.faz_id, 12);
 });
 
-test('planned days must be an integer and consumption cannot be zero', () => {
+test('planned days must be an integer', () => {
   const validBase = buildValidForm();
   const planning = {
     diasEstimados: 160,
@@ -92,7 +92,26 @@ test('planned days must be an integer and consumption cannot be zero', () => {
   };
 
   assert.equal(validarForm({ ...validBase, supl_meta_dias: 0 }, planning), 'Informe um número inteiro de dias.');
-  assert.equal(validarForm({ ...validBase, consumo_por_cabeca_dia: 0 }, planning), 'Informe o consumo diário por animal.');
+});
+
+test('nutrição/suplementação e preço da arroba são opcionais para criar o lote (Sprint 34)', () => {
+  const validBase = buildValidForm();
+  const planning = {
+    diasEstimados: 160,
+    dataPrevistaSaida: '2026-11-08',
+    consumoTotalEstimado: 0,
+    custoEstimadoTotal: 0,
+  };
+
+  const semNutricao = {
+    ...validBase,
+    supl_nome: '',
+    consumo_por_cabeca_dia: '',
+    supl_rkg: '',
+    preco_arroba: '',
+  };
+
+  assert.equal(validarForm(semNutricao, planning), null);
 });
 
 test('history rows include consumo records with the expected shape', () => {

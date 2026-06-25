@@ -6,8 +6,26 @@ import {
   buildRelatorioFinanceiro,
   buildRelatorioPastagens,
   buildResumoGeralFazenda,
+  buscarPastagemNome,
 } from '../src/domain/relatorios.js';
 import { makeBaseDb } from './fixtures.js';
+
+test('buscarPastagemNome encontra o pasto certo quando o id é uuid (Sprint 34)', () => {
+  const db = {
+    pastagens: [
+      { id: '43dfeb75-fba1-4f99-8ba5-fe3814416b26', nome: 'Pasto 1' },
+      { id: '90b3c952-4ed9-4250-bb8b-220176e7b00b', nome: 'Pasto 2' },
+    ],
+  };
+  assert.equal(buscarPastagemNome(db, '90b3c952-4ed9-4250-bb8b-220176e7b00b'), 'Pasto 2');
+  assert.equal(buscarPastagemNome(db, '43dfeb75-fba1-4f99-8ba5-fe3814416b26'), 'Pasto 1');
+});
+
+test('buscarPastagemNome retorna null sem pastagemId ou sem match', () => {
+  const db = { pastagens: [{ id: 'abc', nome: 'Pasto X' }] };
+  assert.equal(buscarPastagemNome(db, null), null);
+  assert.equal(buscarPastagemNome(db, 'nao-existe'), null);
+});
 
 test('buildRelatorioLote retorna dados completos quando o lote existe', () => {
   const db = makeBaseDb();

@@ -1,6 +1,24 @@
 # Decisão de Venda — Teste Manual (Sprint 32)
 
-## O que foi possível testar nesta sessão
+> **Atualização (Sprint 34):** testado com conta autenticada real contra
+> o Supabase de produção. Itens 1, 3, 6, 7, 9 e 10 confirmados: lote com
+> pesagem e financeiro mostrou "Arrobas estimadas: 249,6 @ · Custo/@:
+> R$18,75 · Lucro/@: R$-6,01 · Status: Acompanhar por mais alguns dias";
+> simulação "Se vender hoje"/"Se manter por 30 dias" renderizou valores e
+> a diferença corretamente, com o aviso de estimativa; texto WhatsApp
+> confirmado pelos testes automatizados (cobertura existente,
+> `gerarResumoLoteTexto`). **Achado importante, não previsto no roteiro
+> original:** um lote com `qtd` preenchida mas sem registro correspondente
+> em `animais` mostra "Dados insuficientes" em tudo (arrobas, custo/@,
+> decisão), mesmo tendo pesagens e despesas reais — porque os cálculos
+> usam a tabela `animais`, não `lotes.qtd`. Documentado em detalhe, com
+> reprodução e correção do exemplo de teste, em
+> [QA_PILOTO_HERDON.md](QA_PILOTO_HERDON.md#4-achado-documentado-não-corrigido--gap-entre-cabeças-do-lote-e-animais).
+> Itens 2, 4, 5, 8 e 11 (lote sem financeiro/pesagem, custo alto, GMD
+> baixo, coluna em Resultado dos Lotes, prioridade no Dashboard) não
+> foram montados como cenários separados nesta sessão — ficam pendentes.
+
+## O que foi possível testar nesta sessão (Sprint 32, sem conta autenticada)
 
 - Servidor de desenvolvimento iniciado com sucesso, sem erros de build.
 - Tela de login carrega sem erros de console ou de servidor.
