@@ -4754,6 +4754,11 @@ body,
     top: var(--mobile-topbar-height);
     border-radius: 20px;
     margin: 0 10px;
+    /* Sprint 35: sem isso, alguma outra regra de width nas dezenas de
+       blocos .header.top-header deste arquivo "ganha" e o auto-resolve do
+       width com left/right/margin não acontece — o header fica 20px mais
+       largo que a viewport e estoura a tela em 375px. */
+    width: auto;
   }
 
   .main {
@@ -8169,6 +8174,11 @@ body {
   .header.top-header {
     left: 0;
     width: 100%;
+    /* Sprint 35: outra regra de .header.top-header (mais acima neste
+       arquivo) define `margin: 0 10px` para um layout "cartão flutuante"
+       diferente deste. Com width:100% + essa margem ainda valendo, o
+       cabeçalho ficava 20px mais largo que a tela e cortava à direita. */
+    margin: 0;
     z-index: 1500;
   }
 

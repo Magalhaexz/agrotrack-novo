@@ -23,6 +23,16 @@ const STATUS_LABEL = {
 
 const MENSAGEM_DADOS_INSUFICIENTES = 'Ainda faltam dados de pesagem ou financeiro para uma decisão segura.';
 
+// Ordem de checagem = ordem de prioridade quando mais de um dado falta —
+// cabeças primeiro, porque sem elas nada mais pode ser calculado (Sprint 35:
+// "Dados insuficientes" sozinho não dizia ao produtor o que fazer a seguir).
+const DESCRICAO_CAMPO_FALTANTE = [
+  { campo: 'qtdCabecas', descricao: 'a quantidade de cabeças (cadastre o grupo de animais do lote)' },
+  { campo: 'pesoAtual', descricao: 'o peso médio atual (registre uma pesagem)' },
+  { campo: 'arrobas', descricao: 'as arrobas estimadas (confirme peso e rendimento de carcaça)' },
+  { campo: 'custoTotal', descricao: 'o custo total do lote (lance uma despesa vinculada a ele)' },
+];
+
 /**
  * Monta o objeto `dados` consumido pelas demais funções deste domínio, a
  * partir do que já existe em `getResumoLote` (resumoLote.js) — não recalcula
@@ -83,6 +93,26 @@ export function calcularPontoEquilibrioArroba({ custoTotal, arrobas } = {}) {
 function temDadosSuficientes(dados) {
   if (!dados) return false;
   return toNumber(dados.qtdCabecas) > 0 && toNumber(dados.pesoAtual) > 0 && toNumber(dados.arrobas) > 0 && toNumber(dados.custoTotal) > 0;
+}
+
+/**
+ * Lista, em ordem de prioridade, o(s) campo(s) que faltam para calcular
+ * custo por arroba e decisão de venda — usada para trocar o "Dados
+ * insuficientes" genérico por uma instrução do que fazer a seguir.
+ */
+export function listarCamposFaltantesDecisaoVenda(dados) {
+  return DESCRICAO_CAMPO_FALTANTE.filter(({ campo }) => toNumber(dados?.[campo]) <= 0);
+}
+
+function gerarMensagemDadosInsuficientes(dados) {
+  const faltantes = listarCamposFaltantesDecisaoVenda(dados);
+  if (!faltantes.length) return MENSAGEM_DADOS_INSUFICIENTES;
+  if (faltantes.length === 1) {
+    return `Ainda falta ${faltantes[0].descricao} para calcular o custo por arroba e a decisão de venda deste lote.`;
+  }
+  const descricoes = faltantes.map((item) => item.descricao);
+  const ultima = descricoes.pop();
+  return `Ainda faltam ${descricoes.join(', ')} e ${ultima} para calcular o custo por arroba e a decisão de venda deste lote.`;
 }
 
 /** Simula vender o lote hoje, pelo preço de arroba e arrobas já calculados em `dados`. */
@@ -163,7 +193,7 @@ export function classificarDecisaoVenda(dados = {}) {
     return {
       status: STATUS_DECISAO.DADOS_INSUFICIENTES,
       statusLabel: STATUS_LABEL[STATUS_DECISAO.DADOS_INSUFICIENTES],
-      mensagem: MENSAGEM_DADOS_INSUFICIENTES,
+      mensagem: gerarMensagemDadosInsuficientes(dados),
     };
   }
 

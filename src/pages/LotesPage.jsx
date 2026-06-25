@@ -17,6 +17,7 @@ import RetiradaAnimaisModal from '../components/lotes/RetiradaAnimaisModal';
 import FechamentoLoteModal from '../components/lotes/FechamentoLoteModal';
 import MoverPastoModal from '../components/lotes/MoverPastoModal';
 import { moverLoteParaPasto, listarHistoricoPastos } from '../services/movimentacaoPastos';
+import { buildGrupoAnimaisAutoPatch } from './lotesLogic';
 import {
   addDaysToDate,
   calculateDailyConsumptionKg,
@@ -533,7 +534,24 @@ export default function LotesPage({ db, setDb, onRegistrarSaidaAnimal, session, 
       return;
     }
 
+    const loteIdReal = persisted?.data?.id ?? novoLote.id;
+
     setDb((prev) => ({ ...prev, lotes: [...(prev.lotes || []), novoLote] }));
+
+    // Sem isso, um lote com "Cabeças" preenchida mas sem grupo em `animais`
+    // mostra "Dados insuficientes" em Resultado/Decisão de Venda/Manejo,
+    // mesmo com pesagens e despesas reais — esses cálculos usam `animais`,
+    // nunca `lotes.qtd`. Criamos o grupo automaticamente, sem pedir nada
+    // novo ao produtor (Sprint 35).
+    const grupoAutoPatch = buildGrupoAnimaisAutoPatch({ ...novoLote, id: loteIdReal });
+    if (grupoAutoPatch) {
+      const grupoPersistido = await createOperationalRecord('animais', grupoAutoPatch, session);
+      if (grupoPersistido?.persisted) {
+        const novoGrupo = grupoPersistido.data || { id: gerarNovoId(animais), ...grupoAutoPatch };
+        setDb((prev) => ({ ...prev, animais: [...(prev.animais || []), novoGrupo] }));
+      }
+    }
+
     showToast({ type: 'success', message: 'Lote criado com sucesso.' });
     setOpenNovoLote(false);
   }

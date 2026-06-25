@@ -1,5 +1,28 @@
 # Suplementação ligada ao Resultado — HERDON (Sprint 33)
 
+> **Atualização crítica (Sprint 35 — QA com conta real):** a página
+> **Suplementação não persiste nada no banco real.** Cadastrar um
+> produto nutricional, uma dieta ou registrar um consumo funciona na
+> tela (o modal fecha, o item some/aparece, sem erro visível), mas
+> `src/pages/SuplementacaoPage.jsx` **nunca chama**
+> `createOperationalRecord`/`updateOperationalRecord` — todo o estado é
+> mantido só em memória via `setDb(...)`. Confirmado ao vivo: criei um
+> produto "Ração QA 18%" e um consumo de 50kg vinculado a um lote real; a
+> UI mostrou sucesso, mas consultas diretas ao Supabase (`estoque`,
+> `consumo_suplementacao`, `movimentacoes_financeiras`) confirmaram
+> **zero linhas gravadas**. Isso significa que tudo descrito abaixo sobre
+> "Onde aparece" (Manejo, Relatório, WhatsApp, Hoje na Fazenda) **funciona
+> corretamente com os dados que existirem em `db.consumo_suplementacao`**,
+> mas hoje **nenhum dado real chega a essa tabela** pela própria tela de
+> Suplementação — qualquer consumo "registrado" se perde ao recarregar a
+> página, fazer logout, ou trocar de aparelho. Não corrigido nesta sprint
+> (exigiria conectar 3 fluxos — produto, dieta, consumo — à persistência
+> real, incluinda o efeito colateral de baixa de estoque e geração de
+> despesa financeira automaticamente, o que é "módulo grande" pelo
+> critério da própria sprint). **Pendência de prioridade alta para a
+> Sprint 36.** Ver
+> [SPRINT_35_RESULTADO.md](SPRINT_35_RESULTADO.md).
+
 Leitura simples de custo de suplementação por lote, comparado ao custo por
 arroba do lote (Sprint 32) e ao GMD realizado x meta. Não promete
 causalidade absoluta — usa termos como "indício", "sinal", "acompanhar",

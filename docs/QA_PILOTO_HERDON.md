@@ -302,3 +302,91 @@ em vez da correção completa de arquitetura.
 Depois disso, a landing page pode seguir com confiança de que o fluxo
 operacional principal foi validado contra o banco real, não só por
 leitura de código.
+
+---
+
+# Sprint 35 — Fechamento de Fluxo Piloto
+
+Continuação direta da Sprint 34, mesma conta QA
+(`herdonapp+qa.sprint34@gmail.com`), mesmos dados de teste (fazenda,
+pastos, lote, pesagens, despesa, movimentação, ocorrência, grupo de
+animais já existentes). Dados novos criados nesta sessão:
+
+| Tipo | Dado |
+|---|---|
+| Produto nutricional | "Ração QA 18%" (categoria Ração, 100 sacos de 25kg, R$2,50/kg) — **não persistiu**, ver Achado 8 |
+| Consumo de suplemento | 50kg em 20/06/2026, vinculado ao Lote QA 01 — **não persistiu**, ver Achado 8 |
+| Cenário | "Cenário QA Sprint 35" (01/07–31/12/2026, 5 compras/2 vendas simuladas) — persistiu corretamente |
+
+## Achado 5 (resolvido) — Gap `lotes.qtd` × `animais`
+
+Resolvido com criação automática de grupo em `animais` ao cadastrar um
+lote novo com cabeças preenchidas. Detalhes completos, diagnóstico e
+decisão técnica: [RESULTADO_LOTE_HERDON.md](RESULTADO_LOTE_HERDON.md).
+Como efeito colateral, corrigido também o mesmo padrão de bug (campos
+silenciosamente descartados) no builder de payload de `animais`.
+
+Mensagens de "Dados insuficientes" também deixaram de ser genéricas —
+agora dizem exatamente qual dado falta (`decisaoVenda.js`,
+`listarCamposFaltantesDecisaoVenda`).
+
+## Achado 6 (resolvido) — Cabeçalho mobile sobreposto em 375px
+
+Causa raiz encontrada por medição direta (`getBoundingClientRect`), não
+só inspeção visual: duas regras `.header.top-header` concorrentes em
+`app.css`, uma com `margin: 0 10px` (design "cartão") e outra com
+`width: 100%` sem resetar a margem (design "full bleed"), competindo no
+mesmo breakpoint. Corrigido com `margin: 0` na regra que vence a
+cascata. Validado em 375/390/430/768px e desktop, em 9 páginas
+diferentes, medindo `document.body.scrollWidth` (sem overflow em
+nenhuma). Detalhes completos:
+[MOBILE_HERDON.md](MOBILE_HERDON.md).
+
+## Achado 8 (novo, crítico) — Suplementação não persiste no banco
+
+A página Suplementação (produtos nutricionais, dietas, registro de
+consumo) **nunca chama** `createOperationalRecord`/
+`updateOperationalRecord` — só `setDb(...)` local. Confirmado ao vivo:
+criei um produto e um consumo, a UI mostrou sucesso, e consultas diretas
+ao Supabase (`estoque`, `consumo_suplementacao`,
+`movimentacoes_financeiras`) confirmaram **zero linhas gravadas**. Isso
+significa que qualquer suplementação "registrada" hoje se perde ao
+recarregar a página ou trocar de aparelho. Documentado como pendência de
+prioridade alta para a Sprint 36 — corrigir adequadamente é "módulo
+grande" (3 entidades + baixa de estoque + geração de despesa automática),
+fora do escopo de uma sprint de correção de fluxo. Detalhes:
+[SUPLEMENTACAO_HERDON.md](SUPLEMENTACAO_HERDON.md).
+
+## Simulador de Decisão — funciona
+
+Diferente de Suplementação, o Simulador (`CenariosPage.jsx`) chama
+corretamente a persistência real. Criei um cenário com a conta QA e
+confirmei por SQL que foi gravado no Supabase. Detalhes:
+[SIMULADOR_HERDON.md](SIMULADOR_HERDON.md).
+
+## Importação — parcialmente verificada
+
+Ambiente de preview não permite upload de arquivo binário, então a
+etapa de envio do `.xlsx` não foi exercitada de ponta a ponta. Por
+leitura de código, confirmado que (a) a persistência real está
+corretamente conectada (`createOperationalRecord` para todas as 5
+entidades) e (b) a validação produz mensagens específicas e claras por
+linha/campo, com bloqueio de duplicidade dentro do arquivo e contra o
+banco. Recomendado testar com arquivo real na próxima sessão com esse
+acesso. Detalhes: [IMPORTACAO_HERDON.md](IMPORTACAO_HERDON.md).
+
+## HERDON está pronto para a landing page?
+
+**Quase — falta resolver o Achado 8 (Suplementação) antes.** Os
+bloqueadores de fluxo principal (Achados 1–6 da Sprint 34, gap
+qtd×animais e cabeçalho mobile da Sprint 35) estão todos corrigidos e
+confirmados contra o banco real. Suplementação continua sendo uma
+funcionalidade visível no menu que parece funcionar mas não salva nada —
+isso é mais grave para a confiança do piloto do que uma tela ausente,
+porque o produtor não tem como saber que perdeu o registro até notar que
+ele desapareceu. Recomenda-se ou (a) corrigir a persistência na Sprint 36
+antes do piloto, ou (b) ocultar/avisar claramente que a tela está em
+desenvolvimento, até lá.
+
+Ver resumo completo da sprint em
+[SPRINT_35_RESULTADO.md](SPRINT_35_RESULTADO.md).

@@ -9,6 +9,7 @@ import {
   compararVenderOuManter,
   classificarDecisaoVenda,
   gerarInsightVenda,
+  listarCamposFaltantesDecisaoVenda,
   montarDadosDecisaoVenda,
   STATUS_DECISAO,
 } from './decisaoVenda.js';
@@ -80,10 +81,30 @@ test('compararVenderOuManter calcula a diferença entre os dois cenários e reco
   assert.match(comparacao.aviso, /Simulação estimada/);
 });
 
-test('classificarDecisaoVenda retorna dados insuficientes sem peso/quantidade/custo', () => {
+test('classificarDecisaoVenda retorna dados insuficientes sem peso/quantidade/custo, explicando o que falta (Sprint 35)', () => {
   const resultado = classificarDecisaoVenda({});
   assert.equal(resultado.status, STATUS_DECISAO.DADOS_INSUFICIENTES);
-  assert.match(resultado.mensagem, /faltam dados/i);
+  assert.match(resultado.mensagem, /quantidade de cabeças/i);
+  assert.match(resultado.mensagem, /peso médio atual/i);
+  assert.match(resultado.mensagem, /custo total do lote/i);
+});
+
+test('listarCamposFaltantesDecisaoVenda lista só os campos realmente ausentes', () => {
+  const faltantes = listarCamposFaltantesDecisaoVenda({ qtdCabecas: 20, pesoAtual: 0, arrobas: 0, custoTotal: 5000 });
+  assert.deepEqual(faltantes.map((item) => item.campo), ['pesoAtual', 'arrobas']);
+});
+
+test('listarCamposFaltantesDecisaoVenda retorna vazio quando tudo está presente', () => {
+  assert.deepEqual(listarCamposFaltantesDecisaoVenda({ qtdCabecas: 20, pesoAtual: 360, arrobas: 166, custoTotal: 5000 }), []);
+});
+
+test('classificarDecisaoVenda aponta só o que falta quando falta um único dado', () => {
+  const resultado = classificarDecisaoVenda({
+    qtdCabecas: 20, pesoAtual: 360, arrobas: 166.4, custoTotal: 0,
+  });
+  assert.equal(resultado.status, STATUS_DECISAO.DADOS_INSUFICIENTES);
+  assert.match(resultado.mensagem, /^Ainda falta o custo total do lote/);
+  assert.doesNotMatch(resultado.mensagem, /quantidade de cabeças/i);
 });
 
 test('classificarDecisaoVenda não quebra com dados nulos', () => {

@@ -126,6 +126,39 @@ export function buildLoteSavePatch(payload = {}, loteEmEdicao = null, activeFarm
   };
 }
 
+/**
+ * Monta o registro de "grupo de animais" criado automaticamente quando um
+ * lote novo é cadastrado com cabeças preenchidas — sem isso, Resultado do
+ * Lote/Decisão de Venda/Manejo (que calculam tudo a partir de `animais`,
+ * não de `lotes.qtd`) ficam em "dados insuficientes" mesmo com pesagens e
+ * despesas reais. Retorna `null` quando não há cabeças para registrar.
+ */
+export function buildGrupoAnimaisAutoPatch(lote) {
+  const qtd = toNumber(lote?.qtd);
+  if (qtd <= 0) return null;
+
+  const pesoInicial = toNumber(lote?.p_ini);
+  const pesoAtual = toNumber(lote?.p_at) || pesoInicial;
+
+  return {
+    tipo_registro: 'grupo',
+    fazenda_id: lote?.faz_id ? Number(lote.faz_id) : null,
+    lote_id: lote?.id ?? null,
+    identificacao: lote?.nome || 'Grupo do lote',
+    nome: lote?.nome || 'Grupo do lote',
+    categoria: lote?.categoria_animal || '',
+    raca: lote?.raca || '',
+    qtd,
+    p_ini: pesoInicial,
+    p_at: pesoAtual,
+    data_referencia: lote?.entrada || new Date().toISOString().slice(0, 10),
+    status: 'ativo',
+    rendimento_carcaca: toNumber(lote?.rendimento_carcaca) || 52,
+    observacao: 'Criado automaticamente a partir do cadastro do lote.',
+    metadata: { criado_automaticamente: true, origem: 'lote_qtd_auto' },
+  };
+}
+
 export function canCreateLoteInCurrentFarm(activeFarmId, loteEmEdicao = null) {
   return Boolean(activeFarmId) || Boolean(loteEmEdicao);
 }

@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import {
   createAuditEvent,
   createOperationalRecord,
+  updateOperationalRecord,
   deleteOwnerScopedCollection,
   getPendingSyncQueueSnapshot,
   canUseLocalRecoveryForWrite,
@@ -32,6 +33,21 @@ function mockInsertSuccess(capture) {
           single: async () => ({ data: { id: 1, ...payload }, error: null }),
         }),
       };
+    },
+  });
+}
+
+function mockUpdateSuccess(capture) {
+  supabase.from = () => ({
+    update: (payload) => {
+      capture.payload = payload;
+      const chain = {
+        eq: () => chain,
+        select: () => ({
+          single: async () => ({ data: { id: 1, ...payload }, error: null }),
+        }),
+      };
+      return chain;
     },
   });
 }
@@ -183,6 +199,71 @@ test('operationalPersistence', { concurrency: 1 }, async (t) => {
     const snapshot = getPendingSyncQueueSnapshot(makeSession());
     assert.equal(snapshot.pendingCount, 1);
     assert.equal(snapshot.queue[0].localId, 'local-1');
+  });
+
+  // ─── regressão: update parcial de lotes não zera campos ausentes (Sprint 35) ───
+
+  await t.test('updateOperationalRecord em lotes só envia os campos do patch, sem zerar o resto (regressão Sprint 35)', async () => {
+    const capture = {};
+    mockUpdateSuccess(capture);
+
+    const result = await updateOperationalRecord('lotes', 20, {
+      p_at: 360,
+      ultima_pesagem: '2026-06-25',
+    }, makeSession());
+
+    assert.equal(result.persisted, true);
+    assert.deepEqual(Object.keys(capture.payload).sort(), ['p_at', 'ultima_pesagem']);
+    assert.equal(capture.payload.nome, undefined);
+    assert.equal(capture.payload.faz_id, undefined);
+    assert.equal(capture.payload.status, undefined);
+  });
+
+  await t.test('updateOperationalRecord em lotes com patch completo continua enviando todos os campos informados', async () => {
+    const capture = {};
+    mockUpdateSuccess(capture);
+
+    await updateOperationalRecord('lotes', 20, {
+      nome: 'Lote QA 01',
+      faz_id: 641,
+      pastagem_id: 'abc-123',
+      qtd: 20,
+      p_ini: 300,
+      p_at: 360,
+    }, makeSession());
+
+    assert.equal(capture.payload.nome, 'Lote QA 01');
+    assert.equal(capture.payload.faz_id, 641);
+    assert.equal(capture.payload.pastagem_id, 'abc-123');
+    assert.equal(capture.payload.qtd, 20);
+  });
+
+  // ─── regressão: builder de payload de animais inclui os campos reais da tabela (Sprint 35) ───
+
+  await t.test('createOperationalRecord em animais envia fazenda_id, categoria, raca e demais campos do formulário (regressão Sprint 35)', async () => {
+    const capture = {};
+    mockInsertSuccess(capture);
+
+    const result = await createOperationalRecord('animais', {
+      tipo_registro: 'grupo',
+      fazenda_id: 641,
+      lote_id: 20,
+      identificacao: 'Grupo Lote QA 01',
+      categoria: 'Bois',
+      raca: 'Nelore',
+      qtd: 20,
+      p_ini: 300,
+      p_at: 360,
+      data_referencia: '2026-06-25',
+      status: 'ativo',
+    }, makeSession());
+
+    assert.equal(result.persisted, true);
+    assert.equal(capture.payload.fazenda_id, 641);
+    assert.equal(capture.payload.categoria, 'Bois');
+    assert.equal(capture.payload.raca, 'Nelore');
+    assert.equal(capture.payload.data_referencia, '2026-06-25');
+    assert.equal(capture.payload.qtd, 20);
   });
 
 });

@@ -1,7 +1,24 @@
 # Beta Piloto — Decisão de Prontidão
 
 **Sprint 19 · Gerado em:** 2026-06-18
-**Decisão:** ✅ **PRONTO PARA O PILOTO**
+**Decisão:** ✅ **PRONTO PARA O PILOTO** — com 1 ressalva (ver Sprint 35)
+
+> **Atualização (Sprint 35 — fechamento de fluxo piloto):** resolvido o
+> gap `lotes.qtd` × `animais` encontrado na Sprint 34 (criação automática
+> de grupo de animais ao cadastrar um lote com cabeças preenchidas, sem
+> pedir cadastro duplicado) e corrigido o cabeçalho mobile sobreposto em
+> 375px (duas regras CSS concorrentes). QA restante completado:
+> Simulador de Decisão confirmado funcionando (persiste corretamente);
+> Importação parcialmente verificada (persistência e validação
+> corretas por leitura de código, upload de arquivo real não testado por
+> limitação do ambiente). **Achado crítico novo:** a tela de
+> Suplementação inteira (produtos, dietas, consumo) não persiste nada no
+> banco real — só estado local. Recomendado resolver antes do piloto ou,
+> no mínimo, avisar visivelmente que a tela está em desenvolvimento. Ver
+> [SPRINT_35_RESULTADO.md](SPRINT_35_RESULTADO.md),
+> [QA_PILOTO_HERDON.md](QA_PILOTO_HERDON.md),
+> [RESULTADO_LOTE_HERDON.md](RESULTADO_LOTE_HERDON.md) e
+> [MOBILE_HERDON.md](MOBILE_HERDON.md).
 
 > **Atualização (Sprint 34 — QA com conta real):** primeira sessão desde
 > a Sprint 22 com teste autenticado de fato contra o Supabase de
