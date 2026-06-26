@@ -1,4 +1,15 @@
 /* --- Login Page --- */
+/* app.css locks html/body/#root to height:100% + overflow:hidden for the
+   dashboard's internal-scroll layout. The login page is a plain document
+   flow instead, so it needs the document to be scrollable again. */
+html:has(.login-page),
+body:has(.login-page),
+#root:has(.login-page) {
+  height: auto;
+  min-height: 100%;
+  overflow: visible;
+}
+
 .login-page {
   --login-surface: rgba(10, 16, 12, 0.84);
   --login-surface-strong: rgba(9, 14, 11, 0.94);
@@ -6,6 +17,7 @@
   --login-shadow: 0 30px 72px rgba(0, 0, 0, 0.42);
   min-height: 100vh;
   min-height: 100dvh;
+  height: auto;
   display: flex;
   align-items: safe center;
   justify-content: center;
@@ -13,7 +25,6 @@
   background: #020403;
   position: relative;
   overflow-x: hidden;
-  overflow-y: auto;
   -webkit-overflow-scrolling: touch;
   overscroll-behavior-y: contain;
   touch-action: pan-y;
