@@ -1202,10 +1202,12 @@
 
   .dashboard-onboarding-actions {
     width: 100%;
+    flex-direction: column;
   }
 
   .dashboard-onboarding-actions .ui-button {
-    flex: 1;
+    width: 100%;
+    white-space: normal;
   }
 }
 

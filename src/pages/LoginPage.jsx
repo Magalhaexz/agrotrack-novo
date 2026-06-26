@@ -75,6 +75,38 @@ function isGoogleProviderDisabledError(error) {
   );
 }
 
+function isInvalidCredentialsError(error) {
+  return getErrorMessage(error).toLowerCase().includes('invalid login credentials');
+}
+
+function isEmailJaCadastradoError(error) {
+  const message = getErrorMessage(error).toLowerCase();
+  return message.includes('already registered') || message.includes('already exists');
+}
+
+function isSenhaFracaError(error) {
+  const message = getErrorMessage(error).toLowerCase();
+  return message.includes('password') && (message.includes('characters') || message.includes('weak'));
+}
+
+function getAuthErrorMessage(error, modo) {
+  if (modo === 'cadastro') {
+    if (isEmailJaCadastradoError(error)) {
+      return 'Este e-mail já está cadastrado. Tente entrar ou recuperar sua senha.';
+    }
+    if (isSenhaFracaError(error)) {
+      return 'A senha é muito fraca. Use pelo menos 6 caracteres.';
+    }
+    return 'Não foi possível concluir o cadastro. Verifique suas informações e tente novamente.';
+  }
+
+  if (isInvalidCredentialsError(error)) {
+    return 'E-mail ou senha incorretos. Verifique e tente novamente.';
+  }
+
+  return 'Não foi possível concluir o acesso. Verifique suas informações e tente novamente.';
+}
+
 async function signInWithRetry({ email, password }) {
   let lastError = null;
 
@@ -185,6 +217,29 @@ export default function LoginPage() {
         ? 'Configure seu acesso e comece a centralizar rebanho, estoque e rotina.'
         : 'Recupere o acesso sem perder o contexto da operação.';
 
+  function aceitarSessaoEEntrar(session, source) {
+    try {
+      localStorage.setItem(HERDON_LOGIN_ATTEMPT_KEY, String(Date.now()));
+      localStorage.setItem(HERDON_LOGIN_ACCEPTED_AT, String(Date.now()));
+    } catch {
+      // storage indisponível
+    }
+    limparMarcadoresFluxoAuth();
+    marcarLogoutEmAndamento(false);
+    acceptSession(session, { source });
+    if (import.meta.env.DEV) {
+      console.debug('[HERDON_LOGIN_BOOT]', {
+        stage: 'login_session_accepted',
+        source,
+        hasSession: Boolean(session),
+        hasUserId: Boolean(session?.user?.id),
+      });
+    }
+    globalThis.setTimeout(() => {
+      window.location.replace('/');
+    }, 50);
+  }
+
   async function handleSubmit(e) {
     e.preventDefault();
 
@@ -214,11 +269,17 @@ export default function LoginPage() {
 
         if (data?.session) {
           setMensagem('Conta criada e login realizado com sucesso.');
+          aceitarSessaoEEntrar(data.session, 'cadastro_submit_success');
+          return;
+        }
+
+        if (Array.isArray(data?.user?.identities) && data.user.identities.length === 0) {
+          setErro('Este e-mail já está cadastrado. Tente entrar ou recuperar sua senha.');
           return;
         }
 
         setMensagem(
-          'Cadastro realizado com sucesso. Agora entre com seu e-mail e senha.'
+          'Conta criada com sucesso. Verifique seu e-mail para confirmar o cadastro antes de acessar.'
         );
         setModo('login');
         setSenha('');
@@ -264,43 +325,20 @@ export default function LoginPage() {
 
       setMostrarResetLocal(false);
       if (data?.session) {
-        try {
-          localStorage.setItem(HERDON_LOGIN_ATTEMPT_KEY, String(Date.now()));
-          localStorage.setItem(HERDON_LOGIN_ACCEPTED_AT, String(Date.now()));
-        } catch {
-          // storage indisponível
-        }
-        limparMarcadoresFluxoAuth();
-        marcarLogoutEmAndamento(false);
-        acceptSession(data.session, {
-          source: 'login_submit_success',
-        });
-        if (import.meta.env.DEV) {
-          console.debug('[HERDON_LOGIN_BOOT]', {
-            stage: 'login_session_accepted',
-            signInSuccess: true,
-            hasSession: Boolean(data?.session),
-            hasUserId: Boolean(data?.session?.user?.id),
-          });
-        }
-        globalThis.setTimeout(() => {
-          window.location.replace('/');
-        }, 50);
+        aceitarSessaoEEntrar(data.session, 'login_submit_success');
         return;
       }
 
-      if (!data?.session) {
-        setErro(
-          'Não foi possível concluir o acesso. Verifique sua conta e tente novamente.'
-        );
-      }
+      setErro(
+        'Não foi possível concluir o acesso. Verifique sua conta e tente novamente.'
+      );
     } catch (err) {
       console.error('Erro de autenticação:', err);
       setMostrarResetLocal(isTransientLoginError(err));
       setErro(
         isTransientLoginError(err)
           ? 'Não foi possível conectar ao servidor. Verifique sua internet e tente novamente.'
-          : 'Não foi possível concluir o acesso. Verifique suas informações e tente novamente.'
+          : getAuthErrorMessage(err, modo)
       );
     } finally {
       marcarLogoutEmAndamento(false);

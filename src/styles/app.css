@@ -8528,6 +8528,11 @@ body {
     padding-bottom: calc(var(--herdon-mobile-bottomnav-height) + env(safe-area-inset-bottom) + 14px);
   }
 
+  .app-shell .main.main-has-fab {
+    padding-bottom: calc(var(--herdon-mobile-bottomnav-height) + env(safe-area-inset-bottom) + 88px);
+    padding-right: 76px;
+  }
+
   .mobile-bottom-nav {
     padding-bottom: env(safe-area-inset-bottom);
     height: calc(var(--herdon-mobile-bottomnav-height) + env(safe-area-inset-bottom));

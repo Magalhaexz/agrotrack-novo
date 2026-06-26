@@ -905,7 +905,7 @@ export default function App() {
         onToggleCollapse={() => setSidebarCollapsed((prev) => !prev)}
       />
 
-      <main className="main">
+      <main className={`main${['lotes', 'estoque', 'financeiro'].includes(pageKey) ? ' main-has-fab' : ''}`}>
         {subscriptionGate.warning ? (
           <div
             style={{
