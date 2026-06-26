@@ -268,7 +268,7 @@ export default function LoginPage() {
           localStorage.setItem(HERDON_LOGIN_ATTEMPT_KEY, String(Date.now()));
           localStorage.setItem(HERDON_LOGIN_ACCEPTED_AT, String(Date.now()));
         } catch {
-          // storage indisponivel
+          // storage indisponível
         }
         limparMarcadoresFluxoAuth();
         marcarLogoutEmAndamento(false);
@@ -587,7 +587,7 @@ export default function LoginPage() {
                       onClick={alternarModoConta}
                       className="login-link-btn"
                     >
-                      {modo === 'login' ? 'Criar conta' : 'Entrar'}
+                      {modo === 'login' ? 'Criar conta' : 'Entrar'} <span aria-hidden="true">→</span>
                     </button>
                   </div>
 
@@ -598,7 +598,7 @@ export default function LoginPage() {
                       onClick={abrirRecuperacao}
                       className="login-link-btn"
                     >
-                      Esqueci minha senha
+                      Esqueci minha senha <span aria-hidden="true">→</span>
                     </button>
                   </div>
                 </div>
@@ -697,11 +697,11 @@ export default function LoginPage() {
 
             <div className="login-card-foot">
               HERDON centraliza o essencial da operação sem tirar velocidade do dia a dia.
-              <div style={{ marginTop: 12, display: 'flex', gap: 12, justifyContent: 'center', flexWrap: 'wrap' }}>
-                <a href="/termos-de-uso" style={{ color: 'var(--color-text-secondary)', fontSize: 12, textDecoration: 'none' }}>Termos de Uso</a>
-                <a href="/politica-de-privacidade" style={{ color: 'var(--color-text-secondary)', fontSize: 12, textDecoration: 'none' }}>Privacidade</a>
-                <a href="/politica-de-cobranca" style={{ color: 'var(--color-text-secondary)', fontSize: 12, textDecoration: 'none' }}>Cobrança</a>
-                <a href="/suporte" style={{ color: 'var(--color-text-secondary)', fontSize: 12, textDecoration: 'none' }}>Suporte</a>
+              <div className="login-card-foot-links">
+                <a href="/termos-de-uso">Termos de Uso</a>
+                <a href="/politica-de-privacidade">Privacidade</a>
+                <a href="/politica-de-cobranca">Cobrança</a>
+                <a href="/suporte">Suporte</a>
               </div>
             </div>
           </div>
