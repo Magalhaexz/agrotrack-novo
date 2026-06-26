@@ -1,6 +1,7 @@
 import { useMemo, useState } from 'react';
 import { Activity, BarChart3, Beef, ClipboardList, Eye, EyeOff } from 'lucide-react';
 import logoAgrotrack from '../assets/logo_app1.png';
+import loginBg from '../assets/login-cattle-bg.png';
 import { useAuth } from '../auth/useAuth';
 import {
   buildSupabaseSignUpOptions,
@@ -429,68 +430,37 @@ export default function LoginPage() {
   }
 
   return (
-    <div className="login-page">
-      <div className="login-page-glow login-page-glow-left" />
-      <div className="login-page-glow login-page-glow-right" />
-
-      <section className="login-brand-side">
-        <div className="login-brand-shell">
-          <div className="login-brand-header">
-            <div className="login-brand-mark">
-              <img src={logoAgrotrack} alt="HERDON" loading="lazy" />
-            </div>
-            <div className="login-brand-copy">
-              <div className="login-brand-logo">HERDON</div>
-              <div className="login-brand-sub">
-                Gestao inteligente. Resultados reais.
-              </div>
-              <div className="login-brand-icons" aria-hidden="true">
-                <Beef size={16} />
-                <BarChart3 size={16} />
-                <ClipboardList size={16} />
-                <Activity size={16} />
-              </div>
-            </div>
+    <div className="login-page" style={{ '--login-bg-image': `url(${loginBg})` }}>
+      <div className="login-page-rings" aria-hidden="true" />
+      <div className="login-page-frame">
+        <header className="login-brand-header">
+          <div className="login-brand-mark">
+            <img src={logoAgrotrack} alt="HERDON" loading="lazy" />
           </div>
-
-          <div className="login-brand-content">
-            <span className="login-brand-kicker">Plataforma de monitoramento</span>
-            <h1 className="login-brand-title">
-              A operacao do rebanho com mais clareza, ritmo e leitura executiva.
-            </h1>
-            <p className="login-brand-description">
-              Centralize rebanho, pesagens, manejo, estoque e financeiro em uma
-              experiencia mais limpa, segura e pronta para decisao diaria.
-            </p>
+          <div className="login-brand-logo">HERDON</div>
+          <div className="login-brand-sub">Gestao inteligente. Resultados reais.</div>
+          <div className="login-brand-icons" aria-hidden="true">
+            <Beef size={16} />
+            <BarChart3 size={16} />
+            <ClipboardList size={16} />
+            <Activity size={16} />
           </div>
+        </header>
 
-          <div className="login-benefits">
-            <div className="login-benefit-card">
-              <strong>Monitoramento acionavel</strong>
-              <span>Indicadores organizados para agir rapido no lote certo.</span>
-            </div>
-            <div className="login-benefit-card">
-              <strong>Rotina sem ruído</strong>
-              <span>Pesagens, tarefas e manejo com leitura mais objetiva.</span>
-            </div>
-            <div className="login-benefit-card">
-              <strong>Gestao com contexto</strong>
-              <span>Financeiro, estoque e agenda conectados ao desempenho.</span>
-            </div>
-          </div>
+        <div className="login-hero-copy">
+          <h1 className="login-brand-title">
+            A operacao do rebanho com mais{' '}
+            <span className="login-brand-title-accent">clareza, ritmo e decisao.</span>
+          </h1>
+          <p className="login-brand-description">
+            Centralize rebanho, pesagens, manejo, estoque e financeiro em uma
+            experiencia mais limpa, segura e pronta para decisao diaria.
+          </p>
         </div>
-      </section>
 
-      <section className="login-form-side">
-        <div className="login-form-shell">
-          <div className="login-mobile-brand">
-            <div className="login-brand-mark">
-              <img src={logoAgrotrack} alt="HERDON" loading="lazy" />
-            </div>
-            <div className="login-brand-logo">HERDON</div>
-          </div>
-
-          <div className="login-card">
+        <section className="login-form-side">
+          <div className="login-form-shell">
+            <div className="login-card">
             <div className="login-card-topline">
               <span className="login-card-kicker">Acesso seguro</span>
               <span className="login-card-chip">
@@ -736,7 +706,8 @@ export default function LoginPage() {
             </div>
           </div>
         </div>
-      </section>
+        </section>
+      </div>
     </div>
   );
 }
