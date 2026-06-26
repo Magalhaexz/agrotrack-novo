@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react';
-import { Eye, EyeOff } from 'lucide-react';
+import { Activity, BarChart3, Beef, ClipboardList, Eye, EyeOff } from 'lucide-react';
 import logoAgrotrack from '../assets/logo_app1.png';
 import { useAuth } from '../auth/useAuth';
 import {
@@ -442,7 +442,13 @@ export default function LoginPage() {
             <div className="login-brand-copy">
               <div className="login-brand-logo">HERDON</div>
               <div className="login-brand-sub">
-                Gestao premium para acompanhar desempenho, rotina e resultado.
+                Gestao inteligente. Resultados reais.
+              </div>
+              <div className="login-brand-icons" aria-hidden="true">
+                <Beef size={16} />
+                <BarChart3 size={16} />
+                <ClipboardList size={16} />
+                <Activity size={16} />
               </div>
             </div>
           </div>

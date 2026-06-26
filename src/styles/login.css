@@ -119,8 +119,23 @@
 .login-brand-sub {
   max-width: 360px;
   color: rgba(223, 232, 226, 0.72);
-  font-size: 0.9rem;
+  font-size: 0.72rem;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
   line-height: 1.55;
+}
+
+.login-brand-icons {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-top: 2px;
+  color: rgba(86, 255, 154, 0.75);
+}
+
+.login-brand-icons svg {
+  flex-shrink: 0;
 }
 
 .login-brand-content {
