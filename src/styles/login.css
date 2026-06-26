@@ -75,8 +75,8 @@ body:has(.login-page),
   width: min(900px, 100%);
   display: grid;
   justify-items: center;
-  gap: clamp(4px, 1vh, 10px);
-  padding: clamp(8px, 2vh, 28px) clamp(16px, 3vw, 32px);
+  gap: 10px;
+  padding: clamp(14px, 2.4vw, 32px) clamp(16px, 3vw, 32px);
   margin: auto 0;
 }
 
@@ -88,8 +88,8 @@ body:has(.login-page),
 }
 
 .login-brand-mark {
-  width: clamp(40px, 6vh, 56px);
-  height: clamp(40px, 6vh, 56px);
+  width: 56px;
+  height: 56px;
   border-radius: 18px;
   background: transparent;
   display: grid;
@@ -137,16 +137,16 @@ body:has(.login-page),
 .login-hero-copy {
   display: grid;
   justify-items: center;
-  gap: clamp(3px, 0.8vh, 6px);
+  gap: 6px;
   text-align: center;
   max-width: 640px;
-  margin-bottom: clamp(4px, 1.4vh, 12px);
+  margin-bottom: 0;
 }
 
 .login-brand-title {
   margin: 0;
-  font-size: clamp(1.3rem, 1.1vw + 0.9rem, 2rem);
-  line-height: 1.16;
+  font-size: clamp(1.4rem, 1.1vw + 1rem, 2rem);
+  line-height: 1.18;
   letter-spacing: -0.01em;
   color: #f6faf7;
   font-weight: 800;
@@ -160,8 +160,8 @@ body:has(.login-page),
   margin: 0;
   max-width: 52ch;
   color: rgba(216, 226, 219, 0.72);
-  font-size: clamp(0.8rem, 0.5vh + 0.7rem, 0.92rem);
-  line-height: 1.5;
+  font-size: 0.92rem;
+  line-height: 1.6;
 }
 
 .login-form-side {
@@ -189,7 +189,7 @@ body:has(.login-page),
     inset 0 -1px 0 rgba(0, 0, 0, 0.28),
     0 0 0 1px rgba(255, 255, 255, 0.015),
     var(--login-shadow);
-  padding: clamp(14px, 2.2vh, 20px);
+  padding: 20px;
   overflow: hidden;
 }
 
@@ -213,7 +213,7 @@ body:has(.login-page),
   align-items: center;
   justify-content: space-between;
   gap: 12px;
-  margin-bottom: clamp(6px, 1.4vh, 12px);
+  margin-bottom: 12px;
 }
 
 .login-card-kicker,
@@ -240,13 +240,13 @@ body:has(.login-page),
 
 .login-header {
   display: grid;
-  gap: 4px;
-  margin-bottom: clamp(6px, 1.4vh, 12px);
+  gap: 6px;
+  margin-bottom: 12px;
 }
 
 .login-title {
   margin: 0;
-  font-size: clamp(1.3rem, 0.9rem + 0.7vw, 1.9rem);
+  font-size: clamp(1.5rem, 1rem + 0.8vw, 1.9rem);
   line-height: 1;
   letter-spacing: -0.04em;
   color: #f6faf7;
@@ -255,8 +255,8 @@ body:has(.login-page),
 .login-subtitle {
   margin: 0;
   color: rgba(212, 224, 216, 0.78);
-  font-size: clamp(0.8rem, 0.4vh + 0.72rem, 0.92rem);
-  line-height: 1.4;
+  font-size: 0.92rem;
+  line-height: 1.58;
   max-width: 40ch;
 }
 
@@ -268,12 +268,12 @@ body:has(.login-page),
 
 .login-form {
   display: grid;
-  gap: clamp(8px, 1.4vh, 14px);
+  gap: 14px;
 }
 
 .login-field {
   display: grid;
-  gap: clamp(4px, 0.8vh, 8px);
+  gap: 8px;
 }
 
 .login-label {
@@ -286,13 +286,13 @@ body:has(.login-page),
 
 .login-input {
   width: 100%;
-  min-height: clamp(38px, 6vh, 50px);
-  padding: clamp(8px, 1.4vh, 14px) 16px;
+  min-height: 50px;
+  padding: 14px 16px;
   border-radius: 16px;
   border: 1px solid rgba(255, 255, 255, 0.08);
   background: var(--login-surface-strong);
   color: #f5f8f6;
-  font-size: clamp(0.84rem, 0.5vh + 0.74rem, 0.94rem);
+  font-size: 0.94rem;
   transition:
     border-color 0.2s ease,
     box-shadow 0.2s ease,
@@ -346,15 +346,15 @@ body:has(.login-page),
 
 .login-actions {
   display: grid;
-  gap: clamp(6px, 1.2vh, 10px);
-  margin-top: 2px;
+  gap: 10px;
+  margin-top: 4px;
 }
 
 .login-btn {
-  min-height: clamp(38px, 6vh, 50px);
+  min-height: 50px;
   border-radius: 16px;
   border: 1px solid transparent;
-  font-size: clamp(0.84rem, 0.5vh + 0.74rem, 0.94rem);
+  font-size: 0.94rem;
   font-weight: 700;
   cursor: pointer;
   transition:
@@ -398,7 +398,7 @@ body:has(.login-page),
   position: relative;
   display: flex;
   justify-content: center;
-  margin: clamp(8px, 1.6vh, 18px) 0 clamp(6px, 1.2vh, 14px);
+  margin: 18px 0 14px;
 }
 
 .login-divider::before {
@@ -423,8 +423,8 @@ body:has(.login-page),
 
 .login-links-card {
   display: grid;
-  gap: clamp(4px, 0.8vh, 8px);
-  padding: clamp(8px, 1.6vh, 14px) 16px;
+  gap: 8px;
+  padding: 14px 16px;
   border-radius: 18px;
   border: 1px solid rgba(255, 255, 255, 0.06);
   background: rgba(255, 255, 255, 0.02);
@@ -436,8 +436,8 @@ body:has(.login-page),
   justify-content: space-between;
   gap: 14px;
   color: rgba(208, 220, 212, 0.7);
-  font-size: clamp(0.78rem, 0.4vh + 0.7rem, 0.88rem);
-  line-height: 1.35;
+  font-size: 0.88rem;
+  line-height: 1.45;
 }
 
 .login-link-btn {
@@ -456,12 +456,12 @@ body:has(.login-page),
 }
 
 .login-card-foot {
-  margin-top: clamp(6px, 1.4vh, 16px);
-  padding-top: clamp(6px, 1.2vh, 14px);
+  margin-top: 16px;
+  padding-top: 14px;
   border-top: 1px solid rgba(255, 255, 255, 0.06);
   color: rgba(198, 211, 202, 0.56);
-  font-size: clamp(0.66rem, 0.3vh + 0.6rem, 0.8rem);
-  line-height: 1.35;
+  font-size: 0.8rem;
+  line-height: 1.5;
 }
 
 .login-error,
@@ -633,7 +633,7 @@ body:has(.login-page),
   }
 }
 
-@media (max-height: 1040px) {
+@media (max-height: 860px) {
   .login-page-frame {
     gap: 4px;
     padding-top: 6px;
