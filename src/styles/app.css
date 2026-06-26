@@ -8370,17 +8370,23 @@ body {
     display: none !important;
   }
 
+  .header.top-header .top-header-actions,
   .top-header-actions {
     width: auto;
     margin-left: auto;
     display: inline-flex;
     align-items: center;
+    flex-wrap: nowrap;
     gap: 8px;
     grid-template-columns: none;
   }
 
   .top-header-actions .user-menu-wrap {
     display: inline-flex;
+  }
+
+  .top-header-actions .user-menu-wrap:has(.header-user-btn) {
+    display: none;
   }
 
   .mobile-utility-wrap,

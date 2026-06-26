@@ -148,4 +148,60 @@ test.describe('Smoke E2E - Herdon', () => {
 
     await expect(page.getByText('Usuários e Acessos')).toHaveCount(0);
   });
+
+  test('Modo Curral: Ver pendências navega para Sincronização sem erro', async ({ page }) => {
+    test.skip(!hasAuthEnv, 'E2E_MODOCURRAL_SKIP: defina E2E_ADMIN_EMAIL e E2E_ADMIN_PASSWORD.');
+
+    const consoleErrors = [];
+    page.on('pageerror', (err) => consoleErrors.push(String(err)));
+    page.on('console', (msg) => {
+      if (msg.type() === 'error') consoleErrors.push(msg.text());
+    });
+
+    await login(page, env.adminEmail, env.adminPassword);
+    await page.getByRole('button', { name: /^Modo Curral$/ }).click();
+    await expect(page.getByRole('heading', { name: /^Modo Curral$/ })).toBeVisible();
+
+    await page.getByRole('button', { name: /Ver pendências/ }).first().click();
+    await expect(page.getByRole('heading', { name: /^Sincronização$/ })).toBeVisible();
+
+    expect(consoleErrors).toEqual([]);
+    await logout(page);
+  });
+
+  test('Suporte abre sem erro a partir do menu Ajuda', async ({ page }) => {
+    test.skip(!hasAuthEnv, 'E2E_SUPORTE_SKIP: defina E2E_ADMIN_EMAIL e E2E_ADMIN_PASSWORD.');
+
+    const consoleErrors = [];
+    page.on('pageerror', (err) => consoleErrors.push(String(err)));
+    page.on('console', (msg) => {
+      if (msg.type() === 'error') consoleErrors.push(msg.text());
+    });
+
+    await login(page, env.adminEmail, env.adminPassword);
+    await page.getByRole('button', { name: /^Suporte$/ }).click();
+    await expect(page.getByRole('heading', { name: /^Suporte$/ })).toBeVisible();
+    await expect(page.getByText('herdonapp@gmail.com')).toBeVisible();
+
+    expect(consoleErrors).toEqual([]);
+  });
+
+  test('mobile: cabeçalho não sobrepõe a marca em telas estreitas', async ({ page }) => {
+    test.skip(!hasAuthEnv, 'E2E_MOBILE_HEADER_SKIP: defina E2E_ADMIN_EMAIL e E2E_ADMIN_PASSWORD.');
+
+    await page.setViewportSize({ width: 375, height: 812 });
+    await login(page, env.adminEmail, env.adminPassword);
+
+    const actions = page.locator('.top-header-actions');
+    const box = await actions.boundingBox();
+    expect(box).not.toBeNull();
+    // O cabeçalho fixo mede ~64px nesta faixa; se as ações ficarem mais altas
+    // que isso, o flex-wrap voltou a empilhar ícones e a sobrepor a marca HERDON.
+    expect(box.height).toBeLessThanOrEqual(56);
+
+    const scrollWidth = await page.evaluate(() => document.documentElement.scrollWidth);
+    expect(scrollWidth).toBeLessThanOrEqual(376);
+
+    await logout(page);
+  });
 });

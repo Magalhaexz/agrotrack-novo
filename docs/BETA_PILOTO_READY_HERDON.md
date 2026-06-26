@@ -1,7 +1,26 @@
 # Beta Piloto — Decisão de Prontidão
 
 **Sprint 19 · Gerado em:** 2026-06-18
-**Decisão:** ✅ **PRONTO PARA O PILOTO** — ressalva da Sprint 35 corrigida (ver Sprint 36); QA geral fica para a próxima sprint
+**Decisão:** ⚠️ **QUASE PRONTO** — QA funcional amplo concluído na Sprint 37 sem novos bugs críticos de fluxo, mas os dois bugs reportados pela usuária (Modo Curral → Ver pendências; Suporte) não reproduziram em ambiente local e precisam de confirmação dela no ambiente publicado antes de declarar pronto
+
+> **Atualização (Sprint 37 — QA funcional completo + correção de cabeçalho mobile):**
+> investigados os dois bugs reportados pela usuária (Modo Curral → "Ver
+> pendências" e Suporte causando queda) em `npm run dev` e em build de
+> produção real — **nenhum dos dois reproduziu** com a conta de teste. Durante
+> a investigação de viewports mobile (Etapa 5), encontrada e corrigida uma
+> regressão real: cabeçalho sobreposto à marca HERDON em telas ≤768px, mesma
+> classe de bug já corrigida na Sprint 35 mas reintroduzida por outra regra
+> CSS concorrente em `app.css` (acúmulo de blocos `@media` redundantes de
+> sprints sucessivos). Navegação testada em todas as 27 páginas do menu + 4
+> páginas públicas, **zero erros de console**. Persistência de dados
+> existentes confirmada por reload completo. **Não cobertos:** auditoria
+> botão a botão exaustiva de cada módulo, perfis não-proprietário, upload
+> real na Importação, persistência de criação de novos registros. Antes de
+> seguir para auditoria de cibersegurança/piloto, recomenda-se confirmar com
+> a usuária se os dois bugs originais persistem no ambiente publicado
+> (Vercel) — se sim, é provável mismatch de deploy, não um bug deste
+> repositório. Ver [SPRINT_37_RESULTADO.md](SPRINT_37_RESULTADO.md) e
+> [QA_FUNCIONAL_COMPLETO_HERDON.md](QA_FUNCIONAL_COMPLETO_HERDON.md).
 
 > **Atualização (Sprint 36 — persistência real de Suplementação):**
 > corrigido o achado crítico da Sprint 35 — produto nutricional e consumo
