@@ -11,7 +11,7 @@ export default function RankingLotes({ ranking = [] }) {
           <h3>Ranking de lotes</h3>
         </div>
         <p style={{ color: 'var(--color-text-secondary)', fontSize: '0.85rem' }}>
-          Nenhum dado disponivel para ranking.
+          Nenhum dado disponível para ranking.
         </p>
       </div>
     );

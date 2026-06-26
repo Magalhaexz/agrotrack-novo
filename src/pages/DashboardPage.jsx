@@ -17,8 +17,10 @@ import {
   Tractor,
   Users,
 } from 'lucide-react';
+import Badge from '../components/ui/Badge';
 import Card from '../components/ui/Card';
 import Button from '../components/ui/Button';
+import EmptyState from '../components/EmptyState';
 import { getResumoLote } from '../domain/resumoLote';
 import { construirHojeNaFazenda } from '../domain/hojeNaFazenda';
 import { construirChecklistPrimeirosPassos } from '../domain/guiaCriador';
@@ -365,9 +367,9 @@ export default function DashboardPage({
                 <p className="dashboard-section-subtitle">O que precisa da sua atenção agora.</p>
               </div>
               <div className="action-row">
-                <span className={`status-badge ${hojeNaFazenda.detalhes.alertasCriticosTotal.length > 0 ? 'status-badge--critico' : 'status-badge--sucesso'}`}>
+                <Badge variant={hojeNaFazenda.detalhes.alertasCriticosTotal.length > 0 ? 'danger' : 'success'}>
                   {hojeNaFazenda.detalhes.alertasCriticosTotal.length > 0 ? `${hojeNaFazenda.detalhes.alertasCriticosTotal.length} críticos` : 'Sem críticos'}
-                </span>
+                </Badge>
               </div>
             </div>
 
@@ -387,9 +389,9 @@ export default function DashboardPage({
                     <div className="dashboard-list-copy">
                       <strong>{item.texto}</strong>
                     </div>
-                    <span className={`status-badge ${item.tom === 'critico' ? 'status-badge--critico' : 'status-badge--atencao'}`}>
+                    <Badge variant={item.tom === 'critico' ? 'danger' : 'warning'}>
                       {item.tom === 'critico' ? 'Crítico' : 'Atenção'}
-                    </span>
+                    </Badge>
                   </button>
                 ))}
               </div>
@@ -435,7 +437,7 @@ export default function DashboardPage({
                         <strong>{alerta.titulo}</strong>
                         <p>{alerta.descricao}</p>
                       </div>
-                      <span className="status-badge status-badge--critico">Crítico</span>
+                      <Badge variant="danger">Crítico</Badge>
                     </article>
                   ))}
                 </div>
@@ -455,7 +457,7 @@ export default function DashboardPage({
                         <strong>{tarefa.titulo}</strong>
                         <p>{tarefa.descricao || 'Sem descrição adicional.'}</p>
                       </div>
-                      <span className="status-badge status-badge--pendente">Hoje</span>
+                      <Badge variant="warning">Hoje</Badge>
                     </article>
                   ))}
                 </div>
@@ -464,18 +466,16 @@ export default function DashboardPage({
 
             <Card className="section-card" title="Pesagens pendentes" subtitle="Lotes sem pesagem recente.">
               {pesagensPendentes.length === 0 ? (
-                <div className="empty-state">
-                  <p>Todos os lotes estao com pesagem em dia.</p>
-                </div>
+                <EmptyState compact title="Todos os lotes estão com pesagem em dia." />
               ) : (
                 <div className="dashboard-list">
                   {pesagensPendentes.slice(0, 5).map((lote) => (
                     <article key={lote.id} className="dashboard-list-item">
                       <div className="dashboard-list-copy">
                         <strong>{lote.nome}</strong>
-                        <p>{lote.ultima_pesagem ? `Ultima pesagem: ${formatDate(lote.ultima_pesagem)}` : 'Sem pesagem registrada'}</p>
+                        <p>{lote.ultima_pesagem ? `Última pesagem: ${formatDate(lote.ultima_pesagem)}` : 'Sem pesagem registrada'}</p>
                       </div>
-                      <span className="status-badge status-badge--atencao">Atrasada</span>
+                      <Badge variant="warning">Atrasada</Badge>
                     </article>
                   ))}
                 </div>

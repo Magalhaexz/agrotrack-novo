@@ -1,3 +1,4 @@
+import Badge from '../components/ui/Badge';
 import Card from '../components/ui/Card';
 import Button from '../components/ui/Button';
 import PageHeader from '../components/PageHeader';
@@ -140,9 +141,9 @@ export default function SincronizacaoPage({ db, setDb, session }) {
                   <p>{item.status === 'erro' ? (item.erro || STATUS_LABELS.erro) : STATUS_LABELS[item.status]}</p>
                 </div>
                 <div className="row-actions action-row">
-                  <span className={`status-badge ${item.status === 'sincronizado' ? 'status-badge--sucesso' : item.status === 'erro' ? 'status-badge--critico' : 'status-badge--atencao'}`}>
+                  <Badge variant={item.status === 'sincronizado' ? 'success' : item.status === 'erro' ? 'danger' : 'warning'}>
                     {item.status === 'sincronizado' ? 'Sincronizado' : item.status === 'erro' ? 'Erro' : 'Pendente'}
-                  </span>
+                  </Badge>
                   {item.status !== 'sincronizado' ? (
                     <button type="button" className="action-btn" onClick={() => handleSincronizarItem(item.id_local)}>
                       Tentar novamente

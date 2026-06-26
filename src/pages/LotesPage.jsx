@@ -2,6 +2,7 @@
 import Input from '../components/ui/Input';
 import Modal from '../components/ui/Modal';
 import Button from '../components/ui/Button';
+import EmptyState from '../components/EmptyState';
 import LoteForm from '../components/LoteForm';
 import { useAuth } from '../auth/useAuth';
 import { useToast } from '../hooks/useToast';
@@ -690,10 +691,31 @@ export default function LotesPage({ db, setDb, onRegistrarSaidaAnimal, session, 
 
       <div className="lote-cards-grid">
         {lotesFiltrados.length === 0 ? (
-          <div className="empty-state">
-            <strong>{activeFarmId ? 'Nenhum lote encontrado.' : 'Selecione uma fazenda ativa.'}</strong>
-            <span>{activeFarmId ? 'Cadastre seu primeiro lote para acompanhar peso, custos e resultado.' : 'Os lotes são exibidos por fazenda ativa.'}</span>
-          </div>
+          <EmptyState
+            title={activeFarmId ? 'Você ainda não cadastrou nenhum lote.' : 'Selecione uma fazenda ativa.'}
+            subtitle={
+              activeFarmId
+                ? 'Crie seu primeiro lote para acompanhar pesagens, GMD, custos e resultado financeiro.'
+                : 'Os lotes são exibidos por fazenda ativa.'
+            }
+            action={
+              activeFarmId ? (
+                <Button
+                  variant="primary"
+                  onClick={() => {
+                    if (!canCreateLoteInCurrentFarm(activeFarmId, null)) {
+                      showToast({ type: 'warning', message: 'Selecione uma fazenda ativa para cadastrar um lote.' });
+                      return;
+                    }
+                    setLoteEmEdicao(null);
+                    setOpenNovoLote(true);
+                  }}
+                >
+                  Criar lote
+                </Button>
+              ) : null
+            }
+          />
         ) : lotesFiltrados.map((lote) => (
           <LoteCard
             key={lote.id}

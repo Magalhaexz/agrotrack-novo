@@ -39,9 +39,7 @@ export default function LoteCard({
         </div>
         <div className="action-row lote-card-statuses">
           <Badge variant={statusVariant(lote.status)}>{lote.status}</Badge>
-          <span className={`status-badge ${risco ? 'status-badge--atencao' : 'status-badge--sucesso'}`}>
-            {risco ? 'Atenção' : 'OK'}
-          </span>
+          <Badge variant={risco ? 'warning' : 'success'}>{risco ? 'Atenção' : 'OK'}</Badge>
         </div>
       </div>
 

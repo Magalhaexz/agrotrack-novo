@@ -3,6 +3,7 @@ import { AlertTriangle, ArrowDownCircle, ArrowUpCircle, FileText, Plus } from 'l
 import Card from '../components/ui/Card';
 import Badge from '../components/ui/Badge';
 import Button from '../components/ui/Button';
+import EmptyState from '../components/EmptyState';
 import Modal from '../components/ui/Modal';
 import Input from '../components/ui/Input';
 import { formatCurrency, formatDate, formatNumber } from '../utils/calculations';
@@ -274,11 +275,21 @@ export default function EstoquePage({ db, setDb, onRegistrarSaidaEstoque }) {
 
       <div className="lote-cards-grid">
         {itensView.length === 0 ? (
-          <div className="empty-box">
-            <strong>{showOnlyCrit ? 'Nenhum item crítico.' : 'Nenhum item cadastrado.'}</strong>
-            <span>{showOnlyCrit ? 'Todos os itens estão em nível normal.' : 'Cadastre o primeiro item para controlar entradas e saídas.'}</span>
-            {!showOnlyCrit ? <Button icon={<Plus size={14} />} onClick={() => { setItemEmEdicao(null); setOpenCadastroItem(true); }}>Novo item</Button> : null}
-          </div>
+          <EmptyState
+            title={showOnlyCrit ? 'Nenhum item crítico.' : 'Você ainda não cadastrou nenhum item no estoque.'}
+            subtitle={
+              showOnlyCrit
+                ? 'Todos os itens estão em nível normal.'
+                : 'Cadastre o primeiro item para controlar entradas, saídas e custos.'
+            }
+            action={
+              !showOnlyCrit ? (
+                <Button icon={<Plus size={14} />} onClick={() => { setItemEmEdicao(null); setOpenCadastroItem(true); }}>
+                  Novo item
+                </Button>
+              ) : null
+            }
+          />
         ) : (
           itensView.map((item) => {
             const border = item.status === 'critico' ? '#c53030' : item.status === 'baixo' ? '#b7791f' : 'var(--color-border)';
@@ -584,13 +595,16 @@ function EntradaModal({ db, setDb, selectedItem, estoqueMap, onOpenCadastroItem,
   return (
     <Modal open onClose={onClose} title="Entrada de estoque" footer={!semItens ? <Button onClick={submit}>Confirmar entrada</Button> : null}>
       {semItens ? (
-        <div className="empty-box">
-          <strong>Cadastre um item antes de registrar entrada.</strong>
-          <span>Entrada de estoque adiciona quantidade em item já cadastrado.</span>
-          <div className="lote-actions">
-            <Button type="button" icon={<Plus size={14} />} onClick={() => { onClose(); onOpenCadastroItem?.(); }}>Novo item</Button>
-          </div>
-        </div>
+        <EmptyState
+          compact
+          title="Cadastre um item antes de registrar entrada."
+          subtitle="Entrada de estoque adiciona quantidade em item já cadastrado."
+          action={
+            <Button type="button" icon={<Plus size={14} />} onClick={() => { onClose(); onOpenCadastroItem?.(); }}>
+              Novo item
+            </Button>
+          }
+        />
       ) : (
         <div className="form-grid two">
           <p className="financeiro-subtitle full">Este fluxo é para adicionar quantidade em item já cadastrado.</p>

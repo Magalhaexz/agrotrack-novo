@@ -2,8 +2,10 @@ import { useMemo, useState } from 'react';
 import { Plus } from 'lucide-react';
 import AnimalForm from '../components/AnimalForm';
 import AnimalMovementModal from '../components/AnimalMovementModal';
+import Badge from '../components/ui/Badge';
 import Button from '../components/ui/Button';
 import Card from '../components/ui/Card';
+import EmptyState from '../components/EmptyState';
 import { TIPOS_SAIDA_ANIMAL } from '../utils/constantes';
 import { formatarData, formatarNumero, formatarMoeda } from '../utils/formatters';
 import { gerarNovoId } from '../utils/id';
@@ -446,9 +448,7 @@ export default function AnimaisPage({ db, setDb, onConfirmAction, subscription =
                     <td className="is-number">{formatarNumero(animal.p_ini)} kg</td>
                     <td className="is-number">{formatarNumero(animal.p_at)} kg</td>
                     <td>
-                      <span className={`status-badge ${animal.ativo ? 'status-badge--ativo' : 'status-badge--inativo'}`}>
-                        {animal.status}
-                      </span>
+                      <Badge variant={animal.ativo ? 'success' : 'neutral'}>{animal.status}</Badge>
                     </td>
                     <td>
                       <div className="row-actions action-row">
@@ -471,18 +471,19 @@ export default function AnimaisPage({ db, setDb, onConfirmAction, subscription =
         ) : null}
 
         {abaAtiva === 'grupos' && grupos.length === 0 ? (
-          <div className="animais-empty-state empty-state">
-            <strong>Nenhum grupo cadastrado.</strong>
-            <span>Cadastre um grupo de animais para acompanhar peso e quantidade em conjunto.</span>
-            <Button size="sm" onClick={() => abrirNovoPorModo('grupo')}>Cadastrar grupo</Button>
-          </div>
+          <EmptyState
+            title="Você ainda não cadastrou nenhum grupo de animais."
+            subtitle="Crie um grupo para acompanhar peso e quantidade em conjunto."
+            action={<Button size="sm" onClick={() => abrirNovoPorModo('grupo')}>Cadastrar grupo</Button>}
+          />
         ) : null}
 
         {abaAtiva === 'individuais' && individuais.length === 0 ? (
-          <div className="animais-empty-state empty-state">
-            <strong>Nenhum animal individual cadastrado.</strong>
-            <span>Cadastre um animal individual quando precisar acompanhar peso e histórico separadamente.</span>
-          </div>
+          <EmptyState
+            title="Você ainda não cadastrou nenhum animal individual."
+            subtitle="Cadastre um animal individual quando precisar acompanhar peso e histórico separadamente."
+            action={<Button size="sm" onClick={() => abrirNovoPorModo('individual')}>Cadastrar animal</Button>}
+          />
         ) : null}
 
         {abaAtiva === 'movimentacoes' ? (
@@ -516,9 +517,10 @@ export default function AnimaisPage({ db, setDb, onConfirmAction, subscription =
               </table>
             </div>
           ) : (
-            <div className="animais-empty-state empty-state">
-              <strong>Nenhuma movimentação registrada.</strong>
-            </div>
+            <EmptyState
+              title="Nenhuma movimentação registrada."
+              subtitle="Vendas, mortes e transferências aparecem aqui automaticamente."
+            />
           )
         ) : null}
       </Card>

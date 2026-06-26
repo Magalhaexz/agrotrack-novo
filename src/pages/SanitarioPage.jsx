@@ -4,6 +4,7 @@ import { formatarData } from '../utils/formatters';
 import { gerarNovoId } from '../utils/id';
 import Card from '../components/ui/Card';
 import Button from '../components/ui/Button';
+import EmptyState from '../components/EmptyState';
 import PageHeader from '../components/PageHeader';
 import { useToast } from '../hooks/useToast'; // Importar useToast
 import { useAuth } from '../auth/useAuth';
@@ -411,10 +412,15 @@ export default function SanitarioPage({ db, setDb, onConfirmAction }) {
       <div className="ui-card no-padding sanitario-table-shell">
         <div className="table-responsive">
           {dadosTabela.length === 0 ? (
-            <div className="empty-state padded">
-              <p>Nenhum manejo sanitário registrado.</p>
-              <span>Registre vacinas, medicações e manejos sanitários para acompanhar a rotina.</span>
-            </div>
+            <EmptyState
+              title="Você ainda não registrou nenhum manejo sanitário."
+              subtitle="Registre vacinas, medicações e manejos sanitários para acompanhar a rotina."
+              action={
+                <Button disabled={!hasPermission('sanitario:editar')} onClick={abrirNovo}>
+                  Registrar manejo
+                </Button>
+              }
+            />
           ) : (
             <table className="dashboard-table herdon-table herdon-table--sanitario">
               <thead>

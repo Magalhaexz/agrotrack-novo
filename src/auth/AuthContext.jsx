@@ -3,6 +3,7 @@ import { createContext, useCallback, useContext, useEffect, useMemo, useRef, use
 import {
   mapProfileRowToUser,
   resolveUserRoleFromAuthAndCache,
+  ensureUserProfile,
   fetchUserProfile,
   isAccessModuleUnavailable,
   readCachedProfile,
@@ -214,7 +215,27 @@ export function AuthProvider({ children }) {
       }
 
       const request = (async () => {
-        const { data, error } = await fetchUserProfile(userId);
+        let { data, error } = await fetchUserProfile(userId);
+
+        if (!error && !data) {
+          // Usuario autenticado sem profile (ex.: gatilho on_auth_user_created falhou ou
+          // ainda nao rodou para este login). Garante o profile no app e tenta de novo.
+          logProfileBootOnce('profile_missing_ensuring', {
+            userId,
+            generationId,
+          }, 'warn');
+          const { error: ensureError } = await ensureUserProfile(userAtual);
+          if (ensureError) {
+            logProfileBootOnce('ensure_profile_failed', {
+              userId,
+              generationId,
+              errorType: getErrorMessage(ensureError) || 'ensure_profile_error',
+            }, 'warn');
+          } else {
+            ({ data, error } = await fetchUserProfile(userId));
+          }
+        }
+
         const isCurrent = ativo && authGenerationRef.current === generationId && activeUserIdRef.current === userId;
         if (!isCurrent) {
           logProfileBootOnce('stale_profile_ignored', {

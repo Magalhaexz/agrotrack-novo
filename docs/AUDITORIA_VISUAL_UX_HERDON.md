@@ -1,7 +1,7 @@
 # Auditoria Visual, UX e Utilidade — HERDON
 
 **Data:** 2026-06-26
-**Status:** Auditoria concluída. **Bloco 1 (quebras críticas C1/C2/C3) e Bloco 2 (bug de cadastro/login A1) corrigidos e validados em 2026-06-26** — ver seções 7 e 8. Blocos 3-4 ainda não executados.
+**Status:** Auditoria concluída. **Bloco 1 (quebras críticas C1/C2/C3), Bloco 2 (bug de cadastro/login A1), Bloco 3 (badges/status A3, estados vazios A4, textos B1) e correção de profile ausente para usuários Google/e-mail corrigidos e validados em 2026-06-26** — ver seções 7, 8, 9 e 10. Bloco 4 ainda não executado.
 **Método:** (1) leitura de código de todas as páginas e componentes compartilhados via agentes de pesquisa especializados; (2) sessão real no app (login criado via fluxo de cadastro próprio do HERDON, conta `herdonapp+auditoria@gmail.com`) com captura de tela e medição de DOM em 1920×1080, 1366×768 e 390×844.
 
 ---
@@ -38,8 +38,8 @@
 |---|------|----------|--------|
 | A1 | **Cadastro de conta (LoginPage)** | Ao criar conta com confirmação automática (sessão retornada), o código mostra "Conta criada e login realizado com sucesso." mas **não chama `acceptSession`** nem redireciona — o usuário fica preso na tela de login e precisa logar manualmente de novo. `src/pages/LoginPage.jsx` branch `modo === 'cadastro'` não tem o mesmo tratamento de sessão que o branch de login. Reproduzido ao vivo nesta auditoria. | ✅ **Corrigido** (ver seção 8) |
 | A2 | **Simulador de Decisão (Cenários)** | Mostra "Viável: SIM/NÃO" em verde/vermelho sem explicar o porquê ao produtor; números brutos (UA, margem bruta projetada) sem contexto de interpretação, diferente do padrão bem resolvido em `RelatorioLotePage` (que tem texto de apoio). | Pendente |
-| A3 | **Badge/status fragmentado** | Pelo menos 4 implementações diferentes de "badge de status" coexistem: `Badge.jsx` compartilhado, `status-badge`/`status-badge--ativo` ad-hoc, `ranking-badge` em `comparativo.css`, `notification-badge`/`notif-badge` duplicado em `app.css` (linhas 409, 3586, 4431). | Pendente |
-| A4 | **Empty state inconsistente em ~80% das páginas** | Existe um componente `EmptyState.jsx` bem feito (usado corretamente em `FazendasPage`, `RelatorioLotePage`, `RelatorioPesagensPage`, `RelatorioFinanceiroPage`, `RelatorioPastagensPage`, `RelatorioResumoGeralPage`), mas a maioria das páginas (Pastagens, Lotes, Animais, Pesagens, Estoque, Suplementação, Sanitário, Tarefas, Financeiro, FluxoCaixa, Custos, CustosCompartilhados, Cenários, RelatoriosGerenciais, Dashboard, EvolucaoRebanho, Planejamento, Calendário) usa `<div className="empty-state">` artesanal com texto solto, sem padrão visual único. | Pendente |
+| A3 | **Badge/status fragmentado** | Pelo menos 4 implementações diferentes de "badge de status" coexistem: `Badge.jsx` compartilhado, `status-badge`/`status-badge--ativo` ad-hoc, `ranking-badge` em `comparativo.css`, `notification-badge`/`notif-badge` duplicado em `app.css` (linhas 409, 3586, 4431). | ✅ **Corrigido** (`status-badge`/`alert-tipo-badge` unificados; `ranking-badge` e `notification-badge` mantidos por serem padrões distintos — ver seção 9) |
+| A4 | **Empty state inconsistente em ~80% das páginas** | Existe um componente `EmptyState.jsx` bem feito (usado corretamente em `FazendasPage`, `RelatorioLotePage`, `RelatorioPesagensPage`, `RelatorioFinanceiroPage`, `RelatorioPastagensPage`, `RelatorioResumoGeralPage`), mas a maioria das páginas (Pastagens, Lotes, Animais, Pesagens, Estoque, Suplementação, Sanitário, Tarefas, Financeiro, FluxoCaixa, Custos, CustosCompartilhados, Cenários, RelatoriosGerenciais, Dashboard, EvolucaoRebanho, Planejamento, Calendário) usa `<div className="empty-state">` artesanal com texto solto, sem padrão visual único. | ✅ **Corrigido nas páginas prioritárias** (Lotes, Animais, Pesagens, Financeiro, Estoque, Sanidade, Cenários, Rotina/Calendário, Dashboard) — ver seção 9. Pastagens, Suplementação (já usa variante de tabela válida), CustosCompartilhados, FluxoCaixa, Custos, RelatoriosGerenciais, EvolucaoRebanho e Planejamento ficam para sprint futura. |
 
 ### 🟡 Médio — inconsistência visual ou de design
 
@@ -61,19 +61,24 @@
 
 ## 3. Erros de português / acentuação (lista para correção)
 
-| Arquivo | Linha | Atual | Correto |
-|---------|-------|-------|---------|
-| `PesagensPage.jsx` | 214 | `Voce nao tem permissao para executar esta acao.` | `Você não tem permissão para executar esta ação.` |
-| `PesagensPage.jsx` | 871 | `Pendencias da ultima pesagem` | `Pendências da última pesagem` |
-| `PesagensPage.jsx` | 417 | `Informe uma quantidade valida` | `Informe uma quantidade válida` |
-| `FinanceiroPage.jsx` | 534 | `Valor e data sao obrigatorios.` | `Valor e data são obrigatórios.` |
-| `ConfiguracoesPage.jsx` | 906 | `Nao foi possivel criar o convite.` | `Não foi possível criar o convite.` |
-| `DashboardPage.jsx` | 468 | `Todos os lotes estao com pesagem em dia.` | `...estão...` |
-| `DashboardPage.jsx` | 476 | `Ultima pesagem:` | `Última pesagem:` |
-| `CalendarioOperacionalPage.jsx` | 454, 518 | `Responsavel` / `Sem responsavel` | `Responsável` / `Sem responsável` |
-| `CalendarioOperacionalPage.jsx` | 469 | `Recorrencia` | `Recorrência` |
-| `CalendarioOperacionalPage.jsx` | 480 | `Notificacao` | `Notificação` |
-| `CalendarioOperacionalPage.jsx` | 561 | `Saida` | `Saída` |
+**Todos os itens abaixo foram corrigidos no Bloco 3 (ver seção 9).**
+
+| Arquivo | Linha | Atual | Correto | Status |
+|---------|-------|-------|---------|--------|
+| `PesagensPage.jsx` | 214 | `Voce nao tem permissao para executar esta acao.` | `Você não tem permissão para executar esta ação.` | ✅ |
+| `PesagensPage.jsx` | 871 | `Pendencias da ultima pesagem` | `Pendências da última pesagem` | ✅ |
+| `PesagensPage.jsx` | 417 | `Informe uma quantidade valida` | `Informe uma quantidade válida` | ✅ |
+| `FinanceiroPage.jsx` | 534 | `Valor e data sao obrigatorios.` | `Valor e data são obrigatórios.` | ✅ |
+| `FinanceiroPage.jsx` | 348 | `Acoes` (cabeçalho de tabela) | `Ações` | ✅ |
+| `ConfiguracoesPage.jsx` | 906 | `Nao foi possivel criar o convite.` | `Não foi possível criar o convite.` | ✅ |
+| `DashboardPage.jsx` | 468 | `Todos os lotes estao com pesagem em dia.` | `...estão...` | ✅ |
+| `DashboardPage.jsx` | 476 | `Ultima pesagem:` | `Última pesagem:` | ✅ |
+| `CalendarioOperacionalPage.jsx` | 454, 518 | `Responsavel` / `Sem responsavel` | `Responsável` / `Sem responsável` | ✅ |
+| `CalendarioOperacionalPage.jsx` | 469 | `Recorrencia` | `Recorrência` | ✅ |
+| `CalendarioOperacionalPage.jsx` | 480 | `Notificacao` | `Notificação` | ✅ |
+| `CalendarioOperacionalPage.jsx` | 561 | `Saida` | `Saída` | ✅ |
+| `CalendarioOperacionalPage.jsx` | 522, 538, 651 | `Sem responsavel` / `Agenda sanitaria` / `Rotina automatica` | `Sem responsável` / `Agenda sanitária` / `Rotina automática` | ✅ (encontrado durante o Bloco 3) |
+| `RankingLotes.jsx` | 14 | `Nenhum dado disponivel para ranking.` | `Nenhum dado disponível para ranking.` | ✅ (encontrado durante o Bloco 3) |
 
 ---
 
@@ -195,3 +200,193 @@ Comparando os dois fluxos em `handleSubmit`:
 - `npm run lint`: ✅ sem erros
 - `npm run build`: ✅ sucesso
 - Preview: testado em 1920×1080 com login/logout/cadastro reais, fluxo completo ponta a ponta.
+
+---
+
+## 9. Bloco 3 — Correções aplicadas (2026-06-26)
+
+**Escopo:** padronização visual (badges/status, estados vazios) e correção de português. Nenhuma regra de negócio, Supabase, RLS, Asaas, cálculo ou rota foi alterada.
+
+### Arquivos alterados (16)
+`AlertList.jsx`, `RankingLotes.jsx`, `FazendaCard.jsx`, `LoteCard.jsx`, `AnimaisPage.jsx`, `CalendarioOperacionalPage.jsx`, `CenariosPage.jsx`, `ConfiguracoesPage.jsx`, `DashboardPage.jsx`, `EstoquePage.jsx`, `FinanceiroPage.jsx`, `LotesPage.jsx`, `PesagensPage.jsx`, `RotinaPage.jsx`, `SanitarioPage.jsx`, `SincronizacaoPage.jsx`.
+
+### 1. Badges/status unificados
+
+Antes de editar, mapeei **todos** os usos de `.status-badge` no app e descobri que essa classe **nunca teve CSS definido** — todo badge que a usava renderizava como texto puro sem cor, fundo ou borda (bug mais grave do que "inconsistente": estava completamente quebrado visualmente). Encontrei 8 ocorrências, 4 mais do que a auditoria original havia citado:
+
+| Arquivo | Badge | Antes | Depois (`Badge` compartilhado) |
+|---|---|---|---|
+| `AnimaisPage.jsx` | status do animal | `status-badge--ativo/inativo` (sem estilo) | `success` / `neutral` |
+| `FazendaCard.jsx` | status da fazenda | `status-badge--ativo/inativo` (sem estilo) | `success` / `neutral` |
+| `LoteCard.jsx` | risco do lote ("Atenção"/"OK") | `status-badge--atencao/sucesso` (sem estilo) | `warning` / `success` |
+| `SincronizacaoPage.jsx` | status de sincronização | `status-badge--sucesso/critico/atencao` (sem estilo) | `success` / `danger` / `warning` |
+| `DashboardPage.jsx` | "Sem críticos" / "N críticos" | `status-badge--sucesso/critico` (sem estilo) | `success` / `danger` |
+| `DashboardPage.jsx` | prioridade do item ("Crítico"/"Atenção") | `status-badge--critico/atencao` (sem estilo) | `danger` / `warning` |
+| `DashboardPage.jsx` | alerta crítico | `status-badge--critico` (sem estilo) | `danger` |
+| `DashboardPage.jsx` | tarefa do dia ("Hoje") | `status-badge--pendente` (sem estilo) | `warning` |
+
+Também padronizei `alert-tipo-badge` (`AlertList.jsx`) — outra classe sem CSS — para `Badge variant="neutral"`, já que é uma etiqueta de categoria (não de severidade; a severidade já é mostrada pela cor do ícone da linha).
+
+**Mantidos intencionalmente, por serem padrões visuais diferentes e já estilizados corretamente:**
+- `ranking-badge` (`RankingLotes.jsx`) — indicador de posição no ranking (#1, #2...), não um status semântico.
+- `notification-badge`/`notif-badge` (`AppHeader.jsx`) — contador numérico de notificações, não um indicador de status.
+
+A paleta de cores usada (`success`=verde, `warning`=amarelo/laranja, `danger`=vermelho, `neutral`=cinza) já existia em `Badge.jsx` e já correspondia exatamente ao padrão pedido nesta sprint.
+
+### 2. Estados vazios padronizados
+
+Troquei `<div className="empty-state">`/`<div className="empty-box">` artesanais pelo componente `EmptyState.jsx` (título, descrição, ícone, botão de ação), seguindo o modelo pedido ("o que falta → por que importa → ação clara"):
+
+| Página | Antes | Depois |
+|---|---|---|
+| Lotes | "Nenhum lote encontrado." | "Você ainda não cadastrou nenhum lote." + "Crie seu primeiro lote para acompanhar pesagens, GMD, custos e resultado financeiro." + botão **Criar lote** |
+| Animais (grupos) | "Nenhum grupo cadastrado." | "Você ainda não cadastrou nenhum grupo de animais." + botão **Cadastrar grupo** |
+| Animais (individuais) | "Nenhum animal individual cadastrado." | + botão **Cadastrar animal** |
+| Animais (movimentações) | "Nenhuma movimentação registrada." | mesmo texto, ícone e estrutura padronizados |
+| Pesagens (histórico) | "Nenhuma pesagem cadastrada." | "Você ainda não registrou nenhuma pesagem." + botão **Registrar pesagem** |
+| Pesagens (evolução) | "Sem dados suficientes para evolução." | + explicação de que são necessárias 2+ pesagens |
+| Financeiro (lançamentos) | "Nenhuma movimentação financeira encontrada." | "Você ainda não lançou nenhuma movimentação financeira." + botão **Registrar movimentação** |
+| Estoque (lista) | "Nenhum item cadastrado." | "Você ainda não cadastrou nenhum item no estoque." + botão **Novo item** |
+| Estoque (modal de entrada) | "Cadastre um item antes de registrar entrada." | mesmo texto, versão `compact` do componente, dentro do modal |
+| Sanidade | "Nenhum manejo sanitário registrado." | "Você ainda não registrou nenhum manejo sanitário." + botão **Registrar manejo** |
+| Cenários | "Nenhum cenário simulado ainda." | "Você ainda não simulou nenhum cenário." (sem botão — o formulário já está visível acima) |
+| Rotina (tarefas do dia/atrasadas/próximas) | `empty-box` artesanal reaproveitado em 3 colunas | `EmptyState compact`, mesmo texto |
+| Calendário (dia selecionado) | "Sem eventos nesta data." | mesmo texto + botão **Novo evento**, versão `compact` |
+| Calendário (próximos eventos) | "Nenhum evento futuro." | mesmo texto, versão `compact` |
+| Dashboard (pesagens pendentes) | "Todos os lotes estao com pesagem em dia." | corrigido o acento + `EmptyState compact` |
+
+**Não alterados (fora do escopo desta rodada):** Fazendas (já usava `EmptyState` corretamente, serviu de referência), Pastagens, Suplementação (usa `empty-state-td`, variante de tabela já estilizada e válida — não é "improvisada"), CustosCompartilhados, FluxoCaixa, Custos, RelatoriosGerenciais, EvolucaoRebanho, Planejamento, RelatoriosPage (hub — o card ali é um aviso contextual, não um estado vazio de lista).
+
+### 3. Textos e acentuação
+
+Todos os 11 itens da seção 3 deste relatório foram corrigidos, mais 4 encontrados durante a edição (não estavam na auditoria original): `RankingLotes.jsx` ("disponivel"), e em `CalendarioOperacionalPage.jsx` mais duas ocorrências de "Sem responsavel", "Agenda sanitaria" e "Rotina automatica".
+
+### Validação no preview (login real, conta de auditoria)
+
+| Verificação | Resultado |
+|---|---|
+| Badge "ativa" em card de fazenda | ✅ Renderiza verde via `.ui-badge` (antes: texto sem estilo) |
+| Badge "Sem críticos" no Dashboard | ✅ Verde, `.ui-badge` |
+| `EmptyState` em Lotes (com fazenda ativa) | ✅ Título, descrição, ícone e botão "Criar lote" — exatamente o texto do modelo pedido |
+| Botão "Criar lote" → abre modal "Novo lote" | ✅ |
+| `EmptyState` em Animais, Estoque, Sanidade, Cenários, Financeiro | ✅ Título/descrição/ação corretos em todos |
+| Overflow horizontal em 1366×768 | ✅ Nenhum (`scrollWidth === innerWidth`) |
+| Overflow horizontal em 390×844 | ✅ Nenhum (`scrollWidth === innerWidth`) |
+| Botão de ação do `EmptyState` acessível em mobile | ✅ Abaixo da dobra mas alcançável por scroll (comportamento normal da página, não é corte) |
+
+### Resultado de validação técnica
+- `npm run lint`: ✅ sem erros
+- `npm run build`: ✅ sucesso
+- Preview: testado em 1920×1080, 1366×768 e 390×844; fazenda/lote criados e removidos durante o teste para validar o fluxo real de cada estado vazio.
+
+### Limitações
+- A conta de teste estava vazia; os badges de status em **tabelas com várias linhas** (ex.: tabela de animais, tabela de sincronização) foram verificados pelo código e por um exemplo isolado (card de fazenda), não por uma lista longa renderizada de fato.
+- `notification-badge`/`notif-badge`, citados na auditoria original como "duplicados em `app.css`", não foram consolidados nesta rodada — são contadores numéricos (não status), e a duplicação é puramente de CSS (limpeza de código), não um problema visual visível ao usuário. Fica para sprint futura de limpeza de CSS.
+
+---
+
+## 10. Correção — usuários autenticados sem `public.profiles` (2026-06-26)
+
+**Escopo:** este item não é parte da auditoria visual original; foi um bug funcional/backend reportado separadamente. Documentado aqui por continuidade. Nenhum layout, autenticação visual, Asaas ou cálculo foi alterado. RLS não foi alterada (apenas lida/verificada).
+
+### Problema reportado
+Usuários que entravam com Google ficavam autenticados e acessavam o app, mas não apareciam em `public.profiles`.
+
+### Diagnóstico real (mais amplo do que o relato inicial)
+Ao rodar as queries de diagnóstico pedidas, descobri que o problema **não era específico do Google** — **todo usuário criado recentemente** (e-mail/senha ou Google) estava sem profile. 8 de 9 usuários em `auth.users` não tinham linha em `public.profiles`.
+
+**Causa raiz:** a tabela `public.profiles` tem `CHECK (perfil IN ('admin','gerente','operador','visualizador'))`, mas a função `handle_new_user_profile()` (e o `DEFAULT` da coluna `perfil`) inseriam o valor `'PROPRIETARIO'` — que **nunca** satisfez essa constraint. O gatilho `on_auth_user_created` já existia e já rodava corretamente em todo INSERT em `auth.users`, mas seu bloco `exception when others` capturava a violação da constraint silenciosamente (só um `RAISE WARNING`), deixando o usuário autenticado e sem profile, sem qualquer erro visível para o app ou para o usuário.
+
+O valor `'admin'` foi escolhido por já ser tratado pelo alias map do próprio app (`src/auth/perfis.js`) como equivalente a `'proprietario'` (dono da conta) — é o único valor da constraint que corresponde à intenção original.
+
+### Solução aplicada
+
+**1. Migração no banco** (via Supabase MCP, `apply_migration`):
+- `handle_new_user_profile()` corrigida para inserir `perfil = 'admin'` (era `'PROPRIETARIO'`).
+- `DEFAULT` da coluna `profiles.perfil` corrigido de `'PROPRIETARIO'` para `'admin'`.
+- Lógica de resolução de nome mantida (`raw_user_meta_data->>'nome'` → `'name'` → `'full_name'` → prefixo do e-mail → `'Novo usuário'`), já funcionava para Google (que popula `name`/`full_name`).
+
+```sql
+create or replace function public.handle_new_user_profile()
+returns trigger
+language plpgsql
+security definer
+set search_path to 'public', 'auth'
+as $function$
+declare
+  resolved_name text;
+begin
+  resolved_name := coalesce(
+    nullif(trim(new.raw_user_meta_data->>'nome'), ''),
+    nullif(trim(new.raw_user_meta_data->>'name'), ''),
+    nullif(trim(new.raw_user_meta_data->>'full_name'), ''),
+    nullif(split_part(new.email, '@', 1), ''),
+    'Novo usuário'
+  );
+
+  insert into public.profiles (id, email, nome, perfil, owner_user_id, created_at, updated_at)
+  values (new.id, new.email, resolved_name, 'admin', new.id, timezone('utc', now()), timezone('utc', now()))
+  on conflict (id) do update
+  set
+    email = excluded.email,
+    nome = coalesce(nullif(public.profiles.nome, ''), excluded.nome),
+    perfil = coalesce(nullif(public.profiles.perfil, ''), excluded.perfil),
+    owner_user_id = coalesce(public.profiles.owner_user_id, excluded.owner_user_id),
+    updated_at = timezone('utc', now());
+
+  return new;
+exception
+  when others then
+    raise warning 'HERDON handle_new_user_profile failed for user %, error: %', new.id, sqlerrm;
+    return new;
+end;
+$function$;
+
+alter table public.profiles alter column perfil set default 'admin';
+```
+
+**2. Backfill dos 8 usuários antigos sem profile:**
+```sql
+insert into public.profiles (id, email, nome, perfil, owner_user_id, created_at, updated_at)
+select u.id, u.email,
+  coalesce(
+    nullif(trim(u.raw_user_meta_data->>'nome'), ''),
+    nullif(trim(u.raw_user_meta_data->>'name'), ''),
+    nullif(trim(u.raw_user_meta_data->>'full_name'), ''),
+    nullif(split_part(u.email, '@', 1), ''),
+    'Novo usuário'
+  ),
+  'admin', u.id, timezone('utc', now()), timezone('utc', now())
+from auth.users u
+left join public.profiles p on p.id = u.id
+where p.id is null
+on conflict (id) do nothing;
+```
+Critério de aceite (`select ... where p.id is null` deve retornar zero linhas) — **confirmado, zero linhas.**
+
+**3. Safety net no app** (`src/services/userAccess.js` — nova função `ensureUserProfile`; `src/auth/AuthContext.jsx` — chamada quando o profile vier `null` sem erro):
+Caso a linha de `profiles` não exista por qualquer motivo futuro, o app cria via `upsert` com `ignoreDuplicates: true` (nunca sobrescreve um profile existente) e tenta buscar de novo, em vez de simplesmente seguir com `profile = null`. Verifiquei a policy de RLS `profiles_insert_self_or_manager` antes de implementar — ela permite que um usuário sem profile ainda insira a própria linha (`auth.uid() = id` e `owner_user_id` resolvendo para o próprio `auth.uid()` via `app_current_owner_user_id()`), então não foi necessária nenhuma alteração de RLS.
+
+### Arquivos alterados
+- `src/services/userAccess.js` (nova função `ensureUserProfile`)
+- `src/auth/AuthContext.jsx` (chama `ensureUserProfile` + nova tentativa de fetch quando profile vem nulo)
+- Banco: função `handle_new_user_profile()`, default da coluna `profiles.perfil` (via migrations do Supabase MCP, não há arquivo `.sql` no repo)
+
+### Testes realizados (reais, não simulados)
+
+| Teste | Resultado |
+|---|---|
+| Cadastro novo por e-mail (`herdonapp+profilefix@gmail.com`) | ✅ Profile criado pelo gatilho com `perfil='admin'`, `nome` correto, header do app mostra "Teste Profile Fix" / "Proprietário" |
+| 3 usuários Google já existentes (`anavaleriomidias`, `henriquem.viale`, `joaovictorlopesrodrigues959`) | ✅ Backfill criou profile para os 3, com nome extraído de `raw_user_meta_data->>'name'` |
+| Backfill completo (8 usuários, e-mail e Google) | ✅ Query de verificação retorna zero linhas sem profile |
+| Login repetido / duplicidade | ✅ `id` é chave primária + `on conflict do nothing`/`ignoreDuplicates: true` — estruturalmente impossível duplicar |
+| Safety net do app (simulando gatilho falho) | ✅ Apaguei manualmente o profile de um usuário de teste, recarreguei o app logado — `ensureUserProfile` recriou a linha automaticamente, sem travar o usuário |
+| Login normal continua funcionando | ✅ Sem alteração de comportamento |
+
+### Resultado de validação técnica
+- `npm run lint`: ✅ sem erros
+- `npm run build`: ✅ sucesso
+- `get_advisors(security)`: nenhum aviso novo introduzido por esta correção (os avisos existentes sobre `SECURITY DEFINER` e `search_path` em outras funções já existiam antes e são pré-existentes, fora do escopo desta correção)
+
+### Observação para o usuário
+Não testei o fluxo real de login com Google "ao vivo" (exigiria credenciais Google reais no navegador, fora do alcance deste ambiente automatizado). A validação foi feita por: (1) backfill dos usuários Google que já tinham passado por esse fluxo anteriormente — confirmando que a causa raiz era genuinamente a constraint, e (2) teste completo do fluxo de e-mail/senha, que usa exatamente o mesmo gatilho de banco. Como a causa raiz (constraint de `perfil`) é independente do provedor de login, a correção cobre Google igualmente — mas recomendo um teste manual de login com Google real antes de considerar este item 100% encerrado em produção.

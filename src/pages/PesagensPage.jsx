@@ -2,6 +2,7 @@ import { useMemo, useState } from 'react';
 import PesagemForm from '../components/PesagemForm';
 import Card from '../components/ui/Card';
 import Button from '../components/ui/Button';
+import EmptyState from '../components/EmptyState';
 import { formatarNumero, formatarData } from '../utils/formatters';
 import { gerarNovoId } from '../utils/id';
 import { useToast } from '../hooks/useToast';
@@ -211,7 +212,7 @@ function shouldUpdateLote(record) {
 export default function PesagensPage({ db, setDb, onConfirmAction, navigationIntent = null }) {
   const { hasPermission, session } = useAuth();
   const { showToast } = useToast();
-  const mensagemSemPermissao = 'Voce nao tem permissao para executar esta acao.';
+  const mensagemSemPermissao = 'Você não tem permissão para executar esta ação.';
 
   const shouldStartWithNewPesagem = navigationIntent?.page === 'pesagens' && navigationIntent?.action === 'novo';
   const [abrirForm, setAbrirForm] = useState(shouldStartWithNewPesagem);
@@ -485,7 +486,7 @@ export default function PesagensPage({ db, setDb, onConfirmAction, navigationInt
     if (dados?.tipo === 'animal_batch') {
       const registros = Array.isArray(dados.registros) ? dados.registros : [];
       if (!registros.length) {
-        showToast({ type: 'error', message: 'Nenhuma pesagem individual valida para salvar.' });
+        showToast({ type: 'error', message: 'Nenhuma pesagem individual válida para salvar.' });
         return;
       }
 
@@ -868,7 +869,7 @@ export default function PesagensPage({ db, setDb, onConfirmAction, navigationInt
       </div>
 
       {ultimoResumoBatch?.totalFalhas ? (
-        <Card title="Pendencias da ultima pesagem" subtitle="Revise os registros que nao foram concluidos totalmente.">
+        <Card title="Pendências da última pesagem" subtitle="Revise os registros que não foram concluídos totalmente.">
           <p style={{ marginTop: 0 }}>
             {ultimoResumoBatch.totalSucessos > 0
               ? `${ultimoResumoBatch.totalSucessos} registro(s) foram processados e ${ultimoResumoBatch.totalFalhas} ficaram com pendencia.`
@@ -898,10 +899,11 @@ export default function PesagensPage({ db, setDb, onConfirmAction, navigationInt
         <div className="fazendas-card">
           <div className="fazendas-table-wrap">
             {dadosTabela.length === 0 ? (
-              <div className="empty-box">
-                <strong>Nenhuma pesagem cadastrada.</strong>
-                <span>Registre a primeira pesagem para calcular evolução e desempenho.</span>
-              </div>
+              <EmptyState
+                title="Você ainda não registrou nenhuma pesagem."
+                subtitle="Registre a primeira pesagem para acompanhar evolução, GMD e desempenho."
+                action={<Button size="sm" onClick={() => abrirNovaPesagem(modoPesagem)}>Registrar pesagem</Button>}
+              />
             ) : (
               <table className="data-table herdon-table herdon-table--pesagens">
                 <thead>
@@ -942,9 +944,10 @@ export default function PesagensPage({ db, setDb, onConfirmAction, navigationInt
       {abaAtiva === 'evolucao' && (
         <div className="fazendas-card">
           {dadosTabela.length < 2 ? (
-            <div className="empty-box">
-              <strong>Sem dados suficientes para evolução.</strong>
-            </div>
+            <EmptyState
+              title="Sem dados suficientes para evolução."
+              subtitle="Registre pelo menos duas pesagens do mesmo lote para ver a evolução de peso e o GMD."
+            />
           ) : (
             <p>Peso médio por lote e GMD disponíveis no histórico de pesagens.</p>
           )}

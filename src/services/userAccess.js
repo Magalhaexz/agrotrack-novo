@@ -194,6 +194,38 @@ export async function fetchUserProfile(userId) {
   return response;
 }
 
+/**
+ * Safety net for users authenticated by Supabase (e-mail/senha ou Google OAuth) that, por
+ * qualquer motivo, ainda não têm linha em public.profiles (o gatilho on_auth_user_created
+ * deveria cobrir isso, mas esta função garante o caso no app caso o gatilho falhe).
+ * Usa ignoreDuplicates para nunca sobrescrever um profile que já exista.
+ */
+export async function ensureUserProfile(user) {
+  if (!user?.id || !user?.email) {
+    return { data: null, error: null };
+  }
+
+  const metadata = user.user_metadata || {};
+  const nome =
+    String(metadata.nome || '').trim()
+    || String(metadata.name || '').trim()
+    || String(metadata.full_name || '').trim()
+    || user.email.split('@')[0];
+
+  return supabase
+    .from('profiles')
+    .upsert(
+      {
+        id: user.id,
+        email: user.email,
+        nome,
+        perfil: 'admin',
+        owner_user_id: user.id,
+      },
+      { onConflict: 'id', ignoreDuplicates: true }
+    );
+}
+
 export async function upsertOwnProfile(userId, payload) {
   if (!userId) {
     return { data: null, error: new Error('Usuario invalido para salvar profile.') };

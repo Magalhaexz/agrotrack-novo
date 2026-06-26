@@ -5,6 +5,7 @@ import { gerarNovoId } from '../utils/id';
 import { useToast } from '../hooks/useToast'; // Importar useToast
 import Card from '../components/ui/Card'; // Importar Card para os resumos
 import Button from '../components/ui/Button'; // Importar Button
+import EmptyState from '../components/EmptyState';
 import PageHeader from '../components/PageHeader'; // Importar PageHeader
 import { Plus } from 'lucide-react'; // Importar ícone
 import { useAuth } from '../auth/useAuth';
@@ -312,12 +313,7 @@ export default function RotinaPage({ db, setDb, onConfirmAction }) {
  */
 function TodoList({ items, vazioTitulo, vazioTexto, destaque, onToggleStatus, onEditar, onExcluir }) {
   if (!items.length) {
-    return (
-      <div className="empty-box">
-        <strong>{vazioTitulo}</strong>
-        <span>{vazioTexto}</span>
-      </div>
-    );
+    return <EmptyState compact title={vazioTitulo} subtitle={vazioTexto} />;
   }
 
   return (

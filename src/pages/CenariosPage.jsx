@@ -1,6 +1,7 @@
 import { useMemo, useState } from 'react';
 import Button from '../components/ui/Button';
 import Card from '../components/ui/Card';
+import EmptyState from '../components/EmptyState';
 import Input from '../components/ui/Input';
 import PageHeader from '../components/PageHeader';
 import { useAuth } from '../auth/useAuth';
@@ -220,10 +221,10 @@ export default function CenariosPage({ db, setDb, session }) {
 
       <Card title="Cenários salvos">
         {!cenarios.length ? (
-          <div className="empty-state">
-            <strong>Nenhum cenário simulado ainda.</strong>
-            <span>Crie um cenário para simular se vale a pena comprar, manter ou vender o lote.</span>
-          </div>
+          <EmptyState
+            title="Você ainda não simulou nenhum cenário."
+            subtitle="Use o formulário acima para simular se vale a pena comprar, manter ou vender o lote."
+          />
         ) : (
           <div className="table-responsive">
             <table className="data-table">

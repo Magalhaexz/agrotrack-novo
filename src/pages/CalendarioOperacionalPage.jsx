@@ -12,6 +12,7 @@ import {
 } from 'lucide-react';
 import Button from '../components/ui/Button';
 import Card from '../components/ui/Card';
+import EmptyState from '../components/EmptyState';
 import Input from '../components/ui/Input';
 import Modal from '../components/ui/Modal';
 import { formatDate } from '../utils/calculations';
@@ -190,10 +191,12 @@ export default function CalendarioOperacionalPage({ db, setDb }) {
         <div className="calendar-side-column">
           <Card title={`Agenda de ${formatDate(selectedDate)}`} subtitle="Clique em um dia para atualizar a lista de eventos.">
             {selectedEvents.length === 0 ? (
-              <div className="calendar-empty-state">
-                <strong>Sem eventos nesta data.</strong>
-                <span>Use o botao "Novo evento" para registrar um compromisso operacional.</span>
-              </div>
+              <EmptyState
+                compact
+                title="Sem eventos nesta data."
+                subtitle='Use o botão "Novo evento" para registrar um compromisso operacional.'
+                action={<Button size="sm" onClick={() => setOpenModal(true)}>Novo evento</Button>}
+              />
             ) : (
               <div className="calendar-event-list">
                 {selectedEvents.map((event) => {
@@ -222,10 +225,11 @@ export default function CalendarioOperacionalPage({ db, setDb }) {
 
           <Card title="Próximos eventos" subtitle="Visão rápida dos compromissos futuros.">
             {upcomingEvents.length === 0 ? (
-              <div className="calendar-empty-state compact">
-                <strong>Nenhum evento futuro.</strong>
-                <span>Assim que novos eventos forem adicionados, eles aparecem aqui.</span>
-              </div>
+              <EmptyState
+                compact
+                title="Nenhum evento futuro."
+                subtitle="Assim que novos eventos forem adicionados, eles aparecem aqui."
+              />
             ) : (
               <div className="calendar-upcoming-list">
                 {upcomingEvents.map((event) => (
@@ -451,14 +455,14 @@ function NovoEventoModal({ db, setDb, onClose }) {
         </label>
 
         <label className="ui-input-wrap">
-          <span className="ui-input-label">Responsavel</span>
+          <span className="ui-input-label">Responsável</span>
           <select
             name="funcionario_responsavel_id"
             value={form.funcionario_responsavel_id}
             onChange={handleChange}
             className="ui-input"
           >
-            <option value="">Sem responsavel</option>
+            <option value="">Sem responsável</option>
             {(db.funcionarios || []).map((funcionario) => (
               <option key={funcionario.id} value={funcionario.id}>{funcionario.nome}</option>
             ))}
@@ -466,7 +470,7 @@ function NovoEventoModal({ db, setDb, onClose }) {
         </label>
 
         <label className="ui-input-wrap">
-          <span className="ui-input-label">Recorrencia</span>
+          <span className="ui-input-label">Recorrência</span>
           <select name="recorrencia" value={form.recorrencia} onChange={handleChange} className="ui-input">
             <option value="nenhuma">Nenhuma</option>
             <option value="semanal">Semanal</option>
@@ -477,7 +481,7 @@ function NovoEventoModal({ db, setDb, onClose }) {
         </label>
 
         <label className="ui-input-wrap">
-          <span className="ui-input-label">Notificacao antecipada</span>
+          <span className="ui-input-label">Notificação antecipada</span>
           <select name="alerta_antes" value={form.alerta_antes} onChange={handleChange} className="ui-input">
             <option value={0}>0 dia</option>
             <option value={1}>1 dia</option>
@@ -515,7 +519,7 @@ function normalizeOperationalEvent(event, lotesMap, funcionariosMap) {
     data: String(event.data || '').slice(0, 10),
     title: event.titulo || 'Evento operacional',
     description: [event.status || 'programado', lote?.nome || null].filter(Boolean).join(' · '),
-    metaLine: responsavel?.nome || event.responsavel || 'Sem responsavel',
+    metaLine: responsavel?.nome || event.responsavel || 'Sem responsável',
   };
 }
 
@@ -531,7 +535,7 @@ function normalizeSanitaryEvent(event, lotesMap, funcionariosMap) {
     data,
     title: event.desc || 'Manejo sanitario',
     description: [lote?.nome || 'Geral', event.obs || null].filter(Boolean).join(' · '),
-    metaLine: responsavel?.nome || 'Agenda sanitaria',
+    metaLine: responsavel?.nome || 'Agenda sanitária',
   };
 }
 
@@ -557,7 +561,7 @@ function normalizeSaidaEvent(lote) {
     source: 'saida',
     type: 'saida',
     data,
-    title: `Saida prevista - ${lote.nome}`,
+    title: `Saída prevista - ${lote.nome}`,
     description: lote.status === 'vendido' ? 'Lote ja vendido' : 'Planejamento de saida do lote',
     metaLine: lote.nome,
   };
@@ -644,6 +648,6 @@ function normalizeRotinaEvent(rotina, data, lotesMap, funcionariosMap) {
     data: String(data || '').slice(0, 10),
     title: rotina?.tarefa || 'Rotina operacional',
     description: [rotina?.setor || 'Operacao', lote?.nome || null].filter(Boolean).join(' · '),
-    metaLine: responsavel?.nome || 'Rotina automatica',
+    metaLine: responsavel?.nome || 'Rotina automática',
   };
 }

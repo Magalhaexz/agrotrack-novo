@@ -1,4 +1,6 @@
-﻿export default function FazendaCard({ fazenda, lotesVinculados = 0, onClick, onDelete }) {
+﻿import Badge from '../ui/Badge';
+
+export default function FazendaCard({ fazenda, lotesVinculados = 0, onClick, onDelete }) {
   if (!fazenda) return null;
 
   const area = Number(fazenda.hectares ?? fazenda.area_total_ha ?? 0);
@@ -21,9 +23,7 @@
           <div className="fazenda-card-nome">{fazenda.nome}</div>
           <div className="fazenda-card-local">{localizacao}</div>
         </div>
-        <span className={`status-badge ${status === 'ativa' ? 'status-badge--ativo' : 'status-badge--inativo'}`}>
-          {status}
-        </span>
+        <Badge variant={status === 'ativa' ? 'success' : 'neutral'}>{status}</Badge>
       </div>
 
       <div className="fazenda-card-stats">

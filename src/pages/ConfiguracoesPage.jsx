@@ -903,7 +903,7 @@ export default function ConfiguracoesPage({ db, setDb, onConfirmAction, subscrip
             });
 
             if (error) {
-              showToast({ type: 'error', message: mensagemErroSegura(error, 'Nao foi possivel criar o convite.') });
+              showToast({ type: 'error', message: mensagemErroSegura(error, 'Não foi possível criar o convite.') });
               return;
             }
             registrarEventoAuditoria({

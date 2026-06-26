@@ -1,3 +1,5 @@
+import Badge from './ui/Badge';
+
 const CONFIG_NIVEL = {
   critical: { classeItem: '',     classeIcone: 'cr',   icone: '!' },
   warning:  { classeItem: 'warn', classeIcone: 'warn', icone: '•' },
@@ -58,9 +60,7 @@ export default function AlertList({ alerts = [], onNavigate = null, onResolveAle
             <div className="alert-txt" style={{ flex: 1 }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap', marginBottom: 4 }}>
                 <strong>{alert.titulo}</strong>
-                <span className="alert-tipo-badge">
-                  {alert.tipoLabel || 'Geral'}
-                </span>
+                <Badge variant="neutral">{alert.tipoLabel || 'Geral'}</Badge>
               </div>
               <span>{alert.mensagem}</span>
             </div>

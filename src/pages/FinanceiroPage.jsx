@@ -3,6 +3,7 @@ import { Bar, BarChart, CartesianGrid, Line, LineChart, Pie, PieChart, Responsiv
 import Badge from '../components/ui/Badge';
 import Button from '../components/ui/Button';
 import Card from '../components/ui/Card';
+import EmptyState from '../components/EmptyState';
 import Input from '../components/ui/Input';
 import Modal from '../components/ui/Modal';
 import PageHeader from '../components/PageHeader';
@@ -344,7 +345,7 @@ export default function FinanceiroPage({ db, setDb }) {
                     <th>Lucro/cab</th>
                     <th>Lucro/@ carcaça</th>
                     <th>Custo/cab/dia</th>
-                    <th>Acoes</th>
+                    <th>Ações</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -484,10 +485,21 @@ export default function FinanceiroPage({ db, setDb }) {
           <Card title="Lançamentos">
             <div className="alerts-list">
               {lancamentos.length === 0 ? (
-                <div className="empty-state">
-                  <strong>Nenhuma movimentação financeira encontrada.</strong>
-                  <span>Registre receitas e despesas para acompanhar o resultado da operação.</span>
-                </div>
+                <EmptyState
+                  title="Você ainda não lançou nenhuma movimentação financeira."
+                  subtitle="Registre receitas e despesas para acompanhar o resultado da operação."
+                  action={
+                    <Button
+                      size="sm"
+                      onClick={() => {
+                        if (!podeEditarFinanceiro()) return;
+                        setOpenLanc(true);
+                      }}
+                    >
+                      Registrar movimentação
+                    </Button>
+                  }
+                />
               ) : (
                 lancamentos.map((item) => (
                   <div key={item.id} className="alert-item">
@@ -531,7 +543,7 @@ function NovoLancamentoModal({ db, setDb, onClose, hasPermission, showToast, ses
       return;
     }
     if (!form.valor || !form.data) {
-      alert('Valor e data sao obrigatorios.');
+      alert('Valor e data são obrigatórios.');
       return;
     }
 
