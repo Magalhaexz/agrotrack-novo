@@ -1,7 +1,27 @@
 # Beta Piloto — Decisão de Prontidão
 
 **Sprint 19 · Gerado em:** 2026-06-18
-**Decisão:** ⚠️ **QUASE PRONTO** — QA funcional amplo concluído na Sprint 37 sem novos bugs críticos de fluxo, mas os dois bugs reportados pela usuária (Modo Curral → Ver pendências; Suporte) não reproduziram em ambiente local e precisam de confirmação dela no ambiente publicado antes de declarar pronto
+**Decisão:** ⚠️ **QUASE PRONTO** — auditoria botão a botão dos módulos de maior risco (Sprint 37.1) confirmou persistência real de ponta a ponta com apenas um bug encontrado e já corrigido; faltam perfil não-proprietário e planilha de importação com erros antes de declarar pronto, além da confirmação da usuária sobre os dois bugs originais no ambiente publicado
+
+> **Atualização (Sprint 37.1 — auditoria botão por botão + persistência por módulo):**
+> testado com ação real (criar/editar/excluir/recarregar) em Fazendas, Pastos,
+> Lotes, Animais, Pesagens, Modo Curral, Sincronização, Financeiro,
+> Suplementação+Estoque (cadeia completa produto→consumo→baixa→despesa) e
+> Importação (com planilha `.xlsx` real gerada para o teste, não só leitura de
+> código). **Um bug real encontrado e corrigido:** editar a quantidade de
+> cabeças de um lote não sincronizava o grupo automático em `animais` (criado
+> na Sprint 35), desalinhando silenciosamente Resultado/Decisão de
+> Venda/Manejo — esses cálculos leem `animais`, nunca `lotes.qtd`. Nenhum
+> outro bug de fluxo encontrado nos módulos testados; boa parte do tempo foi
+> gasto distinguindo bugs reais de falsos positivos do próprio script de teste
+> (botões com texto duplicado, validação inline sem toast, confirmação em duas
+> etapas — documentado para sprints futuras). **Pendências explícitas:** teste
+> com perfil não-proprietário (sem conta de teste disponível), planilha de
+> importação com erros propositais (coluna faltante, duplicidade), e ação real
+> em Relatórios/Simulador/Guia do Criador/Planos/Configurações/Perfil (cobertos
+> só por abertura de página, não por clique real). Ver
+> [SPRINT_37_1_RESULTADO.md](SPRINT_37_1_RESULTADO.md) e
+> [QA_BOTAO_POR_BOTAO_HERDON.md](QA_BOTAO_POR_BOTAO_HERDON.md).
 
 > **Atualização (Sprint 37 — QA funcional completo + correção de cabeçalho mobile):**
 > investigados os dois bugs reportados pela usuária (Modo Curral → "Ver

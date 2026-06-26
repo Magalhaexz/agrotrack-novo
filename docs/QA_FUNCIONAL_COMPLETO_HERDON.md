@@ -1,5 +1,9 @@
 # QA Funcional Completo — Sprint 37
 
+> **Continuação:** a auditoria de ação real botão a botão (criar/editar/excluir/recarregar) por módulo,
+> que este documento aponta como pendência na seção "Escopo NÃO coberto", foi feita na Sprint 37.1.
+> Ver [SPRINT_37_1_RESULTADO.md](SPRINT_37_1_RESULTADO.md) e [QA_BOTAO_POR_BOTAO_HERDON.md](QA_BOTAO_POR_BOTAO_HERDON.md).
+
 **Gerado em:** 2026-06-25
 **Conta usada:** "QA Piloto Sprint 34" (perfil PROPRIETÁRIO), ambiente Supabase de produção.
 **Ambientes testados:** `npm run dev` (Vite dev server) e build de produção real (`npm run build` + `vite preview`), ambos com a mesma sessão autenticada.

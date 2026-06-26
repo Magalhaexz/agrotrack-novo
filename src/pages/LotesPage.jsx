@@ -511,10 +511,32 @@ export default function LotesPage({ db, setDb, onRegistrarSaidaAnimal, session, 
         return;
       }
 
+      const loteAtualizado = { ...loteEmEdicao, ...patch };
       setDb((prev) => ({
         ...prev,
-        lotes: (prev.lotes || []).map((l) => (Number(l.id) === Number(loteId) ? { ...l, ...patch } : l)),
+        lotes: (prev.lotes || []).map((l) => (Number(l.id) === Number(loteId) ? loteAtualizado : l)),
       }));
+
+      // O grupo em `animais` criado automaticamente no cadastro (Sprint 35)
+      // não acompanhava edições do lote — cabeças/peso ficavam desatualizados
+      // ali, e é `animais` (não `lotes.qtd`) que alimenta Resultado, Decisão
+      // de Venda e Manejo (Sprint 37.1).
+      const grupoAuto = animais.find((animal) => (
+        Number(animal.lote_id) === Number(loteId) && animal?.metadata?.criado_automaticamente === true
+      ));
+      if (grupoAuto) {
+        const grupoPatch = buildGrupoAnimaisAutoPatch({ ...loteAtualizado, id: loteId });
+        if (grupoPatch) {
+          const grupoPersistido = await updateOperationalRecord('animais', grupoAuto.id, grupoPatch, session);
+          if (grupoPersistido?.persisted) {
+            setDb((prev) => ({
+              ...prev,
+              animais: (prev.animais || []).map((a) => (Number(a.id) === Number(grupoAuto.id) ? { ...a, ...grupoPatch } : a)),
+            }));
+          }
+        }
+      }
+
       showToast({ type: 'success', message: 'Lote atualizado com sucesso.' });
       setOpenNovoLote(false);
       setLoteEmEdicao(null);
