@@ -696,7 +696,9 @@ export default function LoginPage() {
             )}
 
             <div className="login-card-foot">
-              HERDON centraliza o essencial da operação sem tirar velocidade do dia a dia.
+              <span className="login-card-foot-text">
+                HERDON centraliza o essencial da operação sem tirar velocidade do dia a dia.
+              </span>
               <div className="login-card-foot-links">
                 <a href="/termos-de-uso">Termos de Uso</a>
                 <a href="/politica-de-privacidade">Privacidade</a>
