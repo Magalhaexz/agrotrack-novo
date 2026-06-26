@@ -108,7 +108,7 @@ body:has(.login-page),
 .login-brand-logo {
   font-size: clamp(2.2rem, 0.9rem + 1.7vw, 3rem);
   font-weight: 800;
-  letter-spacing: 0.24em;
+  letter-spacing: 0.32em;
   color: #f5f7f5;
 }
 
@@ -727,12 +727,12 @@ body:has(.login-page),
   }
 
   .login-brand-header {
-    gap: 2px;
+    gap: 1px;
   }
 
   .login-brand-mark {
-    width: clamp(58px, 7.5vh, 84px);
-    height: clamp(58px, 7.5vh, 84px);
+    width: clamp(46px, 6vh, 72px);
+    height: clamp(46px, 6vh, 72px);
   }
 
   .login-brand-sub {
@@ -740,7 +740,7 @@ body:has(.login-page),
   }
 
   .login-brand-icons {
-    margin-top: 2px;
+    margin-top: 1px;
   }
 
   .login-hero-copy {
