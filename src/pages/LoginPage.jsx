@@ -180,10 +180,10 @@ export default function LoginPage() {
 
   const subtituloAtual =
     modo === 'login'
-      ? 'Acesse sua operacao com uma leitura clara, rapida e segura.'
+      ? 'Acesse sua operação com uma leitura clara, rápida e segura.'
       : modo === 'cadastro'
         ? 'Configure seu acesso e comece a centralizar rebanho, estoque e rotina.'
-        : 'Recupere o acesso sem perder o contexto da operacao.';
+        : 'Recupere o acesso sem perder o contexto da operação.';
 
   async function handleSubmit(e) {
     e.preventDefault();
@@ -239,7 +239,7 @@ export default function LoginPage() {
           });
         }
       } catch {
-        // Sem storage disponivel
+        // Sem storage disponível
       }
 
       const { data, error } = await signInWithRetry({
@@ -256,7 +256,7 @@ export default function LoginPage() {
           globalThis.setTimeout(() => {
             void supabase.auth.getSession().catch(() => null);
           }, 250);
-          setErro('Nao foi possivel conectar ao servidor. Verifique sua internet e tente novamente.');
+          setErro('Não foi possível conectar ao servidor. Verifique sua internet e tente novamente.');
           return;
         }
         throw error;
@@ -295,12 +295,12 @@ export default function LoginPage() {
         );
       }
     } catch (err) {
-      console.error('Erro de autenticacao:', err);
+      console.error('Erro de autenticação:', err);
       setMostrarResetLocal(isTransientLoginError(err));
       setErro(
         isTransientLoginError(err)
-          ? 'Nao foi possivel conectar ao servidor. Verifique sua internet e tente novamente.'
-          : 'Nao foi possivel concluir o acesso. Verifique suas informacoes e tente novamente.'
+          ? 'Não foi possível conectar ao servidor. Verifique sua internet e tente novamente.'
+          : 'Não foi possível concluir o acesso. Verifique suas informações e tente novamente.'
       );
     } finally {
       marcarLogoutEmAndamento(false);
@@ -340,9 +340,9 @@ export default function LoginPage() {
       if (error) throw error;
 
       setEtapaRecuperacao(2);
-      setMensagem('Link de recuperacao enviado. Confira sua caixa de entrada.');
+      setMensagem('Link de recuperação enviado. Confira sua caixa de entrada.');
     } catch {
-      setErro('Nao foi possivel enviar o link de recuperacao. Tente novamente em alguns instantes.');
+      setErro('Não foi possível enviar o link de recuperação. Tente novamente em alguns instantes.');
     } finally {
       setCarregando(false);
     }
@@ -366,12 +366,12 @@ export default function LoginPage() {
       if (error) throw error;
 
       setEtapaRecuperacao(3);
-      setMensagem('Senha atualizada com sucesso. Voce ja pode entrar no sistema.');
+      setMensagem('Senha atualizada com sucesso. Você já pode entrar no sistema.');
       setModo('login');
       setSenha('');
       setNovaSenha('');
     } catch {
-      setErro('Nao foi possivel redefinir a senha. Tente novamente em alguns instantes.');
+      setErro('Não foi possível redefinir a senha. Tente novamente em alguns instantes.');
     } finally {
       setCarregando(false);
     }
@@ -438,7 +438,7 @@ export default function LoginPage() {
             <img src={logoAgrotrack} alt="HERDON" loading="lazy" />
           </div>
           <div className="login-brand-logo">HERDON</div>
-          <div className="login-brand-sub">Gestao inteligente. Resultados reais.</div>
+          <div className="login-brand-sub">Gestão inteligente. Resultados reais.</div>
           <div className="login-brand-icons" aria-hidden="true">
             <Beef size={16} />
             <BarChart3 size={16} />
@@ -449,12 +449,12 @@ export default function LoginPage() {
 
         <div className="login-hero-copy">
           <h1 className="login-brand-title">
-            A operacao do rebanho com mais{' '}
-            <span className="login-brand-title-accent">clareza, ritmo e decisao.</span>
+            A operação do rebanho com mais{' '}
+            <span className="login-brand-title-accent">clareza, ritmo e decisão.</span>
           </h1>
           <p className="login-brand-description">
             Centralize rebanho, pesagens, manejo, estoque e financeiro em uma
-            experiencia mais limpa, segura e pronta para decisao diaria.
+            experiência mais limpa, segura e pronta para a decisão diária.
           </p>
         </div>
 
@@ -464,7 +464,7 @@ export default function LoginPage() {
             <div className="login-card-topline">
               <span className="login-card-kicker">Acesso seguro</span>
               <span className="login-card-chip">
-                {modo === 'cadastro' ? 'Novo acesso' : modo === 'recuperar' ? 'Recuperacao' : 'Login'}
+                {modo === 'cadastro' ? 'Novo acesso' : modo === 'recuperar' ? 'Recuperação' : 'Login'}
               </span>
             </div>
 
@@ -489,7 +489,7 @@ export default function LoginPage() {
                     className="login-link-btn"
                     onClick={limparSessaoLocalETentarNovamente}
                   >
-                    Limpar sessao local e tentar novamente
+                    Limpar sessão local e tentar novamente
                   </button>
                 ) : null}
               </div>
@@ -581,7 +581,7 @@ export default function LoginPage() {
 
                 <div className="login-links-card">
                   <div className="login-links-row">
-                    <span>{modo === 'login' ? 'Ainda nao tem conta?' : 'Ja tem conta?'}</span>
+                    <span>{modo === 'login' ? 'Ainda não tem conta?' : 'Já tem conta?'}</span>
                     <button
                       type="button"
                       onClick={alternarModoConta}
@@ -663,7 +663,7 @@ export default function LoginPage() {
                     </div>
 
                     <div className="password-strength" style={{ color: forcaSenha.color }}>
-                      Forca da senha: {forcaSenha.label}
+                      Força da senha: {forcaSenha.label}
                     </div>
 
                     <div className="login-actions">
@@ -676,17 +676,17 @@ export default function LoginPage() {
 
                 {etapaRecuperacao === 3 && (
                   <p className="login-info-text">
-                    Processo concluido. Volte ao login e entre com a nova senha.
+                    Processo concluído. Volte ao login e entre com a nova senha.
                   </p>
                 )}
 
                 <div className="login-divider">
-                  <span>Navegacao</span>
+                  <span>Navegação</span>
                 </div>
 
                 <div className="login-links-card">
                   <div className="login-links-row">
-                    <span>Ja esta pronto para entrar?</span>
+                    <span>Já está pronto para entrar?</span>
                     <button type="button" onClick={voltarParaLogin} className="login-link-btn">
                       Voltar ao login
                     </button>
@@ -696,7 +696,7 @@ export default function LoginPage() {
             )}
 
             <div className="login-card-foot">
-              HERDON centraliza o essencial da operacao sem tirar velocidade do dia a dia.
+              HERDON centraliza o essencial da operação sem tirar velocidade do dia a dia.
               <div style={{ marginTop: 12, display: 'flex', gap: 12, justifyContent: 'center', flexWrap: 'wrap' }}>
                 <a href="/termos-de-uso" style={{ color: 'var(--color-text-secondary)', fontSize: 12, textDecoration: 'none' }}>Termos de Uso</a>
                 <a href="/politica-de-privacidade" style={{ color: 'var(--color-text-secondary)', fontSize: 12, textDecoration: 'none' }}>Privacidade</a>

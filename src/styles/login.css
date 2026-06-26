@@ -88,14 +88,14 @@ body:has(.login-page),
 }
 
 .login-brand-mark {
-  width: 56px;
-  height: 56px;
-  border-radius: 18px;
+  width: clamp(64px, 4.2vw, 84px);
+  height: clamp(64px, 4.2vw, 84px);
+  border-radius: 20px;
   background: transparent;
   display: grid;
   place-items: center;
   flex-shrink: 0;
-  filter: drop-shadow(0 0 18px rgba(60, 255, 140, 0.35));
+  filter: drop-shadow(0 0 22px rgba(60, 255, 140, 0.4));
 }
 
 .login-brand-mark img {
@@ -105,16 +105,16 @@ body:has(.login-page),
 }
 
 .login-brand-logo {
-  font-size: clamp(1.5rem, 1vw + 1.1rem, 1.9rem);
+  font-size: clamp(2rem, 0.7rem + 1.6vw, 2.75rem);
   font-weight: 800;
-  letter-spacing: 0.22em;
+  letter-spacing: 0.24em;
   color: #f5f7f5;
 }
 
 .login-brand-sub {
   max-width: 360px;
   color: rgba(223, 232, 226, 0.6);
-  font-size: 0.62rem;
+  font-size: 0.72rem;
   font-weight: 600;
   letter-spacing: 0.1em;
   text-transform: uppercase;
@@ -125,8 +125,8 @@ body:has(.login-page),
   display: flex;
   align-items: center;
   justify-content: center;
-  gap: 12px;
-  margin-top: 4px;
+  gap: 14px;
+  margin-top: 6px;
   color: rgba(86, 255, 154, 0.8);
 }
 
@@ -137,16 +137,16 @@ body:has(.login-page),
 .login-hero-copy {
   display: grid;
   justify-items: center;
-  gap: 6px;
+  gap: 8px;
   text-align: center;
-  max-width: 640px;
-  margin-bottom: 0;
+  max-width: 680px;
+  margin-bottom: 4px;
 }
 
 .login-brand-title {
   margin: 0;
-  font-size: clamp(1.4rem, 1.1vw + 1rem, 2rem);
-  line-height: 1.18;
+  font-size: clamp(1.9rem, 0.6rem + 1.6vw, 2.625rem);
+  line-height: 1.15;
   letter-spacing: -0.01em;
   color: #f6faf7;
   font-weight: 800;
@@ -160,8 +160,8 @@ body:has(.login-page),
   margin: 0;
   max-width: 52ch;
   color: rgba(216, 226, 219, 0.72);
-  font-size: 0.92rem;
-  line-height: 1.6;
+  font-size: clamp(0.94rem, 0.3vw + 0.85rem, 1.0625rem);
+  line-height: 1.55;
 }
 
 .login-form-side {
@@ -172,7 +172,7 @@ body:has(.login-page),
 }
 
 .login-form-shell {
-  width: min(420px, 100%);
+  width: min(460px, 100%);
   display: grid;
   gap: 16px;
 }
@@ -189,7 +189,7 @@ body:has(.login-page),
     inset 0 -1px 0 rgba(0, 0, 0, 0.28),
     0 0 0 1px rgba(255, 255, 255, 0.015),
     var(--login-shadow);
-  padding: 20px;
+  padding: clamp(22px, 2.4vw, 30px);
   overflow: hidden;
 }
 
@@ -633,63 +633,122 @@ body:has(.login-page),
   }
 }
 
-@media (max-height: 860px) {
+@media (max-height: 1100px) {
   .login-page-frame {
-    gap: 4px;
-    padding-top: 6px;
-    padding-bottom: 6px;
+    gap: 8px;
+    padding-top: 10px;
+    padding-bottom: 10px;
   }
 
   .login-brand-mark {
-    width: 40px;
-    height: 40px;
-    border-radius: 12px;
-  }
-
-  .login-brand-logo {
-    font-size: 1.2rem;
-  }
-
-  .login-brand-sub {
-    font-size: 0.54rem;
+    width: clamp(56px, 7vh, 72px);
+    height: clamp(56px, 7vh, 72px);
   }
 
   .login-brand-icons {
-    margin-top: 2px;
+    margin-top: 4px;
   }
 
   .login-hero-copy {
-    gap: 3px;
-  }
-
-  .login-brand-title {
-    font-size: clamp(1.1rem, 0.9vw + 0.8rem, 1.4rem);
-  }
-
-  .login-brand-description {
-    font-size: 0.78rem;
-    line-height: 1.35;
+    gap: 6px;
+    margin-bottom: 2px;
   }
 
   .login-card {
-    padding: 10px;
+    padding: clamp(16px, 2.4vh, 22px);
   }
 
   .login-card-topline {
-    margin-bottom: 4px;
+    margin-bottom: 8px;
   }
 
   .login-header {
-    gap: 2px;
-    margin-bottom: 4px;
+    gap: 4px;
+    margin-bottom: 8px;
   }
 
   .login-title {
-    font-size: clamp(1.1rem, 0.9rem + 0.4vw, 1.35rem);
+    font-size: clamp(1.3rem, 0.9rem + 0.6vw, 1.7rem);
   }
 
   .login-subtitle {
-    font-size: 0.76rem;
+    font-size: 0.85rem;
+    line-height: 1.35;
+  }
+
+  .login-field {
+    gap: 6px;
+  }
+
+  .login-form {
+    gap: 10px;
+  }
+
+  .login-input {
+    min-height: 44px;
+    padding: 10px 14px;
+  }
+
+  .login-actions {
+    gap: 8px;
+    margin-top: 2px;
+  }
+
+  .login-btn {
+    min-height: 44px;
+  }
+
+  .login-divider {
+    margin: 10px 0 8px;
+  }
+
+  .login-links-card {
+    padding: 8px 14px;
+    gap: 5px;
+  }
+
+  .login-card-foot {
+    margin-top: 10px;
+    padding-top: 10px;
+  }
+}
+
+@media (max-height: 820px) {
+  .login-page-frame {
+    gap: 6px;
+    padding-top: 8px;
+    padding-bottom: 8px;
+  }
+
+  .login-brand-mark {
+    width: clamp(48px, 6vh, 64px);
+    height: clamp(48px, 6vh, 64px);
+  }
+
+  .login-hero-copy {
+    gap: 4px;
+    margin-bottom: 0;
+  }
+
+  .login-card {
+    padding: clamp(14px, 2vh, 18px);
+  }
+
+  .login-card-topline {
+    margin-bottom: 6px;
+  }
+
+  .login-header {
+    gap: 3px;
+    margin-bottom: 6px;
+  }
+
+  .login-title {
+    font-size: clamp(1.2rem, 0.85rem + 0.5vw, 1.45rem);
+  }
+
+  .login-subtitle {
+    font-size: 0.8rem;
     line-height: 1.3;
   }
 
@@ -698,47 +757,40 @@ body:has(.login-page),
   }
 
   .login-form {
-    gap: 6px;
+    gap: 8px;
   }
 
   .login-input {
-    min-height: 34px;
-    padding: 6px 10px;
-    font-size: 0.82rem;
+    min-height: 40px;
+    padding: 8px 12px;
   }
 
   .login-actions {
-    gap: 5px;
+    gap: 6px;
     margin-top: 0;
   }
 
   .login-btn {
-    min-height: 34px;
-    font-size: 0.82rem;
+    min-height: 40px;
   }
 
   .login-divider {
-    margin: 6px 0 5px;
+    margin: 8px 0 6px;
   }
 
   .login-links-card {
-    padding: 6px 10px;
-    gap: 3px;
-  }
-
-  .login-links-row {
-    font-size: 0.76rem;
+    padding: 6px 12px;
+    gap: 4px;
   }
 
   .login-card-foot {
-    margin-top: 6px;
-    padding-top: 6px;
-    font-size: 0.7rem;
-    line-height: 1.3;
+    margin-top: 8px;
+    padding-top: 8px;
+    font-size: 0.66rem;
   }
 }
 
-@media (max-height: 720px) {
+@media (max-height: 700px) {
   .login-page {
     align-items: safe center;
   }
@@ -750,5 +802,13 @@ body:has(.login-page),
   .login-brand-sub,
   .login-brand-icons {
     display: none;
+  }
+
+  .login-input {
+    min-height: 38px;
+  }
+
+  .login-btn {
+    min-height: 38px;
   }
 }
