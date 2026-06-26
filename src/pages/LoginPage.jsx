@@ -452,10 +452,6 @@ export default function LoginPage() {
             A operação do rebanho com mais{' '}
             <span className="login-brand-title-accent">clareza, ritmo e decisão.</span>
           </h1>
-          <p className="login-brand-description">
-            Centralize rebanho, pesagens, manejo, estoque e financeiro em uma
-            experiência mais limpa, segura e pronta para a decisão diária.
-          </p>
         </div>
 
         <section className="login-form-side">

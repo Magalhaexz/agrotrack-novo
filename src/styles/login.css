@@ -157,14 +157,6 @@ body:has(.login-page),
   color: #4dff9e;
 }
 
-.login-brand-description {
-  margin: 0;
-  max-width: 52ch;
-  color: rgba(216, 226, 219, 0.72);
-  font-size: clamp(0.94rem, 0.3vw + 0.85rem, 1.0625rem);
-  line-height: 1.55;
-}
-
 .login-form-side {
   display: flex;
   align-items: center;
@@ -532,10 +524,6 @@ body:has(.login-page),
     font-size: clamp(1.5rem, 5.6vw, 1.9rem);
   }
 
-  .login-brand-description {
-    font-size: 0.86rem;
-  }
-
   .login-form-shell {
     width: 100%;
     max-width: 480px;
@@ -574,8 +562,7 @@ body:has(.login-page),
     font-size: 1.5rem;
   }
 
-  .login-brand-sub,
-  .login-brand-description {
+  .login-brand-sub {
     font-size: 0.84rem;
   }
 
@@ -761,9 +748,6 @@ body:has(.login-page),
     margin-bottom: 0;
   }
 
-  .login-brand-description {
-    line-height: 1.35;
-  }
 
   .login-card {
     padding: clamp(8px, 1.2vh, 14px);
