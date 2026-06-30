@@ -193,3 +193,33 @@ Sem A1 resolvido ou comunicado, há risco de o produtor cadastrar um evento no c
 ## Resultados M1 + M2
 - **Lint:** limpo · **Build:** sucesso · **Testes:** 635/635 passando.
 - **Pendências:** validar no preview com proprietário real os 6 cliques de ação rápida e a seleção de produto na sanidade, em 1920×1080 / 1366×768 / 390×844 (a persistência já foi provada no banco).
+
+---
+
+# M3 — Tabelas operacionais duplicadas (diagnóstico + consolidação segura)
+
+> Diagnóstico completo e decisão em [`docs/DECISAO_M3_TABELAS_DUPLICADAS.md`](DECISAO_M3_TABELAS_DUPLICADAS.md).
+
+**Problema:** suspeita de duplicidade entre `custos`/`movimentacoes_financeiras` e `consumo_suplementacao`/`suplementacao` — risco de valor financeiro contado em dobro e de suplementação salva/lida em tabelas diferentes.
+
+**Tabelas analisadas:** `custos` (2 reg.), `movimentacoes_financeiras` (4 reg.), `consumo_suplementacao` (2 reg.), `suplementacao` (**0 reg.**).
+
+**Causa / achado:**
+- **Financeiro:** as duas tabelas têm papéis distintos. `movimentacoes_financeiras` é o livro-caixa/DRE oficial (FinanceiroPage/Dashboard); `custos` é a tabela operacional de custo do lote. Um custo lançado vira também uma movimentação (`origem='custo'`). O resultado do lote (`calcularCustoLote`) **já deduplicava** (usa o livro-caixa como base e só soma custos legados sem espelho). Join de duplicidade no banco: **0 linhas**. Nenhuma tela soma as duas ingenuamente. Risco real: baixo/teórico — agora travado por teste.
+- **Suplementação:** `suplementacao` está **vazia e descontinuada** (não hidratada, sem leitura/escrita no app). A fonte usada é `consumo_suplementacao`.
+
+**Decisão:**
+- **Financeiro:** manter ambas com papéis claros — `movimentacoes_financeiras` = fonte oficial; `custos` = custo operacional do lote; elo via `origem='custo'`/`origem_id` com dedup em `calcularCustoLote`.
+- **Suplementação:** `consumo_suplementacao` = fonte oficial; `suplementacao` = legado (mantida no banco, marcada como legado no código).
+
+**Arquivos alterados:**
+- `docs/DECISAO_M3_TABELAS_DUPLICADAS.md` (novo — diagnóstico/decisão)
+- `src/domain/calculos.js` (comentário declarando a fonte oficial e a lógica anti-dobro)
+- `src/domain/calculos.test.js` (2 testes de regressão: custo espelhado não duplica; custo legado conta uma vez)
+- `src/data/operationalTemplate.js` (comentário marcando `suplementacao` como legado)
+
+**Schema/RLS/dados:** **nenhuma** alteração de schema, **nenhuma** mudança de RLS, **nenhum** dado apagado, **nenhuma** migration. Nenhuma tabela dropada.
+
+**Testes:** 637/637 passando (2 novos de dedup financeiro). **Lint:** limpo · **Build:** sucesso.
+
+**Pendências (futuro, exige autorização):** eventual `DROP TABLE suplementacao` após período de confirmação; backfill opcional dos 2 custos de aquisição legados para o DRE; possível unificação da entrada de custo em `movimentacoes_financeiras` (refator maior).

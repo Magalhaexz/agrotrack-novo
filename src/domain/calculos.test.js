@@ -90,6 +90,40 @@ test('calcularCustoLote ignora receitas', () => {
 });
 
 // ----------------------------------------------------------------
+// M3: dedup entre `movimentacoes_financeiras` e `custos`.
+// Um custo lançado via CustosPage também vira uma movimentação (origem='custo').
+// O resultado do lote NÃO pode somar as duas e duplicar o valor.
+// ----------------------------------------------------------------
+
+test('calcularCustoLote NÃO duplica custo já espelhado em movimentacoes (origem=custo) — M3', () => {
+  const db = makeDb({
+    movimentacoes: [
+      makeMov({ id: 'mov-1', categoria: 'outros', valor: 2000, origem: 'custo', origem_id: 10 }),
+    ],
+    custos: [
+      { id: 10, lote_id: 1, cat: 'alimentação', val: 2000, data: '2025-01-01' },
+    ],
+  });
+  const result = calcularCustoLote(db, 1);
+  // Conta apenas uma vez (via movimentação), não 4000.
+  assert.equal(result.custoTotal, 2000);
+});
+
+test('calcularCustoLote inclui custo legado SEM espelho em movimentacoes uma única vez — M3', () => {
+  const db = makeDb({
+    movimentacoes: [
+      makeMov({ id: 'mov-1', categoria: 'outros', valor: 1000 }),
+    ],
+    custos: [
+      { id: 99, lote_id: 1, cat: 'aquisição', val: 1500, data: '2025-01-01' },
+    ],
+  });
+  const result = calcularCustoLote(db, 1);
+  // 1000 (movimentação) + 1500 (custo legado não espelhado) = 2500.
+  assert.equal(result.custoTotal, 2500);
+});
+
+// ----------------------------------------------------------------
 // calcularReceitaLote
 // ----------------------------------------------------------------
 

@@ -13,6 +13,13 @@ function pertenceAoLote(item, loteId) {
 
 /**
  * Calcula os custos totais e categorizados para um lote específico.
+ *
+ * M3 — fonte oficial: `movimentacoes_financeiras` é o livro-caixa/DRE oficial.
+ * `custos` é a tabela operacional de custo do lote. Um custo lançado na CustosPage
+ * também vira uma movimentação (`origem='custo'`); esta função usa as movimentações
+ * como base e só adiciona custos legados que NÃO estão espelhados no livro-caixa
+ * (ver `custosLegadosNaoRepresentados`), evitando contagem em dobro.
+ *
  * @param {object} db - O objeto do banco de dados.
  * @param {number|string} loteId - O ID do lote.
  * @returns {{custoAnimais: number, custoEstoque: number, custoOutros: number, custoTotal: number}} Os custos do lote.

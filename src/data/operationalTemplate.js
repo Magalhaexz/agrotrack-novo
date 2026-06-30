@@ -11,6 +11,9 @@ export function createEmptyOperationalDb() {
     rotinas: [],
     tarefas: [],
     estoque: [],
+    // LEGADO/M3: `suplementacao` está descontinuada (0 registros, não hidratada
+    // nem escrita pelo app). A fonte oficial de suplementação é
+    // `consumo_suplementacao`. Mantida só por compatibilidade de snapshots antigos.
     suplementacao: [],
     consumo_suplementacao: [],
     pesagens: [],
