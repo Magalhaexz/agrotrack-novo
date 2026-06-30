@@ -1,0 +1,121 @@
+# Teste do HERDON como produtor real — Relatório
+
+> Sprint: "Teste completo do HERDON como produtor real"
+> Data: 2026-06-29
+> Branch: `main` (working tree limpo no início; correções da sprint anterior já commitadas em `8c472b8` e `2dc7311`)
+
+## 1. Método e conta usada
+
+**Importante sobre o método:** o ambiente desta sessão não permite dirigir a UI logada (não há credenciais e a tela de login não deve ser tocada). Portanto o teste foi feito por **auditoria de código de cada fluxo cruzada com o banco Supabase real** (projeto `ljpiszxicmmuefbiixui`): consultas às tabelas, verificação de integridade referencial (órfãos/FK), `owner_user_id`, defaults, RLS e logs do Postgres. Complementado por `lint`, `build` e suíte de testes.
+
+Isso encontra bugs de salvamento, FK, campos que não puxam dados, persistência e cálculo — mas **não** substitui o teste visual/clicável de responsividade e UX, que precisa ser feito por você com uma conta de proprietário real (ver §6).
+
+Conta/dados reais no banco no momento do teste: 18 usuários (todos com profile), 6 fazendas, 9 lotes, 8 animais, 11 pesagens, 2 consumos de suplementação, 1 sanitário, 2 custos, 4 movimentações financeiras, 3 itens de estoque, 1 tarefa, 0 eventos operacionais, 2 cenários.
+
+## 2. Verificação de integridade (ETAPA 18) — OK
+
+| Checagem | Resultado |
+|---|---|
+| Usuários sem profile | **0** ✅ |
+| Lotes com `faz_id` órfão | 0 ✅ |
+| Animais com `lote_id` órfão | 0 ✅ |
+| Pesagens com `lote_id` órfão | 0 ✅ |
+| Consumo suplementação órfão | 0 ✅ |
+| Sanitário órfão | 0 ✅ |
+
+As FK violations vistas nos logs do Postgres (sprint anterior) eram **inserts rejeitados** pela constraint — nunca criaram órfãos. A correção da sprint anterior (classificação de erros) parou de mascará-las como "erro de conexão".
+
+## 3. Bugs encontrados
+
+### 🔴 CRÍTICO
+Nenhum bug crítico **novo** encontrado nesta auditoria. Os críticos da sprint anterior (falso "erro de conexão" mascarando FK/cast; editar pasto; pesagem não puxar cabeças) já foram corrigidos e validados.
+
+### 🟠 ALTO
+
+**A1 — Calendário Operacional: "Novo evento" salva só localmente e some no reload**
+- **Descrição:** o modal `NovoEventoModal` grava o evento apenas no estado local via `setDb` — não chama `createOperationalRecord`. A tabela `eventos_operacionais` tem **0 linhas** e **não é carregada** pelo app (não está na hidratação de `useOperationalData.js`). Resultado: evento criado no calendário desaparece ao recarregar.
+- **Gravidade:** Alto (quebra a confiança no calendário; ETAPA 12).
+- **Causa provável:** o modal nunca foi ligado à nuvem; a tabela existe mas não é hidratada.
+- **Arquivo:** `src/pages/CalendarioOperacionalPage.jsx` (função `NovoEventoModal`, ~linha 410-430).
+- **Recomendação:** (1) mapear payload para colunas de `eventos_operacionais` (`titulo`, `tipo`, `data_inicio`, `lote_id`, `funcionario_id`, `status`); (2) persistir via `createOperationalRecord('eventos_operacionais', ...)` checando `persisted`; (3) **adicionar `eventos_operacionais` à hidratação** em `useOperationalData.js`, senão não reaparece no reload. Requer verificar políticas RLS de insert/select da tabela.
+- **Status:** **pendente** (correção envolve hidratação + RLS; fora do escopo seguro de correção imediata desta sprint). Tarefas com vencimento já persistem corretamente na página **Tarefas** (ver A-positivo).
+
+**A2 — Cenários: toast de "sucesso" sem checar persistência (perda silenciosa de dados)**
+- **Descrição:** `salvarCenario` (criar e editar) e `arquivarCenario` exibem "Cenário criado/atualizado/arquivado" e atualizam o estado local **sem verificar `persisted.persisted`**. Em falha de salvamento, o registro entra com id local (`gerarNovoId`) e o usuário vê "sucesso", mas o dado não está na nuvem → some no reload.
+- **Gravidade:** Alto (salvamento/persistência + decisão; ETAPA 15).
+- **Causa provável:** ausência da checagem de retorno presente em outras páginas (Estoque, Animais, Lotes etc. checam).
+- **Arquivo:** `src/pages/CenariosPage.jsx` linhas ~149-185.
+- **Recomendação:** checar `persisted.persisted`, exibir aviso real em falha e usar o id da nuvem.
+- **Status:** **CORRIGIDO nesta sprint** (correção segura e isolada — ver §4).
+
+### 🟡 MÉDIO
+
+**M1 — Sanidade não puxa produto/vacina do estoque**
+- **Descrição:** `SanitarioForm` usa campo de texto livre `desc`; não há select de produto/vacina vinculado ao estoque (vacina clostridial, vermífugo). ETAPA 11 espera "Selecionar produto/vacina".
+- **Arquivo:** `src/components/SanitarioForm.jsx`.
+- **Recomendação:** adicionar select/`datalist` opcional de produtos do estoque (mesmo padrão já aplicado em Suplementação/Lote na sprint anterior). Não bloquear o texto livre.
+- **Status:** pendente (melhoria).
+
+**M2 — Ações rápidas do Dashboard só navegam (exceto Pesagem)**
+- **Descrição:** apenas `PesagensPage` consome `navigationIntent` para abrir o formulário automaticamente. "Novo lote/custo/tarefa/manejo/estoque" navegam para a página certa, mas **não abrem o modal de novo registro**.
+- **Arquivos:** `LotesPage.jsx`, `CustosPage.jsx`, `TarefasPage.jsx`, `SanitarioPage.jsx`, `EstoquePage.jsx` (nenhuma lê `navigationIntent`).
+- **Recomendação:** ler `navigationIntent.action === 'novo'` em cada página para abrir o form. Baixo risco, mas toca 5 páginas — fazer com teste individual.
+- **Status:** pendente.
+
+**M3 — Tabelas duplicadas no schema**
+- **Descrição:** existem `custos` **e** `movimentacoes_financeiras` (CustosPage grava nas duas — custo + lançamento no razão), e `consumo_suplementacao` **e** `suplementacao`. O app usa `consumo_suplementacao`; `suplementacao` aparece sem uso nos fluxos atuais.
+- **Recomendação:** confirmar a tabela canônica e descontinuar/limpar a não usada para evitar inconsistência futura. **Investigar antes de mexer** (não alterar agora).
+- **Status:** precisa investigar.
+
+### 🔵 BAIXO
+
+**B1 — `custos.fazenda_id` nunca é preenchido** — `CustoForm` não envia `fazenda_id`; filtro de custo por fazenda pode ficar incompleto. Arquivo: `src/components/CustoForm.jsx`. Status: pendente (polimento).
+
+**B2 — Responsividade não testada automaticamente** — ver §6.
+
+## 4. Correção aplicada nesta sprint (controlada, ETAPA 20)
+
+Seguindo a regra "corrigir apenas críticos/altos seguros", apliquei **somente a A2 (Cenários)**, por ser isolada e de baixo risco. A A1 (calendário) ficou documentada por exigir mudança de hidratação + RLS.
+
+- **A2 corrigido** em `src/pages/CenariosPage.jsx`: `salvarCenario`/`arquivarCenario` agora checam `persisted.persisted`, avisam o motivo real em falha e usam o id retornado pela nuvem.
+
+## 5. Fluxos auditados — status por módulo
+
+| Módulo | Persiste na nuvem? | Checa retorno? | Observação |
+|---|---|---|---|
+| Autenticação/Profile | ✅ | — | 18/18 com profile; trigger `handle_new_user_profile` |
+| Fazendas | ✅ | ✅ | dedup na hidratação |
+| Pastos | ✅ | ✅ | edição corrigida (sprint anterior) |
+| Lotes | ✅ | ✅ | "Trocar lote", GMD, produto via datalist OK |
+| Animais | ✅ | ✅ | — |
+| Pesagens | ✅ | ✅ | puxa cabeças + balão verde (sprint anterior) |
+| GMD/alertas | ✅ | — | alerta no card do lote OK |
+| Estoque | ✅ | ✅ | — |
+| Suplementação | ✅ | ✅ | puxa produto do estoque (sprint anterior) |
+| Financeiro/Custos | ✅ | ✅ | grava em `custos` + `movimentacoes_financeiras` |
+| Sanidade | ✅ | ✅ | **sem select de produto (M1)** |
+| Tarefas | ✅ | ✅ | persiste em `tarefas` |
+| Calendário (evento) | ❌ | ❌ | **A1 — local-only** |
+| Cenários | ✅ | ❌→✅ | **A2 corrigido** |
+
+## 6. O que falta validar com conta real (não testável aqui)
+
+Rodar com proprietário real em preview/produção, em 1920×1080, 1366×768 e 390×844:
+- Responsividade de menus, modais, tabelas, FAB, formulários (ETAPA 16).
+- Fluxo completo cadastro→reload→relogin para confirmar persistência visual (ETAPA 17).
+- Conferir que os toasts de erro agora mostram a **causa real** (FK, permissão, campo obrigatório) e não "erro de conexão" — e o console mostra `[HERDON_SAVE_ERROR]`.
+
+## 7. Resultado de qualidade
+
+- **Lint:** limpo.
+- **Build:** sucesso.
+- **Testes:** 633/633 passando (antes da correção A2; revalidar após — ver §8).
+
+## 8. Conclusão — pronto para piloto?
+
+**Quase.** O núcleo operacional (fazenda, pasto, lote, animal, pesagem, GMD, estoque, suplementação, financeiro, sanidade, tarefas) **persiste corretamente na nuvem, sem órfãos e com mensagens de erro reais**. Recomendação para liberar piloto com tranquilidade:
+1. ✅ A2 (Cenários) — corrigido.
+2. ⚠️ A1 (Calendário) — decidir: persistir `eventos_operacionais` (hidratação+RLS) **ou** comunicar ao produtor que o calendário hoje agrega eventos de sanidade/pesagem/tarefas e usar a página **Tarefas** para compromissos persistentes.
+3. ⚙️ M1/M2 — melhorias de usabilidade desejáveis, não bloqueantes.
+
+Sem A1 resolvido ou comunicado, há risco de o produtor cadastrar um evento no calendário e ele sumir — o que mina a confiança. Os demais fluxos estão prontos para uso de campo.

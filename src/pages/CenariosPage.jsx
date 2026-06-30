@@ -147,6 +147,10 @@ export default function CenariosPage({ db, setDb, session }) {
 
     if (editando) {
       const persisted = await updateOperationalRecord('cenarios', editando.id, payload, session);
+      if (!persisted.persisted) {
+        showToast({ type: 'warning', message: persisted.error || 'Não foi possível salvar o cenário agora.' });
+        return;
+      }
       setDb((prev) => ({
         ...prev,
         cenarios: (prev.cenarios || []).map((item) => (
@@ -157,6 +161,10 @@ export default function CenariosPage({ db, setDb, session }) {
       setCenarioSelecionadoId(editando.id);
     } else {
       const persisted = await createOperationalRecord('cenarios', payload, session);
+      if (!persisted.persisted) {
+        showToast({ type: 'warning', message: persisted.error || 'Não foi possível salvar o cenário agora.' });
+        return;
+      }
       const novo = persisted.data || { id: gerarNovoId(cenarios), ...payload };
       setDb((prev) => ({
         ...prev,
@@ -175,6 +183,10 @@ export default function CenariosPage({ db, setDb, session }) {
     }
     const patch = { status: 'arquivado' };
     const persisted = await updateOperationalRecord('cenarios', cenario.id, patch, session);
+    if (!persisted.persisted) {
+      showToast({ type: 'warning', message: persisted.error || 'Não foi possível arquivar o cenário agora.' });
+      return;
+    }
     setDb((prev) => ({
       ...prev,
       cenarios: (prev.cenarios || []).map((item) => (
