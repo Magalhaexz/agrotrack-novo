@@ -27,6 +27,7 @@ const OPERACIONAL_TABLES = [
   'consumo_suplementacao',
   'configuracoes',
   'cenarios',
+  'eventos_operacionais',
 ];
 
 const OWNER_SCOPED_TABLES = new Set(OPERACIONAL_TABLES);
@@ -44,7 +45,7 @@ const inFlightSnapshots = new Map();
 const failedHydrationAt = new Map();
 const schemaWarningTables = new Set();
 const ownerScopeCapabilityByTable = new Map();
-const OPTIONAL_STRATEGIC_TABLES = new Set(['pastagens', 'cenarios']);
+const OPTIONAL_STRATEGIC_TABLES = new Set(['pastagens', 'cenarios', 'eventos_operacionais']);
 const missingOptionalTables = new Set();
 
 function isPlainObject(value) {

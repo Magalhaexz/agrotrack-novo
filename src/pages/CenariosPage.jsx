@@ -148,6 +148,7 @@ export default function CenariosPage({ db, setDb, session }) {
     if (editando) {
       const persisted = await updateOperationalRecord('cenarios', editando.id, payload, session);
       if (!persisted.persisted) {
+        console.error('[HERDON_CENARIO_SAVE_ERROR]', { action: 'update', error: persisted.error, payload });
         showToast({ type: 'warning', message: persisted.error || 'Não foi possível salvar o cenário agora.' });
         return;
       }
@@ -162,6 +163,7 @@ export default function CenariosPage({ db, setDb, session }) {
     } else {
       const persisted = await createOperationalRecord('cenarios', payload, session);
       if (!persisted.persisted) {
+        console.error('[HERDON_CENARIO_SAVE_ERROR]', { action: 'create', error: persisted.error, payload });
         showToast({ type: 'warning', message: persisted.error || 'Não foi possível salvar o cenário agora.' });
         return;
       }
@@ -184,6 +186,7 @@ export default function CenariosPage({ db, setDb, session }) {
     const patch = { status: 'arquivado' };
     const persisted = await updateOperationalRecord('cenarios', cenario.id, patch, session);
     if (!persisted.persisted) {
+      console.error('[HERDON_CENARIO_SAVE_ERROR]', { action: 'archive', error: persisted.error, payload: patch });
       showToast({ type: 'warning', message: persisted.error || 'Não foi possível arquivar o cenário agora.' });
       return;
     }

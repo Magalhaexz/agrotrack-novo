@@ -380,6 +380,45 @@ test('operationalPersistence', { concurrency: 1 }, async (t) => {
     assert.equal(capture.payload['cabeças_lote'], undefined);
   });
 
+  await t.test('createOperationalRecord em eventos_operacionais mapeia data->data_inicio e ids opcionais com segurança (A1)', async () => {
+    const capture = {};
+    mockInsertSuccess(capture);
+
+    const result = await createOperationalRecord('eventos_operacionais', {
+      titulo: 'Vacinação do Lote Nelore',
+      tipo: 'vacina',
+      data: '2026-06-30',
+      lote_id: 20,
+      funcionario_responsavel_id: '',
+      status: 'programado',
+      metadata: { recorrencia: 'mensal', alerta_antes: 3 },
+    }, makeSession());
+
+    assert.equal(result.persisted, true);
+    assert.equal(capture.payload.data_inicio, '2026-06-30');
+    assert.equal(capture.payload.titulo, 'Vacinação do Lote Nelore');
+    assert.equal(capture.payload.lote_id, 20);
+    // string vazia em coluna bigint precisa virar null (evita erro 22P02)
+    assert.equal(capture.payload.funcionario_id, null);
+    assert.equal(capture.payload.owner_user_id, 'user-1');
+    assert.equal(capture.payload.metadata.recorrencia, 'mensal');
+    assert.equal(capture.payload.id, undefined);
+  });
+
+  await t.test('updateOperationalRecord em eventos_operacionais só envia os campos do patch', async () => {
+    const capture = {};
+    mockUpdateSuccess(capture);
+
+    await updateOperationalRecord('eventos_operacionais', 7, {
+      titulo: 'Novo título',
+      data_inicio: '2026-07-01',
+    }, makeSession());
+
+    assert.deepEqual(Object.keys(capture.payload).sort(), ['data_inicio', 'titulo']);
+    assert.equal(capture.payload.status, undefined);
+    assert.equal(capture.payload.lote_id, undefined);
+  });
+
   await t.test('updateOperationalRecord em consumo_suplementacao só envia os campos do patch, sem zerar o resto', async () => {
     const capture = {};
     mockUpdateSuccess(capture);

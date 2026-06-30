@@ -927,6 +927,31 @@ function buildOperationalCreatePayload(table, record, userId) {
     delete payload.id;
     return Object.fromEntries(Object.entries(payload).filter(([, value]) => value !== undefined));
   }
+  if (normalizedTable === 'eventos_operacionais') {
+    const safe = sanitizeRecord(record);
+    const metadata = isObject(safe?.metadata) ? { ...safe.metadata } : {};
+    if (!Object.prototype.hasOwnProperty.call(metadata, 'local_id')) {
+      metadata.local_id = safe?.id ?? null;
+    }
+    const payload = {
+      owner_user_id: userId || null,
+      titulo: toNullableString(safe?.titulo),
+      tipo: toNullableString(safe?.tipo),
+      descricao: toNullableString(safe?.descricao ?? safe?.desc),
+      // A coluna real é data_inicio; aceitamos 'data' como alias da UI.
+      data_inicio: toNullableDateString(safe?.data_inicio ?? safe?.data),
+      data_fim: toNullableDateString(safe?.data_fim),
+      status: toNullableString(safe?.status),
+      // Colunas bigint: string vazia vira null, nunca '' (evita 22P02).
+      lote_id: toNullableNumber(safe?.lote_id),
+      fazenda_id: toNullableNumber(safe?.fazenda_id),
+      funcionario_id: toNullableNumber(safe?.funcionario_id ?? safe?.funcionario_responsavel_id),
+      origem: toNullableString(safe?.origem),
+      metadata,
+    };
+    delete payload.id;
+    return Object.fromEntries(Object.entries(payload).filter(([, value]) => value !== undefined));
+  }
   if (normalizedTable === 'pesagens') {
     const safe = sanitizeRecord(record);
     const cloudUuid = normalizeCloudUuid(safe?.cloud_id ?? safe?.metadata?.cloud_id);

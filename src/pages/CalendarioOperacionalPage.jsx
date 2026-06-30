@@ -16,7 +16,12 @@ import EmptyState from '../components/EmptyState';
 import Input from '../components/ui/Input';
 import Modal from '../components/ui/Modal';
 import { formatDate } from '../utils/calculations';
-import { gerarNovoId } from '../utils/id';
+import { useToast } from '../hooks/useToast';
+import {
+  createOperationalRecord,
+  deleteOperationalRecord,
+  updateOperationalRecord,
+} from '../services/operationalPersistence';
 
 const MONTH_LABELS = ['Janeiro', 'Fevereiro', 'Março', 'Abril', 'Maio', 'Junho', 'Julho', 'Agosto', 'Setembro', 'Outubro', 'Novembro', 'Dezembro'];
 const WEEKDAY_LABELS = ['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sab'];
@@ -36,12 +41,55 @@ const typeMap = {
 
 const getTodayIso = () => new Date().toISOString().slice(0, 10);
 
-export default function CalendarioOperacionalPage({ db, setDb }) {
+export default function CalendarioOperacionalPage({ db, setDb, session, fazendaSelecionada = null, onConfirmAction }) {
+  const { showToast } = useToast();
   const hoje = getTodayIso();
   const [selectedDate, setSelectedDate] = useState(hoje);
   const [viewMode, setViewMode] = useState('mensal');
   const [cursorDate, setCursorDate] = useState(() => new Date(`${hoje}T00:00:00`));
   const [openModal, setOpenModal] = useState(false);
+  const [eventoEditando, setEventoEditando] = useState(null);
+
+  function abrirNovoEvento() {
+    setEventoEditando(null);
+    setOpenModal(true);
+  }
+
+  function abrirEdicaoEvento(eventoRaw) {
+    setEventoEditando(eventoRaw);
+    setOpenModal(true);
+  }
+
+  function fecharModal() {
+    setOpenModal(false);
+    setEventoEditando(null);
+  }
+
+  async function excluirEvento(eventoRaw) {
+    if (!eventoRaw?.id) return;
+    const confirmado = typeof onConfirmAction === 'function'
+      ? await onConfirmAction({
+          title: 'Excluir evento?',
+          message: `Deseja excluir "${eventoRaw.titulo || 'este evento'}"?`,
+          tone: 'danger',
+        })
+      : window.confirm(`Deseja excluir "${eventoRaw.titulo || 'este evento'}"?`);
+    if (!confirmado) return;
+
+    const persisted = await deleteOperationalRecord('eventos_operacionais', eventoRaw.id, session);
+    if (!persisted?.persisted) {
+      if (persisted?.error) {
+        console.error('[HERDON_CALENDAR_SAVE_ERROR]', { action: 'delete', error: persisted.error, payload: { id: eventoRaw.id } });
+      }
+      showToast({ type: 'warning', message: persisted?.error || 'Não foi possível excluir o evento agora.' });
+      return;
+    }
+    setDb((prev) => ({
+      ...prev,
+      eventos_operacionais: (prev.eventos_operacionais || []).filter((item) => Number(item.id) !== Number(eventoRaw.id)),
+    }));
+    showToast({ type: 'success', message: 'Evento excluído.' });
+  }
 
   const lotes = useMemo(() => (Array.isArray(db?.lotes) ? db.lotes : []), [db]);
   const funcionarios = useMemo(() => (Array.isArray(db?.funcionarios) ? db.funcionarios : []), [db]);
@@ -134,7 +182,7 @@ export default function CalendarioOperacionalPage({ db, setDb }) {
 
         <div className="calendar-hero-actions">
           <Button variant="outline" onClick={goToToday}>Hoje</Button>
-          <Button onClick={() => setOpenModal(true)}>Novo evento</Button>
+          <Button onClick={abrirNovoEvento}>Novo evento</Button>
         </div>
       </section>
 
@@ -195,7 +243,7 @@ export default function CalendarioOperacionalPage({ db, setDb }) {
                 compact
                 title="Sem eventos nesta data."
                 subtitle='Use o botão "Novo evento" para registrar um compromisso operacional.'
-                action={<Button size="sm" onClick={() => setOpenModal(true)}>Novo evento</Button>}
+                action={<Button size="sm" onClick={abrirNovoEvento}>Novo evento</Button>}
               />
             ) : (
               <div className="calendar-event-list">
@@ -215,6 +263,12 @@ export default function CalendarioOperacionalPage({ db, setDb }) {
                         </div>
                         <p>{event.description}</p>
                         <small>{event.metaLine}</small>
+                        {event.source === 'operacional' && event.raw ? (
+                          <div className="action-row" style={{ marginTop: 6, gap: 8 }}>
+                            <button type="button" className="action-btn" onClick={() => abrirEdicaoEvento(event.raw)}>Editar</button>
+                            <button type="button" className="action-btn action-btn-danger" onClick={() => excluirEvento(event.raw)}>Excluir</button>
+                          </div>
+                        ) : null}
                       </div>
                     </article>
                   );
@@ -256,7 +310,12 @@ export default function CalendarioOperacionalPage({ db, setDb }) {
         <NovoEventoModal
           db={db}
           setDb={setDb}
-          onClose={() => setOpenModal(false)}
+          session={session}
+          fazendaSelecionada={fazendaSelecionada}
+          eventoEditando={eventoEditando}
+          defaultDate={selectedDate}
+          showToast={showToast}
+          onClose={fecharModal}
         />
       ) : null}
     </div>
@@ -387,17 +446,21 @@ function MiniMonthCard({ year, monthIndex, label, selectedDate, eventsByDateMap,
   );
 }
 
-function NovoEventoModal({ db, setDb, onClose }) {
-  const [form, setForm] = useState({
-    tipo: 'operacional',
-    titulo: '',
-    data: getTodayIso(),
-    lote_id: '',
-    funcionario_responsavel_id: '',
-    recorrencia: 'nenhuma',
-    alerta_antes: 1,
-    status: 'programado',
-  });
+function NovoEventoModal({ db, setDb, session, fazendaSelecionada, eventoEditando, defaultDate, showToast, onClose }) {
+  const isEdit = Boolean(eventoEditando?.id);
+  const [salvando, setSalvando] = useState(false);
+  const [erro, setErro] = useState('');
+  const [form, setForm] = useState(() => ({
+    tipo: eventoEditando?.tipo || 'operacional',
+    titulo: eventoEditando?.titulo || '',
+    descricao: eventoEditando?.descricao || '',
+    data: String(eventoEditando?.data_inicio || eventoEditando?.data || defaultDate || getTodayIso()).slice(0, 10),
+    lote_id: eventoEditando?.lote_id ?? '',
+    funcionario_responsavel_id: eventoEditando?.funcionario_id ?? eventoEditando?.funcionario_responsavel_id ?? '',
+    recorrencia: eventoEditando?.metadata?.recorrencia || 'nenhuma',
+    alerta_antes: eventoEditando?.metadata?.alerta_antes ?? 1,
+    status: eventoEditando?.status || 'programado',
+  }));
 
   function handleChange(event) {
     const { name, value, type } = event.target;
@@ -407,30 +470,73 @@ function NovoEventoModal({ db, setDb, onClose }) {
     }));
   }
 
-  function submit() {
+  async function submit() {
+    setErro('');
     if (!form.data || !form.titulo.trim()) {
-      alert('Preencha data e titulo do evento.');
+      setErro('Não foi possível salvar o evento. Verifique os campos obrigatórios (título e data).');
       return;
     }
 
-    setDb((prev) => ({
-      ...prev,
-      eventos_operacionais: [
-        ...(prev.eventos_operacionais || []),
-        {
-          id: gerarNovoId(prev.eventos_operacionais || []),
-          ...form,
-          lote_id: form.lote_id ? Number(form.lote_id) : null,
-          funcionario_responsavel_id: form.funcionario_responsavel_id ? Number(form.funcionario_responsavel_id) : null,
-        },
-      ],
-    }));
+    const fazendaAtivaId = fazendaSelecionada?.id ?? fazendaSelecionada?.fazenda_id ?? null;
+    const payload = {
+      titulo: form.titulo.trim(),
+      tipo: form.tipo,
+      descricao: String(form.descricao || '').trim(),
+      data_inicio: form.data,
+      status: form.status || 'programado',
+      lote_id: form.lote_id ? Number(form.lote_id) : null,
+      fazenda_id: fazendaAtivaId ? Number(fazendaAtivaId) : null,
+      funcionario_id: form.funcionario_responsavel_id ? Number(form.funcionario_responsavel_id) : null,
+      origem: 'calendario',
+      metadata: {
+        recorrencia: form.recorrencia || 'nenhuma',
+        alerta_antes: Number(form.alerta_antes || 0),
+      },
+    };
 
-    onClose();
+    setSalvando(true);
+    try {
+      const persisted = isEdit
+        ? await updateOperationalRecord('eventos_operacionais', eventoEditando.id, payload, session)
+        : await createOperationalRecord('eventos_operacionais', payload, session);
+
+      if (!persisted?.persisted) {
+        console.error('[HERDON_CALENDAR_SAVE_ERROR]', {
+          action: isEdit ? 'update' : 'create',
+          error: persisted?.error,
+          payload,
+        });
+        setErro(persisted?.error || 'Ocorreu um erro inesperado ao salvar o evento.');
+        return;
+      }
+
+      const registroFinal = { ...(isEdit ? eventoEditando : {}), ...payload, ...(persisted.data || {}) };
+      setDb((prev) => {
+        const atuais = Array.isArray(prev?.eventos_operacionais) ? prev.eventos_operacionais : [];
+        if (isEdit) {
+          return {
+            ...prev,
+            eventos_operacionais: atuais.map((item) => (
+              Number(item.id) === Number(eventoEditando.id) ? registroFinal : item
+            )),
+          };
+        }
+        return { ...prev, eventos_operacionais: [...atuais, registroFinal] };
+      });
+      showToast?.({ type: 'success', message: isEdit ? 'Evento atualizado.' : 'Evento criado.' });
+      onClose();
+    } finally {
+      setSalvando(false);
+    }
   }
 
   return (
-    <Modal open onClose={onClose} title="Novo evento operacional" footer={<Button onClick={submit}>Salvar evento</Button>}>
+    <Modal
+      open
+      onClose={onClose}
+      title={isEdit ? 'Editar evento operacional' : 'Novo evento operacional'}
+      footer={<Button onClick={submit} disabled={salvando}>{salvando ? 'Salvando…' : 'Salvar evento'}</Button>}
+    >
       <div className="form-grid two">
         <label className="ui-input-wrap">
           <span className="ui-input-label">Tipo</span>
@@ -441,8 +547,22 @@ function NovoEventoModal({ db, setDb, onClose }) {
           </select>
         </label>
 
-        <Input label="Titulo" name="titulo" value={form.titulo} onChange={handleChange} />
+        <Input label="Título" name="titulo" value={form.titulo} onChange={handleChange} />
         <Input label="Data" type="date" name="data" value={form.data} onChange={handleChange} />
+
+        <label className="ui-input-wrap" style={{ gridColumn: '1 / -1' }}>
+          <span className="ui-input-label">Descrição (opcional)</span>
+          <input className="ui-input" name="descricao" value={form.descricao} onChange={handleChange} placeholder="Detalhes do evento" />
+        </label>
+
+        <label className="ui-input-wrap">
+          <span className="ui-input-label">Status</span>
+          <select name="status" value={form.status} onChange={handleChange} className="ui-input">
+            <option value="programado">Programado</option>
+            <option value="concluido">Concluído</option>
+            <option value="cancelado">Cancelado</option>
+          </select>
+        </label>
 
         <label className="ui-input-wrap">
           <span className="ui-input-label">Lote</span>
@@ -490,6 +610,9 @@ function NovoEventoModal({ db, setDb, onClose }) {
           </select>
         </label>
       </div>
+      {erro ? (
+        <p style={{ margin: '10px 0 0', color: 'var(--color-danger)', fontSize: '0.85rem' }}>{erro}</p>
+      ) : null}
     </Modal>
   );
 }
@@ -510,16 +633,19 @@ function buildCalendarEvents(db, lotesMap, funcionariosMap) {
 
 function normalizeOperationalEvent(event, lotesMap, funcionariosMap) {
   const lote = event?.lote_id ? lotesMap.get(Number(event.lote_id)) : null;
-  const responsavel = event?.funcionario_responsavel_id ? funcionariosMap.get(Number(event.funcionario_responsavel_id)) : null;
+  const funcionarioId = event?.funcionario_id ?? event?.funcionario_responsavel_id;
+  const responsavel = funcionarioId ? funcionariosMap.get(Number(funcionarioId)) : null;
 
   return {
     id: event.id,
     source: 'operacional',
     type: event.tipo || 'operacional',
-    data: String(event.data || '').slice(0, 10),
+    // Coluna real é data_inicio; mantém 'data' como alias para registros antigos.
+    data: String(event.data_inicio || event.data || '').slice(0, 10),
     title: event.titulo || 'Evento operacional',
     description: [event.status || 'programado', lote?.nome || null].filter(Boolean).join(' · '),
     metaLine: responsavel?.nome || event.responsavel || 'Sem responsável',
+    raw: event,
   };
 }
 

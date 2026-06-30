@@ -119,3 +119,39 @@ Rodar com proprietário real em preview/produção, em 1920×1080, 1366×768 e 3
 3. ⚙️ M1/M2 — melhorias de usabilidade desejáveis, não bloqueantes.
 
 Sem A1 resolvido ou comunicado, há risco de o produtor cadastrar um evento no calendário e ele sumir — o que mina a confiança. Os demais fluxos estão prontos para uso de campo.
+
+---
+
+# A1 + A2 — Implementação (sprint "Calendário persistente e Cenários confiáveis")
+
+## A1 — Calendário Operacional agora persiste no Supabase
+
+**Problema:** evento criado no calendário ficava só no estado local e sumia no reload. Causa real: o modal gravava apenas via `setDb` (sem `createOperationalRecord`) **e** a tabela `eventos_operacionais` não era carregada na hidratação — então mesmo persistindo não reapareceria.
+
+**Tabela usada:** `public.eventos_operacionais`.
+**Campos usados:** `owner_user_id` (injetado pela sessão), `titulo` (NOT NULL), `tipo`, `descricao`, `data_inicio` (date), `data_fim`, `status`, `lote_id` (bigint FK→lotes), `fazenda_id` (bigint FK→fazendas), `funcionario_id` (bigint FK→funcionarios), `origem`, `metadata` (jsonb, guarda `recorrencia` e `alerta_antes`).
+
+**RLS:** **não alterada.** A tabela já tinha as 4 policies por dono (`owner_user_id = auth.uid()`): SELECT/INSERT/UPDATE/DELETE. **Migration:** nenhuma.
+
+**Mudanças:**
+- `src/data/operationalTemplate.js` — `eventos_operacionais` adicionado a `createEmptyOperationalDb`, `OPERATIONAL_ARRAY_COLLECTIONS` e `OPERATIONAL_COLLECTIONS_WITH_IDS`.
+- `src/hooks/useOperationalData.js` — `eventos_operacionais` adicionado às tabelas hidratadas (carrega filtrado por `owner_user_id`) e às tabelas estratégicas opcionais (não quebra o boot se faltar).
+- `src/services/operationalPersistence.js` — novo builder de payload `eventos_operacionais`: mapeia `data`→`data_inicio`, `funcionario_responsavel_id`→`funcionario_id`, e converte string vazia de colunas bigint em `null` (evita 22P02). Não envia `id`.
+- `src/pages/CalendarioOperacionalPage.jsx` — CRUD real: criar/editar/excluir via `createOperationalRecord`/`updateOperationalRecord`/`deleteOperationalRecord` com `session`; só mostra sucesso se `persisted.persisted`; botões Editar/Excluir nos eventos operacionais; modal reaproveitado para edição; `normalizeOperationalEvent` lê `data_inicio`/`funcionario_id`. Erros logados com `console.error('[HERDON_CALENDAR_SAVE_ERROR]', { action, error, payload })` e mensagens claras (campo obrigatório / permissão / erro inesperado) — sem "erro de conexão".
+
+**Validação de persistência (round-trip real no banco):** executado INSERT→SELECT→UPDATE→DELETE com o payload exato do app para um proprietário real — todos OK, sem erro de schema/tipo/FK; limpeza confirmada (0 linhas de teste). Prova que o evento persiste e reaparece após reload (a hidratação agora carrega a tabela).
+
+## A2 — Cenários sem falso sucesso
+
+**Problema:** toasts de sucesso apareciam mesmo sem persistência real (perda silenciosa no reload).
+**Correção:** `salvarCenario` (criar/editar) e `arquivarCenario` agora checam `persisted.persisted`, preservam o formulário em falha, usam o `id` real da nuvem e logam `console.error('[HERDON_CENARIO_SAVE_ERROR]', { action, error, payload })`. Tabela `public.cenarios` (sem alteração de RLS, sem migration).
+**Arquivo:** `src/pages/CenariosPage.jsx`.
+
+## Testes
+- `eventos_operacionais` round-trip no banco: OK (insert/select/update/delete).
+- Unit tests novos em `tests/operationalPersistence.test.js`: mapeamento `data→data_inicio`, `funcionario_id` null para string vazia, update parcial. **635/635 passando.**
+- **Lint:** limpo · **Build:** sucesso.
+
+## Pendências / a validar na UI com proprietário real
+- Testar criar/editar/excluir evento no preview e confirmar que reaparece após reload (round-trip já provado no banco; falta o teste visual + responsividade do modal em 390×844).
+- Eventos recorrentes: `recorrencia` é salvo em `metadata`, mas a **expansão visual** de recorrência para eventos operacionais ainda não é renderizada (hoje só `rotinas` expandem). Melhoria futura, não bloqueante.

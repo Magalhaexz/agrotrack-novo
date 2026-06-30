@@ -19,6 +19,7 @@ export function createEmptyOperationalDb() {
     movimentacoes_estoque: [],
     movimentacoes_financeiras: [],
     cenarios: [],
+    eventos_operacionais: [],
     usuarios: [],
     auditoria: [],
     configuracoes: {
@@ -64,6 +65,7 @@ export const OPERATIONAL_ARRAY_COLLECTIONS = new Set([
   'movimentacoes_estoque',
   'movimentacoes_financeiras',
   'cenarios',
+  'eventos_operacionais',
   'usuarios',
   'auditoria',
 ]);
@@ -88,6 +90,7 @@ export const OPERATIONAL_COLLECTIONS_WITH_IDS = new Set([
   'movimentacoes_estoque',
   'movimentacoes_financeiras',
   'cenarios',
+  'eventos_operacionais',
   'usuarios',
   'auditoria',
 ]);
