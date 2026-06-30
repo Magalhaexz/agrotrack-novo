@@ -250,4 +250,51 @@ Sem A1 resolvido ou comunicado, há risco de o produtor cadastrar um evento no c
 
 **Validação (round-trip no banco):** INSERT de 2 procedimentos (vacina + vermífugo) com `grupo_manejo_id` compartilhado e `metadata.item_estoque_id` para owner/lote reais → 2 registros no grupo; DELETE → 0 (limpeza confirmada). **Lint:** limpo · **Build:** sucesso · **Testes:** 637/637.
 
-**Pendências:** validação visual no preview (1920×1080 / 1366×768 / 390×844: adicionar/remover procedimento no mobile); agrupamento visual por `grupo_manejo_id` na listagem; edição do manejo composto inteiro de uma vez.
+**Pendências:** validação visual no preview (1920×1080 / 1366×768 / 390×844: adicionar/remover procedimento no mobile); ~~agrupamento visual por `grupo_manejo_id` na listagem~~ (feito — ver Validação Piloto Real); edição do manejo composto inteiro de uma vez.
+
+---
+
+# Validação Piloto Real
+
+> Data: 2026-06-30 · Projeto Supabase `ljpiszxicmmuefbiixui`.
+> **Método (transparência):** a UI logada não é dirigível neste ambiente (sem credenciais; tela de login não deve ser tocada). A validação foi feita por **auditoria de código de cada fluxo + verificação direta no banco real** (integridade, FK, owner, round-trips com o payload exato do app). Os testes de **clique/reload/responsividade** precisam ser executados por você com conta de proprietário — checklist no fim desta seção.
+
+## Integridade do banco (ETAPA 12) — OK
+18/18 usuários com profile · 6 fazendas · 9 lotes · **0 órfãos** em pesagens/sanitário/consumo_suplementacao · eventos_operacionais e cenários acessíveis. Nenhuma FK inválida, nenhuma duplicidade financeira (join custos×movimentações = 0).
+
+## Status por fluxo (validado em código + banco)
+| Fluxo | Persistência | Fonte oficial | Observação |
+|---|---|---|---|
+| Ações rápidas (6) | — | — | Pesagem/Lote/Custo/Tarefa/Manejo/Estoque abrem o form via `navigationIntent` (padrão `useState` inicial; sem loop, reset no reload). |
+| Sanidade ↔ estoque | ✅ | `sanitario` + `metadata.item_estoque_id` | produto reabre na edição. |
+| Manejo composto | ✅ | N registros + `metadata.grupo_manejo_id` | round-trip 2 procedimentos OK; agrupamento visual feito. |
+| Calendário | ✅ | `eventos_operacionais` (hidratada) | CRUD com checagem de `persisted`. |
+| Pesagem/GMD | ✅ | `pesagens` + `metadata.quantidade_pesada` | puxa cabeças do lote; alerta GMD < meta com ≥2 pesagens. |
+| Suplementação | ✅ | `consumo_suplementacao` (não usa `suplementacao` legado) | produto/lote persistem. |
+| Financeiro | ✅ | `movimentacoes_financeiras` | resultado do lote dedup-aware (não soma `custos` em dobro). |
+| Cenários | ✅ | `cenarios` | sem sucesso falso (checa `persisted`, id da nuvem). |
+
+## Manejo sanitário composto
+- **Como foi validado:** round-trip no banco com 2 procedimentos (vacina + vermífugo) compartilhando `metadata.grupo_manejo_id`, cada um com `metadata.item_estoque_id` próprio — confirmado e limpo (0 sobra). Builder de payload coberto por testes unitários.
+- **Como os registros são salvos:** um registro `sanitario` por procedimento (a coluna `tipo` continua única — **sem migration**), ligados por `grupo_manejo_id`; produto por procedimento em `metadata.item_estoque_id`.
+- **Agrupamento visual:** **feito.** Na listagem, registros com o mesmo `grupo_manejo_id` aparecem sob um cabeçalho "Manejo composto — {lote} · {data} · {N} procedimentos" com acento verde; cada procedimento mantém sua linha (e seu Editar/Excluir individual). Registros sem grupo (legados/individuais) continuam normais. Mobile: a tabela usa o wrap responsivo existente; o cabeçalho ocupa a largura toda (`colSpan`).
+- **Reload:** cada procedimento é um registro hidratado de `sanitario` → reaparece após reload, já reagrupado pelo `grupo_manejo_id`.
+- **Pendência documentada:** edição do **grupo inteiro** de uma vez (hoje edita-se o procedimento individual; o produto reabre via `metadata.item_estoque_id`).
+
+## Bugs encontrados / corrigidos nesta sprint
+- Nenhum bug crítico/alto **novo** encontrado na auditoria (os anteriores já foram corrigidos nas sprints anteriores).
+- **Melhoria entregue (segura):** agrupamento visual do manejo composto (ETAPA 5).
+
+**Arquivos alterados nesta sprint:** `src/pages/SanitarioPage.jsx` (agrupamento visual), `src/styles/app.css` (estilo do grupo), `docs/TESTE_PRODUTOR_REAL_HERDON.md`.
+**Banco/RLS:** nenhuma alteração de schema, RLS ou dados.
+**Lint:** limpo · **Build:** sucesso · **Testes:** 637/637.
+
+## Checklist de validação manual que falta (você, com conta de proprietário)
+No preview/produção, em 1920×1080, 1366×768 e 390×844:
+1. Clicar as 6 ações rápidas do Dashboard → cada uma abre o form certo (sem 2º clique, sem loop).
+2. Sanidade: criar manejo com produto do estoque → reload → editar → produto reaparece.
+3. Manejo composto: 3 procedimentos (vacina+vermífugo+medicamento) → salvar → reload → ver agrupado → editar um → produto reaparece.
+4. Calendário: criar/editar/excluir evento → reload confirma cada passo.
+5. Pesagem: selecionar lote 118 cabeças → campo puxa 118; 2 pesagens com GMD < 1,3 → alerta aparece.
+6. Suplementação/Financeiro/Cenários: criar → reload → editar → reload (sem sumiço, sem sucesso falso, sem duplicar).
+7. Responsividade: modais não cortam, FAB não cobre conteúdo, procedimentos sanitários e agrupamento legíveis no celular.

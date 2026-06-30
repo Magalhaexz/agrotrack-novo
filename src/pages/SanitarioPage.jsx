@@ -1,4 +1,4 @@
-import { useMemo, useState, useCallback } from 'react';
+import { Fragment, useMemo, useState, useCallback } from 'react';
 import SanitarioForm from '../components/SanitarioForm';
 import { formatarData } from '../utils/formatters';
 import { gerarNovoId } from '../utils/id';
@@ -62,6 +62,33 @@ export default function SanitarioPage({ db, setDb, onConfirmAction, navigationIn
         return new Date(dataA).getTime() - new Date(dataB).getTime();
       });
   }, [sanitario, lotesMap, funcionariosMap]);
+
+  // Agrupamento APENAS visual: registros com o mesmo metadata.grupo_manejo_id
+  // formam um manejo composto. Registros sem grupo (legados/individuais)
+  // continuam aparecendo normalmente. Edição/exclusão seguem por registro.
+  const linhasRenderizadas = useMemo(() => {
+    const grupos = new Map();
+    const ordem = [];
+    dadosTabela.forEach((row) => {
+      const grupoId = row?.metadata?.grupo_manejo_id || null;
+      if (grupoId) {
+        if (!grupos.has(grupoId)) {
+          grupos.set(grupoId, []);
+          ordem.push({ tipo: 'grupo', key: grupoId });
+        }
+        grupos.get(grupoId).push(row);
+      } else {
+        ordem.push({ tipo: 'single', row });
+      }
+    });
+    return ordem.map((entry) => {
+      if (entry.tipo === 'single') return { kind: 'single', row: entry.row };
+      const rows = grupos.get(entry.key) || [];
+      // Grupo de 1 procedimento volta a ser linha individual.
+      if (rows.length <= 1) return { kind: 'single', row: rows[0] };
+      return { kind: 'group', grupoId: entry.key, rows };
+    });
+  }, [dadosTabela]);
 
   const resumo = useMemo(() => {
     const total = sanitario.length;
@@ -492,37 +519,60 @@ export default function SanitarioPage({ db, setDb, onConfirmAction, navigationIn
                 </tr>
               </thead>
               <tbody>
-                {dadosTabela.map((item) => (
-                  <tr key={item.id}>
-                    <td>{normalizarTipo(item.tipo)}</td>
-                    <td>{item.desc}</td>
-                    <td>{item.loteNome}</td>
-                    <td>{formatarData(item.data_aplic)}</td>
-                    <td>{item.proxima ? formatarData(item.proxima) : '—'}</td>
-                    <td>{item.funcionarioNome || '—'}</td>
-                    <td className="cell-number">{item.qtd}</td>
-                    <td className="cell-chip">{renderStatus(item.status)}</td>
-                    <td>{item.obs || '—'}</td>
-                    <td className="cell-actions">
-                      <div className="row-actions row-actions--tight sanitario-table-actions">
-                        <button
-                          className="action-btn"
-                          disabled={!hasPermission('sanitario:editar')}
-                          onClick={() => editarItem(item)}
-                        >
-                          Editar
-                        </button>
-                        <button
-                          className="action-btn action-btn-danger"
-                          disabled={!hasPermission('sanitario:excluir')}
-                          onClick={() => excluirItem(item.id)}
-                        >
-                          Excluir
-                        </button>
-                      </div>
-                    </td>
-                  </tr>
-                ))}
+                {linhasRenderizadas.map((entry) => {
+                  const renderRow = (item, rowClass = '') => (
+                    <tr key={item.id} className={rowClass}>
+                      <td>{normalizarTipo(item.tipo)}</td>
+                      <td>{item.desc}</td>
+                      <td>{item.loteNome}</td>
+                      <td>{formatarData(item.data_aplic)}</td>
+                      <td>{item.proxima ? formatarData(item.proxima) : '—'}</td>
+                      <td>{item.funcionarioNome || '—'}</td>
+                      <td className="cell-number">{item.qtd}</td>
+                      <td className="cell-chip">{renderStatus(item.status)}</td>
+                      <td>{item.obs || '—'}</td>
+                      <td className="cell-actions">
+                        <div className="row-actions row-actions--tight sanitario-table-actions">
+                          <button
+                            className="action-btn"
+                            disabled={!hasPermission('sanitario:editar')}
+                            onClick={() => editarItem(item)}
+                          >
+                            Editar
+                          </button>
+                          <button
+                            className="action-btn action-btn-danger"
+                            disabled={!hasPermission('sanitario:excluir')}
+                            onClick={() => excluirItem(item.id)}
+                          >
+                            Excluir
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  );
+
+                  if (entry.kind === 'single') {
+                    return renderRow(entry.row);
+                  }
+
+                  const cabeca = entry.rows[0];
+                  return (
+                    <Fragment key={`grupo-${entry.grupoId}`}>
+                      <tr className="sanitario-grupo-head">
+                        <td colSpan={10}>
+                          <span className="sanitario-grupo-badge">Manejo composto</span>
+                          {' '}
+                          <strong>{cabeca.loteNome}</strong>
+                          {' · '}{formatarData(cabeca.data_aplic)}
+                          {' · '}{cabeca.qtd} cabeças
+                          {' · '}{entry.rows.length} procedimentos
+                        </td>
+                      </tr>
+                      {entry.rows.map((item) => renderRow(item, 'sanitario-grupo-item'))}
+                    </Fragment>
+                  );
+                })}
               </tbody>
             </table>
           )}
