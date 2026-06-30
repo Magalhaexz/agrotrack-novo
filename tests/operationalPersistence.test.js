@@ -86,7 +86,9 @@ test('operationalPersistence', { concurrency: 1 }, async (t) => {
 
     const result = await createOperationalRecord('tarefas', { titulo: 'x' }, makeSession(), { forceStrictWrite: true });
     assert.equal(result.persisted, false);
-    assert.match(String(result.error), /Não foi possível confirmar o salvamento agora/i);
+    // Erro genérico/desconhecido NÃO deve ser apresentado como erro de conexão.
+    assert.match(String(result.error), /Não foi possível salvar agora/i);
+    assert.doesNotMatch(String(result.error).toLowerCase(), /conex|internet/);
     assert.equal(getPendingSyncQueueSnapshot(makeSession()).pendingCount, 0);
   });
 
@@ -176,6 +178,26 @@ test('operationalPersistence', { concurrency: 1 }, async (t) => {
     const message = getFriendlySaveFailureMessage({ readinessCode: 'NETWORK_ERROR' });
     assert.match(message, /Não foi possível confirmar o salvamento agora/i);
     assert.doesNotMatch(message.toLowerCase(), /sync|cloud|fallback|schema|supabase|postgrest|fila|pendente|modo local/);
+  });
+
+  await t.test('database errors are NOT masked as connection errors (Sprint correções)', () => {
+    const fk = getFriendlySaveFailureMessage({ error: { code: '23503', message: 'violates foreign key constraint' } });
+    assert.match(fk.toLowerCase(), /sincroniz/);
+    assert.doesNotMatch(fk.toLowerCase(), /conex|internet/);
+
+    const required = getFriendlySaveFailureMessage({ error: { code: '23502', message: 'null value in column "nome"' } });
+    assert.match(required.toLowerCase(), /obrigat/);
+
+    const invalid = getFriendlySaveFailureMessage({ error: { code: '22P02', message: 'invalid input syntax for type bigint: ""' } });
+    assert.match(invalid.toLowerCase(), /inválido|invalido/);
+    assert.doesNotMatch(invalid.toLowerCase(), /conex|internet/);
+
+    const permission = getFriendlySaveFailureMessage({ error: { code: '42501', message: 'permission denied' } });
+    assert.match(permission.toLowerCase(), /permiss/);
+
+    const notFound = getFriendlySaveFailureMessage({ error: { code: 'PGRST116', message: 'Cannot coerce the result to a single JSON object' } });
+    assert.match(notFound.toLowerCase(), /atualizar|registro/);
+    assert.doesNotMatch(notFound.toLowerCase(), /conex|internet/);
   });
 
   await t.test('strict write policy can be forced for production-like checks', () => {
