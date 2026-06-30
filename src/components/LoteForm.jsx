@@ -216,7 +216,7 @@ function validarForm(form, planejamento, pastagensDisponiveis = []) {
   return null;
 }
 
-export default function LoteForm({ initialData, fazendas = [], pastagens = [], fazendaAtiva = null, onSave, onCancel }) {
+export default function LoteForm({ initialData, fazendas = [], pastagens = [], estoque = [], fazendaAtiva = null, onSave, onCancel }) {
   const [form, setForm] = useState(() => normalizarInitialData(initialData, pastagens, fazendaAtiva));
   const [erro, setErro] = useState('');
 
@@ -233,6 +233,15 @@ export default function LoteForm({ initialData, fazendas = [], pastagens = [], f
     () => fazendas.find((item) => String(item.id) === String(form.faz_id)) || fazendaAtiva || null,
     [fazendas, form.faz_id, fazendaAtiva]
   );
+
+  // Sugestões de "Dieta / produto" a partir dos itens cadastrados no estoque,
+  // para não depender só de digitação manual (mantém o campo livre como fallback).
+  const sugestoesProduto = useMemo(() => {
+    const nomes = (Array.isArray(estoque) ? estoque : [])
+      .map((item) => String(item?.produto || item?.nome || '').trim())
+      .filter(Boolean);
+    return [...new Set(nomes)];
+  }, [estoque]);
 
   useEffect(() => {
     const timer = window.setTimeout(() => {
@@ -535,8 +544,19 @@ export default function LoteForm({ initialData, fazendas = [], pastagens = [], f
                 name="supl_nome"
                 value={form.supl_nome}
                 onChange={handleChange}
-                placeholder="Ex: Ração 18%"
+                placeholder={sugestoesProduto.length ? 'Selecione ou digite' : 'Ex: Ração 18%'}
+                list="lote-supl-produtos"
               />
+              <datalist id="lote-supl-produtos">
+                {sugestoesProduto.map((nome) => (
+                  <option key={nome} value={nome} />
+                ))}
+              </datalist>
+              {sugestoesProduto.length === 0 ? (
+                <span className="ui-input-hint">
+                  Cadastre suplementos no Estoque para selecioná-los aqui.
+                </span>
+              ) : null}
             </label>
 
             <Input as="select" name="consumo_tipo" label="Modo de consumo esperado" value={form.consumo_tipo} onChange={handleChange}>

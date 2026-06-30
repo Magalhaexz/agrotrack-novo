@@ -3,6 +3,7 @@ import {
   BarChart3,
   Beef,
   Calculator,
+  CalendarDays,
   CheckSquare,
   ClipboardList,
   CreditCard,
@@ -47,6 +48,7 @@ export const navSections = [
       { id: 'suplementacao', label: 'Suplementação', icon: Leaf },
       { id: 'sanitario', label: 'Sanidade', icon: Syringe },
       { id: 'tarefas', label: 'Tarefas', icon: CheckSquare },
+      { id: 'calendarioOperacional', label: 'Calendário', icon: CalendarDays },
     ],
   },
   {

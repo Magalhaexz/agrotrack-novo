@@ -22,12 +22,12 @@ export default function FechamentoLoteModal({ open, lote, onClose, onSubmit }) {
     <Modal
       open={open}
       onClose={onClose}
-      title="Encerrar lote"
+      title="Trocar lote"
       subtitle={`Lote ${lote?.nome || ''}`}
       footer={(
         <>
           <Button variant="ghost" onClick={onClose}>Cancelar</Button>
-          <Button variant="danger" onClick={handleSave}>Encerrar lote</Button>
+          <Button variant="danger" onClick={handleSave}>Trocar lote</Button>
         </>
       )}
     >

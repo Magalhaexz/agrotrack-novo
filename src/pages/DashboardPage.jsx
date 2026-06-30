@@ -7,6 +7,7 @@ import {
   Bell,
   BellRing,
   CheckCircle2,
+  CheckSquare,
   DollarSign,
   FileUp,
   MapPin,
@@ -14,6 +15,7 @@ import {
   Receipt,
   Repeat,
   Scale,
+  Syringe,
   Tractor,
   Users,
 } from 'lucide-react';
@@ -360,6 +362,23 @@ export default function DashboardPage({
 
       {tabAtiva === 'geral' && (
         <>
+          <section className="section-card dashboard-quick-actions-top">
+            <div className="section-header">
+              <div>
+                <h3 className="dashboard-section-title">Ações rápidas</h3>
+                <p className="dashboard-section-subtitle">Registre direto do campo, sem procurar no menu.</p>
+              </div>
+            </div>
+            <div className="dashboard-action-grid dashboard-action-grid--quick">
+              <Button variant="primary" icon={<Scale size={14} />} onClick={() => onNavigate?.('pesagens', { action: 'novo' })}>Nova pesagem</Button>
+              <Button variant="primary" icon={<Beef size={14} />} onClick={() => onNavigate?.('lotes', { action: 'novo' })}>Novo lote</Button>
+              <Button variant="outline" icon={<Receipt size={14} />} onClick={() => onNavigate?.('financeiro', { action: 'novo' })}>Novo custo</Button>
+              <Button variant="outline" icon={<CheckSquare size={14} />} onClick={() => onNavigate?.('tarefas', { action: 'novo' })}>Nova tarefa</Button>
+              <Button variant="outline" icon={<Syringe size={14} />} onClick={() => onNavigate?.('sanitario', { action: 'novo' })}>Novo manejo/sanidade</Button>
+              <Button variant="outline" icon={<Package size={14} />} onClick={() => onNavigate?.('estoque', { action: 'novo' })}>Novo produto/estoque</Button>
+            </div>
+          </section>
+
           <section className="section-card dashboard-hero-shell">
             <div className="section-header">
               <div>
@@ -398,24 +417,6 @@ export default function DashboardPage({
             )}
           </section>
 
-          <section className="section-card">
-            <div className="section-header">
-              <div>
-                <h3 className="dashboard-section-title">Ações rápidas</h3>
-                <p className="dashboard-section-subtitle">Atalhos para as tarefas mais comuns do dia a dia.</p>
-              </div>
-            </div>
-            <div className="dashboard-action-grid dashboard-action-grid--quick">
-              <Button variant="outline" icon={<MapPin size={14} />} onClick={() => onNavigate?.('fazendas')}>Nova fazenda</Button>
-              <Button variant="outline" icon={<Tractor size={14} />} onClick={() => onNavigate?.('pastagens')}>Novo pasto</Button>
-              <Button variant="outline" icon={<Beef size={14} />} onClick={() => onNavigate?.('lotes')}>Novo lote</Button>
-              <Button variant="outline" icon={<Scale size={14} />} onClick={() => onNavigate?.('pesagens', { action: 'novo' })}>Registrar pesagem</Button>
-              <Button variant="outline" icon={<Receipt size={14} />} onClick={() => onNavigate?.('financeiro')}>Lançar custo/receita</Button>
-              <Button variant="outline" icon={<FileUp size={14} />} onClick={() => onNavigate?.('importacao')}>Importar dados</Button>
-              <Button variant="outline" icon={<Repeat size={14} />} onClick={() => onNavigate?.('lotes')}>Mover lote de pasto</Button>
-              <Button variant="outline" icon={<BellRing size={14} />} onClick={() => setTabAtiva?.('alertas')}>Ver alertas</Button>
-            </div>
-          </section>
 
           <section className="dashboard-grid dashboard-grid--kpi-main">
             {kpisMain.map((item) => (

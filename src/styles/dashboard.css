@@ -328,6 +328,14 @@
   }
 }
 
+/* Ações rápidas na primeira dobra do Dashboard — destaque sutil para o produtor
+   encontrar de imediato, sem sobrepor cards ou o FAB mobile. */
+.dashboard-quick-actions-top {
+  border: 1px solid rgba(34, 197, 94, 0.28);
+  position: relative;
+  z-index: 1;
+}
+
 .chart-legend {
   display: flex;
   flex-wrap: wrap;

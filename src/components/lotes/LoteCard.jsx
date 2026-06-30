@@ -2,6 +2,7 @@
 import Button from '../ui/Button';
 import Card from '../ui/Card';
 import { formatCurrency, formatDate, formatNumber } from '../../utils/calculations';
+import { avaliarDesempenhoGmd } from '../../domain/gmdAlerta';
 
 function statusVariant(status) {
   if (status === 'ativo') return 'success';
@@ -22,6 +23,12 @@ export default function LoteCard({
   canEdit = true,
 }) {
   const risco = lote?.gmd30 < 0.3 || lote?.heads <= 0;
+  const gmd = avaliarDesempenhoGmd({
+    gmdMeta: lote?.gmdMeta,
+    gmdReal: lote?.gmd30,
+    qtdPesagens: lote?.qtdPesagens,
+  });
+  const gmdAbaixo = gmd.status === 'abaixo';
 
   return (
     <Card className="lote-card-modern section-card">
@@ -40,8 +47,23 @@ export default function LoteCard({
         <div className="action-row lote-card-statuses">
           <Badge variant={statusVariant(lote.status)}>{lote.status}</Badge>
           <Badge variant={risco ? 'warning' : 'success'}>{risco ? 'Atenção' : 'OK'}</Badge>
+          {gmdAbaixo ? <Badge variant="danger">GMD abaixo</Badge> : null}
+          {gmd.status === 'ok' ? <Badge variant="success">GMD ok</Badge> : null}
         </div>
       </div>
+
+      {gmdAbaixo ? (
+        <div className="lote-card-gmd-alert" role="alert">
+          <strong>Atenção: este lote está abaixo do GMD esperado.</strong>
+          <span>
+            Esperado {formatNumber(gmd.gmdMeta, 3)} kg/dia · Realizado {formatNumber(gmd.gmdReal, 3)} kg/dia
+            {' '}({formatNumber(gmd.diferenca, 3)} kg/dia)
+          </span>
+          <span className="lote-card-gmd-alert__hint">
+            Ganho abaixo da meta tende a atrasar o ponto de venda e elevar o custo por arroba.
+          </span>
+        </div>
+      ) : null}
 
       <div className="lote-metrics lote-metrics-grid">
         <p><strong>{formatNumber(lote.heads, 0)}</strong><span>Cabeças</span></p>
@@ -62,7 +84,7 @@ export default function LoteCard({
         <Button size="sm" variant="warning" onClick={onRegistrarVendaParcial} disabled={!canMove || lote.bloqueado}>Venda parcial</Button>
         <Button size="sm" variant="warning" onClick={onRegistrarMorte} disabled={!canMove || lote.bloqueado}>Morte/perda</Button>
         <Button size="sm" variant="warning" onClick={onRegistrarSaida} disabled={!canMove || lote.bloqueado}>Saída do lote</Button>
-        <Button size="sm" variant="danger" onClick={onEncerrar} disabled={!canEdit || lote.bloqueado}>Encerrar lote</Button>
+        <Button size="sm" variant="danger" onClick={onEncerrar} disabled={!canEdit || lote.bloqueado}>Trocar lote</Button>
       </div>
     </Card>
   );

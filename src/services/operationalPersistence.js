@@ -12,6 +12,13 @@ const FRIENDLY_SAVE_RETRY_MESSAGE = 'Não foi possível confirmar o salvamento a
 const FRIENDLY_SAVE_RETRY_LATER_MESSAGE = 'Não foi possível confirmar o salvamento agora. Tente novamente em alguns instantes.';
 const FRIENDLY_SESSION_RETRY_MESSAGE = 'Não foi possível confirmar o salvamento agora. Entre novamente e tente outra vez.';
 const FRIENDLY_PERMISSION_MESSAGE = 'Você não tem permissão para concluir esta ação.';
+// Mensagem padrão para erros inesperados: NÃO sugere problema de conexão.
+const FRIENDLY_SAVE_GENERIC_MESSAGE = 'Não foi possível salvar agora. Tente novamente em instantes.';
+const FRIENDLY_SAVE_FK_MESSAGE = 'Este registro depende de um lote ou fazenda que ainda não foi sincronizado com a nuvem. Sincronize os dados e tente novamente.';
+const FRIENDLY_SAVE_REQUIRED_MESSAGE = 'Preencha todos os campos obrigatórios antes de salvar.';
+const FRIENDLY_SAVE_INVALID_MESSAGE = 'Há um campo com valor inválido. Revise os dados informados e tente novamente.';
+const FRIENDLY_SAVE_DUPLICATE_MESSAGE = 'Já existe um registro com esses dados.';
+const FRIENDLY_UPDATE_NOT_FOUND_MESSAGE = 'Não encontramos este registro para atualizar. Atualize a página e tente novamente.';
 
 function getSessionUserId(session) {
   return session?.user?.id || null;
@@ -80,24 +87,87 @@ export function canUseLocalRecoveryForWrite(session, options = {}) {
 export function getFriendlySaveFailureMessage({
   readinessCode = null,
   error = null,
-  defaultMessage = FRIENDLY_SAVE_RETRY_MESSAGE,
+  defaultMessage = FRIENDLY_SAVE_GENERIC_MESSAGE,
 } = {}) {
   const status = getHttpStatus(error);
   const code = String(readinessCode || error?.code || '').toUpperCase();
   const message = String(getErrorMessage(error) || '').toLowerCase();
-  if (code === 'SESSION_MISSING' || code === 'SESSION_STALE' || status === 401 || message.includes('session')) {
-    return FRIENDLY_SESSION_RETRY_MESSAGE;
-  }
-  if (code === '42501' || message.includes('permission denied') || message.includes('row-level security')) {
-    return FRIENDLY_PERMISSION_MESSAGE;
-  }
-  if (status === 400 || code === 'PGRST204' || code === '42703' || code === '42P01' || message.includes('schema') || message.includes('column') || message.includes('relation')) {
-    return FRIENDLY_SAVE_RETRY_LATER_MESSAGE;
-  }
-  if (isNetworkError(error)) {
+  const details = String(error?.details || '').toLowerCase();
+  const haystack = `${message} ${details}`;
+  // 1. Erro de transporte/rede REAL (única situação que fala em conexão).
+  if (isNetworkError(error) || code.includes('NETWORK')) {
     return FRIENDLY_SAVE_RETRY_MESSAGE;
   }
+  // 2. Sessão expirada / ausente.
+  if (
+    code === 'SESSION_MISSING' || code === 'SESSION_STALE' || code === 'SESSION_READ_ERROR'
+    || status === 401 || haystack.includes('jwt') || haystack.includes('session')
+  ) {
+    return FRIENDLY_SESSION_RETRY_MESSAGE;
+  }
+  // 3. Permissão / RLS.
+  if (
+    code === '42501' || status === 403
+    || haystack.includes('permission denied') || haystack.includes('row-level security')
+  ) {
+    return FRIENDLY_PERMISSION_MESSAGE;
+  }
+  // 4. Chave estrangeira: depende de um registro ainda não sincronizado.
+  if (code === '23503' || haystack.includes('foreign key') || haystack.includes('violates foreign key')) {
+    return FRIENDLY_SAVE_FK_MESSAGE;
+  }
+  // 5. Campo obrigatório (NOT NULL).
+  if (code === '23502' || haystack.includes('not-null') || haystack.includes('null value in column')) {
+    return FRIENDLY_SAVE_REQUIRED_MESSAGE;
+  }
+  // 6. Registro duplicado (unique).
+  if (code === '23505' || haystack.includes('duplicate key') || haystack.includes('already exists')) {
+    return FRIENDLY_SAVE_DUPLICATE_MESSAGE;
+  }
+  // 7. Valor inválido para o tipo da coluna (ex.: texto vazio em bigint).
+  if (
+    code === '22P02' || code === '22007' || code === '22008'
+    || haystack.includes('invalid input syntax') || haystack.includes('invalid input value')
+  ) {
+    return FRIENDLY_SAVE_INVALID_MESSAGE;
+  }
+  // 8. Update não encontrou o registro (0 linhas) — id local divergente da nuvem.
+  if (code === 'PGRST116' || haystack.includes('coerce the result') || haystack.includes('contains 0 rows')) {
+    return FRIENDLY_UPDATE_NOT_FOUND_MESSAGE;
+  }
+  // 9. Configuração de ambiente ausente.
+  if (code === 'SUPABASE_ENV_MISSING' || code === 'CONFIG_ERROR' || haystack.includes('missing_rest_config')) {
+    return FRIENDLY_SAVE_RETRY_LATER_MESSAGE;
+  }
+  // 10. Schema/coluna incompatível.
+  if (
+    status === 400 || code === 'PGRST204' || code === '42703' || code === '42P01'
+    || haystack.includes('schema') || haystack.includes('column') || haystack.includes('relation')
+  ) {
+    return FRIENDLY_SAVE_RETRY_LATER_MESSAGE;
+  }
   return defaultMessage;
+}
+
+// Loga o erro REAL do Supabase no console mesmo em produção, para que falhas
+// de salvamento no campo possam ser diagnosticadas. Não expõe dados sensíveis
+// do payload — apenas código, status e mensagem retornados pelo backend.
+function logSaveFailureReal(context = {}, error) {
+  try {
+    const safe = getSafeErrorDetails(error);
+    console.error('[HERDON_SAVE_ERROR]', {
+      table: context.table || null,
+      action: context.action || null,
+      httpStatus: getHttpStatus(error),
+      postgrestCode: getPostgrestCode(error),
+      classifiedAs: context.classifiedCode || null,
+      message: safe.safeMessage || null,
+      details: safe.details || null,
+      hint: safe.hint || null,
+    });
+  } catch {
+    // noop
+  }
 }
 
 function isSchemaCompatibilityError(error) {
@@ -167,6 +237,19 @@ function isOwnerColumnSchemaError(error) {
     || code === 'PGRST204'
     || message.includes('owner_user_id')
     || details.includes('owner_user_id')
+  );
+}
+
+// Erro do PostgREST quando .single() não encontra linhas (0 rows). Costuma
+// ocorrer quando o filtro client-side owner_user_id = sessão não bate com o
+// dono real do registro (contas com múltiplos perfis / mesma conta).
+function isNoRowsError(error) {
+  const code = String(error?.code || '').toUpperCase();
+  const message = String(getErrorMessage(error) || '').toLowerCase();
+  return (
+    code === 'PGRST116'
+    || message.includes('contains 0 rows')
+    || message.includes('coerce the result to a single')
   );
 }
 
@@ -286,6 +369,12 @@ function classifyOperationalError(error, fallbackMessage, table = null) {
   if (code === 'CONFIG_ERROR' || message.includes('missing_rest_config_or_token')) {
     return FRIENDLY_SAVE_RETRY_LATER_MESSAGE;
   }
+  // Erros de dados reais — não mascarar como schema/conexão.
+  if (code === '23503' || message.includes('foreign key')) return FRIENDLY_SAVE_FK_MESSAGE;
+  if (code === '23502' || message.includes('null value in column')) return FRIENDLY_SAVE_REQUIRED_MESSAGE;
+  if (code === '23505' || message.includes('duplicate key')) return FRIENDLY_SAVE_DUPLICATE_MESSAGE;
+  if (code === '22P02' || message.includes('invalid input syntax')) return FRIENDLY_SAVE_INVALID_MESSAGE;
+  if (code === 'PGRST116' || message.includes('coerce the result')) return FRIENDLY_UPDATE_NOT_FOUND_MESSAGE;
   if (code === 'PGRST204' || code === '42703' || code === '42P01' || message.includes('schema') || message.includes('column') || message.includes('relation')) {
     return getSchemaMissingMessageByTable(table);
   }
@@ -321,8 +410,11 @@ function classifyCloudSaveCode(rawCode, error = null, status = null) {
   if (httpStatus === 401) return 'auth_not_ready';
   if (code === '42501' || message.includes('row-level security') || message.includes('permission denied')) return 'permission_denied';
   if (httpStatus === 403) return 'permission_denied';
-  if (httpStatus === 400) return 'schema_error';
+  if (code === '23503' || message.includes('foreign key')) return 'fk_violation';
+  if (code === '23502' || code === '23505' || code === '22P02' || message.includes('invalid input syntax') || message.includes('null value in column') || message.includes('duplicate key')) return 'validation_error';
+  if (code === 'PGRST116' || message.includes('coerce the result')) return 'record_not_found';
   if (code === 'PGRST204' || code === '42703' || code === '42P01' || message.includes('schema') || message.includes('column') || message.includes('relation')) return 'schema_error';
+  if (httpStatus === 400) return 'schema_error';
   if (isNetworkError(error) || message.includes('network')) return 'network_error';
   return 'unknown';
 }
@@ -841,6 +933,12 @@ function buildOperationalCreatePayload(table, record, userId) {
     const metadata = isObject(safe?.metadata) ? { ...safe.metadata } : {};
     if (!Object.prototype.hasOwnProperty.call(metadata, 'local_id')) {
       metadata.local_id = safe?.id ?? null;
+    }
+    // A tabela pesagens não tem coluna para quantidade de cabeças pesadas;
+    // guardamos em metadata para preservar e reexibir ao editar a pesagem.
+    const quantidadePesada = toNullableNumber(safe?.quantidade_pesada ?? safe?.cabecas ?? metadata?.quantidade_pesada);
+    if (quantidadePesada !== null && quantidadePesada !== undefined) {
+      metadata.quantidade_pesada = quantidadePesada;
     }
     const payload = {
       owner_user_id: userId || null,
@@ -1694,6 +1792,7 @@ export async function createOperationalRecord(table, record, session, options = 
     const classifiedCode = schemaIncompatible
       ? BLOCKED_SCHEMA_ERROR_CODE
       : classifyCloudSaveCode(error?.code, error, status);
+    logSaveFailureReal({ table, action: 'create', classifiedCode }, error);
     logOperationalSync({
       stage: 'create_error',
       requestStage: 'insert',
@@ -1727,7 +1826,7 @@ export async function createOperationalRecord(table, record, session, options = 
     }
     const fallbackMessage = schemaIncompatible
       ? FRIENDLY_SAVE_RETRY_LATER_MESSAGE
-      : getFriendlySaveFailureMessage({ error, defaultMessage: FRIENDLY_SAVE_RETRY_MESSAGE });
+      : getFriendlySaveFailureMessage({ error });
     const fallback = allowLocalRecovery
       ? buildFallback(
           fallbackMessage,
@@ -1944,6 +2043,12 @@ export async function updateOperationalRecord(table, id, patch, session, options
         updateTableCapability(table, { ownerScope: false });
         ({ data, error } = await runUpdate(false, variant.payload));
       }
+      // 0 linhas com filtro owner_user_id da sessão: o registro pode pertencer
+      // à conta (perfil) sob outro owner. Refaz sem o filtro client-side — a RLS
+      // continua garantindo que só registros acessíveis sejam atualizados.
+      if (error && withOwner && isNoRowsError(error)) {
+        ({ data, error } = await runUpdate(false, variant.payload));
+      }
       if (!error) break;
       if (isSchemaCompatibilityError(error)) {
         const safe = getSafeErrorDetails(error);
@@ -1998,6 +2103,7 @@ export async function updateOperationalRecord(table, id, patch, session, options
     const classifiedCode = schemaIncompatible
       ? BLOCKED_SCHEMA_ERROR_CODE
       : classifyCloudSaveCode(error?.code, error, status);
+    logSaveFailureReal({ table, action: 'update', classifiedCode }, error);
     logOperationalSync({
       stage: 'update_error',
       requestStage: 'update',
@@ -2031,7 +2137,7 @@ export async function updateOperationalRecord(table, id, patch, session, options
     }
     const fallbackMessage = schemaIncompatible
       ? FRIENDLY_SAVE_RETRY_LATER_MESSAGE
-      : getFriendlySaveFailureMessage({ error, defaultMessage: FRIENDLY_SAVE_RETRY_MESSAGE });
+      : getFriendlySaveFailureMessage({ error });
     const fallback = allowLocalRecovery
       ? buildFallback(
           fallbackMessage,

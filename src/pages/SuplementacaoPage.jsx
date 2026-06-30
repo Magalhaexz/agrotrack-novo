@@ -34,11 +34,21 @@ function getDietasNormalizadas(db) {
   return Array.isArray(db?.dietas) ? db.dietas : [];
 }
 
+// Palavras que identificam um item de estoque como produto nutricional/suplemento.
+// Antes só "nutrição" era aceito, então produtos cadastrados no Estoque com
+// categorias como "Ração", "Sal mineral" ou "Suplemento" não eram puxados.
+const PALAVRAS_NUTRICIONAIS = [
+  'nutri', 'ração', 'racao', 'mineral', 'suplement', 'alimenta', 'sal',
+  'proteic', 'energ', 'aditivo', 'núcleo', 'nucleo', 'concentrado', 'insumo',
+];
+
 function getProdutosNutricionais(db) {
-  return (db?.estoque || []).filter(
-    (item) => String(item?.categoria || '').toLowerCase().includes('nutrição')
-      || String(item?.metadata?.modulo || '').toLowerCase() === 'nutricao'
-  );
+  return (db?.estoque || []).filter((item) => {
+    if (String(item?.metadata?.modulo || '').toLowerCase() === 'nutricao') return true;
+    const cat = String(item?.categoria || '').toLowerCase();
+    const sub = String(item?.subcategoria || '').toLowerCase();
+    return PALAVRAS_NUTRICIONAIS.some((palavra) => cat.includes(palavra) || sub.includes(palavra));
+  });
 }
 
 function getProdutoEditData(item) {
@@ -674,10 +684,20 @@ function DietaModal({ db, setDb, onClose, showToast, initialData = null }) {
         </label>
         <label className="ui-input-wrap">
           <span className="ui-input-label">Produto nutricional</span>
-          <select className="ui-input" value={form.item_estoque_id} onChange={(e) => setForm((p) => ({ ...p, item_estoque_id: e.target.value }))}>
-            <option value="">Selecione</option>
-            {produtos.map((produto) => <option key={produto.id} value={produto.id}>{produto.produto}</option>)}
+          <select className="ui-input" value={form.item_estoque_id} onChange={(e) => setForm((p) => ({ ...p, item_estoque_id: e.target.value }))} disabled={produtos.length === 0}>
+            <option value="">{produtos.length === 0 ? 'Nenhum produto cadastrado' : 'Selecione'}</option>
+            {produtos.map((produto) => (
+              <option key={produto.id} value={produto.id}>
+                {produto.produto || produto.nome || 'Produto sem nome'}
+                {produto.subcategoria ? ` · ${produto.subcategoria}` : ''}
+              </option>
+            ))}
           </select>
+          {produtos.length === 0 ? (
+            <span className="ui-input-hint">
+              Nenhum produto cadastrado. Cadastre um suplemento no estoque para vinculá-lo ao lote.
+            </span>
+          ) : null}
         </label>
         <Input label="Quantidade por cabeça/dia" type="number" value={form.qtd_cab_dia} onChange={(e) => setForm((p) => ({ ...p, qtd_cab_dia: e.target.value }))} />
         <label className="ui-input-wrap">

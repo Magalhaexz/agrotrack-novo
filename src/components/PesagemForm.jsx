@@ -1,4 +1,4 @@
-﻿import { useEffect, useMemo, useState } from 'react';
+﻿import { useEffect, useMemo, useRef, useState } from 'react';
 import Modal from './ui/Modal';
 import Button from './ui/Button';
 import ArrobaPreview from './ArrobaPreview';
@@ -84,7 +84,7 @@ function normalizarInitialData(data) {
     observacao: data.observacao || '',
     rendimento_carcaca: data.rendimento_carcaca ?? 52,
     preco_arroba: data.preco_arroba ?? '',
-    quantidade_pesada: data.quantidade_pesada ?? '',
+    quantidade_pesada: data.quantidade_pesada ?? data.metadata?.quantidade_pesada ?? '',
   };
 }
 
@@ -111,6 +111,9 @@ export default function PesagemForm({
   const [erro, setErro] = useState('');
   const [pesosAnimais, setPesosAnimais] = useState({});
   const [observacoesAnimais, setObservacoesAnimais] = useState({});
+  // Guarda o último lote para o qual a quantidade foi preenchida automaticamente,
+  // permitindo reabastecer ao trocar de lote sem sobrescrever edição manual no mesmo lote.
+  const ultimoLotePreenchidoRef = useRef(normalizarInitialData(initialData).lote_id ?? '');
   const hasSelectedLote = Boolean(form.lote_id);
 
   const animaisDoLote = hasSelectedLote
@@ -224,6 +227,20 @@ export default function PesagemForm({
       return changed ? next : prev;
     });
   }, [form.tipo, form.data, linhasAnimais, pesagensDoDiaPorAnimalId]);
+
+  // Pesagem por lote: ao selecionar/trocar o lote, puxa automaticamente a
+  // quantidade de cabeças do lote para o campo "Quantidade pesada", mantendo
+  // edição manual posterior (só reabastece quando o lote realmente muda).
+  useEffect(() => {
+    if (form.tipo !== 'lote') return;
+    const loteAtual = String(form.lote_id ?? '');
+    if (loteAtual === String(ultimoLotePreenchidoRef.current ?? '')) return;
+    ultimoLotePreenchidoRef.current = loteAtual;
+    if (!loteAtual) return;
+    if (expectedHeadCount > 0) {
+      setForm((prev) => ({ ...prev, quantidade_pesada: String(expectedHeadCount) }));
+    }
+  }, [form.tipo, form.lote_id, expectedHeadCount]);
   /* eslint-enable react-hooks/set-state-in-effect */
 
   function handleChange(e) {
@@ -321,6 +338,15 @@ export default function PesagemForm({
   return (
     <Modal open onClose={onCancel} title={titulo} footer={footer}>
       <form onSubmit={handleSubmit} className="pesagem-form form-section">
+        <div className="pesagem-balao-verde" role="note">
+          <span className="pesagem-balao-verde__icone" aria-hidden="true">📈</span>
+          <span>
+            {loteSelecionado && expectedHeadCount > 0
+              ? `Pesagem vinculada ao lote ${loteSelecionado.nome || 'selecionado'}. Quantidade sugerida: ${expectedHeadCount} ${expectedHeadCount === 1 ? 'cabeça' : 'cabeças'}.`
+              : 'Registre a pesagem para acompanhar GMD, evolução do lote e ponto de venda.'}
+          </span>
+        </div>
+
         <section className="pesagem-form-section-block section-card">
           <div className="pesagem-form-section-head">Tipo e referência</div>
           <div className="pesagem-form-section">
@@ -431,6 +457,11 @@ export default function PesagemForm({
                 <label className="pesagem-form-field">
                   Quantidade pesada (cabeças)
                   <input className="ui-input" name="quantidade_pesada" type="number" step="1" min={0} value={form.quantidade_pesada} onChange={handleChange} placeholder="Ex.: 80" />
+                  {hasSelectedLote && expectedHeadCount === 0 ? (
+                    <small style={{ color: 'var(--color-warning, #b45309)', fontSize: '0.78rem' }}>
+                      Este lote não tem quantidade de cabeças cadastrada. Informe manualmente.
+                    </small>
+                  ) : null}
                 </label>
               </>
             ) : null}

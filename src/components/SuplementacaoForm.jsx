@@ -42,9 +42,26 @@ export default function SuplementacaoForm({ lotes = [], estoque = [], onSave, on
   const [form, setForm] = useState(() => normalizarInitialData(initialData));
   const [erro, setErro] = useState('');
 
-  const itensDisponiveis = useMemo(() => (
-    estoque.filter((item) => ['insumo', 'ração', 'mineral', 'outros'].includes(String(item.categoria || '').toLowerCase()))
-  ), [estoque]);
+  // Puxa os produtos cadastrados no estoque relacionados a nutrição/suplementação.
+  // Antes o filtro exigia categoria exata ('insumo'/'ração'/'mineral'/'outros'),
+  // o que excluía produtos cadastrados com categorias como "Nutrição / Alimentação".
+  const itensDisponiveis = useMemo(() => {
+    const lista = Array.isArray(estoque) ? estoque : [];
+    const PALAVRAS_NUTRI = [
+      'insumo', 'ração', 'racao', 'mineral', 'suplement', 'nutri', 'alimenta',
+      'sal', 'proteic', 'energ', 'aditivo', 'núcleo', 'nucleo', 'concentrado', 'outros',
+    ];
+    const relevantes = lista.filter((item) => {
+      const cat = String(item?.categoria || '').toLowerCase();
+      const sub = String(item?.subcategoria || '').toLowerCase();
+      return PALAVRAS_NUTRI.some((palavra) => cat.includes(palavra) || sub.includes(palavra));
+    });
+    // O produtor precisa sempre enxergar o que cadastrou: se o filtro por
+    // categoria não encontrar nada mas houver itens no estoque, mostra todos.
+    if (!relevantes.length && lista.length) return lista;
+    return relevantes;
+  }, [estoque]);
+  const semProdutos = itensDisponiveis.length === 0;
 
   /* eslint-disable react-hooks/set-state-in-effect */
   useEffect(() => {
@@ -102,13 +119,21 @@ export default function SuplementacaoForm({ lotes = [], estoque = [], onSave, on
           </label>
 
           <label className="ui-input-wrap">
-            <span className="ui-input-label">Item do estoque</span>
-            <select className="ui-input" name="item_estoque_id" value={form.item_estoque_id} onChange={handleChange}>
-              <option value="">Selecione</option>
+            <span className="ui-input-label">Dieta / produto</span>
+            <select className="ui-input" name="item_estoque_id" value={form.item_estoque_id} onChange={handleChange} disabled={semProdutos}>
+              <option value="">{semProdutos ? 'Nenhum produto cadastrado' : 'Selecione'}</option>
               {itensDisponiveis.map((item) => (
-                <option key={item.id} value={item.id}>{item.produto}</option>
+                <option key={item.id} value={item.id}>
+                  {item.produto || item.nome || 'Produto sem nome'}
+                  {item.subcategoria ? ` · ${item.subcategoria}` : ''}
+                </option>
               ))}
             </select>
+            {semProdutos ? (
+              <small style={{ color: 'var(--color-warning, #b45309)', fontSize: '0.78rem' }}>
+                Nenhum produto cadastrado. Cadastre um suplemento no estoque para vinculá-lo ao lote.
+              </small>
+            ) : null}
           </label>
         </div>
 

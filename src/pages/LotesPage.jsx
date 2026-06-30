@@ -217,6 +217,7 @@ export default function LotesPage({ db, setDb, onRegistrarSaidaAnimal, session, 
   const lotes = Array.isArray(db?.lotes) ? db.lotes : EMPTY_LIST;
   const fazendas = Array.isArray(db?.fazendas) ? db.fazendas : EMPTY_LIST;
   const pastagens = Array.isArray(db?.pastagens) ? db.pastagens : EMPTY_LIST;
+  const estoque = Array.isArray(db?.estoque) ? db.estoque : EMPTY_LIST;
   const pesagens = Array.isArray(db?.pesagens) ? db.pesagens : EMPTY_LIST;
   const animais = Array.isArray(db?.animais) ? db.animais : EMPTY_LIST;
   const sanitarios = Array.isArray(db?.sanitario) ? db.sanitario : EMPTY_LIST;
@@ -275,6 +276,8 @@ export default function LotesPage({ db, setDb, onRegistrarSaidaAnimal, session, 
       progressoPeso,
       ultimaPesagem: latestPesagem?.data || null,
       gmd30: calculateGmd30(lotePesagens),
+      gmdMeta: toNumber(lote.gmd_meta),
+      qtdPesagens: lotePesagens.length,
       fazendaNome,
       pastagemNome,
       categoriaAnimal,
@@ -413,7 +416,7 @@ export default function LotesPage({ db, setDb, onRegistrarSaidaAnimal, session, 
 
     const persisted = await updateOperationalRecord('lotes', loteId, patch, session);
     if (!persisted?.persisted) {
-      showToast({ type: 'warning', message: persisted?.error || 'Não foi possível confirmar o encerramento agora.' });
+      showToast({ type: 'warning', message: persisted?.error || 'Não foi possível confirmar a troca do lote agora.' });
       return;
     }
 
@@ -421,7 +424,7 @@ export default function LotesPage({ db, setDb, onRegistrarSaidaAnimal, session, 
       ...prev,
       lotes: (prev.lotes || []).map((l) => (Number(l.id) === Number(loteId) ? { ...l, ...patch } : l)),
     }));
-    showToast({ type: 'success', message: 'Lote encerrado com sucesso.' });
+    showToast({ type: 'success', message: 'Lote trocado com sucesso.' });
     setOpenFechamento(false);
   }
 
@@ -759,6 +762,7 @@ export default function LotesPage({ db, setDb, onRegistrarSaidaAnimal, session, 
           initialData={loteEmEdicao}
           fazendas={fazendas}
           pastagens={pastagens}
+          estoque={estoque}
           fazendaAtiva={fazendaAtiva}
           onCancel={() => {
             setOpenNovoLote(false);
