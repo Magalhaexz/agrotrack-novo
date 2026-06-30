@@ -12,9 +12,6 @@ const TIPOS_MANEJO = [
 
 const FORM_VAZIO = {
   lote_id: '',
-  tipo: 'vacina',
-  item_estoque_id: '',
-  desc: '',
   data_aplic: '',
   proxima: '',
   alerta_dias_antes: 30,
@@ -30,13 +27,34 @@ const PALAVRAS_SANITARIAS = [
   'mosquic', 'bernic', 'hormô', 'hormo', 'soro', 'antiparasit', 'farmac', 'fármac',
 ];
 
-function normalizarInitialData(data) {
+// Palavras para priorizar produtos por tipo de procedimento.
+const PALAVRAS_POR_TIPO = {
+  vacina: ['vacina'],
+  vermifugo: ['vermif', 'vermíf', 'antiparasit'],
+  medicamento: ['medicament', 'antibiot', 'anti-inflam', 'antiinflam', 'remédio', 'remedio', 'soro', 'farmac', 'fármac'],
+  exame: ['exame'],
+  outro: [],
+};
+
+function novoProcedimento(overrides = {}) {
+  return { tipo: 'vacina', item_estoque_id: '', desc: '', ...overrides };
+}
+
+function procedimentosFromInitial(data) {
+  if (data && (data.tipo || data.desc || data.metadata?.item_estoque_id)) {
+    return [novoProcedimento({
+      tipo: data.tipo || 'vacina',
+      item_estoque_id: data.item_estoque_id ?? data.metadata?.item_estoque_id ?? '',
+      desc: data.desc || '',
+    })];
+  }
+  return [novoProcedimento()];
+}
+
+function sharedFromInitial(data) {
   if (!data) return FORM_VAZIO;
   return {
     lote_id: data.lote_id ?? '',
-    tipo: data.tipo || 'vacina',
-    item_estoque_id: data.item_estoque_id ?? data.metadata?.item_estoque_id ?? '',
-    desc: data.desc || '',
     data_aplic: data.data_aplic || '',
     proxima: data.proxima || '',
     alerta_dias_antes: data.alerta_dias_antes ?? 30,
@@ -46,13 +64,14 @@ function normalizarInitialData(data) {
   };
 }
 
-function validarForm(form) {
+function validarForm(form, procedimentos) {
   if (!form.lote_id) return 'Selecione o lote.';
-  if (!form.desc.trim()) return 'Informe a descrição do manejo sanitário.';
   if (!form.data_aplic) return 'Informe a data de aplicação.';
   if (!form.qtd) return 'Informe a quantidade atendida.';
   if (Number(form.qtd || 0) <= 0) return 'Quantidade atendida deve ser maior que zero.';
   if (Number(form.alerta_dias_antes || 0) <= 0) return 'Aviso de dias antes deve ser maior que zero.';
+  if (!procedimentos.length) return 'Adicione pelo menos um procedimento.';
+  if (procedimentos.some((proc) => !proc.tipo)) return 'Selecione o tipo do procedimento.';
   return null;
 }
 
@@ -64,12 +83,12 @@ export default function SanitarioForm({
   onSave,
   onCancel,
 }) {
-  const [form, setForm] = useState(() => normalizarInitialData(initialData));
+  const [form, setForm] = useState(() => sharedFromInitial(initialData));
+  const [procedimentos, setProcedimentos] = useState(() => procedimentosFromInitial(initialData));
   const [erro, setErro] = useState('');
 
-  // Produtos cadastrados no estoque que servem para manejo sanitário (vacina,
-  // vermífugo, medicamento...). Se nada casar com as palavras sanitárias mas
-  // houver estoque, mostra todos para o produtor não ficar sem opção.
+  // Produtos do estoque relevantes para manejo sanitário. Se nada casar com as
+  // palavras sanitárias mas houver estoque, mostra todos (não trava o produtor).
   const produtosSanitarios = useMemo(() => {
     const lista = Array.isArray(estoque) ? estoque : [];
     const relevantes = lista.filter((item) => {
@@ -83,9 +102,21 @@ export default function SanitarioForm({
   }, [estoque]);
   const semProdutos = produtosSanitarios.length === 0;
 
+  // Produtos priorizados pelo tipo do procedimento (com fallback para todos).
+  const produtosParaTipo = (tipo) => {
+    const palavras = PALAVRAS_POR_TIPO[tipo] || [];
+    if (!palavras.length) return produtosSanitarios;
+    const filtrados = produtosSanitarios.filter((item) => {
+      const hay = `${item?.categoria || ''} ${item?.subcategoria || ''} ${item?.produto || item?.nome || ''}`.toLowerCase();
+      return palavras.some((palavra) => hay.includes(palavra));
+    });
+    return filtrados.length ? filtrados : produtosSanitarios;
+  };
+
   /* eslint-disable react-hooks/set-state-in-effect */
   useEffect(() => {
-    setForm(normalizarInitialData(initialData));
+    setForm(sharedFromInitial(initialData));
+    setProcedimentos(procedimentosFromInitial(initialData));
     setErro('');
   }, [initialData]);
   /* eslint-enable react-hooks/set-state-in-effect */
@@ -95,52 +126,63 @@ export default function SanitarioForm({
     setForm((prev) => ({ ...prev, [name]: value }));
   }
 
-  function handleProdutoChange(e) {
-    const id = e.target.value;
+  function atualizarProcedimento(index, patch) {
+    setProcedimentos((prev) => prev.map((proc, idx) => (idx === index ? { ...proc, ...patch } : proc)));
+  }
+
+  function selecionarProduto(index, id) {
     const produto = produtosSanitarios.find((item) => String(item.id) === String(id));
-    setForm((prev) => ({
-      ...prev,
-      item_estoque_id: id,
-      // Preenche a descrição com o nome do produto (continua editável).
-      desc: produto ? (produto.produto || produto.nome || prev.desc) : prev.desc,
+    setProcedimentos((prev) => prev.map((proc, idx) => {
+      if (idx !== index) return proc;
+      return {
+        ...proc,
+        item_estoque_id: id,
+        // Preenche a descrição com o nome do produto (continua editável).
+        desc: produto ? (produto.produto || produto.nome || proc.desc) : proc.desc,
+      };
     }));
+  }
+
+  function adicionarProcedimento() {
+    setProcedimentos((prev) => [...prev, novoProcedimento()]);
+  }
+
+  function removerProcedimento(index) {
+    setProcedimentos((prev) => (prev.length <= 1 ? prev : prev.filter((_, idx) => idx !== index)));
   }
 
   function handleSubmit(e) {
     e.preventDefault();
-    const erroValidacao = validarForm(form);
-
+    const erroValidacao = validarForm(form, procedimentos);
     if (erroValidacao) {
       setErro(erroValidacao);
       return;
     }
-
     setErro('');
-    // sanitario não tem coluna para produto; guardamos o vínculo em metadata,
-    // preservando metadados existentes ao editar.
     const metadataBase = initialData?.metadata && typeof initialData.metadata === 'object'
       ? initialData.metadata
       : {};
     onSave?.({
       lote_id: Number(form.lote_id),
-      tipo: form.tipo,
-      desc: form.desc.trim(),
       data_aplic: form.data_aplic,
-      proxima: form.proxima || null, // Usar null para data opcional
+      proxima: form.proxima || null,
       alerta_dias_antes: Number(form.alerta_dias_antes || 0),
       qtd: Number(form.qtd || 0),
       obs: form.obs.trim(),
       funcionario_responsavel_id: form.funcionario_responsavel_id
         ? Number(form.funcionario_responsavel_id)
-        : null, // Usar null para responsável opcional
-      metadata: {
-        ...metadataBase,
-        item_estoque_id: form.item_estoque_id ? Number(form.item_estoque_id) : null,
-      },
+        : null,
+      metadataBase,
+      procedimentos: procedimentos.map((proc) => ({
+        tipo: proc.tipo,
+        item_estoque_id: proc.item_estoque_id ? Number(proc.item_estoque_id) : null,
+        desc: String(proc.desc || '').trim(),
+      })),
     });
   }
 
-  const titulo = initialData ? 'Editar manejo sanitário' : 'Novo manejo sanitário';
+  const isEdit = Boolean(initialData);
+  const titulo = isEdit ? 'Editar manejo sanitário' : 'Novo manejo sanitário';
 
   const footer = (
     <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8 }}>
@@ -165,15 +207,6 @@ export default function SanitarioForm({
 
         <div className="grid-2">
           <label className="ui-input-wrap">
-            <span className="ui-input-label">Tipo</span>
-            <select className="ui-input" name="tipo" value={form.tipo} onChange={handleChange}>
-              {TIPOS_MANEJO.map((tipo) => (
-                <option key={tipo.value} value={tipo.value}>{tipo.label}</option>
-              ))}
-            </select>
-          </label>
-
-          <label className="ui-input-wrap">
             <span className="ui-input-label">Quantidade atendida</span>
             <input
               className="ui-input"
@@ -185,44 +218,6 @@ export default function SanitarioForm({
               placeholder="Ex: 120"
             />
           </label>
-        </div>
-
-        <label className="ui-input-wrap">
-          <span className="ui-input-label">Produto / vacina (do estoque, opcional)</span>
-          <select
-            className="ui-input"
-            name="item_estoque_id"
-            value={form.item_estoque_id}
-            onChange={handleProdutoChange}
-            disabled={semProdutos}
-          >
-            <option value="">{semProdutos ? 'Nenhum produto sanitário cadastrado' : 'Selecione um produto do estoque'}</option>
-            {produtosSanitarios.map((item) => (
-              <option key={item.id} value={item.id}>
-                {item.produto || item.nome || 'Produto sem nome'}
-                {item.subcategoria ? ` · ${item.subcategoria}` : ''}
-              </option>
-            ))}
-          </select>
-          {semProdutos ? (
-            <small style={{ color: 'var(--color-warning, #b45309)', fontSize: '0.78rem' }}>
-              Nenhum produto sanitário cadastrado. Cadastre vacinas, vermífugos ou medicamentos no estoque para vinculá-los ao manejo.
-            </small>
-          ) : null}
-        </label>
-
-        <label className="ui-input-wrap">
-          <span className="ui-input-label">Descrição</span>
-          <input
-            className="ui-input"
-            name="desc"
-            value={form.desc}
-            onChange={handleChange}
-            placeholder="Ex: Vacina contra aftosa"
-          />
-        </label>
-
-        <div className="grid-2">
           <label className="ui-input-wrap">
             <span className="ui-input-label">Data de aplicação</span>
             <input
@@ -234,7 +229,87 @@ export default function SanitarioForm({
               onChange={handleChange}
             />
           </label>
+        </div>
 
+        <section className="sanitario-procedimentos">
+          <div className="sanitario-procedimentos__head">
+            <span className="ui-input-label">Procedimentos realizados</span>
+            {isEdit ? (
+              <small style={{ color: 'var(--color-text-secondary)' }}>Na edição, ajuste este procedimento.</small>
+            ) : null}
+          </div>
+
+          {procedimentos.map((proc, index) => {
+            const produtosTipo = produtosParaTipo(proc.tipo);
+            const semProdutosTipo = produtosTipo.length === 0;
+            return (
+              <div key={index} className="sanitario-procedimento">
+                <label className="ui-input-wrap">
+                  <span className="ui-input-label">Tipo</span>
+                  <select
+                    className="ui-input"
+                    value={proc.tipo}
+                    onChange={(e) => atualizarProcedimento(index, { tipo: e.target.value })}
+                  >
+                    {TIPOS_MANEJO.map((tipo) => (
+                      <option key={tipo.value} value={tipo.value}>{tipo.label}</option>
+                    ))}
+                  </select>
+                </label>
+
+                <label className="ui-input-wrap">
+                  <span className="ui-input-label">Produto (do estoque, opcional)</span>
+                  <select
+                    className="ui-input"
+                    value={proc.item_estoque_id}
+                    onChange={(e) => selecionarProduto(index, e.target.value)}
+                    disabled={semProdutosTipo}
+                  >
+                    <option value="">{semProdutosTipo ? 'Nenhum produto cadastrado' : 'Selecione (opcional)'}</option>
+                    {produtosTipo.map((item) => (
+                      <option key={item.id} value={item.id}>
+                        {item.produto || item.nome || 'Produto sem nome'}
+                        {item.subcategoria ? ` · ${item.subcategoria}` : ''}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+
+                <label className="ui-input-wrap">
+                  <span className="ui-input-label">Descrição (opcional)</span>
+                  <input
+                    className="ui-input"
+                    value={proc.desc}
+                    onChange={(e) => atualizarProcedimento(index, { desc: e.target.value })}
+                    placeholder="Ex: Vacina contra aftosa"
+                  />
+                </label>
+
+                {procedimentos.length > 1 ? (
+                  <button
+                    type="button"
+                    className="action-btn action-btn-danger sanitario-procedimento__remover"
+                    onClick={() => removerProcedimento(index)}
+                  >
+                    Remover
+                  </button>
+                ) : null}
+              </div>
+            );
+          })}
+
+          {semProdutos ? (
+            <small style={{ color: 'var(--color-warning, #b45309)', fontSize: '0.78rem' }}>
+              Nenhum produto sanitário cadastrado. Cadastre vacinas, vermífugos ou medicamentos no estoque para vinculá-los ao manejo.
+            </small>
+          ) : null}
+
+          <div>
+            <Button variant="ghost" onClick={adicionarProcedimento}>+ Adicionar procedimento</Button>
+          </div>
+        </section>
+
+        <div className="grid-2">
           <label className="ui-input-wrap">
             <span className="ui-input-label">Próxima dose / revisão (opcional)</span>
             <input
@@ -245,9 +320,7 @@ export default function SanitarioForm({
               onChange={handleChange}
             />
           </label>
-        </div>
 
-        <div className="grid-2">
           <label className="ui-input-wrap">
             <span className="ui-input-label">Avisar quantos dias antes</span>
             <input
@@ -260,7 +333,9 @@ export default function SanitarioForm({
               placeholder="Ex: 15"
             />
           </label>
+        </div>
 
+        <div className="grid-2">
           <label className="ui-input-wrap">
             <span className="ui-input-label">Responsável pela próxima tarefa (opcional)</span>
             <select
@@ -277,18 +352,18 @@ export default function SanitarioForm({
               ))}
             </select>
           </label>
-        </div>
 
-        <label className="ui-input-wrap">
-          <span className="ui-input-label">Observação</span>
-          <input
-            className="ui-input"
-            name="obs"
-            value={form.obs}
-            onChange={handleChange}
-            placeholder="Ex: reforço em 90 dias"
-          />
-        </label>
+          <label className="ui-input-wrap">
+            <span className="ui-input-label">Observação geral</span>
+            <input
+              className="ui-input"
+              name="obs"
+              value={form.obs}
+              onChange={handleChange}
+              placeholder="Ex: reforço em 90 dias"
+            />
+          </label>
+        </div>
 
         {erro && (
           <p style={{ margin: 0, color: 'var(--color-danger)', fontSize: '0.85rem' }}>

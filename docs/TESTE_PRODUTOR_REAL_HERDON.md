@@ -223,3 +223,31 @@ Sem A1 resolvido ou comunicado, há risco de o produtor cadastrar um evento no c
 **Testes:** 637/637 passando (2 novos de dedup financeiro). **Lint:** limpo · **Build:** sucesso.
 
 **Pendências (futuro, exige autorização):** eventual `DROP TABLE suplementacao` após período de confirmação; backfill opcional dos 2 custos de aquisição legados para o DRE; possível unificação da entrada de custo em `movimentacoes_financeiras` (refator maior).
+
+---
+
+# Manejo sanitário com múltiplos procedimentos
+
+**Problema:** o "Novo manejo sanitário" só permitia **um** tipo por lançamento (Vacina **ou** Vermífugo...). No campo, o produtor faz vários procedimentos no mesmo manejo (ex.: vacinação + vermifugação).
+
+**Solução adotada (sem migration):** o formulário ganhou a seção **"Procedimentos realizados"** — começa com 1 procedimento e o produtor adiciona/remove quantos quiser. Lote, quantidade, data, próxima dose, responsável e observação são **compartilhados**; cada procedimento tem **tipo + produto do estoque + descrição** próprios. Ao salvar, é criado **um registro em `sanitario` por procedimento**, todos com o mesmo lote/data/qtd/obs, e ligados por `metadata.grupo_manejo_id` (id gerado no client).
+
+**Houve migration?** **Não.** A tabela `sanitario` tem `tipo` único; a composição é resolvida criando N registros + `grupo_manejo_id` no `metadata` (jsonb já existente). RLS inalterada.
+
+**Como salva no banco / usa metadata:**
+- N registros `sanitario`, cada um com `tipo`, `desc` próprios.
+- `metadata.item_estoque_id` = produto do estoque do procedimento (opcional, vira `null` se vazio — sem erro de tipo).
+- `metadata.grupo_manejo_id` = liga os procedimentos do mesmo manejo (para agrupamento futuro na UI).
+- Tarefa automática (próxima dose): criada **uma vez por manejo** (não por procedimento), ligada ao 1º registro, com descrição combinada.
+
+**Salvamento controlado / erros (sem mascarar conexão):**
+- Valida: "Adicione pelo menos um procedimento." / "Selecione o tipo do procedimento." / lote, data, quantidade obrigatórios.
+- Em falha de um procedimento: loga `console.error('[HERDON_SANITARIO_SAVE_ERROR]', …)` e mostra "Parte do manejo foi salva, mas N procedimento(s) falharam." (parcial) ou "Não foi possível salvar um dos procedimentos do manejo." (total) — nunca "erro de conexão" para validação.
+
+**Edição:** edita o registro **individual** (com seu produto reaberto via `metadata.item_estoque_id`); edição do grupo inteiro fica como **pendência** documentada. Listagem: cada procedimento aparece como sua própria linha (Vacina — Lote — 118; Vermífugo — Lote — 118).
+
+**Arquivos alterados:** `src/components/SanitarioForm.jsx` (UI de procedimentos), `src/pages/SanitarioPage.jsx` (`salvarItem` multi-registro + grupo + parcial), `src/styles/app.css` (layout responsivo dos procedimentos).
+
+**Validação (round-trip no banco):** INSERT de 2 procedimentos (vacina + vermífugo) com `grupo_manejo_id` compartilhado e `metadata.item_estoque_id` para owner/lote reais → 2 registros no grupo; DELETE → 0 (limpeza confirmada). **Lint:** limpo · **Build:** sucesso · **Testes:** 637/637.
+
+**Pendências:** validação visual no preview (1920×1080 / 1366×768 / 390×844: adicionar/remover procedimento no mobile); agrupamento visual por `grupo_manejo_id` na listagem; edição do manejo composto inteiro de uma vez.

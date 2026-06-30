@@ -5708,6 +5708,46 @@ body,
   align-items: end;
 }
 
+/* Manejo sanitário com múltiplos procedimentos */
+.sanitario-procedimentos {
+  display: grid;
+  gap: 10px;
+  padding: 12px;
+  border: 1px solid var(--color-border, rgba(148, 163, 184, 0.25));
+  border-radius: 12px;
+  background: var(--color-surface-2, rgba(148, 163, 184, 0.06));
+}
+
+.sanitario-procedimentos__head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.sanitario-procedimento {
+  display: grid;
+  grid-template-columns: minmax(110px, 0.8fr) minmax(160px, 1.2fr) minmax(160px, 1.4fr) auto;
+  gap: 10px;
+  align-items: end;
+}
+
+.sanitario-procedimento__remover {
+  height: 42px;
+  white-space: nowrap;
+}
+
+@media (max-width: 720px) {
+  .sanitario-procedimento {
+    grid-template-columns: 1fr;
+  }
+  .sanitario-procedimento__remover {
+    height: auto;
+    justify-self: start;
+  }
+}
+
 .herdon-page-topbar.herdon-page-topbar--compact p,
 .page--sanitario .ph p {
   margin-top: 6px;
