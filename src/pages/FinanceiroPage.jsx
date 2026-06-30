@@ -26,12 +26,13 @@ const TAB_LABELS = {
   pag: 'Pagamentos Diários',
 };
 
-export default function FinanceiroPage({ db, setDb }) {
+export default function FinanceiroPage({ db, setDb, navigationIntent = null }) {
   const { hasPermission, session } = useAuth();
   const { showToast } = useToast();
+  const abrirLancamentoPorIntent = navigationIntent?.page === 'financeiro' && navigationIntent?.action === 'novo';
   const [tab, setTab] = useState('dre');
   const [detailLoteId, setDetailLoteId] = useState(null);
-  const [openLanc, setOpenLanc] = useState(false);
+  const [openLanc, setOpenLanc] = useState(abrirLancamentoPorIntent);
   const [filters, setFilters] = useState({ tipo: 'todos', cat: 'todas', lote: 'todos' });
   const [novoPagamento, setNovoPagamento] = useState({ descricao: '', valor: '', data_vencimento: getTodayIso(), metodo: 'Pix', pago: false, observacao: '' });
 

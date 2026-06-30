@@ -116,14 +116,15 @@ function itemEhNutricao(item) {
   );
 }
 
-export default function EstoquePage({ db, setDb, onRegistrarSaidaEstoque }) {
+export default function EstoquePage({ db, setDb, onRegistrarSaidaEstoque, navigationIntent = null }) {
   const { showToast } = useToast();
   const { hasPermission, session } = useAuth();
   const mensagemSemPermissao = 'Você não tem permissão para executar esta ação.';
+  const abrirCadastroPorIntent = navigationIntent?.page === 'estoque' && navigationIntent?.action === 'novo';
 
   const [showOnlyCrit, setShowOnlyCrit] = useState(false);
   const [escopoEstoque, setEscopoEstoque] = useState('geral');
-  const [openCadastroItem, setOpenCadastroItem] = useState(false);
+  const [openCadastroItem, setOpenCadastroItem] = useState(abrirCadastroPorIntent);
   const [openEntrada, setOpenEntrada] = useState(false);
   const [openSaida, setOpenSaida] = useState(false);
   const [selectedItem, setSelectedItem] = useState(null);

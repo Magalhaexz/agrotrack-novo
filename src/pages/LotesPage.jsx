@@ -199,7 +199,8 @@ function resolvePastagemNome(pastagensMap, lote) {
   return byId?.nome || lote?.pastagem_nome || lote?.pastagemAtualNome || LABEL_OR_DASH;
 }
 
-export default function LotesPage({ db, setDb, onRegistrarSaidaAnimal, session, fazendaSelecionada = null }) {
+export default function LotesPage({ db, setDb, onRegistrarSaidaAnimal, session, fazendaSelecionada = null, navigationIntent = null }) {
+  const abrirNovoLotePorIntent = navigationIntent?.page === 'lotes' && navigationIntent?.action === 'novo';
   const { hasPermission } = useAuth();
   const { showToast } = useToast();
   const [filters, setFilters] = useState({ status: 'todos', fazenda: 'todas', periodo: 'todos', busca: '' });
@@ -209,7 +210,7 @@ export default function LotesPage({ db, setDb, onRegistrarSaidaAnimal, session, 
   const [retiradaModo, setRetiradaModo] = useState('sale_partial');
   const [openFechamento, setOpenFechamento] = useState(false);
   const [openPesagem, setOpenPesagem] = useState(false);
-  const [openNovoLote, setOpenNovoLote] = useState(false);
+  const [openNovoLote, setOpenNovoLote] = useState(abrirNovoLotePorIntent);
   const [loteEmEdicao, setLoteEmEdicao] = useState(null);
   const [openMoverPasto, setOpenMoverPasto] = useState(false);
   const [historicoPastos, setHistoricoPastos] = useState(EMPTY_LIST);

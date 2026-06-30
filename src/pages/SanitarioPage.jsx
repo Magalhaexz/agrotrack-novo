@@ -15,11 +15,12 @@ import {
   updateOperationalRecord,
 } from '../services/operationalPersistence';
 
-export default function SanitarioPage({ db, setDb, onConfirmAction }) {
+export default function SanitarioPage({ db, setDb, onConfirmAction, navigationIntent = null }) {
   const { hasPermission, session } = useAuth();
   const { showToast } = useToast(); // Hook para exibir toasts
   const mensagemSemPermissao = 'Você não tem permissão para executar esta ação.';
-  const [abrirForm, setAbrirForm] = useState(false);
+  const abrirManejoPorIntent = navigationIntent?.page === 'sanitario' && navigationIntent?.action === 'novo';
+  const [abrirForm, setAbrirForm] = useState(abrirManejoPorIntent);
   const [itemEditando, setItemEditando] = useState(null);
   const [iatf, setIatf] = useState({ nome: '', fazenda_id: db?.fazendas?.[0]?.id ? String(db.fazendas[0].id) : '', lote_id: db?.lotes?.[0]?.id ? String(db.lotes[0].id) : '', data_inicial: new Date().toISOString().slice(0,10), obs: '', status: 'Planejado', retirada_dias: 8, hormonal_dias: 9, inseminacao_dias: 10, diagnostico_dias: 40, repasse_dias: 55 });
 
@@ -480,6 +481,7 @@ export default function SanitarioPage({ db, setDb, onConfirmAction }) {
           initialData={itemEditando}
           lotes={db?.lotes || []}
           funcionarios={db?.funcionarios || []}
+          estoque={db?.estoque || []}
           onSave={salvarItem}
           onCancel={() => {
             setAbrirForm(false);

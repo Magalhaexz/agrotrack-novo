@@ -155,3 +155,41 @@ Sem A1 resolvido ou comunicado, há risco de o produtor cadastrar um evento no c
 ## Pendências / a validar na UI com proprietário real
 - Testar criar/editar/excluir evento no preview e confirmar que reaparece após reload (round-trip já provado no banco; falta o teste visual + responsividade do modal em 390×844).
 - Eventos recorrentes: `recorrencia` é salvo em `metadata`, mas a **expansão visual** de recorrência para eventos operacionais ainda não é renderizada (hoje só `rotinas` expandem). Melhoria futura, não bloqueante.
+
+---
+
+# M1 + M2 — Sanidade integrada ao estoque e ações rápidas abrindo formulários
+
+## M1 — Sanidade puxa produto/vacina do estoque
+
+**Problema:** no manejo sanitário o produto era texto livre; o produtor não conseguia vincular vacina/vermífugo/medicamento já cadastrados no estoque.
+**Causa:** `SanitarioForm` não recebia `estoque` e não tinha select de produto; a tabela `sanitario` **não tem** coluna `item_estoque_id`/`produto_id`.
+**Comportamento antes:** só campo "Descrição" digitado à mão.
+**Comportamento depois:** novo select **"Produto / vacina (do estoque, opcional)"** populado com itens do estoque de categoria/sub/nome sanitário (vacina, vermífugo, medicamento, soro, antibiótico, carrapaticida...). Se nada casar mas houver estoque, mostra todos; se vazio, orienta a cadastrar no estoque. Ao escolher um produto, a Descrição é preenchida com o nome (continua editável). O vínculo é salvo em `sanitario.metadata.item_estoque_id` (coluna `metadata` jsonb já existente) — **sem migration, sem nova coluna**. Ao editar, o produto selecionado reaparece (lido de `metadata.item_estoque_id`). Strings vazias viram `null` (sem erro 22P02).
+
+**Tabela sanidade:** `public.sanitario` · **Tabela estoque:** `public.estoque` · **RLS:** não alterada · **Migration:** nenhuma.
+**Limitação documentada:** como não há FK para estoque, o vínculo é por id em `metadata` (e o nome em `desc`), não por chave estrangeira. Suficiente para exibir/reabrir; não impõe integridade referencial.
+**Arquivos:** `src/components/SanitarioForm.jsx`, `src/pages/SanitarioPage.jsx`.
+**Validação (round-trip no banco):** INSERT→UPDATE→DELETE de um `sanitario` com `metadata.item_estoque_id` (vacina clostridial) para proprietário/lote reais — OK, `item_estoque_id` preservado após update; limpeza confirmada (0 linhas de teste).
+
+## M2 — Ações rápidas abrem o formulário direto
+
+**Problema:** as ações rápidas do Dashboard navegavam para a página, mas só Pesagem abria o formulário; as demais exigiam um segundo clique.
+**Causa:** só `PesagensPage` lia `navigationIntent`.
+**Comportamento antes:** "Novo lote/custo/tarefa/manejo/produto" caíam na página sem abrir o form.
+**Comportamento depois:** cada página detecta `navigationIntent.page === <id> && action === 'novo'` e abre o formulário/modal correspondente já na montagem. Padrão idêntico ao da Pesagem (estado inicial do `useState`): não reabre em loop nem após reload (o intent é limpo ao navegar pelo menu; o componente só remonta ao trocar de página).
+
+| Ação rápida | Página | Abre |
+|---|---|---|
+| Nova pesagem | `pesagens` | form de pesagem (já existia) |
+| Novo lote | `lotes` | modal de novo lote (`openNovoLote`) |
+| Novo custo | `financeiro` | modal de lançamento (`openLanc`) |
+| Nova tarefa | `tarefas` | modal de tarefa (`openModal`) |
+| Novo manejo/sanidade | `sanitario` | form de manejo (`abrirForm`) |
+| Novo produto/estoque | `estoque` | modal de cadastro de item (`openCadastroItem`) |
+
+**Arquivos:** `src/pages/LotesPage.jsx`, `src/pages/FinanceiroPage.jsx`, `src/pages/TarefasPage.jsx`, `src/pages/SanitarioPage.jsx`, `src/pages/EstoquePage.jsx` (App.jsx já repassava `navigationIntent` a todas as páginas).
+
+## Resultados M1 + M2
+- **Lint:** limpo · **Build:** sucesso · **Testes:** 635/635 passando.
+- **Pendências:** validar no preview com proprietário real os 6 cliques de ação rápida e a seleção de produto na sanidade, em 1920×1080 / 1366×768 / 390×844 (a persistência já foi provada no banco).

@@ -36,12 +36,13 @@ const EMPTY_TASK = {
   data_vencimento: '',
 };
 
-export default function TarefasPage({ db, setDb, onConfirmAction }) {
+export default function TarefasPage({ db, setDb, onConfirmAction, navigationIntent = null }) {
   const { showToast } = useToast();
   const { hasPermission, session } = useAuth();
   const mensagemSemPermissao = 'Você não tem permissão para executar esta ação.';
   const tarefas = useMemo(() => (Array.isArray(db?.tarefas) ? db.tarefas : []), [db.tarefas]);
-  const [openModal, setOpenModal] = useState(false);
+  const abrirNovaTarefaPorIntent = navigationIntent?.page === 'tarefas' && navigationIntent?.action === 'novo';
+  const [openModal, setOpenModal] = useState(abrirNovaTarefaPorIntent);
   const [editingTask, setEditingTask] = useState(null);
   const [filters, setFilters] = useState({
     prioridade: '',
