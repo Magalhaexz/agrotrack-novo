@@ -17,5 +17,6 @@ test('minha assinatura is visible in sidebar navigation and protected by profile
 
   assert.ok(subscriptionEntry);
   assert.equal(subscriptionEntry.label, 'Planos e Assinatura');
-  assert.equal(permissoesPorPagina.minhaAssinatura, 'perfil:ver');
+  // Sprint comercial: plano/assinatura é exclusivo do proprietário (admin '*').
+  assert.equal(permissoesPorPagina.minhaAssinatura, 'assinatura:gerenciar');
 });

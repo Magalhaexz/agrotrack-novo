@@ -35,11 +35,12 @@ import {
   processPendingSyncQueue,
 } from './services/operationalPersistence';
 import {
-  buildSubscriptionAccessState,
   getCurrentSubscription,
   canAccessModule,
   getModuleBlockedMessage,
 } from './services/subscriptions';
+import { buildAccountAccessGate } from './services/accessControl';
+import { useAccountSubscription } from './hooks/useAccountSubscription';
 import { obterResumoUso } from './domain/planos';
 import { buildAlerts } from './utils/alerts';
 import './styles/app.css';
@@ -243,13 +244,19 @@ export default function App() {
   } = useOperationalData(session, {
     enabled: Boolean(session?.user?.id) && !loadingAuth,
   });
+  const accountSubscriptionState = useAccountSubscription(session, {
+    enabled: Boolean(session?.user?.id) && !loadingAuth,
+  });
   const currentSubscription = useMemo(
-    () => getCurrentSubscription({ session, user, db }),
-    [session, user, db]
+    () => accountSubscriptionState.subscription || getCurrentSubscription({ session, user, db }),
+    [accountSubscriptionState.subscription, session, user, db]
   );
   const subscriptionGate = useMemo(
-    () => buildSubscriptionAccessState(currentSubscription),
-    [currentSubscription]
+    () => buildAccountAccessGate(currentSubscription, {
+      user,
+      subscriptionLoadError: accountSubscriptionState.error,
+    }),
+    [currentSubscription, user, accountSubscriptionState.error]
   );
   const subscriptionUsage = useMemo(
     () => obterResumoUso(db, currentSubscription).uso,
@@ -313,7 +320,9 @@ export default function App() {
     });
   }
 
-  const isBootLoading = loadingAuth || (Boolean(session?.user?.id) && !dataReady);
+  const isBootLoading = loadingAuth
+    || (Boolean(session?.user?.id) && !dataReady)
+    || (Boolean(session?.user?.id) && !accountSubscriptionState.loaded);
   const isOperationalSyncing = Boolean(session) && (dataSource === 'syncing' || manualSyncInFlight);
 
   useEffect(() => {
@@ -867,7 +876,13 @@ export default function App() {
     return (
       <AssinaturaBloqueadaPage
         subscription={currentSubscription}
+        reason={subscriptionGate.reason}
+        message={subscriptionGate.message}
+        session={session}
+        user={user}
+        usuarioLogado={usuarioLogado}
         onSignOut={handleLogout}
+        onSubscriptionRefresh={accountSubscriptionState.refresh}
       />
     );
   }

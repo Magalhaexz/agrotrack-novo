@@ -12,6 +12,7 @@ const MODULES_BASIC = [
   'calendarioOperacional',
   'rotina',
   'perfil',
+  'minhaAssinatura',
   'configuracoes',
   'resultados',
   'comparativo',

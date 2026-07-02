@@ -31,6 +31,15 @@ function isBootstrapOwnerEmail(user) {
   return getBootstrapAdminEmails().includes(userEmail);
 }
 
+/**
+ * Exceção interna controlada do gate comercial: e-mails de admin bootstrap
+ * (VITE_HERDON_BOOTSTRAP_ADMIN_EMAILS) nunca são bloqueados por assinatura.
+ * Usado por services/accessControl.js.
+ */
+export function isBootstrapAdminUser(user) {
+  return isBootstrapOwnerEmail(user);
+}
+
 function getOwnerAccountMarkerRaw(user) {
   return (
     user?.user_metadata?.owner_account

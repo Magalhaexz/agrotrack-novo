@@ -164,7 +164,9 @@ export const permissoesPorPagina = {
   financeiro: 'financeiro:ver',
   tarefas: 'tarefas:ver',
   perfil: 'perfil:ver',
-  minhaAssinatura: 'perfil:ver',
+  // Somente o proprietário (admin, permissão '*') gerencia plano/assinatura:
+  // gerente/operador/visualizador não têm 'assinatura:gerenciar' nas listas.
+  minhaAssinatura: 'assinatura:gerenciar',
   configuracoes: 'configuracoes:ver',
   sincronizacao: 'dashboard:ver',
   modoCurral: 'dashboard:ver',
