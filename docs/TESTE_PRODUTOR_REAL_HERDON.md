@@ -298,3 +298,7 @@ No preview/produção, em 1920×1080, 1366×768 e 390×844:
 5. Pesagem: selecionar lote 118 cabeças → campo puxa 118; 2 pesagens com GMD < 1,3 → alerta aparece.
 6. Suplementação/Financeiro/Cenários: criar → reload → editar → reload (sem sumiço, sem sucesso falso, sem duplicar).
 7. Responsividade: modais não cortam, FAB não cobre conteúdo, procedimentos sanitários e agrupamento legíveis no celular.
+
+## Nota pós-auditoria do banco (2026-07-02)
+
+O banco passou por auditoria completa (`docs/AUDITORIA_BANCO_DADOS_HERDON.md`) e pelas correções seguras da migration `20260702171318_fix_database_audit_findings`: função órfã `handle_new_user()` removida, backfill de `owner_user_id` em 7 profiles antigos e policies `same_account` adicionadas em `eventos_operacionais`. Validação pós-migration: 0 usuários sem profile, 0 owner inválido, RLS íntegro em 31/31 tabelas. **Banco corrigido e pronto para o piloto controlado com produtor real.**

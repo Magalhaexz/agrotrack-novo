@@ -230,8 +230,46 @@ Em 18 tabelas operacionais verificadas: **0 registros** com `owner_user_id` nulo
 - `npm run build`: ✅ exit 0 (vite, 244 módulos)
 - `npm test`: ✅ 637 testes, 0 falhas
 
-## 25. Conclusão
+## 25. Correções pós-auditoria (2026-07-02)
+
+Sprint autorizado de correções seguras. Migration **`supabase/migrations/20260702171318_fix_database_audit_findings.sql`** aplicada no projeto `ljpiszxicmmuefbiixui` (registrada no histórico de migrations do Supabase como `20260702171318`). Nenhum dado apagado, nenhuma tabela/coluna dropada, nada de Asaas/planos/login tocado.
+
+**A1 — Função órfã `handle_new_user()`: REMOVIDA.**
+- Confirmado antes da remoção (pg_trigger) que nenhum trigger dependia dela — o único trigger em `auth.users` é `on_auth_user_created` → `handle_new_user_profile`.
+- `drop function if exists public.handle_new_user();`
+- Validação depois: só `handle_new_user_profile` existe e o trigger continua ativo (`tgenabled = O`).
+
+**M1 — Backfill de `profiles.owner_user_id`: 7 profiles atualizados.**
+- Análise pré-migration: os 7 profiles com owner NULL (2 `admin` + 5 `visualizador`) **não eram subusuários** — nenhum outro profile os referenciava como owner e nenhum apontava para outro dono. Como `app_current_owner_user_id()` já fazia `coalesce(owner_user_id, auth.uid())`, o update `owner_user_id = id` preserva o comportamento efetivo, apenas o torna explícito.
+- `update public.profiles set owner_user_id = id where owner_user_id is null;` → **7 linhas**.
+- Validação depois: `profiles_sem_owner = 0`; `owner inválido = 0`; **19/19** profiles apontam para si mesmos.
+
+**M2 — Policies `same_account` em `eventos_operacionais`: 4 policies adicionadas.**
+- Copiado o padrão exato das demais tabelas operacionais (`app_is_same_account(owner_user_id)`), role `authenticated`, com `drop policy if exists` para idempotência:
+  - `eventos_operacionais_select_same_account` (SELECT — USING)
+  - `eventos_operacionais_insert_same_account` (INSERT — WITH CHECK)
+  - `eventos_operacionais_update_same_account` (UPDATE — USING + WITH CHECK)
+  - `eventos_operacionais_delete_same_account` (DELETE — USING)
+- As 4 policies `_owner` existentes **não foram alteradas** (proprietário continua acessando normalmente). Usuário de outra conta segue bloqueado — `app_is_same_account` compara com o dono resolvido via profile.
+- Validação depois: tabela com 8 policies (owner + same_account por comando), igual ao restante do sistema. RLS continua habilitado em 31/31 tabelas.
+
+**Queries de validação pós-migration (todas ✅):**
+
+| Verificação | Resultado |
+|---|---|
+| Usuários auth sem profile | 0 |
+| Profiles sem owner_user_id | 0 |
+| owner_user_id inválido | 0 |
+| Profiles apontando para si mesmos | 19/19 |
+| Funções restantes | apenas `handle_new_user_profile` |
+| Trigger `on_auth_user_created` | ativo, usando `handle_new_user_profile` |
+| Policies em `eventos_operacionais` | 8 (4 owner + 4 same_account) |
+| Tabelas com RLS habilitado | 31/31 |
+
+Com isso, os achados A1, M1 e M2 da seção 21 estão **resolvidos**. Permanecem no backlog apenas itens de limpeza (M4–M7, B1–B6), nenhum bloqueante.
+
+## 26. Conclusão
 
 **O banco está PRONTO para o piloto.** Todos os critérios obrigatórios foram atendidos: nenhum usuário sem profile, zero órfãos, RLS coerente em 100% das tabelas, `owner_user_id` correto em todos os dados, fontes oficiais definidas (`movimentacoes_financeiras` e `consumo_suplementacao`), financeiro sem duplicidade, suplementação sem usar tabela legada, manejo sanitário consistente, calendário e cenários consistentes, e logs recentes sem nenhum erro crítico.
 
-Os achados A1 e M1–M3 são riscos latentes/de manutenção que não bloqueiam o piloto, mas devem entrar no backlog técnico.
+Os achados A1, M1 e M2 foram **corrigidos em 2026-07-02** pela migration `20260702171318_fix_database_audit_findings` (ver seção 25). Os demais itens (M3–M7, B1–B6) são manutenção/limpeza e não bloqueiam o piloto.
