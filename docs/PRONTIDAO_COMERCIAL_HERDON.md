@@ -153,7 +153,53 @@ Nível implementado nesta sprint = **opção mínima para venda inicial** (docum
 
 O único bloqueador real para cobrar dinheiro de verdade é **virar a chave do Asaas para produção e rodar o teste de pagamento ponta a ponta** (§7/§8). Com isso feito, o HERDON está pronto para venda controlada (primeiros clientes acompanhados de perto).
 
-## 10. Validação desta sprint
+## 10. Go-Live Comercial / Asaas (validação de 2026-07-02)
+
+Sprint de go-live executada sem conta logada e sem tocar no login — validou tudo que é automatizável; o clique real de checkout/pagamento ficou como roteiro manual (§10.4).
+
+### 10.1 Deploy em produção — ✅ validado
+- Deploy do commit `e9c8917` (gate comercial): **READY** em produção no Vercel (`dpl_3pEPtAZtjRhyjBuWQHEMtuYMUTk7`), domínio **herdonapp.com.br**.
+- Login abre normalmente (HTTP 200, título e página corretos).
+- **Nenhum secret Asaas no bundle do frontend** — varridos ~496 KB de JS de produção: `ASAAS_API_KEY`, `ASAAS_WEBHOOK_TOKEN` e prefixo de chave `aact_` ausentes. Supabase URL correta (`ljpiszxicmmuefbiixui`); checkout chama a rota server-side `/api/asaas-create-subscription`.
+- Funções serverless vivas em produção: `asaas-webhook`, `asaas-create-subscription`, `asaas-create-customer` respondem **405** a GET (só aceitam POST).
+- **Webhook valida token em produção**: POST sem `asaas-access-token` → **401** (prova que a validação e o secret estão ativos no ambiente).
+
+### 10.2 Ciclo de status validado com o código real do gate — ✅
+Simulação executada com o `accessControl.js` real, usando a assinatura real do banco e variantes (não mocks de lógica):
+
+| Cenário | Resultado |
+|---|---|
+| Conta sem assinatura | 🔴 BLOQUEIA (`sem_plano`) |
+| Assinatura real do banco (`internal_test`/fundador) | ✅ LIBERA |
+| Trial ativo (vence em 10 dias) | ✅ LIBERA |
+| Trial vencido (há 1 dia) | 🔴 BLOQUEIA (`trial_vencido`) |
+| `active` (como o webhook grava após pagamento) | ✅ LIBERA |
+| `past_due` há 1 dia (tolerância 3) | ⚠️ LIBERA com aviso |
+| `past_due` há 5 dias | 🔴 BLOQUEIA (`pagamento_vencido`) |
+| `canceled` / `blocked` | 🔴 BLOQUEIAM (motivos corretos) |
+| Subusuário (gerente/operador/visualizador) com dono ativo | ✅ acessa conforme papel |
+| Subusuário com dono bloqueado | 🔴 bloqueado (herda status) |
+| Papéis: só admin tem `assinatura:gerenciar`; operador edita pesagens mas não vê financeiro; visualizador não edita nada | ✅ |
+| Limites: essencial não cria 2ª fazenda nem 3º usuário; cenários negado no essencial e liberado no premium; upgrade p/ pro libera 2ª fazenda | ✅ |
+
+O mesmo comportamento está travado pelos testes automatizados (652 passando, 15 deles do gate).
+
+### 10.3 O que o banco de produção mostra
+- 19 usuários / 19 profiles (trigger de profile OK), 1 assinatura (`internal_test`).
+- **`billing_events` = 0 e `checkout_sessions` = 0** — nenhum checkout foi completado e nenhum webhook Asaas real foi recebido até hoje. O ciclo ponta a ponta com o Asaas ainda não aconteceu em nenhum ambiente.
+- **Ambiente Asaas: sandbox** (`ASAAS_ENV` padrão; produção nunca configurada — decisão registrada na Sprint 28). A troca para produção exige autorização do proprietário e ação no painel Asaas + Vercel.
+
+### 10.4 Roteiro manual obrigatório antes do primeiro cliente (humano, ~30 min)
+1. **Sandbox ponta a ponta:** criar conta nova em herdonapp.com.br → confirmar tela "Escolha um plano" (sem Dashboard) → escolher plano → completar dados → pagar no checkout sandbox (cartão de teste Asaas) → conferir webhook recebido (`billing_events` ganha linha; `customer_subscriptions.status = 'active'`) → "Já paguei — atualizar" → Dashboard liberado.
+2. No painel Asaas sandbox: vencer a cobrança → app avisa (`past_due`) e bloqueia após 3 dias; cancelar → app bloqueia com motivo.
+3. **Produção:** trocar `ASAAS_API_KEY`/`ASAAS_ENV=production` no Vercel, cadastrar webhook de produção com token no painel Asaas, repetir o passo 1 com pagamento real de baixo valor, estornar/cancelar em seguida.
+4. Não usar `grant_pilot_access.sql` para cliente real — somente conta interna/piloto autorizado.
+
+### 10.5 Conclusão do go-live
+- **App comercial: validado.** Bloqueio, trial, tolerância, cancelamento, herança de subusuário, papéis e limites — tudo confirmado com código real + produção no ar sem secrets expostos e webhook autenticando.
+- **Pode vender?** Somente após o roteiro §10.4 (checkout sandbox ponta a ponta e depois a virada para produção Asaas). Esses passos exigem conta real e painel Asaas — não são automatizáveis por esta sessão. Até lá: **pronto para piloto controlado; venda real pendente apenas do teste de pagamento ponta a ponta.**
+
+## 11. Validação desta sprint
 
 - Lint: ✅ · Build: ✅ · Testes: ✅ (suíte completa incluindo os 15 novos de `accessControl`)
 - RLS alterado: **não** · Migration criada: **não** · Dados alterados/apagados: **não**
