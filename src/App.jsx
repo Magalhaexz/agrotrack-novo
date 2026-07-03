@@ -72,6 +72,7 @@ const PastagensPage = lazy(() => import('./pages/PastagensPage'));
 const EvolucaoRebanhoPage = lazy(() => import('./pages/EvolucaoRebanhoPage'));
 const IndicadoresPage = lazy(() => import('./pages/IndicadoresPage'));
 const CenariosPage = lazy(() => import('./pages/CenariosPage'));
+const DecisoesFazendaPage = lazy(() => import('./pages/DecisoesFazendaPage'));
 const DashboardPremiumPage = lazy(() => import('./pages/DashboardPremiumPage'));
 const RelatoriosGerenciaisPage = lazy(() => import('./pages/RelatoriosGerenciaisPage'));
 const RelatoriosPage = lazy(() => import('./pages/RelatoriosPage'));
@@ -181,6 +182,7 @@ function readSidebarCollapsedState() {
 
 const pageMap = {
   dashboard: DashboardPage,
+  decisoesFazenda: DecisoesFazendaPage,
   fazendas: FazendasPage,
   lotes: LotesPage,
   calendarioOperacional: CalendarioOperacionalPage,

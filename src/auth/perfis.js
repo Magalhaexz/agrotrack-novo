@@ -145,6 +145,7 @@ export const permissoesPorPerfil = {
 
 export const permissoesPorPagina = {
   dashboard: 'dashboard:ver',
+  decisoesFazenda: 'dashboard:ver',
   fazendas: 'fazendas:ver',
   lotes: 'lotes:ver',
   calendarioOperacional: 'sanitario:ver',

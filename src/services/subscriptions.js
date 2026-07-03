@@ -4,6 +4,7 @@ const BLOCKED_STATUSES = new Set(['canceled', 'blocked']);
 
 const MODULES_BASIC = [
   'dashboard',
+  'decisoesFazenda',
   'fazendas',
   'lotes',
   'animais',

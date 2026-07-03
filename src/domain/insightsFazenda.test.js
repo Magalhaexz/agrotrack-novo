@@ -1,9 +1,12 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import {
+  CATEGORIAS_TIPOS_DECISAO,
   SAUDE_FAZENDA,
+  agruparAlertasPorTipo,
   construirInsightsFazenda,
   construirResumoTextoInsights,
+  listarAtencaoImediata,
 } from './insightsFazenda.js';
 
 const AGORA = new Date('2026-07-02T12:00:00Z');
@@ -89,4 +92,70 @@ test('construirResumoTextoInsights resume quantidade por severidade em texto', (
 
 test('construirResumoTextoInsights não quebra com insights indefinido', () => {
   assert.deepEqual(construirResumoTextoInsights(undefined), ['Nenhum alerta pendente. A fazenda está em dia.']);
+});
+
+// ─── agrupamento por tipo (Sprint 2 — "Decisões da Fazenda") ────────────────
+
+function alerta(tipo, severidade, id = `${tipo}-${severidade}`) {
+  return { id, tipo, severidade, titulo: id, descricao: '', entidade: {}, acaoSugerida: '', pagina: '' };
+}
+
+test('agruparAlertasPorTipo separa os alertas nas categorias esperadas e preserva a ordem', () => {
+  const alertas = [
+    alerta('gmd', 'critico', 'g1'),
+    alerta('estoque', 'critico', 'e1'),
+    alerta('gmd', 'medio', 'g2'),
+    alerta('peso_alvo', 'alto', 'p1'),
+  ];
+  const grupos = agruparAlertasPorTipo(alertas);
+  assert.deepEqual(Object.keys(grupos), CATEGORIAS_TIPOS_DECISAO);
+  assert.deepEqual(grupos.gmd.map((a) => a.id), ['g1', 'g2']);
+  assert.deepEqual(grupos.estoque.map((a) => a.id), ['e1']);
+  assert.deepEqual(grupos.peso_alvo.map((a) => a.id), ['p1']);
+  assert.deepEqual(grupos.sanidade, []);
+  assert.deepEqual(grupos.tarefa, []);
+  assert.deepEqual(grupos.custo, []);
+});
+
+test('agruparAlertasPorTipo não quebra com lista vazia ou indefinida', () => {
+  const vazio = agruparAlertasPorTipo([]);
+  CATEGORIAS_TIPOS_DECISAO.forEach((tipo) => assert.deepEqual(vazio[tipo], []));
+  const indefinido = agruparAlertasPorTipo(undefined);
+  CATEGORIAS_TIPOS_DECISAO.forEach((tipo) => assert.deepEqual(indefinido[tipo], []));
+});
+
+// ─── atenção imediata (Sprint 2) ────────────────────────────────────────────
+
+test('listarAtencaoImediata inclui apenas crítico/alto e exclui oportunidades (peso_alvo)', () => {
+  const alertas = [
+    alerta('gmd', 'critico', 'g1'),
+    alerta('peso_alvo', 'alto', 'p1'),
+    alerta('estoque', 'alto', 'e1'),
+    alerta('tarefa', 'medio', 't1'),
+    alerta('sanidade', 'baixo', 's1'),
+  ];
+  const resultado = listarAtencaoImediata(alertas);
+  assert.deepEqual(resultado.map((a) => a.id), ['g1', 'e1']);
+});
+
+test('listarAtencaoImediata respeita o limite e não quebra com lista vazia', () => {
+  const alertas = Array.from({ length: 8 }, (_, i) => alerta('gmd', 'critico', `g${i}`));
+  assert.equal(listarAtencaoImediata(alertas).length, 5);
+  assert.equal(listarAtencaoImediata(alertas, 2).length, 2);
+  assert.deepEqual(listarAtencaoImediata([]), []);
+  assert.deepEqual(listarAtencaoImediata(undefined), []);
+});
+
+test('listarAtencaoImediata mantém a ordem de prioridade já calculada pelo motor', () => {
+  const db = {
+    tarefas: [
+      { id: 1, titulo: 'Tarefa crítica', status: 'pendente', data_vencimento: diasAtrasDe(AGORA, 10) },
+      { id: 2, titulo: 'Tarefa alta', status: 'pendente', data_vencimento: diasAtrasDe(AGORA, 3) },
+    ],
+    estoque: [{ id: 1, produto: 'Sal mineral', quantidade_atual: 0 }],
+  };
+  const insights = construirInsightsFazenda(db, AGORA);
+  const resultado = listarAtencaoImediata(insights.alertas);
+  assert.equal(resultado.length, 3);
+  assert.equal(resultado[0].severidade, 'critico');
 });

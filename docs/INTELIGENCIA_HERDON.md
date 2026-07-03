@@ -82,8 +82,73 @@ Construída sobre o agregador, sem duplicar sua lógica:
 - ✅ `npm run build`: sucesso.
 - ✅ `npm test`: 701 testes, 0 falhas (666 já existentes + 35 novos).
 
-## 8. Próximos passos sugeridos (fora desta sprint)
+## 8. Próximos passos sugeridos (da Sprint 1)
 
-- Ligar `gerarAlertasPriorizados`/`construirInsightsFazenda` a um card real no Dashboard ou a uma futura página "Decisões da Fazenda".
+- ~~Ligar `gerarAlertasPriorizados`/`construirInsightsFazenda` a um card real no Dashboard ou a uma futura página "Decisões da Fazenda".~~ → feito na Sprint 2 (seção 9).
 - Persistir resolução/adiamento desses alertas (hoje `buildAlerts`, em `utils/alerts.js`, já tem esse mecanismo via `alertas_resolvidos`/`alertas_adiados` — poderia ser reaproveitado aqui com o mesmo `ackKey`).
 - Avaliar remover o código morto `src/domain/alertas.js` (protótipo não usado) em uma sprint de limpeza.
+
+---
+
+# Sprint 2 — Tela "Decisões da Fazenda"
+
+> Data: 2026-07-02 · Branch `main`
+
+## 9. Objetivo
+
+Transformar o motor da Sprint 1 em uma tela de decisão: o HERDON deixa de ser só um app de cadastro e passa a responder, de forma direta, "o que merece minha atenção hoje" e "onde estou perdendo dinheiro". Nenhum alerta é criado dentro da tela — ela só consome e organiza o que o motor já calcula.
+
+## 10. Arquivos criados/alterados
+
+| Arquivo | O que mudou |
+|---|---|
+| `src/pages/DecisoesFazendaPage.jsx` (novo) | A tela: lê `construirInsightsFazenda(db)`, agrupa e renderiza os cards |
+| `src/styles/decisoes.css` (novo) | Grid dos cards e cor lateral por severidade |
+| `src/domain/insightsFazenda.js` | +`agruparAlertasPorTipo`, +`listarAtencaoImediata`, +`CATEGORIAS_TIPOS_DECISAO` (lógica pura, testável, sem UI) |
+| `src/domain/insightsFazenda.test.js` | +5 testes cobrindo as duas funções novas |
+| `src/navigation/navConfig.js` | Item "Decisões da Fazenda" no topo da seção "Decisão" do menu |
+| `src/auth/perfis.js` | `decisoesFazenda: 'dashboard:ver'` — mesma visibilidade do Painel Geral, para todos os papéis |
+| `src/services/subscriptions.js` | `'decisoesFazenda'` adicionado a `MODULES_BASIC` (disponível em todos os planos pagos) |
+| `src/App.jsx` | Import lazy + entrada em `pageMap` |
+
+A tela **não chama nenhum detector individualmente** (`detectarLotesAbaixoGmd`, `detectarEstoqueBaixo`, etc.) — usa só `construirInsightsFazenda`, que por sua vez já roda `gerarAlertasPriorizados` (Sprint 1). Isso garante zero duplicação de cálculo: qualquer ajuste de regra continua vivendo só em `alertasInteligentes.js`.
+
+## 11. Os 7 cards e as perguntas que respondem
+
+| Card | Tipo de alerta (`insights.alertas` filtrado) | Pergunta respondida |
+|---|---|---|
+| **Atenção imediata** | crítico/alto de qualquer tipo, exceto `peso_alvo` (via `listarAtencaoImediata`) | "O que merece minha atenção hoje?" / "O que preciso fazer primeiro?" |
+| **Lotes abaixo da meta** | `gmd` | "Qual lote está pior?" |
+| **Estoque crítico** | `estoque` | "O que pode virar problema?" |
+| **Sanidade próxima** | `sanidade` | "O que pode virar problema?" |
+| **Tarefas atrasadas** | `tarefa` | "O que preciso fazer primeiro?" |
+| **Financeiro/custos** | `custo` | "Onde estou perdendo dinheiro?" |
+| **Oportunidades** | `peso_alvo` | "Qual lote está melhor?" |
+
+`peso_alvo` é tratado à parte da "Atenção imediata": um lote perto do peso alvo é uma boa notícia (chance de venda), não um problema — por isso vira o card "Oportunidades" com selo verde "Oportunidade" em vez de severidade vermelha/amarela.
+
+Cada item de decisão mostra, na ordem pedida: **título** (já vem de `alerta.titulo`) → **motivo** (`alerta.descricao`) → **impacto** (frase curta derivada da severidade — só apresentação, não recalcula nada) → **ação sugerida** (`alerta.acaoSugerida`). O card "Atenção imediata" tem um botão por item ("Abrir tela relacionada", usando `alerta.pagina`); os outros 6 cards têm um botão único no cabeçalho (já que todos os itens de uma mesma categoria sempre apontam para a mesma página).
+
+## 12. Estado vazio
+
+Distingue duas situações:
+- **Sem dado nenhum cadastrado** (nenhum lote, pesagem, estoque, custo ou movimentação financeira): mostra o `EmptyState` com o texto pedido — *"Ainda não há dados suficientes para gerar decisões."* — e orienta a cadastrar lotes, pesagens, estoque e custos, com botão "Cadastrar lotes".
+- **Tem dado, mas zero alertas em uma categoria**: a categoria continua visível no grid, mostrando uma mensagem positiva ("Tudo em dia por aqui", "Estoque sob controle...") — reforça que o app está de fato observando, e não apenas escondendo cards vazios.
+
+## 13. Paywall de escrita
+
+A tela é **100% leitura** — nenhum formulário, nenhum `createOperationalRecord`/`update`/`delete`. Os únicos botões chamam `onNavigate(pagina)` (navegação), que já é permitida em modo visualização (ver sprint de paywall de escrita). Por isso não há nada a bloquear aqui: usuário sem plano vê a tela inteira normalmente; se quiser agir sobre um alerta (ex.: cadastrar uma pesagem), é levado à tela de destino, onde o paywall de escrita (já existente) entra em ação normalmente ao tentar salvar.
+
+## 14. Testes e validação
+
+- 5 testes novos em `insightsFazenda.test.js` (agrupamento por tipo preservando ordem e categorias vazias; atenção imediata filtrando severidade/excluindo oportunidades, respeitando limite, e preservando a ordem de prioridade do motor).
+- `npm run lint`: sem erros.
+- `npm run build`: sucesso — chunk `DecisoesFazendaPage` gerado (13,98 kB / 4,96 kB gzip + CSS próprio).
+- `npm test`: **706 testes, 0 falhas** (701 da Sprint 1 + 5 novos).
+- Verificação manual interativa (logada) **não foi possível neste ambiente**: o servidor de desenvolvimento local não tem as chaves do Supabase configuradas (limitação já registrada em sprints comerciais anteriores), então não há como autenticar e navegar até a tela pelo Sidebar nesta sessão. A confiança na integração vem de: build de produção bem-sucedido (compila e resolve todo o grafo de imports/JSX do componente), lint limpo, e cobertura total da lógica de dados por teste automatizado — só a renderização visual final (cores, layout responsivo) não foi vista ao vivo.
+
+## 15. Próximos passos sugeridos
+
+- Verificar visualmente a tela em produção (mobile e desktop) após o deploy deste commit.
+- Ligar o card "Atenção imediata" a uma notificação push/e-mail diária (Assistente HERDON).
+- Reaproveitar `alertas_resolvidos`/`alertas_adiados` (já usado em `utils/alerts.js`) para permitir marcar um item da tela como resolvido/adiado, usando o mesmo `id` do alerta como chave.

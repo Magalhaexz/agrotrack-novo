@@ -14,6 +14,7 @@ import {
   Leaf,
   LayoutDashboard,
   LifeBuoy,
+  ListChecks,
   MapPin,
   Package,
   Receipt,
@@ -64,6 +65,7 @@ export const navSections = [
     id: 'decisao',
     title: 'Decisão',
     items: [
+      { id: 'decisoesFazenda', label: 'Decisões da Fazenda', icon: ListChecks },
       { id: 'resultados', label: 'Resultado dos Lotes', icon: BarChart3 },
       { id: 'cenarios', label: 'Simulador de Decisão', icon: Calculator },
       { id: 'indicadores', label: 'Indicadores', icon: Activity },

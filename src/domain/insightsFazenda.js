@@ -71,6 +71,43 @@ export function construirInsightsFazenda(db = {}, agora = new Date()) {
   };
 }
 
+// Tipos de alerta que viram uma categoria de decisão na tela "Decisões da
+// Fazenda" (Sprint 2), na ordem em que devem aparecer. Mantido aqui — e não
+// na página — para a página não decidir por conta própria quais tipos existem;
+// ela só empresta rótulo/ícone/página de destino para cada um.
+export const CATEGORIAS_TIPOS_DECISAO = ['gmd', 'estoque', 'sanidade', 'tarefa', 'custo', 'peso_alvo'];
+
+/**
+ * Agrupa a lista de alertas (já calculada por `gerarAlertasPriorizados`) por
+ * `tipo`, preservando a ordem de severidade em que cada alerta já chegou.
+ * Não recalcula nada — só reparte a mesma lista em grupos.
+ */
+export function agruparAlertasPorTipo(alertas = [], tipos = CATEGORIAS_TIPOS_DECISAO) {
+  const grupos = {};
+  tipos.forEach((tipo) => {
+    grupos[tipo] = [];
+  });
+  (Array.isArray(alertas) ? alertas : []).forEach((alerta) => {
+    const tipo = alerta?.tipo;
+    if (!tipo) return;
+    if (!grupos[tipo]) grupos[tipo] = [];
+    grupos[tipo].push(alerta);
+  });
+  return grupos;
+}
+
+/**
+ * Os alertas que merecem atenção imediata: severidade crítica ou alta,
+ * excluindo `peso_alvo` (que é uma boa notícia — oportunidade de venda, não
+ * um problema). Limitado a `limite` itens; a ordem de severidade já vem de
+ * `gerarAlertasPriorizados`, então o corte pega sempre os mais urgentes.
+ */
+export function listarAtencaoImediata(alertas = [], limite = 5) {
+  return (Array.isArray(alertas) ? alertas : [])
+    .filter((alerta) => alerta?.tipo !== 'peso_alvo' && (alerta?.severidade === SEVERIDADE.CRITICO || alerta?.severidade === SEVERIDADE.ALTO))
+    .slice(0, limite);
+}
+
 function pluralizar(quantidade, singular, plural) {
   return quantidade === 1 ? singular : plural;
 }
