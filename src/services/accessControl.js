@@ -184,6 +184,62 @@ export function getBlockedMessage(reason) {
   return MENSAGENS_BLOQUEIO[reason] || MENSAGENS_BLOQUEIO[MOTIVOS_BLOQUEIO.SEM_PLANO];
 }
 
+// ============================================================
+// Paywall de escrita / modo visualização
+//
+// Modelo comercial (a partir de 2026-07-02): o usuário logado SEMPRE pode
+// VER o app (modo visualização), para conhecer o produto antes de pagar.
+// Já a ESCRITA (cadastrar/salvar/editar/excluir/importar) exige plano ativo.
+// A decisão de escrita reaproveita exatamente o gate de conta — ou seja, o
+// que antes liberava/bloqueava a ENTRADA agora libera/bloqueia a ESCRITA.
+// ============================================================
+
+export const WRITE_BLOCKED_MESSAGE = 'Para salvar dados no HERDON, escolha um plano.';
+
+export class SubscriptionRequiredError extends Error {
+  constructor(message = WRITE_BLOCKED_MESSAGE) {
+    super(message);
+    this.name = 'SubscriptionRequiredError';
+    this.code = 'SUBSCRIPTION_REQUIRED';
+  }
+}
+
+/**
+ * Pode visualizar o app (modo leitura) se está logado com um profile válido.
+ * Não depende de assinatura — é o novo comportamento comercial padrão.
+ */
+export function canViewApp(profile = null, subscription = null, options = {}) {
+  // `subscription` é aceito por simetria com canWriteData, mas a visualização
+  // nunca depende de assinatura — logado com profile já pode ver.
+  void subscription;
+  if (options.user && isBootstrapAdminUser(options.user)) return true;
+  return Boolean(profile?.id || profile || options.user?.id);
+}
+
+/**
+ * Pode escrever (gravar dados) se a conta tem acesso comercial ativo:
+ * `active`, `trialing` no prazo, `past_due` na tolerância, `internal_test`,
+ * override interno ou e-mail de admin bootstrap. Subusuários herdam a
+ * assinatura do proprietário (avaliada via owner_user_id / RLS same_account).
+ */
+export function canWriteData(profile, subscription, options = {}) {
+  return buildAccountAccessGate(subscription, options).allowed;
+}
+
+export function requiresSubscriptionForWrite(profile, subscription, options = {}) {
+  return !canWriteData(profile, subscription, options);
+}
+
+export function getWriteBlockedReason(profile, subscription, options = {}) {
+  const gate = buildAccountAccessGate(subscription, options);
+  return gate.allowed ? null : gate.reason;
+}
+
+/** Mensagem comercial única do paywall de escrita (independe do motivo). */
+export function getWriteBlockedMessage() {
+  return WRITE_BLOCKED_MESSAGE;
+}
+
 /**
  * Feature = módulo/página ('cenarios', 'financeiro'...) ou permissão
  * explícita ('financeiro:editar'). A resposta combina as três camadas:

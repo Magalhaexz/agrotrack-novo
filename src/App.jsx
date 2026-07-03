@@ -15,7 +15,6 @@ import { useToast } from './hooks/useToast';
 import { useCloudControls } from './hooks/useCloudControls';
 import { useOfflineQueueStatus } from './hooks/useOfflineQueueStatus';
 import { useOfflineAutoSync } from './hooks/useOfflineAutoSync';
-import AssinaturaBloqueadaPage from './pages/AssinaturaBloqueadaPage';
 import {
   limparPersistenciaSessao,
   limparMarcadoresFluxoAuth,
@@ -39,7 +38,8 @@ import {
   canAccessModule,
   getModuleBlockedMessage,
 } from './services/subscriptions';
-import { buildAccountAccessGate } from './services/accessControl';
+import { buildAccountAccessGate, getWriteBlockedMessage } from './services/accessControl';
+import { configureWriteAccess } from './services/writeGuard';
 import { useAccountSubscription } from './hooks/useAccountSubscription';
 import { obterResumoUso } from './domain/planos';
 import { buildAlerts } from './utils/alerts';
@@ -262,6 +262,10 @@ export default function App() {
     () => obterResumoUso(db, currentSubscription).uso,
     [db, currentSubscription]
   );
+  // Paywall de escrita: o usuário SEMPRE entra e visualiza o app; só a gravação
+  // exige plano ativo. `podeEscrever` reaproveita o gate de conta.
+  const podeEscrever = !subscriptionGate.blocked;
+  const writeBlockedRef = useRef(null);
   const [usuarioLogado, setUsuarioLogado] = useState(null);
   const [menuExtraAberto, setMenuExtraAberto] = useState(false);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(() => readSidebarCollapsedState());
@@ -297,6 +301,17 @@ export default function App() {
       // Preferimos manter a UI funcionando mesmo se o storage falhar.
     }
   }, [sidebarCollapsed]);
+
+  // Mantém o serviço central de persistência sabendo se a conta pode gravar.
+  // Um ref guarda o handler de redirecionamento sempre atualizado, evitando
+  // closures obsoletas quando perfil/assinatura mudam.
+  useEffect(() => {
+    configureWriteAccess({
+      canWrite: podeEscrever,
+      reason: subscriptionGate.reason,
+      onBlockedWrite: (payload) => writeBlockedRef.current?.(payload),
+    });
+  }, [podeEscrever, subscriptionGate.reason]);
 
   useEffect(() => {
     const handlePopState = () => {
@@ -700,36 +715,6 @@ export default function App() {
     onWarning: (message) => showToast({ type: 'warning', message: message || 'Operação salva parcialmente apenas localmente.' }),
   };
 
-  const handleRegistrarEntradaAnimal = (dados) => setDb((prev) => registrarEntradaAnimal(prev, dados, userContext, persistContext));
-  const handleRegistrarSaidaAnimal = (dados) => setDb((prev) => registrarSaidaAnimal(prev, dados, userContext, persistContext));
-  const handleRegistrarEntradaEstoque = (dados) => setDb((prev) => registrarEntradaEstoque(prev, dados, userContext));
-  const handleRegistrarSaidaEstoque = (dados) => setDb((prev) => registrarSaidaEstoque(prev, dados, userContext));
-
-  const onConfirmAction = ({ title, message, tone = 'danger' }) =>
-    new Promise((resolve) => {
-      setConfirmState({
-        open: true,
-        title: title || 'Confirmar ação',
-        message,
-        tone,
-        resolver: resolve,
-      });
-    });
-
-  function fecharConfirmacao(resultado) {
-    if (typeof confirmState.resolver === 'function') {
-      confirmState.resolver(resultado);
-    }
-
-    setConfirmState({
-      open: false,
-      title: '',
-      message: '',
-      tone: 'danger',
-      resolver: null,
-    });
-  }
-
   function navigateWithPermission(pagina, intent = null) {
     const permissaoDestino = permissoesPorPagina[pagina];
     if (!permissaoDestino || hasPermission(permissaoDestino)) {
@@ -761,8 +746,83 @@ export default function App() {
     return false;
   }
 
+  // Paywall central: chamado quando uma gravação é barrada (pelo serviço de
+  // persistência ou por um botão guardado). Proprietário vai para a página de
+  // planos; subusuário é orientado a acionar o dono da conta.
+  function handleWriteBlocked(info = {}) {
+    const podeGerenciarAssinatura = hasPermission('assinatura:gerenciar');
+    if (podeGerenciarAssinatura) {
+      showToast({ type: 'warning', message: getWriteBlockedMessage() });
+      navigateWithPermission('minhaAssinatura', { reason: 'write_blocked', feature: info?.feature || null });
+      return;
+    }
+    showToast({
+      type: 'warning',
+      message: 'Para salvar dados, peça ao proprietário da conta para ativar um plano.',
+    });
+  }
+  useEffect(() => {
+    writeBlockedRef.current = handleWriteBlocked;
+  });
+
+  // Guarda de escrita para uso na UI (ações rápidas / botões "Novo"): retorna
+  // false e redireciona quando a conta está em modo visualização.
+  function ensureCanWriteOrRedirect(feature = null) {
+    if (podeEscrever) return true;
+    handleWriteBlocked({ feature });
+    return false;
+  }
+
+  const handleRegistrarEntradaAnimal = (dados) => {
+    if (!ensureCanWriteOrRedirect('animais.create')) return;
+    setDb((prev) => registrarEntradaAnimal(prev, dados, userContext, persistContext));
+  };
+  const handleRegistrarSaidaAnimal = (dados) => {
+    if (!ensureCanWriteOrRedirect('animais.saida')) return;
+    setDb((prev) => registrarSaidaAnimal(prev, dados, userContext, persistContext));
+  };
+  const handleRegistrarEntradaEstoque = (dados) => {
+    if (!ensureCanWriteOrRedirect('estoque.create')) return;
+    setDb((prev) => registrarEntradaEstoque(prev, dados, userContext));
+  };
+  const handleRegistrarSaidaEstoque = (dados) => {
+    if (!ensureCanWriteOrRedirect('estoque.saida')) return;
+    setDb((prev) => registrarSaidaEstoque(prev, dados, userContext));
+  };
+
+  const onConfirmAction = ({ title, message, tone = 'danger' }) =>
+    new Promise((resolve) => {
+      setConfirmState({
+        open: true,
+        title: title || 'Confirmar ação',
+        message,
+        tone,
+        resolver: resolve,
+      });
+    });
+
+  function fecharConfirmacao(resultado) {
+    if (typeof confirmState.resolver === 'function') {
+      confirmState.resolver(resultado);
+    }
+
+    setConfirmState({
+      open: false,
+      title: '',
+      message: '',
+      tone: 'danger',
+      resolver: null,
+    });
+  }
+
   function handleMobileQuickAction(acao) {
     const action = String(acao || '').toLowerCase();
+
+    // Ação rápida = intenção de criar. Sem plano ativo, redireciona direto
+    // para assinatura (Parte 7 do escopo), em vez de abrir o fluxo de cadastro.
+    if (!ensureCanWriteOrRedirect(`quick_action.${action}`)) {
+      return;
+    }
 
     if (action.includes('pesagem')) {
       navigateWithPermission('pesagens');
@@ -872,21 +932,6 @@ export default function App() {
     );
   }
 
-  if (subscriptionGate.blocked) {
-    return (
-      <AssinaturaBloqueadaPage
-        subscription={currentSubscription}
-        reason={subscriptionGate.reason}
-        message={subscriptionGate.message}
-        session={session}
-        user={user}
-        usuarioLogado={usuarioLogado}
-        onSignOut={handleLogout}
-        onSubscriptionRefresh={accountSubscriptionState.refresh}
-      />
-    );
-  }
-
   return (
     <div className={`app app-shell ${sidebarCollapsed ? 'app-shell--sidebar-collapsed' : ''}`}>
       {showAuthDebug && session ? (
@@ -921,6 +966,41 @@ export default function App() {
       />
 
       <main className={`main${['lotes', 'estoque', 'financeiro'].includes(pageKey) ? ' main-has-fab' : ''}`}>
+        {!podeEscrever ? (
+          <div
+            style={{
+              margin: '0 16px 16px',
+              padding: '16px',
+              borderRadius: 16,
+              border: '1px solid rgba(37, 99, 235, 0.22)',
+              background: 'linear-gradient(180deg, rgba(239, 246, 255, 0.96), rgba(255, 255, 255, 0.96))',
+              boxShadow: '0 14px 30px rgba(15, 23, 42, 0.06)',
+              display: 'grid',
+              gap: 10,
+            }}
+          >
+            <strong style={{ fontSize: 15, color: 'var(--color-text)' }}>
+              Você está em modo visualização.
+            </strong>
+            <p style={{ margin: 0, color: 'var(--color-text-secondary)', lineHeight: 1.5 }}>
+              Explore o HERDON à vontade. Para cadastrar, salvar ou editar dados da fazenda, escolha um plano.
+            </p>
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 10 }}>
+              {hasPermission('assinatura:gerenciar') ? (
+                <Button type="button" variant="primary" size="sm" onClick={() => navigateWithPermission('minhaAssinatura', { reason: 'view_mode' })}>
+                  Escolher plano
+                </Button>
+              ) : (
+                <span style={{ color: 'var(--color-text-secondary)', fontSize: 13 }}>
+                  Peça ao proprietário da conta para ativar um plano.
+                </span>
+              )}
+              <Button type="button" variant="ghost" size="sm" onClick={handleLogout}>
+                Sair da conta
+              </Button>
+            </div>
+          </div>
+        ) : null}
         {subscriptionGate.warning ? (
           <div
             style={{

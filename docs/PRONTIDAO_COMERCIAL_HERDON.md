@@ -3,6 +3,47 @@
 > Sprint: "Preparar o HERDON para venda real com bloqueio por plano, papéis e assinatura"
 > Data: 2026-07-02 · Branch `main` · Banco: Supabase `ljpiszxicmmuefbiixui`
 
+## 0. Paywall de escrita / modo visualização (atualização 2026-07-02)
+
+**Por que mudou.** O bloqueio global da sprint anterior era tecnicamente correto mas comercialmente agressivo: uma conta sem plano caía direto numa tela de bloqueio e não conhecia o produto. O produtor precisa ver o HERDON antes de decidir pagar.
+
+**Regra antiga.** Sem assinatura válida → não entra no app (tela `AssinaturaBloqueadaPage` logo após o login).
+
+**Regra nova.** Sem assinatura válida → **entra e vê o app inteiro em modo visualização**; só a **escrita** (cadastrar/salvar/editar/excluir/importar) exige plano. Ao tentar gravar, é levado à página de planos com a mensagem "Para salvar dados no HERDON, escolha um plano."
+
+| Situação | Pode VER | Pode ESCREVER |
+|---|---|---|
+| Sem assinatura | ✅ | 🔴 (sem_plano) |
+| `trialing` no prazo | ✅ | ✅ |
+| `trialing` vencido | ✅ | 🔴 (trial_vencido) |
+| `active` | ✅ | ✅ |
+| `past_due` na tolerância (3 dias) | ✅ | ✅ (com aviso) |
+| `past_due` fora da tolerância | ✅ | 🔴 (pagamento_vencido) |
+| `canceled` / `blocked` | ✅ | 🔴 |
+| `internal_test` / override / admin bootstrap | ✅ | ✅ |
+
+**Subusuários** herdam o status do proprietário (assinatura avaliada via `owner_user_id`): dono sem escrita ⇒ subusuário sem escrita. **Visualizador** nunca escreve, mesmo com plano ativo (bloqueio de papel em `perfis.js`, independente do paywall comercial).
+
+**Como o redirecionamento funciona (camadas centrais, sem tela-a-tela):**
+1. **Serviço central** — `operationalPersistence.createOperationalRecord/update/delete` (e a limpeza de coleção) checam o paywall na primeira linha via `writeGuard`. Sem plano, retornam `{ persisted:false, code:'SUBSCRIPTION_REQUIRED' }` **antes de qualquer chamada de rede ou fila offline** (sem erro técnico, sem "salvar depois", sem sucesso falso) e disparam o redirecionamento. Como as telas persistem primeiro e só atualizam a UI no sucesso, nenhum registro fantasma aparece.
+2. **Ações rápidas / FAB do Dashboard** — guardados no `App.jsx`: tocar em "Nova pesagem/lote/…" sem plano redireciona imediatamente para assinatura (Parte 7).
+3. **Redirecionamento** — proprietário vai para "Planos e Assinatura" (`minhaAssinatura`) com toast; subusuário recebe "peça ao proprietário para ativar um plano".
+
+**Aviso de topo (modo visualização):** banner discreto em azul — "Você está em modo visualização. Explore o HERDON à vontade. Para cadastrar, salvar ou editar dados da fazenda, escolha um plano." + botão "Escolher plano" (proprietário).
+
+**Telas protegidas:** todas — o bloqueio é central no serviço de persistência, cobrindo Fazenda, Pastos, Lotes, Animais, Pesagens, Estoque, Sanidade, Suplementação, Financeiro, Tarefas, Calendário, Cenários, Configurações e importação. **Isenção documentada:** descartes pessoais de notificação (`alertas_resolvidos`, `alertas_adiados`) continuam gravando em modo visualização — não são dados da fazenda.
+
+**Arquivos:** `src/services/accessControl.js` (`canViewApp`/`canWriteData`/`requiresSubscriptionForWrite`/`getWriteBlockedReason`/`SubscriptionRequiredError`), `src/services/writeGuard.js` (novo, ponte de runtime), `src/services/operationalPersistence.js` (guarda central), `src/App.jsx` (remove o bloqueio de entrada, banner de modo visualização, redirect de ações rápidas), `src/pages/AssinaturaBloqueadaPage.jsx` (não mais usado no fluxo — redirecionamos para `minhaAssinatura`).
+
+**Testes (Parte 11):** `tests/writePaywall.test.js` (14 casos) cobre a matriz view/write dos 8 status, herança de subusuário, visualizador sem escrita mesmo com plano, `SubscriptionRequiredError`, o default permissivo do guard e a **integração real**: `createOperationalRecord/update/delete` chamados com `canWrite:false` retornam `SUBSCRIPTION_REQUIRED` e disparam o redirect, e as tabelas isentas não são bloqueadas. Suite total: 666 testes, 0 falhas.
+
+**Limitação / próximos passos (Parte 14 — segurança):** o paywall protege o **fluxo normal do app** (UI + serviço central), mas **não há bloqueio no nível de RLS/RPC** — um usuário sem plano ainda conseguiria gravar na própria conta chamando o Supabase diretamente (o RLS isola contas por `owner_user_id`, mas não valida assinatura; nenhum dado de terceiros é exposto em hipótese alguma). Endurecer via RLS/RPC com validação de assinatura ativa nos INSERT/UPDATE/DELETE operacionais fica como etapa futura, **fora desta sprint** por exigir diagnóstico dedicado (risco de quebrar o app inteiro). Nesta sprint **nenhum RLS foi alterado**.
+
+**Validação manual (Parte 12):** o dev server local não tem chaves Supabase (`.env` sem `VITE_SUPABASE_URL`), então o login logado não roda localmente — a verificação clicável (conta sem plano navega tudo e é redirecionada ao tentar cadastrar; conta paga salva normal) deve ser feita na URL publicada após o deploy deste commit. Lógica coberta integralmente pelos testes; app sobe limpo na tela de login com todos os módulos novos servidos sem erro de console.
+
+---
+
+
 ## 1. Diagnóstico do estado comercial (antes desta sprint)
 
 O HERDON já tinha **quase toda a infraestrutura comercial construída** em sprints anteriores (12, 22–28):

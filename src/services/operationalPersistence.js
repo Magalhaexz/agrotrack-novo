@@ -1,5 +1,22 @@
 ﻿import { getSupabaseEnvStatus, supabase, validateSupabaseSessionForCloud } from '../lib/supabase.js';
+import { isWriteAllowed, notifyBlockedWrite, buildWriteBlockedResult } from './writeGuard.js';
 const IS_DEV = Boolean(import.meta?.env?.DEV);
+// Paywall de escrita: tabelas isentas são descartes pessoais de notificação
+// (não são dados da fazenda), então continuam gravando em modo visualização.
+const PAYWALL_EXEMPT_TABLES = new Set(['alertas_resolvidos', 'alertas_adiados']);
+
+/**
+ * Barra a gravação quando a conta está sem plano ativo (modo visualização).
+ * Retorna o resultado bloqueado padrão e dispara o redirecionamento central
+ * para a página de assinatura; caso contrário retorna null (segue o fluxo).
+ */
+function guardOperationalWrite(table, action) {
+  if (isWriteAllowed()) return null;
+  const key = String(table || '').toLowerCase();
+  if (PAYWALL_EXEMPT_TABLES.has(key)) return null;
+  notifyBlockedWrite({ feature: `${key}.${action}` });
+  return buildWriteBlockedResult(`${key}.${action}`);
+}
 const IS_TEST = typeof globalThis !== 'undefined' && globalThis?.process?.env?.NODE_ENV === 'test';
 const NETWORK_CIRCUIT_OPEN_MS = 45000;
 const moduleNetworkCircuit = new Map();
@@ -1598,6 +1615,8 @@ function sanitizeAuditDetails(input) {
 }
 
 export async function createOperationalRecord(table, record, session, options = {}) {
+  const writeBlocked = guardOperationalWrite(table, 'create');
+  if (writeBlocked) return writeBlocked;
   const runtimeContext = {
     hasSession: Boolean(session),
     hasUserId: Boolean(getSessionUserId(session)),
@@ -1954,6 +1973,8 @@ function validateFazendaCreatePayload(payload = {}, session) {
 }
 
 export async function updateOperationalRecord(table, id, patch, session, options = {}) {
+  const writeBlocked = guardOperationalWrite(table, 'update');
+  if (writeBlocked) return writeBlocked;
   const runtimeContext = {
     hasSession: Boolean(session),
     hasUserId: Boolean(getSessionUserId(session)),
@@ -2210,6 +2231,8 @@ export async function updateOperationalRecord(table, id, patch, session, options
 }
 
 export async function deleteOperationalRecord(table, id, session, options = {}) {
+  const writeBlocked = guardOperationalWrite(table, 'delete');
+  if (writeBlocked) return writeBlocked;
   const runtimeContext = {
     hasSession: Boolean(session),
     hasUserId: Boolean(getSessionUserId(session)),
@@ -2547,6 +2570,8 @@ export async function createAuditEvent(event = {}, session) {
 }
 
 export async function deleteOwnerScopedCollection(table, session, extraFilters = []) {
+  const writeBlocked = guardOperationalWrite(table, 'delete_collection');
+  if (writeBlocked) return writeBlocked;
   const userId = getSessionUserId(session);
   if (!userId) {
     return buildFallback('Sessão indisponível para limpeza da coleção.');
