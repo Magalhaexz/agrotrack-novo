@@ -147,8 +147,78 @@ A tela é **100% leitura** — nenhum formulário, nenhum `createOperationalReco
 - `npm test`: **706 testes, 0 falhas** (701 da Sprint 1 + 5 novos).
 - Verificação manual interativa (logada) **não foi possível neste ambiente**: o servidor de desenvolvimento local não tem as chaves do Supabase configuradas (limitação já registrada em sprints comerciais anteriores), então não há como autenticar e navegar até a tela pelo Sidebar nesta sessão. A confiança na integração vem de: build de produção bem-sucedido (compila e resolve todo o grafo de imports/JSX do componente), lint limpo, e cobertura total da lógica de dados por teste automatizado — só a renderização visual final (cores, layout responsivo) não foi vista ao vivo.
 
-## 15. Próximos passos sugeridos
+## 15. Próximos passos sugeridos (da Sprint 2)
 
-- Verificar visualmente a tela em produção (mobile e desktop) após o deploy deste commit.
+- ~~Verificar visualmente a tela em produção (mobile e desktop) após o deploy deste commit.~~
 - Ligar o card "Atenção imediata" a uma notificação push/e-mail diária (Assistente HERDON).
 - Reaproveitar `alertas_resolvidos`/`alertas_adiados` (já usado em `utils/alerts.js`) para permitir marcar um item da tela como resolvido/adiado, usando o mesmo `id` do alerta como chave.
+
+---
+
+# Sprint 3 — Painel de Saúde do Lote
+
+> Data: 2026-07-02 · Branch `main`
+
+## 16. Objetivo
+
+Dar ao produtor um número único por lote — 0 a 100 — que resuma se aquele lote está bem ou precisa de atenção, com explicação em português de por que o score é o que é. Não é um alerta a mais: é uma síntese que se apoia em tudo que já existe (Sprint 1 e 2) mais três sinais novos (frequência de pesagem, custo por cabeça, mortalidade/perdas).
+
+## 17. Arquivos criados/alterados
+
+| Arquivo | O que mudou |
+|---|---|
+| `src/domain/saudeLote.js` (novo) | `calcularSaudeLote(db, loteId, agora)`, `listarSaudeLotes(db, agora)`, `classificarScore`, `SAUDE_LOTE_CLASSIFICACAO` |
+| `src/domain/saudeLote.test.js` (novo) | 26 testes cobrindo os 8 fatores, os 4 patamares de classificação, confiabilidade e o ranking |
+| `src/components/lotes/SaudeLoteCard.jsx` (novo) | Componente de exibição (score + badge + explicações), reaproveitado nos 3 lugares pedidos |
+| `src/components/lotes/LoteCard.jsx` | `<SaudeLoteCard compact />` no card da listagem |
+| `src/components/lotes/LoteOverviewTab.jsx` | `<SaudeLoteCard />` completo na aba "Visão geral" dos detalhes do lote |
+| `src/pages/LotesPage.jsx` | `lote.saude = calcularSaudeLote(db, lote.id)` no enriquecimento de cada lote |
+| `src/pages/DecisoesFazendaPage.jsx` | Novo card "Saúde dos lotes" com `listarSaudeLotes`, rankeando os 6 piores |
+| `src/styles/rebanho.css` | Classes `.saude-lote*` (cor lateral por classificação, badge, lista de explicações) |
+| `src/styles/decisoes.css` | Grid `.decisoes-saude-lotes` para o novo card |
+
+## 18. Como o score é calculado
+
+Começa em **100 pontos** e só **subtrai** — nunca soma acima de 100. Um fator "em dia" com dado disponível não aumenta o score (já está no teto), só aumenta a **confiança** (registrada como uma frase própria, ex. "Sanidade em dia aumentou a confiança do score." — texto literal do enunciado). Um fator sem dado suficiente **não penaliza** — fica fora da conta e reduz a confiabilidade geral.
+
+| # | Fator | Como decide (reaproveitado de) | Penalidade máxima |
+|---|---|---|---|
+| 1 | GMD em relação à meta | `detectarLotesAbaixoGmd` (Sprint 1) — só decide severidade/pontos aqui | -20 |
+| 2 | Frequência de pesagem | Última data em `db.pesagens` do lote (lógica nova, simples) | -15 |
+| 3 | Tarefas atrasadas | `detectarTarefasAtrasadas` (Sprint 1), filtrado pelas tarefas do lote | -10 |
+| 4 | Sanidade pendente | `detectarSanidadeProxima` (Sprint 1), filtrado pelos registros do lote | -15 |
+| 5 | Estoque/suplementação vinculada | `detectarEstoqueBaixo` (Sprint 1), filtrado pelos itens que o lote consome (via `consumo_suplementacao`) | -10 |
+| 6 | Custo por cabeça | `getResumoLote` + o mesmo limiar de "custo alto" de `decisaoVenda.js` (`LIMIAR_CUSTO_ALTO_PCT`/`PRECO_ARROBA_PADRAO`) — nenhum threshold novo inventado | -15 |
+| 7 | Proximidade do peso alvo | `detectarLotesProximosPesoAlvo` (Sprint 1) — **nunca penaliza**, só confirma confiança ou descreve o estágio de crescimento | 0 |
+| 8 | Mortalidade/perdas | `movimentacoes_animais` (tipo `morte`/`descarte` = perda; `venda`/`abate` = saída normal, não penaliza) | -20 |
+
+Para os fatores 1, 3, 4 e 5, o `saudeLote.js` **não recalcula severidade** — ele chama o detector do Sprint 1 sobre o `db` inteiro e filtra o resultado pelos registros (`entidade.id`) vinculados àquele lote. Zero duplicação de threshold: só conversão de "severidade" em "pontos".
+
+**Classificação** (Entrega 3, faixas exatas do enunciado): 85–100 saudável · 70–84 atenção · 50–69 risco · abaixo de 50 crítico.
+
+## 19. Quando faltam dados
+
+Dois níveis, conforme pedido no enunciado ("reduzir confiança do score ou mostrar dados insuficientes"):
+
+- **Confiança reduzida**: o score é calculado normalmente com os fatores disponíveis; `confiabilidade` fica `'media'` (4-5 de 8 fatores) ou `'baixa'` (≤3 de 8), e quando é `'baixa'` aparece a mensagem *"Poucos dados disponíveis para este lote — o score pode não refletir a situação real."*
+- **Dados insuficientes (bail-out)**: quando **nenhum** dos 8 fatores tem dado (lote recém-criado, nada lançado ainda) ou o lote não existe, `score` e `classificacao` voltam `null` e `dadosInsuficientes: true` — o app nunca mostra um número inventado sem base real. Descoberto e corrigido durante os testes: o fator "frequência de pesagem" só conta como disponível se o lote já tem cabeças (`heads > 0`); sem isso, "nunca foi pesado" não é um sinal de saúde real, é só "ainda não começou a operar" — sem essa checagem, um lote 100% vazio recebia score 85 ("saudável"), o que seria enganoso.
+
+## 20. Onde o score aparece (Entregas 5, 6 e 7)
+
+1. **Card do lote** (`LotesPage` → `LoteCard`): versão compacta — score, classificação e badge, sem a lista de explicações (mobile-friendly, card já é denso).
+2. **Detalhes do lote** (`LoteDetailsPanel` → `LoteOverviewTab`, aba "Visão geral"): versão completa, com todas as explicações e o aviso de confiabilidade quando aplicável.
+3. **Decisões da Fazenda**: novo card "Saúde dos lotes", com `listarSaudeLotes` — os 6 lotes com pior score primeiro (lotes com dados insuficientes vão para o final do ranking), cada um em formato compacto, respondendo diretamente "qual lote está pior" e "qual está melhor".
+
+## 21. Testes e validação
+
+- 26 testes novos em `saudeLote.test.js`: as 8 faixas de classificação, os 8 fatores (positivo, negativo e indisponível para cada um, incluindo os dois exemplos literais do enunciado — "Sem pesagem recente reduziu 10 pontos." e "Sanidade em dia aumentou a confiança do score."), confiabilidade alta/média/baixa, lote não encontrado, lote sem nenhum dado, e o ranking de `listarSaudeLotes`.
+- `npm run lint`: sem erros.
+- `npm run build`: sucesso — chunks de `LotesPage` e `DecisoesFazendaPage` compilam normalmente com os novos imports.
+- `npm test`: **732 testes, 0 falhas** (706 da Sprint 2 + 26 novos).
+- Mesma limitação das sprints anteriores: sem chaves Supabase no `.env` local, não há como logar e ver o score renderizado ao vivo nesta sessão. Confirmei que o app sobe limpo (zero erro de console) na tela de login com os novos módulos já no grafo de build.
+
+## 22. Próximos passos sugeridos
+
+- Ver o painel em produção (mobile e desktop) após o deploy.
+- Permitir abrir o lote específico a partir do card de ranking em "Decisões da Fazenda" (hoje o botão só leva para a lista de lotes, não para o lote específico — limitação de navegação já existente no app, não introduzida por esta sprint).
+- Se o produto quiser, mostrar o score também no card "Lotes abaixo da meta"/"Oportunidades" da tela de Decisões, para reforçar a relação entre o alerta pontual e a saúde geral do lote.

@@ -502,6 +502,109 @@ label textarea {
   font-size: 0.76rem;
 }
 
+/* --- Saúde do Lote (Sprint 3) --- */
+.saude-lote {
+  display: grid;
+  gap: var(--space-2);
+  margin: 8px 0;
+  padding: 10px 12px;
+  border-radius: var(--radius-md);
+  border-left: 4px solid var(--color-text-muted);
+  background: var(--color-surface-2);
+}
+
+.saude-lote--saudavel {
+  border-left-color: var(--color-success);
+}
+
+.saude-lote--atencao {
+  border-left-color: var(--color-warning);
+}
+
+.saude-lote--risco {
+  border-left-color: #f97316;
+}
+
+.saude-lote--critico {
+  border-left-color: var(--color-danger);
+}
+
+.saude-lote--indisponivel {
+  border-left-color: var(--color-text-muted);
+}
+
+.saude-lote__cabecalho {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  flex-wrap: wrap;
+  color: var(--color-text);
+  font-size: 0.9rem;
+}
+
+.saude-lote__badge {
+  margin-left: auto;
+  padding: 2px 10px;
+  border-radius: var(--radius-full);
+  font-size: 0.74rem;
+  font-weight: 600;
+  background: var(--color-surface-3);
+  color: var(--color-text-secondary);
+}
+
+.saude-lote--saudavel .saude-lote__badge {
+  color: var(--color-success);
+}
+
+.saude-lote--atencao .saude-lote__badge {
+  color: var(--color-warning);
+}
+
+.saude-lote--risco .saude-lote__badge {
+  color: #f97316;
+}
+
+.saude-lote--critico .saude-lote__badge {
+  color: var(--color-danger);
+}
+
+.saude-lote__mensagem,
+.saude-lote__aviso {
+  margin: 0;
+  color: var(--color-text-secondary);
+  font-size: 0.8rem;
+  line-height: 1.4;
+}
+
+.saude-lote__explicacoes {
+  margin: 0;
+  padding-left: 18px;
+  display: grid;
+  gap: 4px;
+  color: var(--color-text-secondary);
+  font-size: 0.8rem;
+  line-height: 1.4;
+}
+
+.saude-lote--compact {
+  padding: 6px 10px;
+  margin: 6px 0;
+}
+
+.saude-lote--compact .saude-lote__cabecalho {
+  font-size: 0.82rem;
+}
+
+@media (max-width: 640px) {
+  .saude-lote__cabecalho {
+    gap: 6px;
+  }
+
+  .saude-lote__badge {
+    margin-left: 0;
+  }
+}
+
 .tabs-row {
   flex-wrap: nowrap;
   overflow-x: auto;

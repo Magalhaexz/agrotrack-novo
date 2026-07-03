@@ -1,6 +1,7 @@
 ﻿import Badge from '../ui/Badge';
 import Button from '../ui/Button';
 import Card from '../ui/Card';
+import SaudeLoteCard from './SaudeLoteCard';
 import { formatCurrency, formatDate, formatNumber } from '../../utils/calculations';
 import { avaliarDesempenhoGmd } from '../../domain/gmdAlerta';
 
@@ -71,6 +72,8 @@ export default function LoteCard({
         <p><strong>{formatNumber(lote.gmd30, 3)} kg/dia</strong><span>GMD (30d)</span></p>
         <p><strong>{formatCurrency(lote.resumo?.lucroTotal || 0)}</strong><span>Resultado</span></p>
       </div>
+
+      <SaudeLoteCard saude={lote.saude} compact />
 
       <p className="lote-card-last">Última pesagem: {lote.ultimaPesagem ? formatDate(lote.ultimaPesagem) : 'sem registro'}</p>
 

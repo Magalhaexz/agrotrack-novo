@@ -1,4 +1,5 @@
 import Card from '../ui/Card';
+import SaudeLoteCard from './SaudeLoteCard';
 import { formatCurrency, formatDate, formatNumber } from '../../utils/calculations';
 
 export default function LoteOverviewTab({ lote, resumo }) {
@@ -8,6 +9,7 @@ export default function LoteOverviewTab({ lote, resumo }) {
 
   return (
     <Card title="Visão geral" subtitle="Resumo técnico e financeiro do lote">
+      <SaudeLoteCard saude={lote.saude} titulo="Saúde do lote" />
       <div className="metrics-2col lote-details-grid">
         <p><strong>Status:</strong> {lote.status}</p>
         <p><strong>Entrada:</strong> {formatDate(lote.entrada)}</p>

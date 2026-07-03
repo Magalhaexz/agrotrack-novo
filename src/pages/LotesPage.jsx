@@ -7,6 +7,7 @@ import LoteForm from '../components/LoteForm';
 import { useAuth } from '../auth/useAuth';
 import { useToast } from '../hooks/useToast';
 import { getResumoLote } from '../domain/resumoLote';
+import { calcularSaudeLote } from '../domain/saudeLote';
 import { calcLote } from '../utils/calculations';
 import { gerarNovoId } from '../utils/id';
 import { createOperationalRecord, deleteOperationalRecord, updateOperationalRecord } from '../services/operationalPersistence';
@@ -258,6 +259,7 @@ export default function LotesPage({ db, setDb, onRegistrarSaidaAnimal, session, 
       .sort((a, b) => b.data.localeCompare(a.data))[0];
     const resumo = getResumoLote(db, lote.id);
     const indicators = calcLote(db, lote.id);
+    const saude = calcularSaudeLote(db, lote.id);
     const pesoInicialPlanejado = toNumber(lote.p_ini || indicators.pesoInicialMedio);
     const pesoAtual = toNumber(lote.p_at || latestPesagem?.peso_medio || indicators.pesoAtualMedio || lote.p_ini);
     const heads = toNumber(lote.qtd || resumo.totalAnimais || indicators.totalAnimais);
@@ -274,6 +276,7 @@ export default function LotesPage({ db, setDb, onRegistrarSaidaAnimal, session, 
       pesoAtual,
       heads,
       resumo,
+      saude,
       progressoPeso,
       ultimaPesagem: latestPesagem?.data || null,
       gmd30: calculateGmd30(lotePesagens),

@@ -21,6 +21,17 @@
   align-items: start;
 }
 
+/* Ranking de saúde dos lotes (Sprint 3) — reaproveita .saude-lote (rebanho.css). */
+.decisoes-saude-lotes {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+  gap: var(--space-3);
+}
+
+.decisoes-saude-lotes .saude-lote {
+  margin: 0;
+}
+
 .decisoes-lista {
   display: grid;
   gap: var(--space-3);

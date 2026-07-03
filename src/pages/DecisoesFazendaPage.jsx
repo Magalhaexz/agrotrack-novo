@@ -14,12 +14,17 @@ import Card from '../components/ui/Card';
 import Button from '../components/ui/Button';
 import PageHeader from '../components/PageHeader';
 import EmptyState from '../components/EmptyState';
+import SaudeLoteCard from '../components/lotes/SaudeLoteCard';
 import {
   agruparAlertasPorTipo,
   construirInsightsFazenda,
   listarAtencaoImediata,
 } from '../domain/insightsFazenda';
+import { listarSaudeLotes } from '../domain/saudeLote';
 import '../styles/decisoes.css';
+import '../styles/rebanho.css';
+
+const LIMITE_LOTES_RANKING = 6;
 
 // Rótulo/ícone/página de destino por categoria — puramente apresentação.
 // A lista de tipos válidos e o agrupamento em si vêm do motor (insightsFazenda.js).
@@ -132,6 +137,7 @@ export default function DecisoesFazendaPage({ db = {}, onNavigate = null }) {
   const insights = useMemo(() => construirInsightsFazenda(db), [db]);
   const grupos = useMemo(() => agruparAlertasPorTipo(insights.alertas), [insights.alertas]);
   const atencaoImediata = useMemo(() => listarAtencaoImediata(insights.alertas), [insights.alertas]);
+  const saudeLotes = useMemo(() => listarSaudeLotes(db).slice(0, LIMITE_LOTES_RANKING), [db]);
 
   const temDadosBase = useMemo(
     () => COLECOES_BASE.some((chave) => Array.isArray(db?.[chave]) && db[chave].length > 0),
@@ -192,6 +198,30 @@ export default function DecisoesFazendaPage({ db = {}, onNavigate = null }) {
               </li>
             ))}
           </ul>
+        )}
+      </Card>
+
+      <Card
+        title="Saúde dos lotes"
+        subtitle="Do que precisa de mais atenção ao que está indo melhor."
+        className="decisoes-card"
+        action={(
+          <Button variant="ghost" size="sm" onClick={() => handleNavigate('lotes')}>
+            Ver lotes
+          </Button>
+        )}
+      >
+        {saudeLotes.length === 0 ? (
+          <div className="decisoes-vazio">
+            <CheckCircle2 size={16} aria-hidden="true" />
+            <span>Nenhum lote ativo para avaliar ainda.</span>
+          </div>
+        ) : (
+          <div className="decisoes-saude-lotes">
+            {saudeLotes.map((item) => (
+              <SaudeLoteCard key={item.loteId} saude={item} compact titulo={item.nome || `Lote ${item.loteId}`} />
+            ))}
+          </div>
         )}
       </Card>
 
