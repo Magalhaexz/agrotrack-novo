@@ -41,6 +41,7 @@ import {
 import { buildAccountAccessGate, getWriteBlockedMessage } from './services/accessControl';
 import { configureWriteAccess } from './services/writeGuard';
 import { useAccountSubscription } from './hooks/useAccountSubscription';
+import { useTeamUsage } from './hooks/useTeamUsage';
 import { obterResumoUso } from './domain/planos';
 import { buildAlerts } from './utils/alerts';
 import './styles/app.css';
@@ -251,6 +252,9 @@ export default function App() {
   const accountSubscriptionState = useAccountSubscription(session, {
     enabled: Boolean(session?.user?.id) && !loadingAuth,
   });
+  const teamUsageState = useTeamUsage(session, {
+    enabled: Boolean(session?.user?.id) && !loadingAuth,
+  });
   const currentSubscription = useMemo(
     () => accountSubscriptionState.subscription || getCurrentSubscription({ session, user, db }),
     [accountSubscriptionState.subscription, session, user, db]
@@ -263,8 +267,12 @@ export default function App() {
     [currentSubscription, user, accountSubscriptionState.error]
   );
   const subscriptionUsage = useMemo(
-    () => obterResumoUso(db, currentSubscription).uso,
-    [db, currentSubscription]
+    () => obterResumoUso(db, currentSubscription, {
+      // `profiles`/`invites` (Sprint 6) vivem fora do `db` operacional — sem
+      // essa contagem, "Usuários" ficaria preso à tabela legada `db.usuarios`.
+      usuariosAtivos: teamUsageState.loaded ? teamUsageState.activeUsers : undefined,
+    }).uso,
+    [db, currentSubscription, teamUsageState.loaded, teamUsageState.activeUsers]
   );
   // Paywall de escrita: o usuário SEMPRE entra e visualiza o app; só a gravação
   // exige plano ativo. `podeEscrever` reaproveita o gate de conta.
@@ -860,6 +868,9 @@ export default function App() {
   const pageKey = podeAcessarPaginaAtual ? currentPage : 'dashboard';
   const ActivePage = pageMap[pageKey] || DashboardPage;
   const permissaoPaginaAtual = permissoesPorPagina[pageKey] || null;
+  // Fecha o mesmo bloqueio de módulo/plano do clique de navegação também para
+  // carregamento direto de rota/URL e refresh (ver RotaProtegida.jsx).
+  const moduloBloqueadoAtual = !canAccessModule(currentSubscription, pageKey);
 
   const mobileNavGroups = useMemo(() => {
     const grupos = navSections
@@ -1101,7 +1112,12 @@ export default function App() {
                 </div>
               )}
             >
-              <RotaProtegida permissao={permissaoPaginaAtual}>
+              <RotaProtegida
+                permissao={permissaoPaginaAtual}
+                moduleBloqueado={moduloBloqueadoAtual}
+                moduleMensagem={getModuleBlockedMessage()}
+                onIrParaAssinatura={() => navigateWithPermission('minhaAssinatura', { action: 'upgrade', motivo: 'modulo_bloqueado', modulo: pageKey })}
+              >
                 <ActivePage
                   db={pageKey === 'dashboard' ? dbDashboard : db}
                   setDb={setDb}

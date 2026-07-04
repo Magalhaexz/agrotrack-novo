@@ -1,0 +1,141 @@
+/* PlanoUsoCard (Sprint 7) — uso do plano e recursos liberados/bloqueados. */
+
+.plano-uso-card {
+  display: grid;
+  gap: var(--space-5);
+}
+
+.plano-uso-card__metricas {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: var(--space-4);
+}
+
+.plano-uso-metrica {
+  display: grid;
+  gap: var(--space-2);
+  padding: var(--space-4);
+  border-radius: var(--radius-md);
+  background: var(--color-surface-2);
+  border: 1px solid var(--color-border);
+}
+
+.plano-uso-metrica.is-perto {
+  border-color: var(--color-warning);
+}
+
+.plano-uso-metrica.is-limite {
+  border-color: var(--color-danger);
+}
+
+.plano-uso-metrica__cabecalho {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--space-2);
+}
+
+.plano-uso-metrica__label {
+  color: var(--color-text-secondary);
+  font-size: 0.85rem;
+}
+
+.plano-uso-metrica__valor {
+  color: var(--color-text);
+  font-size: 1.1rem;
+}
+
+.plano-uso-metrica__barra {
+  height: 6px;
+  border-radius: var(--radius-full);
+  background: var(--color-surface-3);
+  overflow: hidden;
+}
+
+.plano-uso-metrica__barra-fill {
+  height: 100%;
+  background: var(--color-primary);
+  border-radius: var(--radius-full);
+}
+
+.is-perto .plano-uso-metrica__barra-fill {
+  background: var(--color-warning);
+}
+
+.is-limite .plano-uso-metrica__barra-fill {
+  background: var(--color-danger);
+}
+
+.plano-uso-metrica__aviso {
+  margin: 0;
+  font-size: 0.82rem;
+  color: var(--color-text-secondary);
+}
+
+.plano-uso-metrica__aviso--perto {
+  color: var(--color-warning);
+}
+
+.is-limite .plano-uso-metrica__aviso {
+  color: var(--color-danger);
+}
+
+.plano-uso-card__recursos {
+  display: grid;
+  gap: var(--space-2);
+}
+
+.plano-uso-card__recursos-titulo {
+  font-size: 0.9rem;
+  color: var(--color-text);
+}
+
+.plano-uso-card__recursos ul {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: grid;
+  gap: var(--space-2);
+}
+
+.plano-uso-card__recursos li {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  flex-wrap: wrap;
+}
+
+.plano-uso-card__recursos li span {
+  color: var(--color-text-secondary);
+  font-size: 0.88rem;
+}
+
+.plano-uso-card__acao {
+  display: flex;
+  justify-content: flex-end;
+}
+
+.plano-upgrade-banner {
+  display: grid;
+  gap: var(--space-2);
+  padding: var(--space-4);
+  border-radius: var(--radius-md);
+  background: var(--color-primary-bg);
+  border: 1px solid var(--color-primary);
+}
+
+.plano-upgrade-banner strong {
+  color: var(--color-text);
+}
+
+.plano-upgrade-banner p {
+  margin: 0;
+  color: var(--color-text-secondary);
+  font-size: 0.9rem;
+}
+
+@media (max-width: 640px) {
+  .plano-uso-card__metricas {
+    grid-template-columns: 1fr;
+  }
+}

@@ -7,8 +7,11 @@ import {
   verificarLimiteUso,
   verificarAcessoModulo,
   obterResumoUso,
+  listarRecursosPlano,
+  recomendarProximoPlano,
+  getUpgradeReason,
 } from '../src/domain/planos.js';
-import { getSubscriptionLimitMessage, getModuleBlockedMessage } from '../src/services/subscriptions.js';
+import { canAccessModule, canCreateFarm, getSubscriptionLimitMessage, getModuleBlockedMessage } from '../src/services/subscriptions.js';
 
 test('getPlanoConfig retorna limites e módulos do plano Essencial', () => {
   const config = getPlanoConfig('essencial');
@@ -177,4 +180,87 @@ test('getModuleBlockedMessage: mensagem amigável sem termo técnico', () => {
   const mensagem = getModuleBlockedMessage();
   assert.match(mensagem, /outro plano/);
   assert.doesNotMatch(mensagem, /erro|exception|undefined|null/i);
+});
+
+// ─── Sprint 7 — obterResumoUso com contagem real de usuários (Sprint 6) ────
+
+test('obterResumoUso usa opcoes.usuariosAtivos quando informado, em vez de db.usuarios (tabela legada)', () => {
+  const db = { fazendas: [], animais: [], usuarios: [{ id: 1, status: 'ativo' }] };
+  const semOverride = obterResumoUso(db, { plan_code: 'essencial', status: 'active' });
+  assert.equal(semOverride.uso.users, 1, 'sem override, mantém compatibilidade com db.usuarios');
+
+  const comOverride = obterResumoUso(db, { plan_code: 'essencial', status: 'active' }, { usuariosAtivos: 4 });
+  assert.equal(comOverride.uso.users, 4, 'com override, usa a contagem real de profiles/invites');
+});
+
+// ─── Sprint 7 — listarRecursosPlano ─────────────────────────────────────────
+
+test('listarRecursosPlano: essencial bloqueia cenários e relatórios avançados', () => {
+  const recursos = listarRecursosPlano('essencial');
+  const porChave = Object.fromEntries(recursos.map((r) => [r.chave, r]));
+  assert.equal(porChave.cenarios.liberado, false);
+  assert.equal(porChave.relatorios_avancados.liberado, false);
+  assert.equal(porChave.equipe.liberado, true, 'equipeAcessos está em MODULES_BASIC');
+  assert.equal(porChave.decisoes.liberado, true, 'decisoesFazenda está em MODULES_BASIC');
+});
+
+test('listarRecursosPlano: premium libera cenários e relatórios avançados', () => {
+  const recursos = listarRecursosPlano('premium');
+  const porChave = Object.fromEntries(recursos.map((r) => [r.chave, r]));
+  assert.equal(porChave.cenarios.liberado, true);
+  assert.equal(porChave.relatorios_avancados.liberado, true);
+});
+
+test('listarRecursosPlano: recursos sem módulo (backup, assistente) aparecem como liberados sem depender do plano', () => {
+  const recursos = listarRecursosPlano('essencial');
+  const porChave = Object.fromEntries(recursos.map((r) => [r.chave, r]));
+  assert.equal(porChave.backup.liberado, true);
+  assert.equal(porChave.backup.semRestricaoDePlano, true);
+  assert.equal(porChave.assistente.liberado, true);
+  assert.equal(porChave.assistente.semRestricaoDePlano, true);
+});
+
+// ─── Sprint 7 — recomendarProximoPlano / getUpgradeReason (upgrade) ────────
+
+test('recomendarProximoPlano: limite de fazendas do essencial recomenda o pro', () => {
+  const recomendado = recomendarProximoPlano({ planoAtual: 'essencial', chaveLimite: 'farms' });
+  assert.equal(recomendado.planCode, 'pro');
+});
+
+test('recomendarProximoPlano: módulo cenários indisponível no essencial recomenda premium (pro não tem cenários)', () => {
+  const recomendado = recomendarProximoPlano({ planoAtual: 'essencial', modulo: 'cenarios' });
+  assert.equal(recomendado.planCode, 'premium');
+});
+
+test('recomendarProximoPlano: plano recomendado realmente libera o recurso (upgrade libera)', () => {
+  const recomendado = recomendarProximoPlano({ planoAtual: 'essencial', modulo: 'cenarios' });
+  assert.equal(canAccessModule({ status: 'active', plan_code: recomendado.planCode }, 'cenarios'), true);
+  assert.equal(canAccessModule({ status: 'active', plan_code: 'essencial' }, 'cenarios'), false);
+});
+
+test('recomendarProximoPlano: sem restrição nenhuma, retorna o próximo da escada', () => {
+  assert.equal(recomendarProximoPlano({ planoAtual: 'essencial' }).planCode, 'pro');
+  assert.equal(recomendarProximoPlano({ planoAtual: 'pro' }).planCode, 'premium');
+});
+
+test('getUpgradeReason: limite de fazendas monta mensagem + plano recomendado, diferente da mensagem de módulo', () => {
+  const avaliacaoFarms = canCreateFarm({ plan_code: 'essencial', status: 'active' }, 1);
+  const razaoLimite = getUpgradeReason({ planoAtual: 'essencial', tipo: 'limite', chaveLimite: 'farms', avaliacao: avaliacaoFarms });
+  const razaoModulo = getUpgradeReason({ planoAtual: 'essencial', tipo: 'modulo', modulo: 'cenarios' });
+
+  assert.match(razaoLimite.mensagem, /fazenda/);
+  assert.equal(razaoLimite.planoRecomendadoCodigo, 'pro');
+  assert.match(razaoModulo.mensagem, /outro plano/);
+  assert.equal(razaoModulo.planoRecomendadoCodigo, 'premium');
+  assert.notEqual(razaoLimite.mensagem, razaoModulo.mensagem, 'mensagem de limite é diferente da mensagem de módulo/sem plano');
+});
+
+// ─── Sprint 7 — dados existentes acima do limite continuam visíveis ────────
+
+test('uso acima do limite não apaga nem esconde dados existentes — só impede nova criação', () => {
+  const db = { fazendas: [{ id: 1 }, { id: 2 }], animais: [] };
+  const resumo = obterResumoUso(db, { plan_code: 'essencial', status: 'active' });
+  assert.equal(resumo.uso.farms, 2, 'as 2 fazendas existentes continuam contadas/visíveis');
+  assert.equal(resumo.limites.farms.allowed, false, 'mas não permite criar mais uma (limite é 1)');
+  assert.deepEqual(db.fazendas, [{ id: 1 }, { id: 2 }], 'a função não muta nem filtra os dados existentes');
 });

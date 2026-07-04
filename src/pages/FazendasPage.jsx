@@ -46,7 +46,7 @@ function logFazendaDirectCreate(payload = {}) {
   }
 }
 
-export default function FazendasPage({ db, setDb, onConfirmAction, session: sessionProp, subscription = null }) {
+export default function FazendasPage({ db, setDb, onConfirmAction, session: sessionProp, subscription = null, onNavigate = null }) {
   const { showToast, dismissToast } = useToast();
   const { hasPermission, session: authSession, user, forceLocalSignOut } = useAuth();
   const session = sessionProp ?? authSession;
@@ -64,6 +64,7 @@ export default function FazendasPage({ db, setDb, onConfirmAction, session: sess
 
   const fazendas = useMemo(() => (Array.isArray(db?.fazendas) ? db.fazendas : []), [db?.fazendas]);
   const lotes = useMemo(() => (Array.isArray(db?.lotes) ? db.lotes : []), [db?.lotes]);
+  const limiteFazendas = useMemo(() => canCreateFarm(subscription, fazendas.length), [subscription, fazendas.length]);
 
   const lotesByFazendaMap = useMemo(() => {
     const map = new Map();
@@ -137,12 +138,12 @@ export default function FazendasPage({ db, setDb, onConfirmAction, session: sess
       if (!session?.user?.id) {
         showToast({ type: 'warning', message: 'Faça login novamente para continuar.' });
       }
-      const capacity = canCreateFarm(subscription, fazendas.length);
-      if (!capacity.allowed) {
+      if (!limiteFazendas.allowed) {
         showToast({
           type: 'warning',
-          message: getSubscriptionLimitMessage('farms', capacity) || 'Regularize sua assinatura para continuar usando o HERDON.',
+          message: getSubscriptionLimitMessage('farms', limiteFazendas) || 'Regularize sua assinatura para continuar usando o HERDON.',
         });
+        onNavigate?.('minhaAssinatura', { action: 'upgrade', motivo: 'limite_fazendas' });
         return;
       }
       const localId = gerarNovoId(fazendas);
@@ -669,12 +670,20 @@ export default function FazendasPage({ db, setDb, onConfirmAction, session: sess
     <div className="page">
       <PageHeader
         title="Fazendas"
-        subtitle="Organize propriedades, capacidade e responsáveis da operação."
+        subtitle={`Organize propriedades, capacidade e responsáveis da operação. Fazendas: ${fazendas.length}${limiteFazendas.limit != null ? `/${limiteFazendas.limit}` : ''}`}
         actions={(
           <div className="action-row">
             <Button disabled={!hasPermission('fazendas:editar')} onClick={() => {
               if (!hasPermission('fazendas:editar')) {
                 showToast({ type: 'error', message: mensagemSemPermissao });
+                return;
+              }
+              if (!limiteFazendas.allowed) {
+                showToast({
+                  type: 'warning',
+                  message: getSubscriptionLimitMessage('farms', limiteFazendas) || 'Regularize sua assinatura para continuar usando o HERDON.',
+                });
+                onNavigate?.('minhaAssinatura', { action: 'upgrade', motivo: 'limite_fazendas' });
                 return;
               }
               setEditando(null);

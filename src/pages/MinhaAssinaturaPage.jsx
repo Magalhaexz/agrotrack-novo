@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { CheckCircle2, FileText } from 'lucide-react';
 import SubscriptionSummary from '../components/subscription/SubscriptionSummary';
+import PlanoUsoCard from '../components/assinatura/PlanoUsoCard';
 import Badge from '../components/ui/Badge';
 import Button from '../components/ui/Button';
 import Card from '../components/ui/Card';
@@ -12,6 +13,7 @@ import {
   getSubscriptionDisplayCopy,
   hasSubscriptionBillingReady,
 } from '../services/subscriptions';
+import { getUpgradeReason, verificarLimiteUso } from '../domain/planos';
 import {
   getMissingAsaasCustomerFields,
   isSandboxCheckoutAllowed,
@@ -23,17 +25,6 @@ import '../styles/subscription.css';
 function formatLimit(value) {
   if (value === null || value === undefined) return 'Ilimitado';
   return new Intl.NumberFormat('pt-BR').format(Number(value));
-}
-
-function buildStatusTone(status) {
-  if (status === 'past_due') return 'warning';
-  if (status === 'canceled' || status === 'blocked') return 'danger';
-  return 'success';
-}
-
-function resolveSnapshotValue(value, fallback = 'Em preparação') {
-  if (value === null || value === undefined || value === '') return fallback;
-  return value;
 }
 
 function getSafeCustomerSeed({ usuarioLogado = null, session = null } = {}) {
@@ -70,6 +61,7 @@ export default function MinhaAssinaturaPage({
   subscriptionUsage = {},
   session = null,
   usuarioLogado = null,
+  navigationIntent = null,
 }) {
   const { showToast } = useToast();
   const plans = useMemo(() => getAvailablePlans(), []);
@@ -87,8 +79,29 @@ export default function MinhaAssinaturaPage({
   const normalizedPlanCode = String(subscription?.plan_code || subscription?.plan?.planCode || '').toLowerCase();
   const checkoutReady = hasSubscriptionBillingReady(subscription);
   const canStartCheckout = isSandboxCheckoutAllowed(subscription);
-  const statusTone = buildStatusTone(actionCopy.status);
   const customerFieldIssues = useMemo(() => getMissingAsaasCustomerFields(customerSeed), [customerSeed]);
+
+  // Contexto de upgrade (Sprint 7): quando o usuário chega aqui redirecionado
+  // de um bloqueio (limite de fazenda/usuário ou módulo fora do plano), via
+  // `navigationIntent` — mesmo mecanismo já usado pelo resto do app (Sprint 5).
+  const upgradeContext = useMemo(() => {
+    if (navigationIntent?.page !== 'minhaAssinatura' || navigationIntent?.action !== 'upgrade') return null;
+    const motivo = navigationIntent.motivo;
+    const chaveLimite = motivo === 'limite_fazendas' ? 'farms' : motivo === 'limite_usuarios' ? 'users' : null;
+    const modulo = motivo === 'modulo_bloqueado' ? navigationIntent.modulo : null;
+    const titulo = motivo === 'limite_fazendas'
+      ? 'Você atingiu o limite de fazendas do seu plano.'
+      : motivo === 'limite_usuarios'
+        ? 'Você atingiu o limite de usuários do seu plano.'
+        : 'Esse recurso não está disponível no seu plano atual.';
+
+    const avaliacao = chaveLimite ? verificarLimiteUso(normalizedPlanCode, subscriptionUsage)?.[chaveLimite] : null;
+
+    return {
+      titulo,
+      ...getUpgradeReason({ planoAtual: normalizedPlanCode, tipo: chaveLimite ? 'limite' : 'modulo', chaveLimite, modulo, avaliacao }),
+    };
+  }, [navigationIntent, normalizedPlanCode, subscriptionUsage]);
 
   useEffect(() => {
     setCustomerSeed(getSafeCustomerSeed({ usuarioLogado, session }));
@@ -272,6 +285,17 @@ export default function MinhaAssinaturaPage({
         </div>
       </header>
 
+      {upgradeContext ? (
+        <div className="plano-upgrade-banner">
+          <strong>{upgradeContext.titulo}</strong>
+          <p>Plano atual: {upgradeContext.planoAtualNome || actionCopy.planName}.</p>
+          <p>{upgradeContext.mensagem}</p>
+          {upgradeContext.planoRecomendadoNome ? (
+            <p>Para continuar, recomendamos o plano <strong>{upgradeContext.planoRecomendadoNome}</strong>.</p>
+          ) : null}
+        </div>
+      ) : null}
+
       <div className="subscription-page__hero">
         <SubscriptionSummary
           subscription={subscription}
@@ -282,42 +306,11 @@ export default function MinhaAssinaturaPage({
           secondaryLabel="Falar com o suporte"
         />
 
-        <Card title="Visão da assinatura" subtitle="Base comercial exibida para validação antes do checkout.">
-          <div className="subscription-page__snapshot">
-            <div className="summary-row">
-              <span className="summary-row__label">Plano atual</span>
-              <strong className="summary-row__value">{actionCopy.planName}</strong>
-            </div>
-            <div className={`summary-row ${statusTone === 'danger' ? 'summary-row--alert' : statusTone === 'success' ? 'summary-row--success' : ''}`}>
-              <span className="summary-row__label">Status</span>
-              <span className={`summary-badge summary-badge--${statusTone}`}>{actionCopy.statusLabel}</span>
-            </div>
-            <div className="summary-row">
-              <span className="summary-row__label">Valor</span>
-              <strong className="summary-row__value">{actionCopy.priceLabel}</strong>
-            </div>
-            <div className="summary-row">
-              <span className="summary-row__label">Cobrança</span>
-              <strong className="summary-row__value">{resolveSnapshotValue(subscription?.plan?.billingIntervalLabel)}</strong>
-            </div>
-            <div className="summary-row">
-              <span className="summary-row__label">Fazendas</span>
-              <strong className="summary-row__value">{resolveSnapshotValue(subscription?.plan ? formatLimit(subscription?.plan?.limits?.farms) : null)}</strong>
-            </div>
-            <div className="summary-row">
-              <span className="summary-row__label">Animais</span>
-              <strong className="summary-row__value">{resolveSnapshotValue(subscription?.plan ? formatLimit(subscription?.plan?.limits?.animals) : null)}</strong>
-            </div>
-            <div className="summary-row">
-              <span className="summary-row__label">Usuários</span>
-              <strong className="summary-row__value">{resolveSnapshotValue(subscription?.plan ? formatLimit(subscription?.plan?.limits?.users) : null)}</strong>
-            </div>
-            <div className="summary-row">
-              <span className="summary-row__label">Checkout</span>
-              <strong className="summary-row__value">{checkoutReady ? 'Preparado' : 'Em preparação'}</strong>
-            </div>
-          </div>
-        </Card>
+        <PlanoUsoCard
+          subscription={subscription}
+          usage={subscriptionUsage}
+          onUpgrade={() => document.getElementById('planos-disponiveis')?.scrollIntoView({ behavior: 'smooth' })}
+        />
       </div>
 
       {pendingPaymentUrl ? (
@@ -334,7 +327,7 @@ export default function MinhaAssinaturaPage({
       ) : null}
 
       <Card title="Planos disponíveis" subtitle="Referência comercial para revisão do caminho de upgrade antes da integração de pagamento.">
-        <div className="subscription-page__plans">
+        <div id="planos-disponiveis" className="subscription-page__plans">
           {plans.map((plan) => {
             const isCurrent = normalizedPlanCode && normalizedPlanCode === String(plan.planCode || '').toLowerCase();
             const isEnterprise = plan.planCode === 'enterprise';

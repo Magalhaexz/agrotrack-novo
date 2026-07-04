@@ -2,6 +2,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import {
   contarAdministradoresAtivos,
+  contarUsuariosDoPlano,
   ehUnicoProprietario,
   podeAlterarPapel,
   podeRemoverAcesso,
@@ -10,6 +11,7 @@ import {
 } from './equipe.js';
 import { perfilPodeGerenciarAcessos, perfilTemPermissao } from '../auth/perfis.js';
 import { buildAccountAccessGate } from '../services/accessControl.js';
+import { canInviteUser } from '../services/subscriptions.js';
 
 function membrosPadrao() {
   return [
@@ -152,4 +154,42 @@ test('separarProprietarioEMembros não quebra com lista vazia', () => {
   const { proprietario, membros } = separarProprietarioEMembros([]);
   assert.equal(proprietario, null);
   assert.deepEqual(membros, []);
+});
+
+// ─── contarUsuariosDoPlano (Sprint 7) — única fonte de "quantos assentos a conta usa" ──
+
+test('contarUsuariosDoPlano soma proprietário + membros ativos + convites pendentes', () => {
+  const total = contarUsuariosDoPlano({
+    profiles: [
+      { id: 'dono-1', owner_user_id: 'dono-1', status: 'ativo' },
+      { id: 'ger-1', owner_user_id: 'dono-1', status: 'ativo' },
+      { id: 'op-1', owner_user_id: 'dono-1', status: 'removido' },
+    ],
+    invites: [
+      { id: 'inv-1', status: 'pendente' },
+      { id: 'inv-2', status: 'cancelado' },
+    ],
+  });
+  // proprietário + gerente ativo (operador removido não conta) + 1 convite pendente
+  assert.equal(total, 3);
+});
+
+test('contarUsuariosDoPlano não quebra sem dado nenhum', () => {
+  assert.equal(contarUsuariosDoPlano({}), 0);
+  assert.equal(contarUsuariosDoPlano(), 0);
+});
+
+test('bloqueia convite acima do limite de usuários usando a contagem real da equipe', () => {
+  const contaNoLimite = { status: 'active', plan_code: 'essencial' }; // limite: 2 usuários
+  const totalUsado = contarUsuariosDoPlano({
+    profiles: [
+      { id: 'dono-1', owner_user_id: 'dono-1', status: 'ativo' },
+      { id: 'vis-1', owner_user_id: 'dono-1', status: 'ativo' },
+    ],
+    invites: [],
+  });
+  assert.equal(canInviteUser(contaNoLimite, totalUsado).allowed, false);
+
+  const contaComVaga = { status: 'active', plan_code: 'pro' }; // limite: 5 usuários
+  assert.equal(canInviteUser(contaComVaga, totalUsado).allowed, true);
 });

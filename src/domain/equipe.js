@@ -101,3 +101,20 @@ export function separarProprietarioEMembros(profiles = []) {
   const membros = lista.filter((p) => !proprietario || String(p.id) !== String(proprietario.id));
   return { proprietario, membros };
 }
+
+/**
+ * Quantos "assentos" a conta já usa do limite `users` do plano (Sprint 7):
+ * proprietário + membros ativos (status ≠ removido) + convites pendentes —
+ * a mesma conta d'água que decide se `canInviteUser` deixa convidar mais
+ * alguém. Única fonte desta contagem: `EquipePage.jsx` e o resumo de uso da
+ * assinatura (`domain/planos.js`) devem sempre chamar esta função em vez de
+ * recalcular localmente, para nunca mostrar dois números diferentes de
+ * "quantos usuários eu uso" em telas diferentes.
+ */
+export function contarUsuariosDoPlano({ profiles = [], invites = [] } = {}) {
+  const membrosAtivos = (Array.isArray(profiles) ? profiles : [])
+    .filter((p) => String(p?.status || 'ativo').toLowerCase() !== 'removido').length;
+  const invitesPendentes = (Array.isArray(invites) ? invites : [])
+    .filter((i) => ['pendente', 'enviado'].includes(String(i?.status || '').toLowerCase())).length;
+  return membrosAtivos + invitesPendentes;
+}

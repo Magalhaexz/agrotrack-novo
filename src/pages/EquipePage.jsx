@@ -11,7 +11,7 @@ import PermissoesPerfilResumo from '../components/equipe/PermissoesPerfilResumo'
 import { useAuth } from '../auth/useAuth';
 import { useToast } from '../hooks/useToast';
 import { obterLabelPerfil, perfilPodeGerenciarAcessos } from '../auth/perfis';
-import { podeAlterarPapel, podeRemoverAcesso, separarProprietarioEMembros } from '../domain/equipe';
+import { contarUsuariosDoPlano, podeAlterarPapel, podeRemoverAcesso, separarProprietarioEMembros } from '../domain/equipe';
 import {
   createInvite,
   deleteInvite,
@@ -42,7 +42,7 @@ function mensagemErroSegura(error, fallbackMessage) {
  * salvaguardas de `domain/equipe.js` (não remover o único proprietário, não
  * rebaixar o próprio papel até ficar sem admin, etc.).
  */
-export default function EquipePage({ onConfirmAction, subscription = null }) {
+export default function EquipePage({ onConfirmAction, subscription = null, onNavigate = null }) {
   const { perfil, user, session } = useAuth();
   const { showToast } = useToast();
   const podeGerenciar = perfilPodeGerenciarAcessos(perfil);
@@ -93,7 +93,11 @@ export default function EquipePage({ onConfirmAction, subscription = null }) {
     () => invitesRows.filter((invite) => ['pendente', 'enviado'].includes(String(invite?.status || '').toLowerCase())),
     [invitesRows]
   );
-  const totalUsuariosPlano = useMemo(() => membrosAtivos.length + 1 + invitesPendentes.length, [membrosAtivos, invitesPendentes]);
+  const totalUsuariosPlano = useMemo(
+    () => contarUsuariosDoPlano({ profiles: profilesRows, invites: invitesRows }),
+    [profilesRows, invitesRows]
+  );
+  const limiteUsuarios = useMemo(() => canInviteUser(subscription, totalUsuariosPlano), [subscription, totalUsuariosPlano]);
 
   async function alterarPapel(membro, novoPerfil) {
     if (novoPerfil === membro.perfil) return;
@@ -186,9 +190,10 @@ export default function EquipePage({ onConfirmAction, subscription = null }) {
   }
 
   async function enviarConvite(payload) {
-    const capacity = canInviteUser(subscription, totalUsuariosPlano);
-    if (!capacity.allowed) {
-      showToast({ type: 'warning', message: getSubscriptionLimitMessage('users', capacity) || 'Regularize sua assinatura para convidar mais pessoas.' });
+    if (!limiteUsuarios.allowed) {
+      showToast({ type: 'warning', message: getSubscriptionLimitMessage('users', limiteUsuarios) || 'Regularize sua assinatura para convidar mais pessoas.' });
+      setOpenInvite(false);
+      onNavigate?.('minhaAssinatura', { action: 'upgrade', motivo: 'limite_usuarios' });
       return;
     }
 
@@ -212,6 +217,15 @@ export default function EquipePage({ onConfirmAction, subscription = null }) {
     await carregar();
   }
 
+  function abrirConvite() {
+    if (!limiteUsuarios.allowed) {
+      showToast({ type: 'warning', message: getSubscriptionLimitMessage('users', limiteUsuarios) || 'Regularize sua assinatura para convidar mais pessoas.' });
+      onNavigate?.('minhaAssinatura', { action: 'upgrade', motivo: 'limite_usuarios' });
+      return;
+    }
+    setOpenInvite(true);
+  }
+
   if (!podeGerenciar) {
     return (
       <div className="page equipe-page">
@@ -226,8 +240,18 @@ export default function EquipePage({ onConfirmAction, subscription = null }) {
       <PageHeader
         title="Equipe"
         subtitle="Gerencie quem acessa sua conta HERDON."
-        actions={<Button icon={<Plus size={14} />} onClick={() => setOpenInvite(true)}>Convidar membro</Button>}
+        actions={(
+          <Button icon={<Plus size={14} />} onClick={abrirConvite}>
+            Convidar membro
+          </Button>
+        )}
       />
+
+      <p className="equipe-uso-plano">
+        Usuários: {totalUsuariosPlano}
+        {limiteUsuarios.limit != null ? `/${limiteUsuarios.limit}` : ' (ilimitado)'}
+        {!limiteUsuarios.allowed ? ' — limite do plano atingido.' : ''}
+      </p>
 
       <PermissoesPerfilResumo />
 

@@ -6,6 +6,12 @@
   gap: var(--space-6);
 }
 
+.equipe-uso-plano {
+  margin: calc(var(--space-6) * -1) 0 0;
+  color: var(--color-text-secondary);
+  font-size: 0.9rem;
+}
+
 .permissoes-perfil-resumo__lista {
   margin: 0;
   padding: 0;

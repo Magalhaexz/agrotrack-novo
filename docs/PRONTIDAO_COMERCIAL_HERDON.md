@@ -253,3 +253,90 @@ O mesmo comportamento está travado pelos testes automatizados (652 passando, 15
 **Por que importa para venda real**: os planos já vendem "N usuários" (`canInviteUser`, limite por plano — §3 acima), mas até esta sprint não havia uma forma real de o proprietário adicionar/remover pessoas da conta fora de um fallback local. Equipe é um recurso que aparece na tela de planos e precisa funcionar de ponta a ponta para justificar o preço dos planos com mais de 1 usuário (Pro/Premium/Fundador).
 
 **Subusuários continuam herdando o status comercial do proprietário** (`owner_user_id` / RLS `same_account`, sem mudança nesta sprint) — dono bloqueado ⇒ toda a equipe bloqueada para escrita, independente do papel. A única mudança de permissão desta sprint foi restringir `'acessos:gerenciar'` a proprietário/admin (gerente perdeu essa permissão, tanto na matriz do app quanto na função `app_can_manage_account` do banco) — reforça, não afrouxa, o modelo comercial já descrito acima.
+
+## 13. Sprint 7 — Limites do plano e upgrade (2026-07-04)
+
+### 13.1 Diagnóstico: nada novo precisou ser inventado
+
+Antes de escrever qualquer função nova, o diagnóstico confirmou que **quase todo o "serviço central de limites" pedido pelo enunciado já existia**, só que sob outros nomes:
+
+| Pedido no enunciado | Já existia como |
+|---|---|
+| `getPlanoAtual`/`getLimitesPlano` | `getPlanoConfig`/`getLimitesPlano` (`domain/planos.js`) — mesmo nome |
+| `calcularUsoPlano(db, profile)` | `obterResumoUso(db, assinatura)` (`domain/planos.js`) |
+| `avaliarLimitePlano` | `verificarLimiteUso` (`domain/planos.js`) / `evaluateLimit` (`services/subscriptions.js`) |
+| `canCreateFazenda` | `canCreateFarm` (`services/subscriptions.js`) — mesmo comportamento, já **usado em `FazendasPage.jsx`** |
+| `canInviteUser` | `canInviteUser` (`services/subscriptions.js`) — mesmo nome, já usado em `EquipePage.jsx` (Sprint 6) |
+| `canUsePremiumFeature` | `verificarAcessoModulo`/`canAccessModule` |
+| `getUpgradeReason` | **não existia** — única peça genuinamente nova (ver §13.4) |
+
+Por isso **não foi criado `src/services/planLimits.js`** — criar um arquivo paralelo duplicaria regra de plano em duas fontes de verdade, indo direto contra a regra desta sprint ("não duplicar regra de plano em várias telas"). Tudo foi construído estendendo `src/domain/planos.js` e `src/domain/equipe.js` (Sprint 6).
+
+### 13.2 Bug real encontrado e corrigido: contagem de usuários desatualizada
+
+`obterResumoUso` calculava `uso.users` a partir de `db.usuarios` — a tabela **legada de fallback**, usada apenas quando `profiles`/`invites` não estavam disponíveis. Desde a Sprint 6, a Equipe real vive em `profiles`/`invites` (tabelas na nuvem, fora do `db` operacional local) — ou seja, o número de "usuários usados" mostrado na tela de assinatura estava, na prática, sempre desatualizado/zerado para qualquer conta que já usasse a Equipe de verdade.
+
+**Correção**: `obterResumoUso(db, assinatura, opcoes)` ganhou um terceiro parâmetro opcional `opcoes.usuariosAtivos`, que substitui a contagem de `db.usuarios` quando informado (mantém 100% de compatibilidade com quem chama sem esse parâmetro — o teste antigo continua passando sem alteração). Um novo hook `src/hooks/useTeamUsage.js` (mesmo padrão de `useAccountSubscription.js`: busca direto da nuvem, fora do sync operacional) calcula a contagem real via `domain/equipe.js#contarUsuariosDoPlano` — a MESMA função agora usada também por `EquipePage.jsx` para decidir se pode convidar mais alguém, evitando dois números diferentes de "quantos usuários eu uso" em telas diferentes.
+
+### 13.3 `PlanoUsoCard.jsx` — o que mostra
+
+Novo componente `src/components/assinatura/PlanoUsoCard.jsx`, na página "Planos e Assinatura" (substitui o antigo card estático "Visão da assinatura", que já mostrava quase a mesma coisa de forma menos clara):
+- Fazendas usadas/limite e Usuários usados/limite, com barra de progresso e aviso quando restam ≤20% (mínimo 1) do limite;
+- Mensagem de limite atingido reaproveitando `getSubscriptionLimitMessage` (nunca um texto novo);
+- Lista de recursos com Liberado/Bloqueado: **Cenários, Relatórios avançados, Backup/exportação, Equipe, Assistente HERDON, Decisões da Fazenda** — calculado por `listarRecursosPlano(planoCode)` (`domain/planos.js`), que só chama `verificarAcessoModulo` sobre a MESMA lista de módulos de `services/subscriptions.js` (`MODULES_BASIC`/`MODULES_PRO`/`MODULES_PREMIUM`). Não inventa uma segunda régua de acesso.
+- Botão "Fazer upgrade" (rola até "Planos disponíveis", que já existia).
+
+`src/components/subscription/SubscriptionSummary.jsx` (usado também em `PerfilPage`/`AssinaturaBloqueadaPage`) foi mantido como está — continua sendo o resumo compacto para esses outros lugares; `PlanoUsoCard` é o card detalhado, só na página de assinatura.
+
+### 13.4 Discrepância consciente: catálogo real × sugestão do enunciado
+
+O enunciado sugere Cenários como recurso do "Profissional" (pro) e lista Backup/exportação, Assistente HERDON e Decisões da Fazenda como recursos de tier (Profissional/Premium). O catálogo real (`MODULES_PRO`/`MODULES_PREMIUM`, já em produção) diz outra coisa:
+- **Cenários** só está em `MODULES_PREMIUM` — plano `pro` não inclui hoje. Mudar isso mudaria o que clientes Pro pagantes recebem pelo mesmo preço — decisão de precificação, fora do escopo autorizado ("não alterar preços agora se não for necessário").
+- **Backup/exportação** não tem nenhum gate de plano hoje — é bloqueado só pelo paywall de escrita (`writeGuard`/`AcoesRelatorio.jsx`: sem plano nenhum, bloqueia; com qualquer plano ativo, libera). Inventar um bloqueio Premium-only novo seria uma mudança de produto não pedida por nenhum código existente.
+- **Assistente HERDON** (Sprint 5) e **Decisões da Fazenda** (`decisoesFazenda`, em `MODULES_BASIC`) foram deliberadamente projetados para funcionar mesmo sem plano/no plano básico, como vitrine de valor.
+
+**Decisão**: `PlanoUsoCard` mostra a verdade do catálogo atual (Cenários/Relatórios avançados = Pro só a partir do Premium/Relatórios Gerenciais no Pro; Backup/Assistente = "disponível em todos os planos", com badge própria `semRestricaoDePlano` em vez de um "Bloqueado" falso). Reclassificar essas fronteiras de plano é uma decisão de produto/preço que fica para quem define pricing, não para esta sprint.
+
+### 13.5 Bloqueio acima do limite — três mensagens diferentes, nunca misturadas
+
+| Situação | Pode ver | Pode agir | Mensagem |
+|---|---|---|---|
+| Sem assinatura | ✅ | 🔴 nenhuma escrita | "Para salvar dados no HERDON, escolha um plano." (paywall de escrita, inalterado) |
+| Plano ativo, limite de fazenda/usuário atingido | ✅ | 🔴 só a criação daquele recurso | `getSubscriptionLimitMessage('farms'|'users', avaliacao)` — ex.: "Seu plano atual permite 1 fazenda. Para cadastrar mais fazendas, escolha um plano superior." |
+| Plano ativo, módulo fora do plano (ex.: Cenários no Essencial) | ✅ | 🔴 só aquele módulo | `getModuleBlockedMessage()` — "Este recurso está disponível em outro plano..." |
+
+As três mensagens vêm de funções diferentes e nunca se confundem (testado em `getUpgradeReason` — Parte 10, item 10).
+
+**Onde o bloqueio acontece, sem tentativa de salvar/registro parcial:**
+- **Fazendas** (`FazendasPage.jsx`): o botão "Cadastrar fazenda" já checa `canCreateFarm` ANTES de abrir o formulário — se o limite foi atingido, mostra o aviso e redireciona para "Planos e Assinatura" sem nem abrir o modal. O `salvarFazenda` mantém a mesma checagem como segunda barreira (defesa em profundidade) antes de qualquer `createOperationalRecord`.
+- **Equipe** (`EquipePage.jsx`): o botão "Convidar membro" checa `canInviteUser` (com a contagem real — §13.2) antes de abrir o modal de convite; o envio do formulário reforça a mesma checagem antes de `createInvite`. Também mostra um contador "Usuários: X/Y" fixo no topo da página.
+- **Módulo fora do plano (Cenários etc.)**: já existia um bloqueio no CLIQUE de navegação (`navigateWithPermission`, `App.jsx`) — mas ele não cobria carregamento direto de URL/refresh. Fechado nesta sprint: `RotaProtegida.jsx` ganhou um segundo tipo de bloqueio (`moduleBloqueado`, calculado uma vez em `App.jsx` a partir de `canAccessModule`) que cobre a página inteira, não só o clique — com uma tela própria (`BloqueadoPorPlano.jsx`) e botão para ir à assinatura.
+
+Em nenhum dos três casos existe: tentativa de salvar seguida de erro técnico, criação parcial, ou sucesso falso — a checagem acontece sempre ANTES de qualquer chamada de persistência, reaproveitando exatamente as mesmas funções (`canCreateFarm`/`canInviteUser`/`canAccessModule`) já usadas em outros pontos do app.
+
+### 13.6 Redirecionamento com contexto (upgrade)
+
+Os três pontos de bloqueio acima (fazenda, usuário, módulo) chamam `onNavigate('minhaAssinatura', { action: 'upgrade', motivo, modulo? })` — reaproveitando o mecanismo de `navigationIntent` que já existe desde a Sprint 5 (Assistente HERDON), sem nenhuma rota nova. `MinhaAssinaturaPage.jsx` lê essa intenção e mostra um banner no topo: "Você atingiu o limite de X. Plano atual: Y. Recomendamos o plano Z.", usando `getUpgradeReason` (`domain/planos.js`) para escolher o próximo plano da escada `essencial → pro → premium → enterprise` que de fato resolve a restrição (limite maior ou módulo incluído) — nunca um plano aleatório.
+
+### 13.7 Subusuários
+
+Sem mudança de arquitetura: a assinatura é sempre avaliada pela conta (`owner_user_id`), então fazenda/usuário/módulo bloqueados para o proprietário bloqueiam igualmente qualquer subusuário. `contarUsuariosDoPlano` conta a equipe inteira (proprietário + membros ativos + convites pendentes) contra o limite do plano da conta — não existe limite "por usuário".
+
+### 13.8 Dados existentes acima do limite
+
+Nenhuma tela filtra ou esconde fazendas/usuários já cadastrados quando a conta está acima do limite atual do plano (ex.: downgrade). `verificarLimiteUso`/`obterResumoUso` são funções puras de leitura — nunca mutam `db.fazendas`/`profiles`. O bloqueio é exclusivamente na ação de CRIAR um novo registro.
+
+### 13.9 Testes, arquivos e validação
+
+- **Testes novos**: 10 em `tests/planos.test.js` (override de contagem de usuários, `listarRecursosPlano` essencial×premium, recursos sem gate de plano, `recomendarProximoPlano` por limite/módulo/escada, `getUpgradeReason` com mensagens diferentes, dados existentes não somem); 3 em `src/domain/equipe.test.js` (`contarUsuariosDoPlano`, bloqueio de convite com a contagem real). `tests/planos.test.js`/`tests/subscriptions.test.js` já cobriam boa parte dos 10 cenários pedidos (limite de fazenda/usuário, módulo bloqueado, plano desconhecido não bloqueia) — não duplicados.
+- **Arquivos novos**: `src/hooks/useTeamUsage.js`, `src/components/assinatura/PlanoUsoCard.jsx`, `src/components/BloqueadoPorPlano.jsx`, `src/styles/planoUso.css`.
+- **Arquivos alterados**: `src/domain/planos.js` (+`listarRecursosPlano`, +`recomendarProximoPlano`, +`getUpgradeReason`, `obterResumoUso` com override), `src/domain/equipe.js` (+`contarUsuariosDoPlano`), `src/App.jsx` (hook novo, `moduloBloqueadoAtual`, props de `RotaProtegida`), `src/components/RotaProtegida.jsx` (bloqueio de módulo além de permissão), `src/pages/FazendasPage.jsx` (redirect + indicador de limite), `src/pages/EquipePage.jsx` (contagem centralizada + redirect + indicador), `src/pages/MinhaAssinaturaPage.jsx` (`PlanoUsoCard` + banner de upgrade), `tests/planos.test.js`, `src/domain/equipe.test.js`.
+- **RLS**: nenhuma alterada. **Migration**: nenhuma criada. **Dados**: nenhum apagado/alterado.
+- Lint ✅ · Build ✅ · Testes ✅ (789 no total, 776 anteriores + 13 novos).
+- Validação manual interativa **não foi possível neste ambiente** (mesma limitação de todas as sprints anteriores: sem chaves Supabase locais) — confirmado apenas que o app builda, os testes cobrem toda a lógica nova, e a tela de login sobe sem erro de console.
+
+### 13.10 Pendências
+
+- Reclassificar Cenários/Backup como recursos de tier diferente do catálogo atual (se o negócio decidir) fica para uma sprint de precificação — não implementado aqui de propósito (§13.4).
+- O banner de upgrade em `MinhaAssinaturaPage` é só contextual/informativo — não pré-seleciona nem inicia checkout automaticamente do plano recomendado (o clique ainda passa pelo fluxo normal de "Escolher plano").
+- Verificação visual (mobile, cores da barra de progresso, clique real do fluxo de bloqueio→upgrade) pendente de ambiente com Supabase configurado.
