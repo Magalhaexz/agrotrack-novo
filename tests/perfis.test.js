@@ -12,7 +12,7 @@ test('permissão de rota de perfil é explícita', () => {
   assert.equal(permissoesPorPagina.perfil, 'perfil:ver');
 });
 
-test('admin e gerente gerenciam acessos conforme matriz de permissões', () => {
+test('gerenciar acessos segue a matriz de permissões (admin sim, gerente conforme a lista)', () => {
   const expectedAdmin = (permissoesPorPerfil[PERFIS.ADMIN] || []).includes('*')
     || (permissoesPorPerfil[PERFIS.ADMIN] || []).includes('acessos:gerenciar');
   const expectedGerente = (permissoesPorPerfil[PERFIS.GERENTE] || []).includes('*')

@@ -1,22 +1,15 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useRef, useState } from 'react';
 import { AlertTriangle, FileText, Plus, X } from 'lucide-react';
 import Card from '../components/ui/Card';
 import Button from '../components/ui/Button';
-import Modal from '../components/ui/Modal';
-import { obterLabelPerfil, perfilEhAdministrador, perfilPodeGerenciarAcessos } from '../auth/perfis';
+import { perfilPodeGerenciarAcessos } from '../auth/perfis';
 import { supabase } from '../lib/supabase'; // Assumindo que supabase está configurado
 import { useAuth } from '../auth/useAuth';
 import { useToast } from '../hooks/useToast'; // Importa o hook de toast
-import { createInvite, deleteInvite, isAccessModuleUnavailable, listInvites, listProfiles, updateInvite } from '../services/userAccess';
-import { canInviteUser, getSubscriptionLimitMessage } from '../services/subscriptions';
-import { gerarNovoId } from '../utils/id'; // Importa a função de gerar ID
 import { normalizeBackupPayload } from '../utils/backupValidation';
 import {
   createAuditEvent,
-  createOperationalRecord,
   deleteOwnerScopedCollection,
-  deleteOperationalRecord,
-  updateOperationalRecord,
   upsertOperationalRecord,
 } from '../services/operationalPersistence';
 import '../styles/configuracoes.css';
@@ -24,7 +17,6 @@ import '../styles/configuracoes.css';
 const TABS = [
   { id: 'geral', label: 'Geral' },
   { id: 'notificacoes', label: 'Notificações' },
-  { id: 'acessos', label: 'Usuários e Acessos' },
   { id: 'dados', label: 'Dados e Segurança' },
 ];
 
@@ -38,17 +30,12 @@ const TABS = [
  * @param {function} props.setDb - Função para atualizar o banco de dados.
  * @param {function} [props.onConfirmAction] - Função para exibir um modal de confirmação customizado.
  */
-export default function ConfiguracoesPage({ db, setDb, onConfirmAction, subscription = null }) {
+export default function ConfiguracoesPage({ db, setDb, onConfirmAction, onNavigate = null }) {
   const { perfil, user, session, hasPermission } = useAuth();
   const { showToast } = useToast(); // Hook para exibir toasts
   const [tab, setTab] = useState('geral');
-  const [openInvite, setOpenInvite] = useState(false);
   const [confirmText, setConfirmText] = useState('');
   const fileInputRef = useRef(null);
-  const [profilesRows, setProfilesRows] = useState([]);
-  const [invitesRows, setInvitesRows] = useState([]);
-  const [loadingAccessData, setLoadingAccessData] = useState(false);
-  const [accessModuleReady, setAccessModuleReady] = useState(false);
 
   const configGeral = db?.configuracoes?.geral || {};
   const configNotificacoes = db?.configuracoes?.notificacoes || {};
@@ -69,55 +56,15 @@ export default function ConfiguracoesPage({ db, setDb, onConfirmAction, subscrip
     lote_data_saida: configNotificacoes.lote_data_saida ?? true,
     dias_antecedencia: configNotificacoes.dias_antecedencia ?? 3,
   });
+  // Gestão de equipe/acessos mudou para a página dedicada "Equipe e Acessos"
+  // (Sprint 6, src/pages/EquipePage.jsx) — aqui fica só o atalho abaixo.
   const podeGerenciarAcessos = perfilPodeGerenciarAcessos(perfil);
   const mensagemSemPermissao = 'Você não tem permissão para executar esta ação.';
-  const usuariosFallback = useMemo(() => (db.usuarios || []).map((item) => ({ ...item })), [db.usuarios]);
-  const invitesPendentes = useMemo(
-    () => invitesRows.filter((invite) => ['pendente', 'enviado'].includes(String(invite?.status || '').toLowerCase())),
-    [invitesRows]
-  );
-  const invitesCanceladosExpirados = useMemo(
-    () => invitesRows.filter((invite) => ['cancelado', 'expirado'].includes(String(invite?.status || '').toLowerCase())),
-    [invitesRows]
-  );
-  const invitesAceitos = useMemo(
-    () => invitesRows.filter((invite) => String(invite?.status || '').toLowerCase() === 'aceito' || Boolean(invite?.used_at)),
-    [invitesRows]
-  );
-  const totalUsuariosPlano = useMemo(() => {
-    const usuariosAtivos = usuariosFallback.filter((item) => String(item?.status || 'ativo') === 'ativo').length;
-    const convitesEmUso = invitesRows.filter((invite) => ['pendente', 'enviado', 'aceito'].includes(String(invite?.status || '').toLowerCase())).length;
-    return usuariosAtivos + convitesEmUso;
-  }, [usuariosFallback, invitesRows]);
-  const totalAdminsAtivosFallback = useMemo(
-    () => usuariosFallback.filter((item) => perfilEhAdministrador(item?.perfil) && String(item?.status || 'ativo') === 'ativo').length,
-    [usuariosFallback]
-  );
 
   function validarPermissao(permissao) {
     if (hasPermission(permissao)) return true;
     showToast({ type: 'error', message: mensagemSemPermissao });
     return false;
-  }
-
-  function mensagemErroSegura(error, fallbackMessage) {
-    if ([400, 406].includes(Number(error?.status)) || ['400', '406'].includes(String(error?.code || ''))) {
-      return 'Não foi possível confirmar a ação agora. Atualize a lista e tente novamente.';
-    }
-    const message = String(error?.message || '').toLowerCase();
-
-    if (
-      message.includes('jwt')
-      || message.includes('token')
-      || message.includes('permission')
-      || message.includes('rls')
-      || message.includes('auth')
-      || message.includes('failed to fetch')
-    ) {
-      return fallbackMessage;
-    }
-
-    return error?.message || fallbackMessage;
   }
 
   function registrarEventoAuditoria(evento) {
@@ -133,99 +80,6 @@ export default function ConfiguracoesPage({ db, setDb, onConfirmAction, subscrip
     });
   }
 
-  const carregarDadosDeAcesso = useCallback(async () => {
-    if (!podeGerenciarAcessos) {
-      return;
-    }
-
-    setLoadingAccessData(true);
-
-    const [profilesResponse, invitesResponse] = await Promise.all([listProfiles(), listInvites()]);
-
-    if (profilesResponse.error || invitesResponse.error) {
-      const erro = profilesResponse.error || invitesResponse.error;
-
-      if (!isAccessModuleUnavailable(erro)) {
-        showToast({ type: 'error', message: erro.message || 'Não foi possível carregar usuários e convites agora.' });
-      }
-
-      setAccessModuleReady(false);
-      setProfilesRows([]);
-      setInvitesRows([]);
-      setLoadingAccessData(false);
-      return;
-    }
-
-    setProfilesRows(profilesResponse.data || []);
-    setInvitesRows(invitesResponse.data || []);
-    setAccessModuleReady(true);
-    setLoadingAccessData(false);
-  }, [podeGerenciarAcessos, showToast]);
-
-  async function cancelarConvite(invite) {
-    if (!validarPermissao('acessos:gerenciar')) return;
-    const confirmar = onConfirmAction
-      ? await onConfirmAction({ title: 'Cancelar convite', message: `Deseja cancelar o convite de ${invite.email}?`, tone: 'danger' })
-      : window.confirm(`Deseja cancelar o convite de ${invite.email}?`);
-    if (!confirmar) return;
-    const cancelPayload = {
-      status: 'cancelado',
-      canceled_at: new Date().toISOString(),
-      cancelled_at: new Date().toISOString(),
-    };
-    let response = await updateInvite(invite.id, cancelPayload);
-    if (response.error) {
-      response = await updateInvite(invite.id, { status: 'cancelado' });
-    }
-    const { data, error } = response;
-    if (import.meta.env.DEV) {
-      console.debug('[HERDON_INVITES_DEBUG]', { action: 'cancel', inviteId: invite.id, hasData: Boolean(data), error: error?.message || null });
-    }
-    if (error) {
-      showToast({ type: 'error', message: mensagemErroSegura(error, 'Não foi possível cancelar o convite agora.') });
-      return;
-    }
-    setInvitesRows((prev) => prev.filter((item) => item.id !== invite.id));
-    showToast({ type: 'success', message: 'Convite cancelado com sucesso.' });
-    await carregarDadosDeAcesso();
-  }
-
-  async function removerConvitePendente(invite) {
-    if (!validarPermissao('acessos:gerenciar')) return;
-    if (String(invite.status || '').toLowerCase() === 'aceito' || invite.used_at) {
-      showToast({ type: 'warning', message: 'Este convite já foi aceito. Para remover acesso, altere o usuário.' });
-      return;
-    }
-    const confirmar = onConfirmAction
-      ? await onConfirmAction({ title: 'Remover convite pendente', message: `Remover convite pendente de ${invite.email}?`, tone: 'danger' })
-      : window.confirm(`Remover convite pendente de ${invite.email}?`);
-    if (!confirmar) return;
-    let removeError = null;
-    const { error } = await deleteInvite(invite.id);
-    if (error) {
-      let fallback = await updateInvite(invite.id, { status: 'cancelado', canceled_at: new Date().toISOString(), cancelled_at: new Date().toISOString() });
-      if (fallback.error) {
-        fallback = await updateInvite(invite.id, { status: 'cancelado' });
-      }
-      removeError = fallback.error || error;
-      if (!fallback.error && import.meta.env.DEV) {
-        console.debug('[HERDON_INVITES_DEBUG]', { action: 'remove-fallback-cancel', inviteId: invite.id });
-      }
-    }
-    if (removeError) {
-      showToast({ type: 'error', message: mensagemErroSegura(removeError, 'Não foi possível remover o convite agora.') });
-      return;
-    }
-    setInvitesRows((prev) => prev.filter((item) => item.id !== invite.id));
-    showToast({ type: 'success', message: 'Convite pendente removido com sucesso.' });
-    await carregarDadosDeAcesso();
-  }
-
-  /* eslint-disable react-hooks/set-state-in-effect */
-  useEffect(() => {
-    void carregarDadosDeAcesso();
-  }, [carregarDadosDeAcesso]);
-  /* eslint-enable react-hooks/set-state-in-effect */
 
   async function salvarGeral() {
     if (!validarPermissao('configuracoes:editar')) return;
@@ -511,8 +365,16 @@ export default function ConfiguracoesPage({ db, setDb, onConfirmAction, subscrip
         <p>Parâmetros globais, notificações e segurança dos dados.</p>
       </header>
 
+      {podeGerenciarAcessos ? (
+        <Card title="Equipe e acessos" subtitle="Convide pessoas, altere papéis e gerencie quem acessa sua conta HERDON.">
+          <Button variant="outline" icon={<Plus size={14} />} onClick={() => onNavigate?.('equipeAcessos')}>
+            Abrir Equipe e Acessos
+          </Button>
+        </Card>
+      ) : null}
+
       <div className="config-tabs">
-        {TABS.filter((item) => (item.id === 'acessos' ? podeGerenciarAcessos : true)).map((item) => (
+        {TABS.map((item) => (
           <button key={item.id} type="button" className={tab === item.id ? 'active' : ''} onClick={() => setTab(item.id)}>
             {item.label}
           </button>
@@ -576,254 +438,6 @@ export default function ConfiguracoesPage({ db, setDb, onConfirmAction, subscrip
         </Card>
       ) : null}
 
-      {tab === 'acessos' && podeGerenciarAcessos ? (
-        <Card
-          title="Usuários e Acessos"
-          action={<Button size="sm" icon={<Plus size={14} />} onClick={() => setOpenInvite(true)}>+ Convidar usuário</Button>}
-        >
-          <div className="config-actions-wrap" style={{ marginBottom: 16 }}>
-            <Button variant="outline" onClick={carregarDadosDeAcesso} loading={loadingAccessData}>
-              Atualizar lista
-            </Button>
-          </div>
-          <p style={{ marginTop: 0, marginBottom: 12, color: 'var(--text-muted)' }}>
-            Usuário é quem acessa o HERDON. Funcionário é a pessoa da operação da fazenda.
-          </p>
-
-          {accessModuleReady ? (
-            <>
-              <div className="table-responsive">
-                <table className="dashboard-table">
-                  <thead><tr><th>Nome</th><th>E-mail</th><th>Perfil atual</th><th>Origem</th><th>Atualizado em</th></tr></thead>
-                  <tbody>
-                    {profilesRows.length === 0 ? (
-                      <tr><td colSpan="5">Nenhum usuário ativo encontrado.</td></tr>
-                    ) : (
-                      profilesRows.map((item) => (
-                        <tr key={item.id}>
-                          <td>{item.nome || 'Sem nome'}</td>
-                          <td>{item.email}</td>
-                          <td><span className={badgeStatusClass(item.perfil)}>{obterLabelPerfil(item.perfil)}</span></td>
-                          <td>Perfil</td>
-                          <td>{item.updated_at ? new Date(item.updated_at).toLocaleString('pt-BR') : '-'}</td>
-                        </tr>
-                      ))
-                    )}
-                  </tbody>
-                </table>
-              </div>
-
-              <div style={{ height: 20 }} />
-
-              <div className="table-responsive">
-                <table className="dashboard-table">
-                  <thead><tr><th>Convite</th><th>Perfil automático</th><th>Status</th><th>Uso</th><th>Ações</th></tr></thead>
-                  <tbody>
-                    {invitesPendentes.length === 0 ? (
-                      <tr><td colSpan="5">Nenhum convite pendente.</td></tr>
-                    ) : (
-                      invitesPendentes.map((invite) => (
-                        <tr key={invite.id}>
-                          <td>
-                            <strong>{invite.nome || 'Convite sem nome'}</strong>
-                            <div>{invite.email}</div>
-                          </td>
-                          <td><span className={badgeStatusClass(invite.perfil)}>{obterLabelPerfil(invite.perfil)}</span></td>
-                          <td><span className={badgeStatusClass(invite.status)}>{invite.status}</span></td>
-                          <td>{invite.used_at ? new Date(invite.used_at).toLocaleString('pt-BR') : '-'}</td>
-                          <td>
-                            <div className="config-actions-wrap">
-                              {invite.status !== 'cancelado' ? (
-                                <Button
-                                  size="sm"
-                                  variant="outline"
-                                  onClick={() => cancelarConvite(invite)}
-                                >
-                                  Cancelar convite
-                                </Button>
-                              ) : null}
-                              <Button
-                                size="sm"
-                                variant="danger"
-                                onClick={() => removerConvitePendente(invite)}
-                              >
-                                Remover convite pendente
-                              </Button>
-                            </div>
-                          </td>
-                        </tr>
-                      ))
-                    )}
-                  </tbody>
-                </table>
-              </div>
-
-              <div style={{ height: 20 }} />
-              <div className="table-responsive">
-                <table className="dashboard-table">
-                  <thead><tr><th colSpan="5">Convites aceitos</th></tr></thead>
-                  <tbody>
-                    {invitesAceitos.length === 0 ? <tr><td colSpan="5">Nenhum convite aceito.</td></tr> : invitesAceitos.map((invite) => (
-                      <tr key={invite.id}><td><strong>{invite.nome || 'Convite sem nome'}</strong><div>{invite.email}</div></td><td><span className={badgeStatusClass(invite.perfil)}>{obterLabelPerfil(invite.perfil)}</span></td><td><span className={badgeStatusClass(invite.status)}>{invite.status}</span></td><td>{invite.used_at ? new Date(invite.used_at).toLocaleString('pt-BR') : '-'}</td><td>Este convite já foi aceito. Para remover acesso, altere o usuário.</td></tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-
-              <div style={{ height: 20 }} />
-              <div className="table-responsive">
-                <table className="dashboard-table">
-                  <thead><tr><th colSpan="5">Convites cancelados/expirados</th></tr></thead>
-                  <tbody>
-                    {invitesCanceladosExpirados.length === 0 ? <tr><td colSpan="5">Nenhum convite cancelado.</td></tr> : invitesCanceladosExpirados.map((invite) => (
-                      <tr key={invite.id}><td><strong>{invite.nome || 'Convite sem nome'}</strong><div>{invite.email}</div></td><td><span className={badgeStatusClass(invite.perfil)}>{obterLabelPerfil(invite.perfil)}</span></td><td><span className={badgeStatusClass(invite.status)}>{invite.status}</span></td><td>{invite.used_at ? new Date(invite.used_at).toLocaleString('pt-BR') : '-'}</td><td><Button size="sm" variant="danger" onClick={() => removerConvitePendente(invite)}>Remover convite pendente</Button></td></tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            </>
-          ) : (
-            <div className="empty-state empty-state--warning" style={{ marginBottom: 16 }}>
-              <strong>Módulo de acessos em preparação</strong>
-              <span>O gerenciamento automático de perfis será ativado em uma próxima etapa.</span>
-            </div>
-          )}
-
-          {!accessModuleReady ? (
-          <div className="table-responsive">
-            <table className="dashboard-table">
-              <thead><tr><th>Nome</th><th>E-mail</th><th>Perfil atual</th><th>Origem</th><th>Status</th><th>Ações</th></tr></thead>
-              <tbody>
-                {usuariosFallback.map((item) => (
-                  <tr key={item.id}>
-                    <td>{item.nome}<div style={{ fontSize: 12, opacity: 0.75 }}>Acesso temporário.</div></td>
-                    <td>{item.email}</td>
-                    <td>
-                      <span className="badge badge-info" style={{ marginRight: 8 }}>{obterLabelPerfil(item.perfil)}</span>
-                      <select
-                        className="ui-input" // Adicionado classe ui-input
-                        value={item.perfil}
-                        onChange={async (e) => {
-                          if (!validarPermissao('acessos:gerenciar')) return;
-                          const novoPerfil = e.target.value;
-                          const isSelf = String(item.id) === String(user?.id);
-                          if (isSelf && novoPerfil !== 'admin') {
-                            showToast({ type: 'warning', message: 'Você não pode rebaixar seu próprio perfil administrativo.' });
-                            return;
-                          }
-                          const adminAtual = perfilEhAdministrador(item.perfil);
-                          const adminNovo = perfilEhAdministrador(novoPerfil);
-                          if (adminAtual && !adminNovo && totalAdminsAtivosFallback <= 1) {
-                            showToast({ type: 'warning', message: 'Não é possível remover ou rebaixar o último administrador.' });
-                            return;
-                          }
-                          const confirmarAlteracao = onConfirmAction
-                            ? await onConfirmAction({ title: 'Alterar perfil', message: 'Alterar o perfil deste usuário pode limitar o acesso dele ao sistema. Deseja continuar?', tone: 'warning' })
-                            : window.confirm('Alterar o perfil deste usuário pode limitar o acesso dele ao sistema. Deseja continuar?');
-                          if (!confirmarAlteracao) {
-                            return;
-                          }
-                          await updateOperationalRecord('usuarios', item.id, { perfil: novoPerfil }, user ? { user } : null);
-                          registrarEventoAuditoria({
-                            acao: 'usuario_fallback_perfil_atualizado',
-                            entidade: 'usuarios',
-                            entidade_id: item.id,
-                            criticidade: 'alta',
-                            detalhes: { perfil_anterior: item.perfil, perfil_novo: novoPerfil },
-                          });
-                          setDb((prev) => ({
-                            ...prev,
-                            usuarios: (prev.usuarios || []).map((u) => (u.id === item.id ? { ...u, perfil: novoPerfil } : u)),
-                          }));
-                        }}
-                      >
-                        <option value="admin">Proprietário</option>
-                        <option value="gerente">Gerente</option>
-                        <option value="operador">Operador</option>
-                        <option value="visualizador">Visualizador</option>
-                      </select>
-                    </td>
-                    <td>fallback</td>
-                    <td>
-                      <select
-                        className="ui-input" // Adicionado classe ui-input
-                        value={item.status}
-                        onChange={(e) => {
-                          if (!validarPermissao('acessos:gerenciar')) return;
-                          const novoStatus = e.target.value;
-                          const isSelf = String(item.id) === String(user?.id);
-                          if (isSelf && novoStatus !== 'ativo') {
-                            showToast({ type: 'warning', message: 'Você não pode remover seu próprio acesso.' });
-                            return;
-                          }
-                          if (perfilEhAdministrador(item.perfil) && novoStatus !== 'ativo' && totalAdminsAtivosFallback <= 1) {
-                            showToast({ type: 'warning', message: 'Não é possível remover ou rebaixar o último administrador.' });
-                            return;
-                          }
-                          void updateOperationalRecord('usuarios', item.id, { status: novoStatus }, user ? { user } : null);
-                          registrarEventoAuditoria({
-                            acao: 'usuario_fallback_status_atualizado',
-                            entidade: 'usuarios',
-                            entidade_id: item.id,
-                            criticidade: 'alta',
-                            detalhes: { status_anterior: item.status, status_novo: novoStatus },
-                          });
-                          setDb((prev) => ({
-                            ...prev,
-                            usuarios: (prev.usuarios || []).map((u) => (u.id === item.id ? { ...u, status: novoStatus } : u)),
-                          }));
-                        }}
-                      >
-                        <option value="ativo">Ativo</option>
-                        <option value="inativo">Inativo</option>
-                      </select>
-                    </td>
-                    <td>
-                      <Button
-                        size="sm"
-                        variant="danger"
-                        onClick={async () => {
-                          if (!validarPermissao('acessos:gerenciar')) return;
-                          if (String(item.id) === String(user?.id)) {
-                            showToast({ type: 'warning', message: 'Você não pode remover seu próprio acesso.' });
-                            return;
-                          }
-                          if (perfilEhAdministrador(item.perfil) && totalAdminsAtivosFallback <= 1) {
-                            showToast({ type: 'warning', message: 'Não é possível remover ou rebaixar o último administrador.' });
-                            return;
-                          }
-                          const confirmarRemocaoLocal = onConfirmAction
-                            ? await onConfirmAction({
-                                title: 'Remover usuário',
-                                message: `Deseja remover ${item.nome} da base local?`,
-                                tone: 'danger',
-                              })
-                            : window.confirm(`Deseja remover ${item.nome} da base local?`);
-
-                          if (!confirmarRemocaoLocal) return;
-                          void deleteOperationalRecord('usuarios', item.id, user ? { user } : null);
-                          registrarEventoAuditoria({
-                            acao: 'usuario_fallback_removido',
-                            entidade: 'usuarios',
-                            entidade_id: item.id,
-                            criticidade: 'alta',
-                            detalhes: { nome: item.nome, email: item.email },
-                          });
-                          setDb((prev) => ({ ...prev, usuarios: (prev.usuarios || []).filter((u) => u.id !== item.id) }));
-                        }}
-                      >
-                        Remover
-                      </Button>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-          ) : null}
-        </Card>
-      ) : null}
-
       {tab === 'dados' ? (
         <Card title="Dados e Segurança">
           <div className="config-data-stack">
@@ -855,130 +469,7 @@ export default function ConfiguracoesPage({ db, setDb, onConfirmAction, subscrip
         </Card>
       ) : null}
 
-      <Modal open={openInvite} onClose={() => setOpenInvite(false)} title="Convidar usuário">
-        <InviteForm
-          onClose={() => setOpenInvite(false)}
-          onInvite={async (payload) => {
-            if (!validarPermissao('acessos:gerenciar')) return;
-            const capacity = canInviteUser(subscription, totalUsuariosPlano);
-            if (!capacity.allowed) {
-              showToast({
-                type: 'warning',
-                message: getSubscriptionLimitMessage('users', capacity) || 'Regularize sua assinatura para continuar usando o HERDON.',
-              });
-              return;
-            }
-            if (!accessModuleReady) {
-              const persisted = await createOperationalRecord('usuarios', {
-                ...payload,
-                owner_user_id: user?.id || null,
-              }, user ? { user } : null);
-              setDb((prev) => ({
-                ...prev,
-                usuarios: [
-                  ...(prev.usuarios || []),
-                  { ...payload, ...(persisted.data || {}), id: persisted.data?.id ?? gerarNovoId(prev.usuarios || []), owner_user_id: user?.id || null },
-                ],
-              }));
-              registrarEventoAuditoria({
-                acao: 'usuario_fallback_criado',
-                entidade: 'usuarios',
-                entidade_id: persisted.data?.id ?? null,
-                criticidade: 'alta',
-                detalhes: { email: payload.email, perfil: payload.perfil },
-              });
-              showToast({ type: 'success', message: 'Convite salvo com sucesso.' });
-              setOpenInvite(false);
-              return;
-            }
-
-            const { error } = await createInvite({
-              email: payload.email,
-              nome: payload.nome,
-              perfil: payload.perfil,
-              status: 'pendente',
-              notes: payload.notes || null,
-              created_by: user?.id || null,
-              owner_user_id: user?.id || null,
-            });
-
-            if (error) {
-              showToast({ type: 'error', message: mensagemErroSegura(error, 'Não foi possível criar o convite.') });
-              return;
-            }
-            registrarEventoAuditoria({
-              acao: 'convite_criado',
-              entidade: 'invites',
-              criticidade: 'alta',
-              detalhes: { email: payload.email, perfil: payload.perfil },
-            });
-
-            showToast({ type: 'success', message: 'Convite criado. O perfil será aplicado automaticamente no cadastro.' });
-            setOpenInvite(false);
-            carregarDadosDeAcesso();
-          }}
-        />
-      </Modal>
     </div>
-  );
-}
-
-/**
- * Formulário para convidar um novo usuário.
- * @param {object} props - As propriedades do componente.
- * @param {function} props.onInvite - Callback para quando o usuário é convidado.
- * @param {function} props.onClose - Callback para fechar o formulário.
- */
-function badgeStatusClass(status = '') {
-  const s = String(status).toLowerCase();
-  if (['ativo', 'aceito'].includes(s)) return 'badge badge-g';
-  if (['inativo', 'pendente', 'enviado'].includes(s)) return 'badge badge-a';
-  if (['desligado', 'cancelado', 'expirado'].includes(s)) return 'badge badge-r';
-  return 'badge badge-info';
-}
-
-function InviteForm({ onInvite, onClose }) {
-  const { showToast } = useToast(); // Hook para exibir toasts
-  const [form, setForm] = useState({ nome: '', email: '', perfil: 'visualizador', status: 'ativo', notes: '' });
-
-  return (
-    <form
-      className="config-grid"
-      onSubmit={(e) => {
-        e.preventDefault();
-        if (!form.nome.trim() || !form.email.trim()) {
-          showToast({ type: 'error', message: 'Informe nome e e-mail do usuário.' });
-          return;
-        }
-        onInvite({ ...form, nome: form.nome.trim(), email: form.email.trim() });
-      }}
-    >
-      <label className="ui-input-wrap">
-        <span className="ui-input-label">Nome</span>
-        <input className="ui-input" value={form.nome} onChange={(e) => setForm((prev) => ({ ...prev, nome: e.target.value }))} />
-      </label>
-      <label className="ui-input-wrap">
-        <span className="ui-input-label">E-mail</span>
-        <input className="ui-input" type="email" value={form.email} onChange={(e) => setForm((prev) => ({ ...prev, email: e.target.value }))} />
-      </label>
-      <label className="ui-input-wrap">
-        <span className="ui-input-label">Perfil</span>
-        <select className="ui-input" value={form.perfil} onChange={(e) => setForm((prev) => ({ ...prev, perfil: e.target.value }))}>
-          <option value="admin">Proprietário</option>
-          <option value="gerente">Gerente</option>
-          <option value="operador">Operador</option>
-          <option value="visualizador">Visualizador</option>
-        </select>
-      </label>
-      <label className="ui-input-wrap">
-        <span className="ui-input-label">Observação interna</span>
-        <input className="ui-input" value={form.notes} onChange={(e) => setForm((prev) => ({ ...prev, notes: e.target.value }))} />
-      </label>
-      <div className="config-actions">
-        <Button type="button" variant="ghost" onClick={onClose}>Cancelar</Button>
-        <Button type="submit">Convidar</Button>
-      </div>
-    </form>
   );
 }
 

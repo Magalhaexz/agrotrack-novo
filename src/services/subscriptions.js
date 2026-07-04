@@ -14,6 +14,7 @@ const MODULES_BASIC = [
   'rotina',
   'perfil',
   'minhaAssinatura',
+  'equipeAcessos',
   'configuracoes',
   'resultados',
   'comparativo',

@@ -245,3 +245,11 @@ O mesmo comportamento está travado pelos testes automatizados (652 passando, 15
 - Lint: ✅ · Build: ✅ · Testes: ✅ (suíte completa incluindo os 15 novos de `accessControl`)
 - RLS alterado: **não** · Migration criada: **não** · Dados alterados/apagados: **não**
 - Arquivos: `src/services/accessControl.js` (novo), `src/hooks/useAccountSubscription.js` (novo), `src/App.jsx`, `src/pages/AssinaturaBloqueadaPage.jsx`, `src/auth/perfis.js`, `src/services/subscriptions.js` (1 linha), `src/services/userAccess.js` (export da exceção), `tests/accessControl.test.js` (novo), `tests/subscription-surface.test.js` (asserção atualizada).
+
+## 12. Sprint 6 — Gestão de equipe (2026-07-04)
+
+**Gestão de equipe implementada**: nova página dedicada `src/pages/EquipePage.jsx` ("Equipe e Acessos" no menu) substitui a antiga aba "Usuários e Acessos" de Configurações — proprietário agora convida (gerente/operador/visualizador), altera papel e remove acesso de membros, com salvaguardas para nunca deixar a conta sem nenhum administrador. Detalhamento completo em [`docs/EQUIPE_PERMISSOES_HERDON.md`](EQUIPE_PERMISSOES_HERDON.md).
+
+**Por que importa para venda real**: os planos já vendem "N usuários" (`canInviteUser`, limite por plano — §3 acima), mas até esta sprint não havia uma forma real de o proprietário adicionar/remover pessoas da conta fora de um fallback local. Equipe é um recurso que aparece na tela de planos e precisa funcionar de ponta a ponta para justificar o preço dos planos com mais de 1 usuário (Pro/Premium/Fundador).
+
+**Subusuários continuam herdando o status comercial do proprietário** (`owner_user_id` / RLS `same_account`, sem mudança nesta sprint) — dono bloqueado ⇒ toda a equipe bloqueada para escrita, independente do papel. A única mudança de permissão desta sprint foi restringir `'acessos:gerenciar'` a proprietário/admin (gerente perdeu essa permissão, tanto na matriz do app quanto na função `app_can_manage_account` do banco) — reforça, não afrouxa, o modelo comercial já descrito acima.

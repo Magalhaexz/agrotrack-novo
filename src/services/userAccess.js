@@ -1,7 +1,7 @@
 import { obterLabelPerfil, PERFIS, normalizarPerfil, perfilEhAdministrador } from '../auth/perfis.js';
 import { supabase } from '../lib/supabase.js';
 
-const PROFILE_COLUMNS = 'id, owner_user_id, email, nome, perfil, telefone, cargo, foto_url, created_at, updated_at';
+const PROFILE_COLUMNS = 'id, owner_user_id, email, nome, perfil, status, telefone, cargo, foto_url, created_at, updated_at';
 const INVITE_COLUMNS = 'id, email, nome, perfil, status, notes, created_by, used_by, used_at, created_at, updated_at';
 const PROFILE_CACHE_PREFIX = 'HERDON_PROFILE_CACHE::';
 const DEFAULT_BOOTSTRAP_ADMIN_EMAILS = ['magalhaesh617@gmail.com'];
@@ -258,6 +258,33 @@ export async function listProfiles() {
     .from('profiles')
     .select(PROFILE_COLUMNS)
     .order('nome', { ascending: true, nullsFirst: false });
+}
+
+/**
+ * Altera o papel de um membro da equipe (Sprint 6). RLS
+ * (`profiles_update_self_or_manager` / `app_can_manage_account`) garante que
+ * só proprietário/admin da mesma conta consegue atualizar o perfil de outro.
+ */
+export async function updateProfilePerfil(profileId, perfil) {
+  return supabase
+    .from('profiles')
+    .update({ perfil })
+    .eq('id', profileId)
+    .select(PROFILE_COLUMNS)
+    .maybeSingle();
+}
+
+/**
+ * Marca um membro como removido sem apagar a linha (profiles não tem policy
+ * de DELETE, de propósito — histórico/auditoria continuam íntegros).
+ */
+export async function updateProfileStatus(profileId, status) {
+  return supabase
+    .from('profiles')
+    .update({ status })
+    .eq('id', profileId)
+    .select(PROFILE_COLUMNS)
+    .maybeSingle();
 }
 
 export async function listInvites() {

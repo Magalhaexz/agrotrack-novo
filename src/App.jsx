@@ -68,6 +68,7 @@ const TarefasPage = lazy(() => import('./pages/TarefasPage'));
 const PerfilPage = lazy(() => import('./pages/PerfilPage'));
 const MinhaAssinaturaPage = lazy(() => import('./pages/MinhaAssinaturaPage'));
 const ConfiguracoesPage = lazy(() => import('./pages/ConfiguracoesPage'));
+const EquipePage = lazy(() => import('./pages/EquipePage'));
 const PastagensPage = lazy(() => import('./pages/PastagensPage'));
 const EvolucaoRebanhoPage = lazy(() => import('./pages/EvolucaoRebanhoPage'));
 const IndicadoresPage = lazy(() => import('./pages/IndicadoresPage'));
@@ -193,6 +194,7 @@ const pageMap = {
   perfil: PerfilPage,
   minhaAssinatura: MinhaAssinaturaPage,
   configuracoes: ConfiguracoesPage,
+  equipeAcessos: EquipePage,
   animais: AnimaisPage,
   suplementacao: SuplementacaoPage,
   sanitario: SanitarioPage,

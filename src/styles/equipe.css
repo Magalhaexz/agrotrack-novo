@@ -1,0 +1,152 @@
+/* Página "Equipe" (Sprint 6) — quem acessa a conta HERDON, papéis e
+   convites. Segue a paleta/spacing já usados em decisoes.css/configuracoes.css. */
+
+.equipe-page {
+  display: grid;
+  gap: var(--space-6);
+}
+
+.permissoes-perfil-resumo__lista {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: grid;
+  gap: var(--space-3);
+}
+
+.permissoes-perfil-resumo__lista li {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  flex-wrap: wrap;
+}
+
+.permissoes-perfil-resumo__lista li span {
+  color: var(--color-text-secondary);
+  font-size: 0.9rem;
+}
+
+.equipe-lista {
+  display: grid;
+  gap: var(--space-3);
+}
+
+.equipe-secao-titulo {
+  margin: var(--space-4) 0 var(--space-2);
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: var(--color-text-secondary);
+}
+
+.membro-equipe-card {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+  flex-wrap: wrap;
+  padding: var(--space-4);
+  border-radius: var(--radius-md);
+  background: var(--color-surface-2);
+  border: 1px solid var(--color-border);
+}
+
+.membro-equipe-card--removido {
+  opacity: 0.65;
+}
+
+.membro-equipe-card__info {
+  display: grid;
+  gap: 2px;
+  min-width: 200px;
+}
+
+.membro-equipe-card__info strong {
+  color: var(--color-text);
+}
+
+.membro-equipe-card__email,
+.membro-equipe-card__meta {
+  font-size: 0.85rem;
+  color: var(--color-text-secondary);
+}
+
+.membro-equipe-card__papel {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  flex-wrap: wrap;
+}
+
+.membro-equipe-card__acoes {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  flex-wrap: wrap;
+}
+
+.membro-equipe-card__acoes select {
+  min-width: 160px;
+}
+
+.equipe-convite-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+  flex-wrap: wrap;
+  padding: var(--space-3) var(--space-4);
+  border-radius: var(--radius-md);
+  background: var(--color-surface-2);
+  border: 1px solid var(--color-border);
+}
+
+.equipe-convite-row__info {
+  display: grid;
+  gap: 2px;
+}
+
+.equipe-convite-row__info strong {
+  color: var(--color-text);
+}
+
+.equipe-convite-row__info span {
+  font-size: 0.85rem;
+  color: var(--color-text-secondary);
+}
+
+.equipe-convite-row__acoes {
+  display: flex;
+  gap: var(--space-2);
+  flex-wrap: wrap;
+}
+
+.equipe-convite-form {
+  display: grid;
+  gap: var(--space-3);
+}
+
+.equipe-convite-form__acoes {
+  display: flex;
+  justify-content: flex-end;
+  gap: var(--space-2);
+}
+
+@media (max-width: 640px) {
+  .membro-equipe-card,
+  .equipe-convite-row {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .membro-equipe-card__acoes select {
+    width: 100%;
+  }
+
+  .equipe-convite-row__acoes {
+    width: 100%;
+  }
+
+  .equipe-convite-row__acoes .ui-button {
+    flex: 1;
+  }
+}

@@ -29,6 +29,9 @@ const PERFIL_ALIASES = {
 
 export const permissoesPorPerfil = {
   [PERFIS.ADMIN]: ['*'],
+  // Gerente NÃO tem 'acessos:gerenciar' nem 'assinatura:gerenciar' (Sprint 6 —
+  // "apenas proprietário/admin gerencia equipe e plano"). O mesmo limite já é
+  // reforçado no banco pela função app_can_manage_account (RLS).
   [PERFIS.GERENTE]: [
     'perfil:ver',
     'dashboard:ver',
@@ -78,7 +81,6 @@ export const permissoesPorPerfil = {
     'dados:limpar',
     'funcionarios:ver',
     'funcionarios:editar',
-    'acessos:gerenciar',
   ],
   [PERFIS.OPERADOR]: [
     'perfil:ver',
@@ -168,6 +170,9 @@ export const permissoesPorPagina = {
   // Somente o proprietário (admin, permissão '*') gerencia plano/assinatura:
   // gerente/operador/visualizador não têm 'assinatura:gerenciar' nas listas.
   minhaAssinatura: 'assinatura:gerenciar',
+  // Sprint 6 — só quem gerencia acessos (proprietário/admin) vê/acessa a
+  // página de Equipe (convites, papéis, remoção de acesso).
+  equipeAcessos: 'acessos:gerenciar',
   configuracoes: 'configuracoes:ver',
   sincronizacao: 'dashboard:ver',
   modoCurral: 'dashboard:ver',
