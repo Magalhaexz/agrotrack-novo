@@ -26,6 +26,7 @@ export default function LoteDetailsPanel({
   onNovaPesagem,
   onEncerrar,
   onMoverPasto,
+  onGerarRelatorio,
   animais,
   pesagens,
   retiradas,
@@ -57,6 +58,7 @@ export default function LoteDetailsPanel({
         </div>
         <div className="lote-actions page-actions action-row">
           <Button variant="ghost" onClick={onBack}>Voltar para lotes</Button>
+          <Button variant="outline" onClick={onGerarRelatorio}>Gerar relatório do lote</Button>
           <Button variant="outline" onClick={onEdit} disabled={!canEdit || lote.bloqueado}>Editar lote</Button>
           <Button variant="outline" onClick={onNovaPesagem} disabled={!canEditPesagem || lote.bloqueado}>Nova pesagem</Button>
           <Button variant="warning" onClick={onRegistrarVendaParcial} disabled={!canMove || lote.bloqueado}>Venda parcial</Button>

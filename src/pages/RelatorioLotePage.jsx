@@ -4,7 +4,8 @@ import Button from '../components/ui/Button';
 import PageHeader from '../components/PageHeader';
 import EmptyState from '../components/EmptyState';
 import AcoesRelatorio from '../components/relatorios/AcoesRelatorio';
-import { buildRelatorioLote } from '../domain/relatorios';
+import RelatorioLotePreview from '../components/relatorios/RelatorioLotePreview';
+import { gerarResumoRelatorioLote } from '../domain/relatorioLote';
 import { gerarResumoLoteTexto } from '../domain/whatsappResumo';
 import { formatCurrency, formatDate, formatNumber } from '../utils/calculations';
 
@@ -13,7 +14,7 @@ export default function RelatorioLotePage({ db, onNavigate }) {
   const [loteId, setLoteId] = useState(lotes[0]?.id ?? '');
   const containerRef = useRef(null);
 
-  const relatorio = useMemo(() => (loteId ? buildRelatorioLote(db, loteId) : null), [db, loteId]);
+  const relatorio = useMemo(() => (loteId ? gerarResumoRelatorioLote(db, loteId) : null), [db, loteId]);
 
   if (!lotes.length) {
     return (
@@ -57,33 +58,15 @@ export default function RelatorioLotePage({ db, onNavigate }) {
           />
 
           <div ref={containerRef}>
-            <div className="dashboard-grid dashboard-grid--dual">
-              <Card title="Identificação">
-                <div className="summary-list">
-                  <Row label="Lote" value={relatorio.lote?.nome} />
-                  <Row label="Fazenda" value={relatorio.fazendaNome} />
-                  <Row label="Pasto atual" value={relatorio.pastagemNome || 'Sem pasto vinculado'} />
-                  <Row label="Sistema" value={relatorio.sistema || '—'} />
-                  <Row label="Categoria" value={relatorio.categoria || '—'} />
-                  <Row label="Cabeças" value={formatNumber(relatorio.totalAnimais, 0)} />
-                  <Row label="Situação" value={relatorio.situacao} />
-                </div>
-              </Card>
+            <RelatorioLotePreview relatorio={relatorio} />
 
-              <Card title="Desempenho e resultado">
-                <div className="summary-list">
-                  <Row label="Peso inicial" value={`${formatNumber(relatorio.pesoInicialMedio, 1)} kg`} />
-                  <Row label="Peso atual" value={`${formatNumber(relatorio.pesoAtualMedio, 1)} kg`} />
-                  <Row label="GMD" value={`${formatNumber(relatorio.gmdMedio, 2)} kg/dia`} />
-                  <Row label="Meta de GMD" value={relatorio.gmdMeta ? `${formatNumber(relatorio.gmdMeta, 2)} kg/dia` : 'Sem meta definida'} />
-                  <Row label="Dias no ciclo" value={formatNumber(relatorio.dias, 0)} />
-                  <Row label="Custo total" value={formatCurrency(relatorio.custoTotal)} />
-                  <Row label="Receita total" value={formatCurrency(relatorio.receitaTotal)} />
-                  <Row label="Lucro/prejuízo" value={formatCurrency(relatorio.lucroTotal)} />
-                  <Row label="ROI (margem)" value={`${formatNumber(relatorio.margemPct, 1)}%`} />
-                </div>
-              </Card>
-            </div>
+            <Card title="Resultado realizado (histórico completo)" subtitle="Receita e lucro já registrados para este lote — diferente da simulação de venda hoje, mostrada acima.">
+              <div className="summary-list">
+                <Row label="Receita total" value={formatCurrency(relatorio.receitaTotal)} />
+                <Row label="Lucro/prejuízo" value={formatCurrency(relatorio.lucroTotal)} />
+                <Row label="ROI (margem)" value={`${formatNumber(relatorio.margemPct, 1)}%`} />
+              </div>
+            </Card>
 
             <Card title="Decisão de venda e custo por arroba">
               <div className="summary-list">

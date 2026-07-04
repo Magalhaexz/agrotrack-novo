@@ -1,4 +1,4 @@
-﻿import { useEffect, useMemo, useState } from 'react';
+﻿import { useEffect, useMemo, useRef, useState } from 'react';
 import Input from '../components/ui/Input';
 import Modal from '../components/ui/Modal';
 import Button from '../components/ui/Button';
@@ -8,6 +8,8 @@ import { useAuth } from '../auth/useAuth';
 import { useToast } from '../hooks/useToast';
 import { getResumoLote } from '../domain/resumoLote';
 import { calcularSaudeLote } from '../domain/saudeLote';
+import { gerarResumoRelatorioLote } from '../domain/relatorioLote';
+import { gerarResumoLoteTexto } from '../domain/whatsappResumo';
 import { calcLote } from '../utils/calculations';
 import { gerarNovoId } from '../utils/id';
 import { createOperationalRecord, deleteOperationalRecord, updateOperationalRecord } from '../services/operationalPersistence';
@@ -18,6 +20,8 @@ import LotesPageHeader from '../components/lotes/LotesPageHeader';
 import RetiradaAnimaisModal from '../components/lotes/RetiradaAnimaisModal';
 import FechamentoLoteModal from '../components/lotes/FechamentoLoteModal';
 import MoverPastoModal from '../components/lotes/MoverPastoModal';
+import RelatorioLotePreview from '../components/relatorios/RelatorioLotePreview';
+import AcoesRelatorio from '../components/relatorios/AcoesRelatorio';
 import { moverLoteParaPasto, listarHistoricoPastos } from '../services/movimentacaoPastos';
 import { buildGrupoAnimaisAutoPatch } from './lotesLogic';
 import {
@@ -214,6 +218,8 @@ export default function LotesPage({ db, setDb, onRegistrarSaidaAnimal, session, 
   const [openNovoLote, setOpenNovoLote] = useState(abrirNovoLotePorIntent);
   const [loteEmEdicao, setLoteEmEdicao] = useState(null);
   const [openMoverPasto, setOpenMoverPasto] = useState(false);
+  const [openRelatorio, setOpenRelatorio] = useState(false);
+  const relatorioContainerRef = useRef(null);
   const [historicoPastos, setHistoricoPastos] = useState(EMPTY_LIST);
   const [loadingHistoricoPastos, setLoadingHistoricoPastos] = useState(false);
   const lotes = Array.isArray(db?.lotes) ? db.lotes : EMPTY_LIST;
@@ -311,6 +317,13 @@ export default function LotesPage({ db, setDb, onRegistrarSaidaAnimal, session, 
 
   const selectedLoteConsumos = useMemo(() => buildLoteConsumptionHistoryRows(consumoHistorico, selectedLote?.id), [consumoHistorico, selectedLote?.id]);
   const consumoAlerta = useMemo(() => buildLoteConsumptionAlert({ lote: selectedLote, consumoRows: selectedLoteConsumos }), [selectedLote, selectedLoteConsumos]);
+
+  // Relatório do lote (Sprint 4): só recalcula quando o modal está aberto,
+  // reaproveitando getResumoLote/calcularSaudeLote via gerarResumoRelatorioLote.
+  const relatorioLote = useMemo(
+    () => (openRelatorio && selectedLote?.id ? gerarResumoRelatorioLote(db, selectedLote.id) : null),
+    [openRelatorio, db, selectedLote]
+  );
 
   useEffect(() => {
     const timer = window.setTimeout(() => {
@@ -624,6 +637,7 @@ export default function LotesPage({ db, setDb, onRegistrarSaidaAnimal, session, 
           onNovaPesagem={() => setOpenPesagem(true)}
           onEncerrar={() => setOpenFechamento(true)}
           onMoverPasto={() => setOpenMoverPasto(true)}
+          onGerarRelatorio={() => setOpenRelatorio(true)}
           animais={loteAnimais}
           pesagens={lotePesagens}
           retiradas={loteRetiradas}
@@ -672,6 +686,29 @@ export default function LotesPage({ db, setDb, onRegistrarSaidaAnimal, session, 
           onClose={() => setOpenMoverPasto(false)}
           onSubmit={handleMoverPasto}
         />
+
+        <Modal
+          open={openRelatorio}
+          onClose={() => setOpenRelatorio(false)}
+          title="Relatório do lote"
+          subtitle={selectedLote?.nome}
+          size="lg"
+        >
+          {relatorioLote ? (
+            <>
+              <AcoesRelatorio
+                containerRef={relatorioContainerRef}
+                getTexto={() => gerarResumoLoteTexto(relatorioLote)}
+                titulo="Relatório do Lote"
+                fazendaNome={relatorioLote.fazenda}
+                nomeArquivo={`relatorio-lote-${relatorioLote.lote?.nome || selectedLote?.id}`}
+              />
+              <div ref={relatorioContainerRef}>
+                <RelatorioLotePreview relatorio={relatorioLote} />
+              </div>
+            </>
+          ) : null}
+        </Modal>
       </>
     );
   }

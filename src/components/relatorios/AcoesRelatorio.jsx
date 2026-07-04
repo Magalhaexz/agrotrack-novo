@@ -4,6 +4,23 @@ import Button from '../ui/Button';
 import { exportarRelatorio } from '../../utils/exportarPDF';
 import { copiarTexto, abrirWhatsApp, compartilharResumo } from '../../utils/compartilhar';
 import { useToast } from '../../hooks/useToast';
+import { isWriteAllowed, notifyBlockedWrite } from '../../services/writeGuard';
+
+const MENSAGEM_EXPORTACAO_BLOQUEADA = 'Escolha um plano para exportar relatórios do HERDON.';
+
+/**
+ * Exportar/compartilhar um relatório é tratado como ação premium: reaproveita
+ * o mesmo gate comercial do paywall de escrita (`writeGuard`) — "conta tem
+ * plano ativo?" — em vez de duplicar essa checagem. Visualizar o relatório
+ * continua sempre livre; só baixar/copiar/compartilhar exige plano (Sprint 4,
+ * Parte 7). Sem plano, mostra a mensagem específica de exportação e
+ * redireciona para Planos e Assinatura (mesmo fluxo do paywall de escrita).
+ */
+function garantirExportacaoPermitida() {
+  if (isWriteAllowed()) return true;
+  notifyBlockedWrite({ feature: 'relatorio.exportar', message: MENSAGEM_EXPORTACAO_BLOQUEADA });
+  return false;
+}
 
 /**
  * Barra de ações comum a todos os relatórios: baixar/imprimir em PDF, copiar o
@@ -16,6 +33,7 @@ export default function AcoesRelatorio({ containerRef, getTexto, titulo, fazenda
   const ref = containerRef || internalRef;
 
   async function handleCopiar() {
+    if (!garantirExportacaoPermitida()) return;
     const texto = getTexto?.();
     if (!texto) return;
     const ok = await copiarTexto(texto);
@@ -23,6 +41,7 @@ export default function AcoesRelatorio({ containerRef, getTexto, titulo, fazenda
   }
 
   async function handleWhatsApp() {
+    if (!garantirExportacaoPermitida()) return;
     const texto = getTexto?.();
     if (!texto) return;
     const compartilhou = await compartilharResumo(texto, titulo);
@@ -32,6 +51,7 @@ export default function AcoesRelatorio({ containerRef, getTexto, titulo, fazenda
   }
 
   function handlePdf() {
+    if (!garantirExportacaoPermitida()) return;
     if (!ref.current) return;
     exportarRelatorio(ref.current, nomeArquivo, { titulo, fazenda: fazendaNome });
   }

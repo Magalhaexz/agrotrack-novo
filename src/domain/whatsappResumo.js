@@ -57,6 +57,20 @@ export function gerarResumoLoteTexto(relatorio) {
     linhas.push(linhaManejoResultado(relatorio.manejoResultado));
   }
 
+  // Saúde do lote / alerta / ação sugerida (Sprint 4) — só aparecem quando o
+  // relatório vem de gerarResumoRelatorioLote (relatorioLote.js); um objeto
+  // vindo direto de buildRelatorioLote (sem essas chaves) gera exatamente o
+  // texto de antes, sem quebrar nenhum chamador existente.
+  if (relatorio.saudeLote && !relatorio.saudeLote.dadosInsuficientes) {
+    linhas.push('', `Saúde do lote: ${relatorio.saudeLote.score}/100 — ${relatorio.saudeLote.classificacaoLabel}`);
+  }
+  if (relatorio.alertas?.length) {
+    linhas.push(`Alerta: ${relatorio.alertas[0].titulo}.`);
+  }
+  if (relatorio.decisoes?.length) {
+    linhas.push(`Ação sugerida: ${relatorio.decisoes[0]}.`);
+  }
+
   return linhas.join('\n');
 }
 

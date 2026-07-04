@@ -217,8 +217,22 @@ Dois níveis, conforme pedido no enunciado ("reduzir confiança do score ou most
 - `npm test`: **732 testes, 0 falhas** (706 da Sprint 2 + 26 novos).
 - Mesma limitação das sprints anteriores: sem chaves Supabase no `.env` local, não há como logar e ver o score renderizado ao vivo nesta sessão. Confirmei que o app sobe limpo (zero erro de console) na tela de login com os novos módulos já no grafo de build.
 
-## 22. Próximos passos sugeridos
+## 22. Próximos passos sugeridos (da Sprint 3)
 
-- Ver o painel em produção (mobile e desktop) após o deploy.
+- ~~Ver o painel em produção (mobile e desktop) após o deploy.~~
 - Permitir abrir o lote específico a partir do card de ranking em "Decisões da Fazenda" (hoje o botão só leva para a lista de lotes, não para o lote específico — limitação de navegação já existente no app, não introduzida por esta sprint).
 - Se o produto quiser, mostrar o score também no card "Lotes abaixo da meta"/"Oportunidades" da tela de Decisões, para reforçar a relação entre o alerta pontual e a saúde geral do lote.
+
+---
+
+# Sprint 4 — Relatório do Lote usa o motor de inteligência
+
+> Data: 2026-07-02 · Branch `main` · Detalhes completos em [`docs/RELATORIOS_HERDON.md`](RELATORIOS_HERDON.md)
+
+O "Relatório do Lote" (PDF/WhatsApp) passou a reaproveitar diretamente o que as três sprints anteriores construíram, sem recalcular nada:
+
+- **Motor de alertas (Sprint 1)** — via `calcularSaudeLote` (que já reaproveita `detectarLotesAbaixoGmd`/`detectarLotesProximosPesoAlvo`/`detectarTarefasAtrasadas`/`detectarSanidadeProxima`/`detectarEstoqueBaixo`), o relatório mostra os alertas específicos daquele lote.
+- **Saúde do Lote (Sprint 3)** — o score 0-100, a classificação e as explicações aparecem no relatório (`SaudeLoteCard`, reaproveitado sem alteração) e no texto de WhatsApp ("Saúde do lote: 74/100 — Atenção").
+- **Decisões sugeridas** — uma frase por fator de saúde negativo (ex.: "Priorizar nova pesagem") mais "Avaliar venda" quando a decisão de venda (já calculada por `decisaoVenda.js`) indicar isso.
+
+Novo arquivo `src/domain/relatorioLote.js` (`gerarResumoRelatorioLote`) é a única peça nova de lógica — e mesmo essa só orquestra `buildRelatorioLote` + `calcularSaudeLote`, sem duplicar cálculo. Ver seção "Sprint 4" em `docs/RELATORIOS_HERDON.md` para o detalhamento completo (arquivos, paywall de exportação, testes).

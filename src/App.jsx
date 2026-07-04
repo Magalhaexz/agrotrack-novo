@@ -754,13 +754,16 @@ export default function App() {
   function handleWriteBlocked(info = {}) {
     const podeGerenciarAssinatura = hasPermission('assinatura:gerenciar');
     if (podeGerenciarAssinatura) {
-      showToast({ type: 'warning', message: getWriteBlockedMessage() });
-      navigateWithPermission('minhaAssinatura', { reason: 'write_blocked', feature: info?.feature || null });
+      // `info.message` permite a features premium não-relacionadas a
+      // gravação (ex.: exportar relatório) mostrar seu próprio texto em vez
+      // do genérico de escrita — ver AcoesRelatorio.jsx (Sprint 4).
+      showToast({ type: 'warning', message: info?.message || getWriteBlockedMessage() });
+      navigateWithPermission('minhaAssinatura', { reason: info?.reason || 'write_blocked', feature: info?.feature || null });
       return;
     }
     showToast({
       type: 'warning',
-      message: 'Para salvar dados, peça ao proprietário da conta para ativar um plano.',
+      message: info?.message || 'Para salvar dados, peça ao proprietário da conta para ativar um plano.',
     });
   }
   useEffect(() => {
