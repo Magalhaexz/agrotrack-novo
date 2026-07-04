@@ -23,6 +23,7 @@ import Badge from '../components/ui/Badge';
 import Card from '../components/ui/Card';
 import Button from '../components/ui/Button';
 import EmptyState from '../components/EmptyState';
+import AssistenteHerdon from '../components/assistente/AssistenteHerdon';
 import { getResumoLote } from '../domain/resumoLote';
 import { construirHojeNaFazenda } from '../domain/hojeNaFazenda';
 import { construirChecklistPrimeirosPassos } from '../domain/guiaCriador';
@@ -304,6 +305,9 @@ export default function DashboardPage({
         <div className="dashboard-toolbar-copy">
           <h1>Painel Geral</h1>
           <p>Hoje na fazenda: o que precisa de atenção, e o que fazer a seguir.</p>
+        </div>
+        <div className="dashboard-toolbar-actions">
+          <AssistenteHerdon db={db} onNavigate={onNavigate} />
         </div>
       </header>
 

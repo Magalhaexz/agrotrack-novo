@@ -15,6 +15,7 @@ import Button from '../components/ui/Button';
 import PageHeader from '../components/PageHeader';
 import EmptyState from '../components/EmptyState';
 import SaudeLoteCard from '../components/lotes/SaudeLoteCard';
+import AssistenteHerdon from '../components/assistente/AssistenteHerdon';
 import {
   agruparAlertasPorTipo,
   construirInsightsFazenda,
@@ -156,6 +157,7 @@ export default function DecisoesFazendaPage({ db = {}, onNavigate = null }) {
         <PageHeader
           title="Decisões da Fazenda"
           subtitle="Prioridades, riscos e oportunidades identificados a partir dos seus dados."
+          actions={<AssistenteHerdon db={db} onNavigate={onNavigate} />}
         />
         <EmptyState
           icon={ListChecks}
@@ -173,7 +175,11 @@ export default function DecisoesFazendaPage({ db = {}, onNavigate = null }) {
 
   return (
     <div className="page decisoes-page">
-      <PageHeader title="Decisões da Fazenda" subtitle={insights.saudeLabel} />
+      <PageHeader
+        title="Decisões da Fazenda"
+        subtitle={insights.saudeLabel}
+        actions={<AssistenteHerdon db={db} onNavigate={onNavigate} />}
+      />
 
       <Card title="Atenção imediata" subtitle="O que precisa ser resolvido primeiro." className="decisoes-card decisoes-card--destaque">
         {atencaoImediata.length === 0 ? (

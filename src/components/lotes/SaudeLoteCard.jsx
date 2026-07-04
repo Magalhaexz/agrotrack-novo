@@ -32,7 +32,7 @@ export default function SaudeLoteCard({ saude, compact = false, titulo = 'Saúde
   return (
     <div className={`saude-lote saude-lote--${saude.classificacao} ${compact ? 'saude-lote--compact' : ''}`}>
       <div className="saude-lote__cabecalho">
-        <HeartPulse size={compact ? 14 : 16} aria-hidden="true" />
+        <Activity size={compact ? 14 : 16} aria-hidden="true" />
         <strong>{titulo}: {saude.score}/100</strong>
         <span className="saude-lote__badge">{saude.classificacaoLabel}</span>
       </div>

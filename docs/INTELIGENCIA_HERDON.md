@@ -236,3 +236,76 @@ O "Relatório do Lote" (PDF/WhatsApp) passou a reaproveitar diretamente o que as
 - **Decisões sugeridas** — uma frase por fator de saúde negativo (ex.: "Priorizar nova pesagem") mais "Avaliar venda" quando a decisão de venda (já calculada por `decisaoVenda.js`) indicar isso.
 
 Novo arquivo `src/domain/relatorioLote.js` (`gerarResumoRelatorioLote`) é a única peça nova de lógica — e mesmo essa só orquestra `buildRelatorioLote` + `calcularSaudeLote`, sem duplicar cálculo. Ver seção "Sprint 4" em `docs/RELATORIOS_HERDON.md` para o detalhamento completo (arquivos, paywall de exportação, testes).
+
+---
+
+# Sprint 5 — Assistente HERDON baseado em regras
+
+> Data: 2026-07-04 · Branch `main`
+
+## 23. Objetivo
+
+Dar ao produtor um jeito direto de perguntar "o que fazer agora" sem precisar interpretar sozinho as telas de Decisões/Saúde do Lote/Relatório. O Assistente HERDON **não é IA**: é uma camada de perguntas prontas que lê o que os motores das Sprints 1–4 já calculam e devolve uma resposta curta, com o motivo e a próxima ação — nunca um número ou um lote inventado.
+
+## 24. Arquivos criados/alterados
+
+| Arquivo | O que mudou |
+|---|---|
+| `src/domain/respostasAssistente.js` (novo) | `responderPerguntaHerdon(db, perguntaId, options)`, `listarPerguntasAssistente(db)`, `avaliarProntidaoAssistente(db)` |
+| `src/domain/respostasAssistente.test.js` (novo) | 16 testes cobrindo as 8 perguntas, dados insuficientes, links e severidade |
+| `src/components/assistente/AssistenteHerdon.jsx` (novo) | Painel (Modal) com os chips de pergunta, a resposta, evidências, próxima ação e botões de navegação |
+| `src/styles/assistente.css` (novo) | Estilo do painel, seguindo a paleta já usada em `decisoes.css`/`rebanho.css` |
+| `src/pages/DashboardPage.jsx` | Botão "Perguntar ao HERDON" no cabeçalho do Painel Geral |
+| `src/pages/DecisoesFazendaPage.jsx` | Mesmo botão em `PageHeader` (estado vazio e estado normal) |
+| `src/components/lotes/SaudeLoteCard.jsx` | Correção de bug encontrado durante o diagnóstico desta sprint: o ícone usado no caminho "score disponível" (`HeartPulse`) nunca foi importado e não existe no shim `src/lucide-react.js` — o card quebrava com `ReferenceError` sempre que um lote tinha dado suficiente para mostrar um score real (só o caminho "dados insuficientes", que usa `Activity`, sobrevivia). Trocado por `Activity`, ícone já importado no arquivo. Bug pré-existente da Sprint 3, sem relação com a lógica de dados — corrigido por estar num dos arquivos que esta sprint pediu para auditar. |
+
+## 25. As 8 perguntas e de onde vem cada resposta
+
+Nenhuma pergunta roda um cálculo novo — todas reaproveitam funções das Sprints 1–4:
+
+| Pergunta (`id`) | Reaproveita |
+|---|---|
+| `lote_pior_desempenho` | `listarSaudeLotes` (Sprint 3) para achar o pior score com dado disponível; `gerarResumoRelatorioLote` (Sprint 4) para a ação sugerida (`decisoes[0]`) |
+| `lote_prioritario` | `gerarAlertasPriorizados` (Sprint 1) filtrado a `entidade.tipo === 'lote'`; cai para `listarSaudeLotes` quando não há alerta crítico/alto em nenhum lote |
+| `custo_mais_pesado` | `gerarAlertasPriorizados` filtrado a `tipo === 'custo'` (o próprio `detectarCustoAcimaDoPrevisto`, Sprint 1); soma simples de despesas por categoria nos últimos 30 dias só para nomear a categoria que mais pesou (não é um novo alerta/threshold, só uma agregação descritiva sobre dado já carregado) |
+| `vale_a_pena_lote` | `gerarResumoRelatorioLote` (Sprint 4) — usa `decisaoVenda`, `custoPorArroba`, `lucroEstimado` já calculados; aceita `options.loteId`, com fallback para o primeiro lote ativo |
+| `proxima_pesagem` | `listarSaudeLotes`, olhando o fator `pesagem` (Sprint 3) já calculado por `calcularSaudeLote` |
+| `produto_acabando` | `detectarEstoqueBaixo` (Sprint 1) via `gerarAlertasPriorizados` filtrado a `tipo === 'estoque'` |
+| `atencao_hoje` | `construirInsightsFazenda` + `listarAtencaoImediata` (Sprint 1/2), sem alteração |
+| `sanidade_pendente` | `detectarSanidadeProxima` (Sprint 1) via `gerarAlertasPriorizados` filtrado a `tipo === 'sanidade'` |
+
+`listarPerguntasAssistente(db)` esconde as 4 perguntas que dependem de lote (`lote_pior_desempenho`, `lote_prioritario`, `vale_a_pena_lote`, `proxima_pesagem`) quando o banco não tem nenhum lote cadastrado — perguntar "qual lote está pior" sem nenhum lote não tem resposta possível.
+
+## 26. Sem IA externa — e como isso é garantido
+
+Não há chamada a nenhum serviço de IA (OpenAI ou outro), nenhuma chave de API nova, nenhuma dependência nova no `package.json`. `respostasAssistente.js` é só JavaScript puro: `if`/`filter`/template string sobre o retorno das funções de domínio já existentes. Toda pergunta é um `id` fixo de uma lista fechada (`PERGUNTAS`) — não há campo de texto livre, então não existe risco de o "assistente" interpretar mal uma pergunta aberta ou alucinar uma resposta para algo fora do escopo.
+
+## 27. Como nunca inventa dado
+
+Mesma régua das Sprints 3 e 4: todo handler primeiro verifica se a base mínima existe (lote cadastrado, pesagem suficiente, despesa lançada, item de estoque, sanidade registrada) antes de montar qualquer frase. Quando falta, a resposta vem com `dadosInsuficientes: true` e o texto diz literalmente o que cadastrar (ex.: *"Ainda não há pesagens suficientes para responder com segurança. Cadastre pelo menos uma pesagem do lote..."*). `vale_a_pena_lote` nunca mostra "lucro estimado" quando `gerarResumoRelatorioLote` não tem preço de venda suficiente — o campo fica de fora da frase em vez de aparecer como `R$ 0,00`.
+
+## 28. Estado vazio geral (`avaliarProntidaoAssistente`)
+
+Quando a conta não tem nem fazenda nem lote cadastrado, o painel não mostra a lista de perguntas — mostra *"O HERDON ainda precisa de dados para responder melhor."* com uma checklist clicável (cadastrar fazenda, cadastrar lotes, lançar pesagem, cadastrar estoque, lançar custos), cada item levando direto à tela correspondente.
+
+## 29. Onde o botão aparece e como navega
+
+"Perguntar ao HERDON" está no cabeçalho do **Painel Geral** (`DashboardPage`) e de **Decisões da Fazenda** (`DecisoesFazendaPage`, nos dois estados — vazio e com dados). O painel abre como `Modal` (mesmo componente usado em `MobileFab`/formulários do app — nada novo em termos de padrão de UI). Os botões de ação de cada resposta chamam `onNavigate(pagina, intent)`, a mesma função (`navigateWithPermission`, `App.jsx`) usada pelo resto do app: navegação pura é sempre livre; quando o link usa `intent: { action: 'novo' }` (ex.: "Registrar pesagem", "Registrar manejo sanitário"), ele abre a tela já no fluxo de cadastro — reaproveitando o mecanismo de `navigationIntent` que `EstoquePage`/`FinanceiroPage`/`LotesPage`/`PesagensPage`/`SanitarioPage`/`TarefasPage` já entendem, sem nenhuma lógica nova de navegação.
+
+## 30. Paywall
+
+O assistente inteiro é leitura: abrir o painel, escolher uma pergunta e ler a resposta nunca chama `createOperationalRecord`/`update`/`delete`, então nunca é bloqueado por falta de plano — inclusive serve como vitrine do valor do HERDON para quem ainda não assinou. Os botões de "próxima ação" só navegam (às vezes com `intent: 'novo'` para abrir um formulário); o bloqueio de escrita continua acontecendo do jeito que já existe, no momento de salvar, dentro da tela de destino — nada foi adicionado ou alterado no `writeGuard`.
+
+## 31. Testes e validação
+
+- 16 testes novos em `respostasAssistente.test.js`: sem dado nenhum, lote pior com GMD+tarefa atrasada, produto do estoque prestes a acabar, sanidade próxima, tarefa atrasada em "atenção hoje", custo em alta com categoria destacada, lote sem pesagem, "não inventar lucro" sem preço/custo, links corretos por pergunta, severidade coerente com a pior severidade real, filtragem de `listarPerguntasAssistente` sem lote, e pergunta desconhecida sem quebrar.
+- `npm run lint`: sem erros.
+- `npm run build`: sucesso — novo chunk `AssistenteHerdon` (~18 kB / 5,7 kB gzip).
+- `npm test`: **760 testes, 0 falhas** (744 já existentes + 16 novos).
+- Verificação manual interativa (logada) **não foi possível neste ambiente** — mesma limitação registrada desde a Sprint 2: sem chaves Supabase locais, não há como autenticar e abrir o painel pelo navegador nesta sessão. Confirmado que o servidor de preview sobe limpo (zero erro de console) na tela de login com o novo componente já no grafo de build; a cobertura de mobile/desktop e do fluxo "sem plano" descrita no enunciado fica pendente de verificação visual real após o deploy.
+
+## 32. Pendências / próximos passos sugeridos
+
+- Verificar visualmente o painel em produção (mobile e desktop, incluindo o fluxo "sem plano → abre o assistente → clica em ação de cadastro → cai na tela de assinatura") após o deploy deste commit.
+- `vale_a_pena_lote` hoje usa um `<select>` simples para escolher o lote quando há mais de um ativo; se o produto quiser, dá para promover isso a um passo de "escolha o lote" mais visual antes de mostrar a resposta.
+- Sem entrada de texto livre por decisão deste sprint — uma extensão futura de IA real (se e quando fizer sentido) poderia entrar como uma nova pergunta "livre" ao lado destas 8, sem precisar alterar as 8 já existentes.
