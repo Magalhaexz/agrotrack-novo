@@ -660,6 +660,7 @@ function buildReportBundle(db, filters) {
       margem: Number(item.indicadores.margem || 0),
       custoPorArroba: Number(item.indicadores.custoPorArroba || 0),
       lucroPorArroba: Number(item.indicadores.lucroPorArroba || 0),
+      lucroPorCabeca: Number(item.indicadores.lucroPorCabeca || 0),
       decisaoVenda,
       sanidadePendente: item.sanitarioPeriodo.filter((registro) => resolveSanitaryStatus(registro) !== 'Em dia').length,
     };
@@ -721,6 +722,16 @@ function buildReportBundle(db, filters) {
             { key: 'custoPeriodo', label: 'Custos', render: (row) => formatCurrency(row.custoPeriodo) },
             { key: 'margem', label: 'Margem', render: (row) => <span className={row.margem >= 0 ? 'text-success' : 'text-danger'}>{formatCurrency(row.margem)}</span> },
             { key: 'custoPorArroba', label: 'Custo/@', render: (row) => formatCurrency(row.custoPorArroba) },
+            {
+              key: 'lucroPorCabeca',
+              label: 'Lucro/cabeça',
+              render: (row) => <span className={row.lucroPorCabeca >= 0 ? 'text-success' : 'text-danger'}>{formatCurrency(row.lucroPorCabeca)}</span>,
+            },
+            {
+              key: 'lucroPorArroba',
+              label: 'Lucro/@',
+              render: (row) => <span className={row.lucroPorArroba >= 0 ? 'text-success' : 'text-danger'}>{formatCurrency(row.lucroPorArroba)}</span>,
+            },
             {
               key: 'decisao',
               label: 'Decisão de venda',
