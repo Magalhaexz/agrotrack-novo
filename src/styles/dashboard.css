@@ -98,6 +98,10 @@
   grid-template-columns: minmax(0, 1.2fr) minmax(0, 1.2fr) minmax(300px, 0.85fr);
 }
 
+.dashboard-grid--operations .ui-card-header {
+  margin-bottom: 20px;
+}
+
 .dashboard-grid--feature {
   grid-template-columns: minmax(0, 1.45fr) minmax(300px, 0.9fr);
 }
@@ -230,19 +234,23 @@
 .dashboard-list,
 .stock-list {
   display: grid;
-  gap: 12px;
+  gap: 14px;
 }
 
 .dashboard-list-item,
 .stock-item {
   display: grid;
-  align-items: center;
   gap: 12px;
   padding: 16px;
 }
 
+.stock-item {
+  align-items: center;
+}
+
 .dashboard-list-item {
   grid-template-columns: minmax(0, 1fr) auto;
+  align-items: start;
 }
 
 .dashboard-list-item--button {
