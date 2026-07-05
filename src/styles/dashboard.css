@@ -110,6 +110,39 @@
   grid-template-columns: repeat(2, minmax(0, 1fr));
 }
 
+/* Resumo financeiro / Resumo do rebanho: aqui strong=rótulo e p=valor
+   (padrão invertido em relação às outras listas do dashboard, onde
+   strong=título e p=descrição). Ajuste escopado só a esses 2 cards. */
+.dashboard-grid--dual .dashboard-list-copy strong {
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--dash-helper);
+}
+
+.dashboard-grid--dual .dashboard-list-copy p {
+  margin-top: 6px;
+  font-size: 1.1rem;
+  font-weight: 700;
+  line-height: 1.2;
+}
+
+.dashboard-grid--dual .dashboard-list-copy p:not(.positive):not(.negative) {
+  color: #edf4f1;
+}
+
+/* .positive/.negative perdiam para a regra de cor acima por especificidade
+   (bug pré-existente, de antes desta sprint). Restaura as cores que essas
+   classes já pretendiam usar, só aqui. */
+.dashboard-grid--dual .dashboard-list-copy p.positive {
+  color: #91f4b4;
+}
+
+.dashboard-grid--dual .dashboard-list-copy p.negative {
+  color: #ffb3b3;
+}
+
 .dashboard-hero-shell {
   padding: 16px 18px;
 }
