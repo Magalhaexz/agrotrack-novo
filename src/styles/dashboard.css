@@ -44,8 +44,8 @@
   display: flex;
   justify-content: space-between;
   align-items: center;
-  gap: 14px;
-  padding: 2px 2px 2px;
+  gap: 20px;
+  padding: 6px 2px 14px;
 }
 
 .dashboard-toolbar-actions {
@@ -126,11 +126,17 @@
   position: relative;
   overflow: hidden;
   min-height: 150px;
-  padding: 18px;
+  padding: 20px;
   border-radius: 18px;
   border: 1px solid var(--dash-card-border);
   background: var(--dash-card-bg);
   box-shadow: 0 10px 22px rgba(0, 0, 0, 0.22);
+  transition: border-color 0.18s ease, transform 0.18s ease;
+}
+
+.dashboard-grid--kpi-main .kpi-panel:hover {
+  border-color: var(--dash-card-border-hover);
+  transform: translateY(-1px);
 }
 
 .kpi-panel::after {
@@ -158,7 +164,7 @@
   justify-content: space-between;
   align-items: center;
   gap: 10px;
-  margin-bottom: 16px;
+  margin-bottom: 18px;
 }
 
 .kpi-panel-label {
@@ -184,7 +190,7 @@
 
 .kpi-panel strong {
   display: block;
-  margin-bottom: 8px;
+  margin-bottom: 10px;
   color: #f2f7f4;
   font-family: "Inter Tight", "Segoe UI", sans-serif;
   font-size: clamp(1.5rem, 1.7vw, 2.2rem);
