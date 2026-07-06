@@ -159,6 +159,21 @@
   font-size: 0.86rem;
 }
 
+/* Central de Alertas Internos — grupos Crítico/Atenção/Decisão (Sprint 4) */
+.dashboard-priority-groups {
+  display: grid;
+  gap: 16px;
+}
+
+.dashboard-priority-group-title {
+  margin: 0 0 8px;
+  font-size: 0.76rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--dash-helper);
+}
+
 .kpi-panel {
   position: relative;
   overflow: hidden;
