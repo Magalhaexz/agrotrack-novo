@@ -25,8 +25,8 @@ import Button from '../components/ui/Button';
 import EmptyState from '../components/EmptyState';
 import AssistenteHerdon from '../components/assistente/AssistenteHerdon';
 import { getResumoLote } from '../domain/resumoLote';
-import { construirHojeNaFazenda, listarContasFinanceiras } from '../domain/hojeNaFazenda';
-import { getDataVencimento } from '../domain/financeiroStatus';
+import { construirHojeNaFazenda } from '../domain/hojeNaFazenda';
+import { gerarAlertasUnificados, PRIORIDADE } from '../domain/alertasUnificados';
 import { construirChecklistPrimeirosPassos } from '../domain/guiaCriador';
 import { getNavLabel } from '../navigation/navConfig';
 import { formatCurrency, formatDate, formatNumber } from '../utils/calculations';
@@ -41,39 +41,22 @@ const getTodayIso = () => new Date().toISOString().slice(0, 10);
 
 const NIVEL_PARA_PRIORIDADE = { critical: 'alta', warning: 'media', info: 'baixa' };
 
-// Central de Alertas Internos (Sprint 4): agrupa as prioridades já calculadas
-// por `construirHojeNaFazenda` (mais os itens de pagamento/tarefas abaixo,
-// reaproveitados dos mesmos dados já usados em Pagamentos e no Quadro de
-// Tarefas) em 3 grupos visuais. Não é um sistema de alerta novo — só uma
-// reorganização de exibição sobre dados já existentes.
-const IDS_GRUPO_DECISAO = new Set(['lotes-prontos-venda', 'lotes-custo-alto-arroba']);
-
+// Central de Alertas Internos (Sprint 4, dados unificados no Sprint 5): 3
+// grupos visuais sobre a lista já padronizada por `gerarAlertasUnificados`.
 const GRUPOS_PRIORIDADE = [
   { chave: 'critico', titulo: 'Crítico', variant: 'danger' },
   { chave: 'atencao', titulo: 'Atenção', variant: 'warning' },
   { chave: 'decisao', titulo: 'Decisão', variant: 'info' },
 ];
 
-const ORIGEM_POR_PREFIXO = [
-  [/^pagamentos-|^contas-/, 'Financeiro'],
-  [/^lotes-sem-pesagem/, 'Pesagem'],
-  [/^lotes-gmd/, 'GMD'],
-  [/^lotes-sem-pasto|^pastos-/, 'Pastagem'],
-  [/^estoque-/, 'Estoque'],
-  [/^lotes-revisao-manejo/, 'Manejo/Sanidade'],
-  [/^lotes-prontos-venda|^lotes-custo-alto/, 'Decisão'],
-  [/^tarefas-/, 'Tarefas'],
-  [/^alertas-criticos/, 'Alertas gerais'],
-];
-
-function origemDoAlerta(id) {
-  const encontrado = ORIGEM_POR_PREFIXO.find(([regex]) => regex.test(id));
-  return encontrado ? encontrado[1] : 'Geral';
-}
-
-function pluralizarSimples(quantidade, singular, plural) {
-  return quantidade === 1 ? singular : plural;
-}
+const ORIGEM_LABEL = {
+  financeiro: 'Financeiro',
+  estoque: 'Estoque',
+  rebanho: 'Rebanho',
+  sanidade: 'Sanidade',
+  tarefas: 'Tarefas',
+  decisao: 'Decisão',
+};
 
 const KPI_VARIANTS = {
   success: 'success',
@@ -303,77 +286,27 @@ export default function DashboardPage({
     });
   }, [db.tarefas, funcionariosMap]);
 
-  const tarefasAtrasadas = useMemo(
-    () => boardTarefas.filter((tarefa) => tarefa.coluna === 'vencidas'),
-    [boardTarefas]
+  // Motor Único de Alertas Internos (Sprint 5) — fonte canônica, reaproveita
+  // `alertasInteligentes.js` + `hojeNaFazenda.js` internamente e já devolve
+  // {prioridade, origem, titulo, pageId} padronizados. Substitui a composição
+  // ad-hoc que vivia aqui desde o Sprint 4.
+  const alertasUnificados = useMemo(
+    () => gerarAlertasUnificados({ ...db, pastagens: pastagensFazendaAtiva }),
+    [db, pastagensFazendaAtiva]
   );
-
-  // Reaproveita `listarContasFinanceiras` (mesma função da Visão Geral de
-  // Pagamentos, Sprint 3) com janela de 7 dias para separar "vence hoje" de
-  // "vence nos próximos 7 dias" na Central de Alertas — não recalcula nada,
-  // só reusa o resultado com um filtro de data por cima.
-  const pagamentosDetalhados = useMemo(() => listarContasFinanceiras(db, 7), [db]);
-  const pagamentosVencendoHoje = useMemo(
-    () => pagamentosDetalhados.proximas.filter((mov) => getDataVencimento(mov) === getTodayIso()),
-    [pagamentosDetalhados]
-  );
-  const pagamentosProximos7Dias = useMemo(
-    () => pagamentosDetalhados.proximas.filter((mov) => getDataVencimento(mov) !== getTodayIso()),
-    [pagamentosDetalhados]
-  );
-
-  const prioridadesCombinadas = useMemo(() => {
-    // Remove o item genérico "contas-proximas" (janela de 3 dias) da lista
-    // vinda de `construirHojeNaFazenda` para não duplicar com os dois itens
-    // mais precisos (hoje / 7 dias) adicionados abaixo.
-    const base = hojeNaFazenda.prioridades.filter((item) => item.id !== 'contas-proximas');
-    const extras = [];
-
-    if (pagamentosVencendoHoje.length > 0) {
-      extras.push({
-        id: 'pagamentos-vencendo-hoje',
-        tom: 'atencao',
-        texto: `${pagamentosVencendoHoje.length} ${pluralizarSimples(pagamentosVencendoHoje.length, 'pagamento vence', 'pagamentos vencem')} hoje`,
-        rota: 'financeiro',
-      });
-    }
-    if (pagamentosProximos7Dias.length > 0) {
-      extras.push({
-        id: 'pagamentos-proximos-7-dias',
-        tom: 'atencao',
-        texto: `${pagamentosProximos7Dias.length} ${pluralizarSimples(pagamentosProximos7Dias.length, 'pagamento vence', 'pagamentos vencem')} nos próximos 7 dias`,
-        rota: 'financeiro',
-      });
-    }
-    if (tarefasAtrasadas.length > 0) {
-      extras.push({
-        id: 'tarefas-atrasadas',
-        tom: 'critico',
-        texto: `${tarefasAtrasadas.length} ${pluralizarSimples(tarefasAtrasadas.length, 'tarefa está', 'tarefas estão')} atrasada${tarefasAtrasadas.length > 1 ? 's' : ''}`,
-        rota: 'tarefas',
-      });
-    }
-    if (tarefasDoDia.length > 0) {
-      extras.push({
-        id: 'tarefas-hoje',
-        tom: 'atencao',
-        texto: `${tarefasDoDia.length} ${pluralizarSimples(tarefasDoDia.length, 'tarefa é', 'tarefas são')} para hoje`,
-        rota: 'tarefas',
-      });
-    }
-
-    return [...base, ...extras];
-  }, [hojeNaFazenda.prioridades, pagamentosVencendoHoje, pagamentosProximos7Dias, tarefasAtrasadas, tarefasDoDia]);
 
   const gruposPrioridades = useMemo(() => {
     const grupos = { critico: [], atencao: [], decisao: [] };
-    prioridadesCombinadas.forEach((item) => {
-      if (IDS_GRUPO_DECISAO.has(item.id)) grupos.decisao.push(item);
-      else if (item.tom === 'critico') grupos.critico.push(item);
-      else grupos.atencao.push(item);
+    alertasUnificados.forEach((alerta) => {
+      if (alerta.prioridade === PRIORIDADE.DECISAO) grupos.decisao.push(alerta);
+      else if (alerta.prioridade === PRIORIDADE.CRITICO) grupos.critico.push(alerta);
+      else if (alerta.prioridade === PRIORIDADE.ATENCAO) grupos.atencao.push(alerta);
+      // itens 'informativo' não aparecem nesta central — mesma densidade visual do Sprint 4.
     });
     return grupos;
-  }, [prioridadesCombinadas]);
+  }, [alertasUnificados]);
+
+  const totalPrioridadesExibidas = gruposPrioridades.critico.length + gruposPrioridades.atencao.length + gruposPrioridades.decisao.length;
 
   async function criarTarefaDashboard() {
     if (!hasPermission('tarefas:editar')) {
@@ -504,7 +437,7 @@ export default function DashboardPage({
               </div>
             </div>
 
-            {prioridadesCombinadas.length === 0 ? (
+            {totalPrioridadesExibidas === 0 ? (
               <div className="empty-state">
                 <p>Tudo certo por aqui — nenhuma prioridade pendente hoje.</p>
               </div>
@@ -520,11 +453,11 @@ export default function DashboardPage({
                             key={item.id}
                             type="button"
                             className="dashboard-list-item dashboard-list-item--button"
-                            onClick={() => (item.rota === 'dashboard' ? setTabAtiva?.('alertas') : onNavigate?.(item.rota))}
+                            onClick={() => onNavigate?.(item.pageId)}
                           >
                             <div className="dashboard-list-copy">
-                              <strong>{item.texto}</strong>
-                              <p>{origemDoAlerta(item.id)} · {item.rota === 'dashboard' ? 'Ver alertas' : `Ver em ${getNavLabel(item.rota)}`}</p>
+                              <strong>{item.titulo}</strong>
+                              <p>{ORIGEM_LABEL[item.origem] || 'Geral'} · Ver em {getNavLabel(item.pageId)}</p>
                             </div>
                             <Badge variant={variant}>{titulo}</Badge>
                           </button>
