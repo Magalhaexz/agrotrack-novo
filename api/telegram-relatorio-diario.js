@@ -9,6 +9,7 @@
 // alerta paralelo. Uma falha de envio não interrompe as demais conexões.
 import { getSupabaseAdminClient, extractBearerToken } from './_supabaseAdmin.js';
 import { enviarMensagemTelegramParaChat, getTelegramEnvStatus } from './_telegram.js';
+import { montarDbDaConta } from './_herdonDb.js';
 import { gerarAlertasUnificados } from '../src/domain/alertasUnificados.js';
 import { gerarRelatorioDiarioTelegram } from '../src/domain/telegramRelatorio.js';
 
@@ -16,37 +17,9 @@ function readEnv(name) {
   return String(process.env[name] || '').trim();
 }
 
-// Tabelas que `gerarAlertasUnificados` precisa para montar o `db` — mesma
-// lista de fontes já auditada no Sprint 5, nada além disso é lido.
-const TABELAS_NECESSARIAS = [
-  'lotes',
-  'animais',
-  'pesagens',
-  'movimentacoes_financeiras',
-  'estoque',
-  'movimentacoes_estoque',
-  'tarefas',
-  'sanitario',
-  'pastagens',
-];
-
 function isAuthorized(req, secret) {
   const token = extractBearerToken(req);
   return Boolean(token) && token === secret;
-}
-
-async function montarDbDaConta(client, ownerUserId) {
-  const resultados = await Promise.all(
-    TABELAS_NECESSARIAS.map((tabela) => client.from(tabela).select('*').eq('owner_user_id', ownerUserId))
-  );
-
-  const db = {};
-  TABELAS_NECESSARIAS.forEach((tabela, index) => {
-    const { data, error } = resultados[index];
-    if (error) throw error;
-    db[tabela] = Array.isArray(data) ? data : [];
-  });
-  return db;
 }
 
 async function registrarLog(client, { ownerUserId, connectionId, status, errorMessage }) {
