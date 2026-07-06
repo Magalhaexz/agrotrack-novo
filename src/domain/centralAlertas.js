@@ -1,24 +1,19 @@
-// Central de Alertas Inteligente (Sprint 11) — módulo puro que enriquece,
-// filtra, ordena e resume a lista já produzida por
-// `gerarAlertasUnificados()` (Sprint 5/9/10). Não recalcula nenhum alerta:
-// só lê os campos que o motor único já expõe
-// (`{ id, tipo, prioridade, origem, titulo, descricao, acaoSugerida, pageId, dataReferencia }`)
+// Central de Alertas Inteligente (Sprint 11, qualificada no Sprint 12) —
+// módulo puro que enriquece, filtra, ordena e resume a lista já produzida
+// por `gerarAlertasUnificados()` (Sprint 5/9/10/12). Não recalcula nenhum
+// alerta: só lê os campos que o motor único já expõe
+// (`{ id, tipo, prioridade, origem, titulo, descricao, acaoSugerida, pageId, dataReferencia, loteId, loteNome }`)
 // e deriva campos de apresentação/decisão sobre eles.
 //
-// Auditoria (antes de implementar, ver docs/SPRINT11_CENTRAL_ALERTAS_INTELIGENTE.md):
-// - `dataReferencia` hoje é sempre `null` em todo alerta unificado (nenhum
-//   `agrupar*` de `alertasUnificados.js` preenche esse campo — os alertas são
-//   agregados por categoria, não por item, então não há uma data única por
-//   alerta). `classificarPrazo` por isso usa `dataReferencia` quando
-//   presente (futuro-compatível, caso um dia passe a ser preenchido) e cai
-//   para um mapa por `tipo` (ver `PRAZO_POR_TIPO`) — não inventa data onde
-//   não existe.
-// - Nenhum alerta carrega `lote_id` estruturado (os grupos combinam vários
-//   lotes numa única `descricao`, ex. "Lote A · Lote B"). `loteId`/`loteNome`
-//   só são preenchidos quando o chamador passa `opcoes.lotes` (lista
-//   `{ id, nome }`) e exatamente um nome de lote conhecido aparece no
-//   título/descrição do alerta — heurística de texto, não um vínculo real,
-//   documentada e testada como tal.
+// Sprint 12 — o motor único passou a preencher `dataReferencia`/`loteId`/
+// `loteNome` diretamente nos alertas que têm uma data ou lote real e
+// inequívoco (ver `alertasUnificados.js`). Esses campos, quando presentes,
+// são sempre preferidos aqui. Nem todo alerta tem essa informação — grupos
+// com mais de um lote ou sem data real continuam com `loteId`/`loteNome`/
+// `dataReferencia` em `null` (honesto, não inventado); para esses,
+// `normalizarAlertaCentral` ainda cai para a heurística de texto por
+// `opcoes.lotes` (Sprint 11) e `classificarPrazo` cai para o mapa por
+// `tipo` (`PRAZO_POR_TIPO`).
 import { toDateKey, daysBetween } from './calcHelpers.js';
 
 export const PRAZO = {
@@ -148,12 +143,23 @@ function encontrarLoteReferenciado(alerta, lotes) {
  * Enriquece um alerta do motor único para a Central de Alertas — devolve um
  * objeto seguro para UI, sem remover nada do original (`alertaOriginal`
  * preserva o objeto tal como veio de `gerarAlertasUnificados`).
+ *
+ * Sprint 12: prioriza `alerta.loteId`/`alerta.loteNome`/`alerta.dataReferencia`
+ * quando o motor único já os preenche (vínculo real, não ambíguo) — só cai
+ * para a heurística de texto por `opcoes.lotes` (Sprint 11) quando o
+ * alerta não trouxer um lote estruturado. `dataReferencia` inválida
+ * (`toDateKey` não reconhece) nunca quebra: vira `null` e `classificarPrazo`
+ * cai para o fallback por `tipo`/prioridade normalmente.
  */
 export function normalizarAlertaCentral(alerta, opcoes = {}) {
   const hoje = opcoes.hoje || new Date();
-  const lote = encontrarLoteReferenciado(alerta, opcoes.lotes);
   const prazoCategoria = classificarPrazo(alerta, hoje);
   const prioridade = alerta?.prioridade || 'informativo';
+
+  const loteEstruturado = alerta?.loteId != null || alerta?.loteNome;
+  const loteHeuristico = loteEstruturado ? null : encontrarLoteReferenciado(alerta, opcoes.lotes);
+
+  const dataReferenciaValida = toDateKey(alerta?.dataReferencia) || null;
 
   return {
     id: alerta?.id || null,
@@ -161,9 +167,9 @@ export function normalizarAlertaCentral(alerta, opcoes = {}) {
     descricao: alerta?.descricao || '',
     origem: alerta?.origem || 'geral',
     prioridade,
-    loteId: lote?.id ?? null,
-    loteNome: lote?.nome ?? null,
-    dataReferencia: alerta?.dataReferencia ?? null,
+    loteId: loteEstruturado ? (alerta.loteId ?? null) : (loteHeuristico?.id ?? null),
+    loteNome: loteEstruturado ? (alerta.loteNome ?? null) : (loteHeuristico?.nome ?? null),
+    dataReferencia: dataReferenciaValida,
     prazoCategoria,
     acaoRecomendada: sugerirAcao(alerta),
     pesoDecisao: (PESO_PRIORIDADE[prioridade] ?? 0) + (PESO_PRAZO[prazoCategoria] ?? 0),
@@ -202,8 +208,9 @@ export function filtrarAlertasCentral(alertasNormalizados = [], filtros = {}) {
 
 /**
  * Ordena por urgência: maior prioridade primeiro, depois vencidos → hoje →
- * 7 dias → 30 dias → sem prazo, com `pesoDecisao` como critério final de
- * desempate (maior peso primeiro).
+ * 7 dias → 30 dias → sem prazo. Dentro da mesma faixa de prazo, alertas com
+ * `dataReferencia` real são desempatados pela data mais antiga primeiro
+ * (o mais vencido/mais urgente sobe) antes de cair no `pesoDecisao`.
  */
 export function ordenarAlertasCentral(alertasNormalizados = []) {
   return (Array.isArray(alertasNormalizados) ? alertasNormalizados : [])
@@ -216,6 +223,10 @@ export function ordenarAlertasCentral(alertasNormalizados = []) {
       const prazoA = ORDEM_PRAZO[a.prazoCategoria] ?? 99;
       const prazoB = ORDEM_PRAZO[b.prazoCategoria] ?? 99;
       if (prazoA !== prazoB) return prazoA - prazoB;
+
+      if (a.dataReferencia && b.dataReferencia && a.dataReferencia !== b.dataReferencia) {
+        return a.dataReferencia < b.dataReferencia ? -1 : 1;
+      }
 
       if (b.pesoDecisao !== a.pesoDecisao) return b.pesoDecisao - a.pesoDecisao;
       return String(a.id).localeCompare(String(b.id));

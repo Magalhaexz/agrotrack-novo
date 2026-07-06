@@ -135,3 +135,79 @@ test('ordenarAlertasCentral ordena por prioridade e depois por prazo', () => {
   const ordenado = ordenarAlertasCentral(lista);
   assert.deepEqual(ordenado.map((a) => a.id), ['critica', 'atencao-hoje', 'atencao-7-dias', 'baixa']);
 });
+
+// ── Sprint 12 — campos estruturados vindos do motor único ───────────────────
+
+test('normalizarAlertaCentral prioriza loteId/loteNome/dataReferencia/acaoSugerida vindos do alerta', () => {
+  const original = alerta({
+    loteId: 42,
+    loteNome: 'Lote Estruturado',
+    dataReferencia: '2026-07-05',
+    acaoSugerida: 'Ação vinda do motor único',
+    descricao: 'Nenhum nome de lote aparece aqui',
+  });
+  // Sem `opcoes.lotes` — a heurística de texto nem teria como achar o lote
+  // pela descrição; ainda assim loteId/loteNome vêm preenchidos direto do alerta.
+  const normalizado = normalizarAlertaCentral(original, { hoje: HOJE });
+  assert.equal(normalizado.loteId, 42);
+  assert.equal(normalizado.loteNome, 'Lote Estruturado');
+  assert.equal(normalizado.dataReferencia, '2026-07-05');
+  assert.equal(normalizado.prazoCategoria, PRAZO.VENCIDO);
+  assert.equal(normalizado.acaoRecomendada, 'Ação vinda do motor único');
+});
+
+test('normalizarAlertaCentral cai para fallback quando alerta legado não tem loteId/loteNome/dataReferencia', () => {
+  const legado = { id: 'legado-1', tipo: 'estoque', prioridade: 'atencao', origem: 'estoque', titulo: 'Alerta legado', descricao: 'Sem campos novos' };
+  const normalizado = normalizarAlertaCentral(legado, { hoje: HOJE });
+  assert.equal(normalizado.loteId, null);
+  assert.equal(normalizado.loteNome, null);
+  assert.equal(normalizado.dataReferencia, null);
+  assert.equal(normalizado.prazoCategoria, PRAZO.SEM_PRAZO);
+  assert.ok(normalizado.acaoRecomendada);
+});
+
+test('normalizarAlertaCentral não quebra com dataReferencia inválida', () => {
+  const normalizado = normalizarAlertaCentral(alerta({ dataReferencia: 'data-invalida' }), { hoje: HOJE });
+  assert.equal(normalizado.dataReferencia, null);
+  assert.equal(normalizado.prazoCategoria, PRAZO.SEM_PRAZO);
+});
+
+test('filtrarAlertasCentral filtra por loteId e loteNome estruturados (sem depender de heurística de texto)', () => {
+  const lista = [
+    normalizarAlertaCentral(alerta({ id: 'l1', loteId: 5, loteNome: 'Lote Cinco' }), { hoje: HOJE }),
+    normalizarAlertaCentral(alerta({ id: 'l2', loteId: 6, loteNome: 'Lote Seis' }), { hoje: HOJE }),
+  ];
+  assert.deepEqual(filtrarAlertasCentral(lista, { loteId: 5 }).map((a) => a.id), ['l1']);
+  assert.deepEqual(filtrarAlertasCentral(lista, { loteNome: 'Lote Seis' }).map((a) => a.id), ['l2']);
+});
+
+test('filtrarAlertasCentral filtra por prazo usando dataReferencia real', () => {
+  const lista = [
+    normalizarAlertaCentral(alerta({ id: 'vencido', dataReferencia: '2026-07-05' }), { hoje: HOJE }),
+    normalizarAlertaCentral(alerta({ id: 'proximo', dataReferencia: '2026-07-12' }), { hoje: HOJE }),
+  ];
+  assert.deepEqual(filtrarAlertasCentral(lista, { prazoCategoria: PRAZO.VENCIDO }).map((a) => a.id), ['vencido']);
+  assert.deepEqual(filtrarAlertasCentral(lista, { prazoCategoria: PRAZO.PROXIMOS_7_DIAS }).map((a) => a.id), ['proximo']);
+});
+
+test('resumirCentralAlertas conta vencidos/vencendo hoje/próximos 7 dias a partir de dataReferencia real', () => {
+  const lista = [
+    normalizarAlertaCentral(alerta({ id: 'v1', dataReferencia: '2026-07-01' }), { hoje: HOJE }),
+    normalizarAlertaCentral(alerta({ id: 'v2', dataReferencia: '2026-07-08' }), { hoje: HOJE }),
+    normalizarAlertaCentral(alerta({ id: 'hoje1', dataReferencia: '2026-07-10' }), { hoje: HOJE }),
+    normalizarAlertaCentral(alerta({ id: 'prox1', dataReferencia: '2026-07-15' }), { hoje: HOJE }),
+  ];
+  const resumo = resumirCentralAlertas(lista);
+  assert.equal(resumo.vencidos, 2);
+  assert.equal(resumo.vencendoHoje, 1);
+  assert.equal(resumo.proximos7Dias, 1);
+});
+
+test('ordenarAlertasCentral usa dataReferencia real como desempate — vencido mais antigo primeiro', () => {
+  const lista = [
+    normalizarAlertaCentral(alerta({ id: 'vencido-recente', prioridade: 'critico', dataReferencia: '2026-07-09' }), { hoje: HOJE }),
+    normalizarAlertaCentral(alerta({ id: 'vencido-antigo', prioridade: 'critico', dataReferencia: '2026-07-01' }), { hoje: HOJE }),
+  ];
+  const ordenado = ordenarAlertasCentral(lista);
+  assert.deepEqual(ordenado.map((a) => a.id), ['vencido-antigo', 'vencido-recente']);
+});

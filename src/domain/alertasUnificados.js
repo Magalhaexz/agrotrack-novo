@@ -74,8 +74,53 @@ function pluralizar(quantidade, singular, plural) {
   return quantidade === 1 ? singular : plural;
 }
 
-function alertaPadrao({ id, tipo, prioridade, origem, titulo, descricao, acaoSugerida, pageId, dataReferencia = null }) {
-  return { id, tipo, prioridade, origem, titulo, descricao, acaoSugerida, pageId, dataReferencia };
+// Sprint 12 — contrato interno para montar um alerta com segurança:
+// normaliza `dataReferencia` (string/Date vira "YYYY-MM-DD" válido ou
+// `null` — nunca `undefined`, nunca inventa `new Date()` como fallback) e
+// mantém `loteId`/`loteNome` como `null` quando não há lote seguro. Não é
+// exportado: uso interno deste arquivo só.
+function criarAlerta({ id, tipo, prioridade, origem, titulo, descricao, acaoSugerida, pageId, dataReferencia = null, loteId = null, loteNome = null, metadata = null }) {
+  return {
+    id,
+    tipo,
+    prioridade,
+    origem,
+    titulo,
+    descricao,
+    acaoSugerida,
+    pageId,
+    dataReferencia: toDateKey(dataReferencia) || null,
+    loteId: loteId ?? null,
+    loteNome: loteNome ?? null,
+    ...(metadata ? { metadata } : {}),
+  };
+}
+
+// Aceita as variações de nome de campo já usadas em diferentes tabelas do
+// app (`lote_id` na maioria, `loteId` em objetos já normalizados, `id_lote`
+// em alguns imports legados) — nunca infere lote a partir de texto solto.
+function obterLoteId(item) {
+  if (!item) return null;
+  const candidato = item.lote_id ?? item.loteId ?? item.id_lote ?? null;
+  if (candidato == null || candidato === '') return null;
+  const numero = Number(candidato);
+  return Number.isFinite(numero) ? numero : null;
+}
+
+function obterLoteNome(item) {
+  if (!item) return null;
+  const candidato = item.lote_nome ?? item.loteNome ?? item.nome_lote ?? item.nome ?? null;
+  const texto = String(candidato ?? '').trim();
+  return texto || null;
+}
+
+/** Menor data válida entre uma lista de valores — usada para resumir a `dataReferencia` de um grupo com vários itens. `null` quando nenhum item tem data. */
+function dataMinima(valores) {
+  const chaves = (Array.isArray(valores) ? valores : [])
+    .map((valor) => toDateKey(valor))
+    .filter(Boolean)
+    .sort();
+  return chaves[0] || null;
 }
 
 function tituloGrupoInteligente(tipo, prioridade, quantidade) {
@@ -125,7 +170,11 @@ function agruparAlertasInteligentes(db, agora) {
 
   return Array.from(grupos.values()).map((grupo) => {
     const quantidade = grupo.itens.length;
-    return alertaPadrao({
+    // `loteId`/`loteNome` só quando o grupo tem 1 item só (ambíguo com mais
+    // de um lote); `dataReferencia` já vem de cada item (Sprint 12, ver
+    // `alertasInteligentes.js`) — usa a mais próxima/urgente do grupo.
+    const unico = quantidade === 1 ? grupo.itens[0] : null;
+    return criarAlerta({
       id: `unificado-${grupo.tipo}-${grupo.prioridade}`,
       tipo: grupo.tipo,
       prioridade: grupo.prioridade,
@@ -134,8 +183,21 @@ function agruparAlertasInteligentes(db, agora) {
       descricao: grupo.itens.slice(0, 3).map((item) => item.titulo).join(' · '),
       acaoSugerida: grupo.itens[0].acaoSugerida,
       pageId: grupo.pageId,
+      dataReferencia: dataMinima(grupo.itens.map((item) => item.dataReferencia)),
+      loteId: unico?.loteId ?? null,
+      loteNome: unico?.loteNome ?? null,
     });
   });
+}
+
+/** Resolve loteId/loteNome só quando a lista tem exatamente 1 lançamento com lote_id — ambíguo com mais de um. */
+function loteUnicoFinanceiro(lista, lotesMap) {
+  if (!Array.isArray(lista) || lista.length !== 1) return { loteId: null, loteNome: null };
+  const mov = lista[0];
+  const loteId = obterLoteId(mov);
+  if (loteId == null) return { loteId: null, loteNome: null };
+  const lote = lotesMap.get(loteId);
+  return { loteId, loteNome: lote?.nome ?? obterLoteNome(mov) };
 }
 
 /** Contas a pagar vencidas / vencendo hoje / vencendo em 7 dias — reaproveita `listarContasFinanceiras` (mesma função da Visão Geral de Pagamentos, Sprint 3). */
@@ -144,11 +206,12 @@ function agruparFinanceiro(db, hoje) {
   const { vencidas, proximas } = listarContasFinanceiras(db, 7);
   const vencendoHoje = proximas.filter((mov) => getDataVencimento(mov) === hoje);
   const proximos7Dias = proximas.filter((mov) => getDataVencimento(mov) !== hoje);
+  const lotesMap = new Map((Array.isArray(db?.lotes) ? db.lotes : []).map((l) => [Number(l.id), l]));
 
   const descricaoDe = (lista) => lista.slice(0, 3).map((mov) => mov.descricao || mov.categoria || 'Despesa').join(' · ');
 
   if (vencidas.length > 0) {
-    alertas.push(alertaPadrao({
+    alertas.push(criarAlerta({
       id: 'unificado-financeiro-vencidas',
       tipo: 'financeiro-vencido',
       prioridade: PRIORIDADE.CRITICO,
@@ -157,10 +220,12 @@ function agruparFinanceiro(db, hoje) {
       descricao: descricaoDe(vencidas),
       acaoSugerida: 'Regularizar os pagamentos vencidos.',
       pageId: 'financeiro',
+      dataReferencia: dataMinima(vencidas.map(getDataVencimento)),
+      ...loteUnicoFinanceiro(vencidas, lotesMap),
     }));
   }
   if (vencendoHoje.length > 0) {
-    alertas.push(alertaPadrao({
+    alertas.push(criarAlerta({
       id: 'unificado-financeiro-hoje',
       tipo: 'financeiro-vence-hoje',
       prioridade: PRIORIDADE.ATENCAO,
@@ -169,10 +234,12 @@ function agruparFinanceiro(db, hoje) {
       descricao: descricaoDe(vencendoHoje),
       acaoSugerida: 'Confirmar o pagamento hoje para não vencer.',
       pageId: 'financeiro',
+      dataReferencia: dataMinima(vencendoHoje.map(getDataVencimento)),
+      ...loteUnicoFinanceiro(vencendoHoje, lotesMap),
     }));
   }
   if (proximos7Dias.length > 0) {
-    alertas.push(alertaPadrao({
+    alertas.push(criarAlerta({
       id: 'unificado-financeiro-7-dias',
       tipo: 'financeiro-vence-7-dias',
       prioridade: PRIORIDADE.ATENCAO,
@@ -181,9 +248,18 @@ function agruparFinanceiro(db, hoje) {
       descricao: descricaoDe(proximos7Dias),
       acaoSugerida: 'Planejar o pagamento dentro da semana.',
       pageId: 'financeiro',
+      dataReferencia: dataMinima(proximos7Dias.map(getDataVencimento)),
+      ...loteUnicoFinanceiro(proximos7Dias, lotesMap),
     }));
   }
   return alertas;
+}
+
+/** loteId/loteNome só quando a lista tem exatamente 1 lote — ambíguo com mais de um. */
+function loteUnicoDireto(lotes) {
+  if (!Array.isArray(lotes) || lotes.length !== 1) return { loteId: null, loteNome: null };
+  const lote = lotes[0];
+  return { loteId: lote?.id ?? null, loteNome: lote?.nome ?? null };
 }
 
 /** Lotes sem pesagem recente / sem pasto definido — reaproveita `hojeNaFazenda.js`. */
@@ -194,7 +270,7 @@ function agruparRebanho(db) {
   const nomeDe = (lista) => lista.slice(0, 3).map((lote) => lote.nome || `Lote ${lote.id}`).join(' · ');
 
   if (semPesagem.length > 0) {
-    alertas.push(alertaPadrao({
+    alertas.push(criarAlerta({
       id: 'unificado-rebanho-sem-pesagem',
       tipo: 'sem-pesagem',
       prioridade: PRIORIDADE.ATENCAO,
@@ -203,10 +279,14 @@ function agruparRebanho(db) {
       descricao: nomeDe(semPesagem),
       acaoSugerida: 'Registrar uma nova pesagem para o lote.',
       pageId: 'pesagens',
+      // `ultima_pesagem` é a data que torna o alerta relevante (quando existe
+      // — lotes nunca pesados não têm essa data, fica null).
+      dataReferencia: dataMinima(semPesagem.map((lote) => lote.ultima_pesagem)),
+      ...loteUnicoDireto(semPesagem),
     }));
   }
   if (semPasto.length > 0) {
-    alertas.push(alertaPadrao({
+    alertas.push(criarAlerta({
       id: 'unificado-rebanho-sem-pasto',
       tipo: 'sem-pasto',
       prioridade: PRIORIDADE.ATENCAO,
@@ -215,9 +295,17 @@ function agruparRebanho(db) {
       descricao: nomeDe(semPasto),
       acaoSugerida: 'Vincular o lote a um pasto cadastrado.',
       pageId: 'lotes',
+      ...loteUnicoDireto(semPasto),
     }));
   }
   return alertas;
+}
+
+/** loteId/loteNome só quando a lista de `{lote, ...}` tem exatamente 1 item — ambíguo com mais de um. */
+function loteUnicoDecisao(itens) {
+  if (!Array.isArray(itens) || itens.length !== 1) return { loteId: null, loteNome: null };
+  const lote = itens[0]?.lote;
+  return { loteId: lote?.id ?? null, loteNome: lote?.nome ?? null };
 }
 
 /** Lote pronto para avaliar venda / custo por arroba alto — reaproveita `decisaoVenda.js` via `hojeNaFazenda.js`. */
@@ -227,7 +315,7 @@ function agruparDecisao(db) {
   const nomeDe = (lista) => lista.slice(0, 3).map((item) => item.lote.nome || `Lote ${item.lote.id}`).join(' · ');
 
   if (prontosParaAvaliar.length > 0) {
-    alertas.push(alertaPadrao({
+    alertas.push(criarAlerta({
       id: 'unificado-decisao-prontos-venda',
       tipo: 'pronto-venda',
       prioridade: PRIORIDADE.DECISAO,
@@ -236,10 +324,13 @@ function agruparDecisao(db) {
       descricao: nomeDe(prontosParaAvaliar),
       acaoSugerida: 'Avaliar a decisão de venda do lote.',
       pageId: 'resultados',
+      // Sem data única real: "pronto para venda"/"custo alto" são estados
+      // calculados agora, não vencimentos — dataReferencia fica null (Sprint 12).
+      ...loteUnicoDecisao(prontosParaAvaliar),
     }));
   }
   if (custoAlto.length > 0) {
-    alertas.push(alertaPadrao({
+    alertas.push(criarAlerta({
       id: 'unificado-decisao-custo-alto',
       tipo: 'custo-alto-arroba',
       prioridade: PRIORIDADE.DECISAO,
@@ -248,6 +339,7 @@ function agruparDecisao(db) {
       descricao: nomeDe(custoAlto),
       acaoSugerida: 'Revisar o custo do lote antes de decidir.',
       pageId: 'resultados',
+      ...loteUnicoDecisao(custoAlto),
     }));
   }
   return alertas;
@@ -260,7 +352,7 @@ function agruparPastos(db) {
   const nomeDe = (lista) => lista.slice(0, 3).map((pasto) => pasto.nome).join(' · ');
 
   if (resumo.pastosAcimaCapacidade.length > 0) {
-    alertas.push(alertaPadrao({
+    alertas.push(criarAlerta({
       id: 'unificado-pastos-acima-capacidade',
       tipo: 'pasto-acima-capacidade',
       prioridade: PRIORIDADE.CRITICO,
@@ -272,7 +364,7 @@ function agruparPastos(db) {
     }));
   }
   if (resumo.pastosEmAtencao.length > 0) {
-    alertas.push(alertaPadrao({
+    alertas.push(criarAlerta({
       id: 'unificado-pastos-atencao',
       tipo: 'pasto-atencao',
       prioridade: PRIORIDADE.ATENCAO,
@@ -315,7 +407,7 @@ function agruparSaidaLote(db, hoje) {
   const nomeDe = (lista) => lista.slice(0, 3).map((lote) => lote.nome || `Lote ${lote.id}`).join(' · ');
 
   if (vencidas.length > 0) {
-    alertas.push(alertaPadrao({
+    alertas.push(criarAlerta({
       id: 'unificado-lote-saida-vencida',
       tipo: 'lote-saida-vencida',
       prioridade: PRIORIDADE.CRITICO,
@@ -324,10 +416,12 @@ function agruparSaidaLote(db, hoje) {
       descricao: nomeDe(vencidas),
       acaoSugerida: 'Confirmar a venda/saída ou atualizar a data prevista do lote.',
       pageId: 'lotes',
+      dataReferencia: dataMinima(vencidas.map((lote) => lote.saida)),
+      ...loteUnicoDireto(vencidas),
     }));
   }
   if (proximas.length > 0) {
-    alertas.push(alertaPadrao({
+    alertas.push(criarAlerta({
       id: 'unificado-lote-saida-proxima',
       tipo: 'lote-saida-proxima',
       prioridade: PRIORIDADE.ATENCAO,
@@ -336,6 +430,8 @@ function agruparSaidaLote(db, hoje) {
       descricao: nomeDe(proximas),
       acaoSugerida: 'Planejar a saída/venda do lote.',
       pageId: 'lotes',
+      dataReferencia: dataMinima(proximas.map((lote) => lote.saida)),
+      ...loteUnicoDireto(proximas),
     }));
   }
   return alertas;
@@ -367,7 +463,7 @@ function agruparEstoqueValidade(db, hoje) {
   const nomeDe = (lista) => lista.slice(0, 3).map((item) => item.produto || 'Produto').join(' · ');
 
   if (vencidos.length > 0) {
-    alertas.push(alertaPadrao({
+    alertas.push(criarAlerta({
       id: 'unificado-estoque-vencido',
       tipo: 'estoque-vencido',
       prioridade: PRIORIDADE.CRITICO,
@@ -376,10 +472,12 @@ function agruparEstoqueValidade(db, hoje) {
       descricao: nomeDe(vencidos),
       acaoSugerida: 'Retirar ou descartar o produto vencido do estoque.',
       pageId: 'estoque',
+      dataReferencia: dataMinima(vencidos.map((item) => item.data_validade)),
+      // Estoque não é vinculado a lote — loteId/loteNome ficam null (Sprint 12).
     }));
   }
   if (proximos.length > 0) {
-    alertas.push(alertaPadrao({
+    alertas.push(criarAlerta({
       id: 'unificado-estoque-validade-proxima',
       tipo: 'estoque-validade-proxima',
       prioridade: PRIORIDADE.ATENCAO,
@@ -388,6 +486,7 @@ function agruparEstoqueValidade(db, hoje) {
       descricao: nomeDe(proximos),
       acaoSugerida: 'Priorizar o uso do produto antes do vencimento.',
       pageId: 'estoque',
+      dataReferencia: dataMinima(proximos.map((item) => item.data_validade)),
     }));
   }
   return alertas;
@@ -409,6 +508,8 @@ function agruparCarenciaAtiva(db, hoje) {
   const lotesMap = new Map((Array.isArray(db?.lotes) ? db.lotes : []).map((l) => [Number(l.id), l]));
   const nomeLote = (loteId) => lotesMap.get(Number(loteId))?.nome || (loteId ? `Lote ${loteId}` : 'sem lote vinculado');
 
+  // Guarda o registro inteiro (não só o nome) para poder derivar
+  // dataReferencia/loteId/loteNome do grupo sem recalcular nada (Sprint 12).
   const vencendoEmBreve = [];
   const ativos = [];
 
@@ -419,37 +520,47 @@ function agruparCarenciaAtiva(db, hoje) {
     const diasRestantes = daysBetween(hoje, fimCarencia);
     if (diasRestantes < 0) return; // carência já terminou — nada a avisar
 
-    const nome = nomeLote(item.lote_id);
     if (diasRestantes <= CARENCIA_DIAS_VENCENDO) {
-      vencendoEmBreve.push(nome);
+      vencendoEmBreve.push(item);
     } else {
-      ativos.push(nome);
+      ativos.push(item);
     }
   });
 
+  const nomesDe = (lista) => lista.slice(0, 3).map((item) => nomeLote(item.lote_id)).join(' · ');
+  const loteUnicoCarencia = (lista) => {
+    if (lista.length !== 1) return { loteId: null, loteNome: null };
+    const lote = lotesMap.get(Number(lista[0].lote_id));
+    return { loteId: lote?.id ?? null, loteNome: lote?.nome ?? null };
+  };
+
   const alertas = [];
   if (vencendoEmBreve.length > 0) {
-    alertas.push(alertaPadrao({
+    alertas.push(criarAlerta({
       id: 'unificado-carencia-vencendo',
       tipo: 'carencia-vencendo',
       prioridade: PRIORIDADE.ATENCAO,
       origem: 'sanidade',
       titulo: `${vencendoEmBreve.length} ${pluralizar(vencendoEmBreve.length, 'lote termina', 'lotes terminam')} a carência em breve`,
-      descricao: vencendoEmBreve.slice(0, 3).join(' · '),
+      descricao: nomesDe(vencendoEmBreve),
       acaoSugerida: 'Confirmar o fim da carência antes de liberar a venda.',
       pageId: 'sanitario',
+      dataReferencia: dataMinima(vencendoEmBreve.map((item) => item.data_fim_carencia)),
+      ...loteUnicoCarencia(vencendoEmBreve),
     }));
   }
   if (ativos.length > 0) {
-    alertas.push(alertaPadrao({
+    alertas.push(criarAlerta({
       id: 'unificado-carencia-ativa',
       tipo: 'carencia-ativa',
       prioridade: PRIORIDADE.ATENCAO,
       origem: 'sanidade',
       titulo: `${ativos.length} ${pluralizar(ativos.length, 'lote está', 'lotes estão')} em período de carência`,
-      descricao: ativos.slice(0, 3).join(' · '),
+      descricao: nomesDe(ativos),
       acaoSugerida: 'Não vender ou abater até o fim da carência.',
       pageId: 'sanitario',
+      dataReferencia: dataMinima(ativos.map((item) => item.data_fim_carencia)),
+      ...loteUnicoCarencia(ativos),
     }));
   }
   return alertas;
@@ -463,6 +574,7 @@ function agruparCarenciaAtiva(db, hoje) {
  */
 function agruparTarefasHoje(db, hoje) {
   const tarefas = Array.isArray(db?.tarefas) ? db.tarefas : [];
+  const lotesMap = new Map((Array.isArray(db?.lotes) ? db.lotes : []).map((l) => [Number(l.id), l]));
   const doDia = tarefas.filter((tarefa) => (
     String(tarefa?.status || '').toLowerCase() !== 'concluida'
     && String(tarefa?.status || '').toLowerCase() !== 'feita'
@@ -470,7 +582,11 @@ function agruparTarefasHoje(db, hoje) {
   ));
   if (doDia.length === 0) return [];
 
-  return [alertaPadrao({
+  const loteUnico = doDia.length === 1 && doDia[0]?.lote_id != null
+    ? lotesMap.get(Number(doDia[0].lote_id))
+    : null;
+
+  return [criarAlerta({
     id: 'unificado-tarefas-hoje',
     tipo: 'tarefa-hoje',
     prioridade: PRIORIDADE.ATENCAO,
@@ -479,6 +595,11 @@ function agruparTarefasHoje(db, hoje) {
     descricao: doDia.slice(0, 3).map((tarefa) => tarefa.titulo || 'Tarefa').join(' · '),
     acaoSugerida: 'Concluir as tarefas do dia.',
     pageId: 'tarefas',
+    // `hoje` é o próprio `data_vencimento` da tarefa (é por isso que ela caiu
+    // neste grupo) — não é um fallback inventado.
+    dataReferencia: hoje,
+    loteId: loteUnico?.id ?? null,
+    loteNome: loteUnico?.nome ?? null,
   })];
 }
 

@@ -77,8 +77,13 @@ function formatarDataBR(dateKey) {
   return `${dia}/${mes}/${ano}`;
 }
 
-function buildAlerta({ id, tipo, severidade, titulo, descricao, entidade, acaoSugerida, pagina }) {
-  return { id, tipo, severidade, titulo, descricao, entidade, acaoSugerida, pagina };
+// Sprint 12 — `dataReferencia`/`loteId`/`loteNome` são aditivos: só expõem
+// dado que cada detector já calculava internamente (ou já lia do próprio
+// registro, como `lote.ultima_pesagem`), nunca um valor novo/inventado.
+// Ausência de dado real mantém os três campos `null` — nenhum detector foi
+// alterado em sua lógica de severidade/cálculo.
+function buildAlerta({ id, tipo, severidade, titulo, descricao, entidade, acaoSugerida, pagina, dataReferencia = null, loteId = null, loteNome = null }) {
+  return { id, tipo, severidade, titulo, descricao, entidade, acaoSugerida, pagina, dataReferencia, loteId, loteNome };
 }
 
 /**
@@ -113,6 +118,12 @@ export function detectarLotesAbaixoGmd(db = {}) {
       entidade: { tipo: 'lote', id: lote.id, nome },
       acaoSugerida: 'Revisar suplementação, sanidade e pastagem do lote.',
       pagina: 'resultados',
+      // `ultima_pesagem` já é um campo do próprio lote (denormalizado, usado
+      // por `listarLotesSemPesagemRecente` em hojeNaFazenda.js) — não é um
+      // novo cálculo, só a data que já existia no registro.
+      dataReferencia: toDateKey(lote.ultima_pesagem) || null,
+      loteId: lote.id,
+      loteNome: nome,
     })];
   });
 }
@@ -146,6 +157,9 @@ export function detectarLotesProximosPesoAlvo(db = {}) {
         entidade: { tipo: 'lote', id: lote.id, nome },
         acaoSugerida: 'Avaliar a venda do lote.',
         pagina: 'resultados',
+        dataReferencia: toDateKey(lote.ultima_pesagem) || null,
+        loteId: lote.id,
+        loteNome: nome,
       })];
     }
 
@@ -159,6 +173,9 @@ export function detectarLotesProximosPesoAlvo(db = {}) {
       entidade: { tipo: 'lote', id: lote.id, nome },
       acaoSugerida: 'Planejar pesagem de acompanhamento e decisão de venda.',
       pagina: 'resultados',
+      dataReferencia: toDateKey(lote.ultima_pesagem) || null,
+      loteId: lote.id,
+      loteNome: nome,
     })];
   });
 }
@@ -242,6 +259,7 @@ export function detectarEstoqueBaixo(db = {}, agora = new Date()) {
 export function detectarTarefasAtrasadas(db = {}, agora = new Date()) {
   const hoje = hojeISO(agora);
   const tarefas = Array.isArray(db?.tarefas) ? db.tarefas : [];
+  const lotesMap = new Map((Array.isArray(db?.lotes) ? db.lotes : []).map((l) => [toNumber(l.id), l]));
 
   return tarefas.flatMap((tarefa) => {
     if (!tarefa) return [];
@@ -262,6 +280,7 @@ export function detectarTarefasAtrasadas(db = {}, agora = new Date()) {
         : SEVERIDADE.MEDIO;
 
     const titulo = tarefa.titulo || 'Tarefa sem título';
+    const loteDaTarefa = tarefa.lote_id != null ? lotesMap.get(toNumber(tarefa.lote_id)) : null;
     return [buildAlerta({
       id: `tarefa-atrasada-${tarefa.id}`,
       tipo: 'tarefa',
@@ -271,6 +290,9 @@ export function detectarTarefasAtrasadas(db = {}, agora = new Date()) {
       entidade: { tipo: 'tarefa', id: tarefa.id, nome: titulo },
       acaoSugerida: 'Concluir ou reagendar a tarefa.',
       pagina: 'tarefas',
+      dataReferencia: vencimento,
+      loteId: loteDaTarefa?.id ?? null,
+      loteNome: loteDaTarefa?.nome ?? null,
     })];
   });
 }
@@ -317,6 +339,9 @@ export function detectarSanidadeProxima(db = {}, agora = new Date()) {
       entidade: { tipo: 'sanidade', id: item.id, nome: loteNome },
       acaoSugerida: 'Agendar ou confirmar a execução do manejo sanitário.',
       pagina: 'sanitario',
+      dataReferencia: proxima,
+      loteId: lote?.id ?? null,
+      loteNome: lote?.nome ?? null,
     })];
   });
 }

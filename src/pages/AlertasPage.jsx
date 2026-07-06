@@ -3,6 +3,7 @@ import { AlertCircle, Beef, CheckCircle2, CheckSquare, DollarSign, FileSearch, L
 import Card from '../components/ui/Card';
 import EmptyState from '../components/EmptyState';
 import PageHeader from '../components/PageHeader';
+import { formatarData } from '../utils/formatters';
 import { gerarAlertasUnificados } from '../domain/alertasUnificados';
 import {
   normalizarAlertaCentral,
@@ -261,12 +262,13 @@ export default function AlertasPage({ db = {}, fazendaSelecionada = null, onNavi
                   </span>
                   <span className={`badge ${PRAZO_BADGE[alerta.prazoCategoria] || 'badge-n'}`}>
                     {PRAZO_LABEL[alerta.prazoCategoria]}
+                    {alerta.dataReferencia ? ` · ${formatarData(alerta.dataReferencia)}` : ''}
                   </span>
                 </div>
 
                 <h3 className="alertas-card-titulo">{alerta.titulo}</h3>
                 {alerta.descricao ? <p className="alertas-card-descricao">{alerta.descricao}</p> : null}
-                {alerta.loteNome ? <p className="alertas-card-lote">Lote: {alerta.loteNome}</p> : null}
+                {alerta.loteNome ? <p className="alertas-card-lote">Lote: <strong>{alerta.loteNome}</strong></p> : null}
 
                 <div className="alertas-card-acao">
                   <span className="alertas-card-acao-label">Ação recomendada</span>
