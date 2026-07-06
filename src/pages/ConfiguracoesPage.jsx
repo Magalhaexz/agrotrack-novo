@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
+import { QRCodeSVG } from 'qrcode.react';
 import { AlertTriangle, FileText, MessageCircle, Plus, X } from 'lucide-react';
 import Card from '../components/ui/Card';
 import Button from '../components/ui/Button';
@@ -17,8 +18,11 @@ import {
   generateTelegramCode,
   updateTelegramPreferences,
   disconnectTelegram,
+  buildTelegramDeepLink,
 } from '../services/telegramConnection';
 import '../styles/configuracoes.css';
+
+const TELEGRAM_BOT_USERNAME = String(import.meta.env.VITE_TELEGRAM_BOT_USERNAME || '').trim();
 
 const TABS = [
   { id: 'geral', label: 'Geral' },
@@ -90,6 +94,13 @@ export default function ConfiguracoesPage({ db, setDb, onConfirmAction, onNaviga
     }, 4000);
     return () => clearInterval(intervalId);
   }, [telegramCode, telegramConnection, session]);
+
+  const telegramDeepLink = buildTelegramDeepLink(TELEGRAM_BOT_USERNAME, telegramCode);
+
+  function abrirTelegram() {
+    if (!telegramDeepLink) return;
+    window.open(telegramDeepLink, '_blank', 'noopener,noreferrer');
+  }
 
   async function gerarCodigoTelegram() {
     setTelegramLoading(true);
@@ -537,13 +548,27 @@ export default function ConfiguracoesPage({ db, setDb, onConfirmAction, onNaviga
             <div className="config-data-stack">
               <p>Conecte seu Telegram para receber o relatório diário e alertas importantes do HERDON.</p>
               {telegramCode ? (
-                <div className="config-panel-intro">
-                  <span className="config-panel-kicker">Código gerado</span>
-                  <p>
-                    Abra o bot do HERDON no Telegram e envie: <strong>{telegramCode}</strong>
-                    <br />
-                    O código expira em 15 minutos. A tela atualiza sozinha assim que o Telegram confirmar.
-                  </p>
+                <div className="telegram-connect-panel">
+                  <div className="config-panel-intro">
+                    <span className="config-panel-kicker">Código gerado</span>
+                    <p>
+                      Abra o bot do HERDON no Telegram e envie: <strong>{telegramCode}</strong>
+                      <br />
+                      Ou use o botão/QR Code ao lado — eles já levam o código embutido.
+                      <br />
+                      O código expira em 15 minutos. A tela atualiza sozinha assim que o Telegram confirmar.
+                    </p>
+                    {telegramDeepLink ? (
+                      <div className="config-actions">
+                        <Button icon={<MessageCircle size={14} />} onClick={abrirTelegram}>Abrir no Telegram</Button>
+                      </div>
+                    ) : null}
+                  </div>
+                  {telegramDeepLink ? (
+                    <div className="telegram-qrcode" aria-label="QR Code para conectar o Telegram">
+                      <QRCodeSVG value={telegramDeepLink} size={152} bgColor="#ffffff" fgColor="#0a0f0d" />
+                    </div>
+                  ) : null}
                 </div>
               ) : null}
               <div className="config-actions">

@@ -56,12 +56,30 @@ Migration: `supabase/migrations/20260706120000_telegram_multiuser_connections.sq
 ## Como o produtor conecta
 
 1. Em **Configurações → Integrações → Telegram**, clica em "Conectar Telegram".
-2. HERDON mostra um código (`HERDON-482913`), válido por 15 minutos.
-3. O usuário abre o bot do HERDON no Telegram e envia `/start HERDON-482913`
-   (ou só `HERDON-482913`).
-4. O webhook valida o código e vincula o `chat_id` à conta do usuário.
+2. HERDON mostra um código (`HERDON-482913`), válido por 15 minutos, e — se
+   `VITE_TELEGRAM_BOT_USERNAME` estiver configurado — também um botão "Abrir
+   no Telegram" e um QR Code, ambos apontando para
+   `https://t.me/<bot>?start=HERDON-482913` (deep link oficial do Telegram:
+   abrir o link já envia `/start HERDON-482913` ao bot).
+3. O usuário abre o bot do HERDON no Telegram (pelo botão, QR Code, ou
+   manualmente) e envia `/start HERDON-482913` (ou só `HERDON-482913`).
+4. O webhook valida o código e vincula o `chat_id` à conta do usuário — a
+   mesma lógica de sempre, o deep link/QR só evitam digitar o código.
 5. A tela em Configurações consulta a conexão a cada 4s enquanto o código
    está pendente e atualiza sozinha para "Conectado" — sem precisar de F5.
+
+### Deep link + QR Code (UX)
+
+`src/services/telegramConnection.js` exporta `buildTelegramDeepLink(botUsername,
+code)`, que só monta o link — nenhuma validação nova, o webhook trata a
+mensagem recebida da mesma forma de sempre. Sem `VITE_TELEGRAM_BOT_USERNAME`
+configurado, a tela cai de volta para só o código textual (comportamento
+anterior).
+
+QR Code renderizado com [`qrcode.react`](https://www.npmjs.com/package/qrcode.react)
+(sem dependências além do `react` já usado no projeto, ~6kB gzip no chunk da
+página) — gerado 100% no navegador, sem chamada a serviço externo (evita
+vazar o código de pareamento para terceiros).
 6. Desconectar marca `is_active = false` (não apaga o histórico).
 
 ## Configurar o bot

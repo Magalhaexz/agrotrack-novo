@@ -2,6 +2,20 @@ import { supabase } from '../lib/supabase.js';
 import { extractAccessToken } from './asaasBilling.js';
 
 /**
+ * Deep link oficial do Telegram (`?start=`): abrir o link já envia
+ * "/start CODIGO" ao bot, que o webhook (api/telegram-webhook.js) processa
+ * exatamente como o código digitado manualmente — nenhuma lógica de
+ * validação nova. Retorna null sem `botUsername`/`code` (fallback: só o
+ * código textual continua funcionando).
+ */
+export function buildTelegramDeepLink(botUsername, code) {
+  const username = String(botUsername || '').trim().replace(/^@/, '');
+  const trimmedCode = String(code || '').trim();
+  if (!username || !trimmedCode) return null;
+  return `https://t.me/${username}?start=${encodeURIComponent(trimmedCode)}`;
+}
+
+/**
  * Conexão Telegram do usuário (Sprint 7). A tabela `telegram_connections` tem
  * RLS por user_id = auth.uid(), então um select simples já traz só a própria
  * conexão — nenhum owner_user_id é resolvido no frontend.
