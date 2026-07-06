@@ -8,6 +8,8 @@ import Input from '../components/ui/Input';
 import Modal from '../components/ui/Modal';
 import PageHeader from '../components/PageHeader';
 import { getResumoLote } from '../domain/resumoLote';
+import { listarContasFinanceiras } from '../domain/hojeNaFazenda';
+import { isMovimentacaoPaga, isMovimentacaoCancelada, getDataVencimento } from '../domain/financeiroStatus';
 import { formatCurrency, formatDate, formatNumber } from '../utils/calculations';
 import { gerarNovoId } from '../utils/id';
 import { useAuth } from '../auth/useAuth';
@@ -23,8 +25,29 @@ const TAB_LABELS = {
   dre: 'DRE',
   lote: 'Por Lote',
   lanc: 'Lançamentos',
-  pag: 'Pagamentos Diários',
+  pag: 'Pagamentos',
 };
+const PAGAMENTOS_PROXIMOS_DIAS = 7;
+
+/**
+ * Visão geral de contas a pagar em 5 grupos, reaproveitando `listarContasFinanceiras`
+ * (vencidas/próximas) e os helpers de `financeiroStatus.js` (pago/cancelado/vencimento) —
+ * não recalcula nada que esses já resolvem, só agrupa em mais faixas para a tela.
+ */
+function buildPagamentosVisaoGeral(db, hoje) {
+  const despesas = (Array.isArray(db?.movimentacoes_financeiras) ? db.movimentacoes_financeiras : [])
+    .filter((mov) => mov?.tipo === 'despesa' && !isMovimentacaoCancelada(mov));
+
+  const { vencidas, proximas } = listarContasFinanceiras(db, PAGAMENTOS_PROXIMOS_DIAS);
+  const vencendoHoje = proximas.filter((mov) => getDataVencimento(mov) === hoje);
+  const proximosSeteDias = proximas.filter((mov) => getDataVencimento(mov) !== hoje);
+  const pagas = despesas.filter((mov) => isMovimentacaoPaga(mov));
+
+  const jaClassificadasIds = new Set([...vencidas, ...proximas, ...pagas].map((mov) => mov.id));
+  const previstas = despesas.filter((mov) => !isMovimentacaoPaga(mov) && !jaClassificadasIds.has(mov.id));
+
+  return { vencidas, vencendoHoje, proximosSeteDias, previstas, pagas };
+}
 
 export default function FinanceiroPage({ db, setDb, navigationIntent = null }) {
   const { hasPermission, session } = useAuth();
@@ -143,6 +166,17 @@ export default function FinanceiroPage({ db, setDb, navigationIntent = null }) {
       .filter((item) => item?.tipo === 'despesa' && (item?.categoria === 'Pagamento Diário' || item?.categoria === 'Pagamento Diario'))
       .sort((a, b) => new Date(a.data_vencimento || a.data || 0) - new Date(b.data_vencimento || b.data || 0))
   ), [movimentacoes]);
+
+  const loteNomeById = useMemo(() => {
+    const map = new Map();
+    lotes.forEach((lote) => map.set(Number(lote.id), lote.nome));
+    return map;
+  }, [lotes]);
+
+  const pagamentosVisaoGeral = useMemo(
+    () => buildPagamentosVisaoGeral(db, getTodayIso()),
+    [db]
+  );
 
   async function salvarPagamentoDiario() {
     if (!podeEditarFinanceiro()) return;
@@ -410,6 +444,47 @@ export default function FinanceiroPage({ db, setDb, navigationIntent = null }) {
 
       {tab === 'pag' ? (
         <>
+          <PagamentosBucket
+            titulo="Contas vencidas"
+            statusLabel="Vencida"
+            variant="danger"
+            itens={pagamentosVisaoGeral.vencidas}
+            loteNomeById={loteNomeById}
+            vazio="Nenhuma conta vencida."
+          />
+          <PagamentosBucket
+            titulo="Vencendo hoje"
+            statusLabel="Hoje"
+            variant="warning"
+            itens={pagamentosVisaoGeral.vencendoHoje}
+            loteNomeById={loteNomeById}
+            vazio="Nenhuma conta vence hoje."
+          />
+          <PagamentosBucket
+            titulo="Vencendo nos próximos 7 dias"
+            statusLabel="Em breve"
+            variant="info"
+            itens={pagamentosVisaoGeral.proximosSeteDias}
+            loteNomeById={loteNomeById}
+            vazio="Nenhuma conta vencendo nos próximos 7 dias."
+          />
+          <PagamentosBucket
+            titulo="Previstas / pendentes"
+            statusLabel="Prevista"
+            variant="neutral"
+            itens={pagamentosVisaoGeral.previstas}
+            loteNomeById={loteNomeById}
+            vazio="Nenhuma conta prevista sem data próxima."
+          />
+          <PagamentosBucket
+            titulo="Pagas"
+            statusLabel="Paga"
+            variant="success"
+            itens={pagamentosVisaoGeral.pagas}
+            loteNomeById={loteNomeById}
+            vazio="Nenhuma conta paga registrada ainda."
+          />
+
           <Card title="Pagamentos Diários" subtitle="Registre e acompanhe pagamentos do dia a dia da fazenda.">
             <div className="form-grid two">
               <Input label="Descrição do pagamento" value={novoPagamento.descricao} onChange={(e) => setNovoPagamento((p) => ({ ...p, descricao: e.target.value }))} />
@@ -712,6 +787,43 @@ function buildFinanceTimeline(db, loteId) {
       receita: acumuladoReceita,
     };
   });
+}
+
+function PagamentosBucket({ titulo, statusLabel, variant, itens, loteNomeById, vazio }) {
+  return (
+    <Card title={`${titulo} (${itens.length})`}>
+      {itens.length === 0 ? (
+        <EmptyState compact title={vazio} />
+      ) : (
+        <div className="table-responsive">
+          <table className="data-table">
+            <thead>
+              <tr>
+                <th>Descrição</th>
+                <th>Fornecedor</th>
+                <th>Lote</th>
+                <th>Vencimento</th>
+                <th>Valor</th>
+                <th>Situação</th>
+              </tr>
+            </thead>
+            <tbody>
+              {itens.map((item) => (
+                <tr key={item.id}>
+                  <td>{item.descricao || item.categoria || 'Despesa'}</td>
+                  <td>{item.fornecedor || '-'}</td>
+                  <td>{item.lote_id ? (loteNomeById.get(Number(item.lote_id)) || `Lote ${item.lote_id}`) : '-'}</td>
+                  <td>{formatDate(item.data_vencimento || item.data)}</td>
+                  <td>{formatCurrency(item.valor || 0)}</td>
+                  <td><Badge variant={variant}>{statusLabel}</Badge></td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+    </Card>
+  );
 }
 
 function findCategoryValue(items, aliases) {
