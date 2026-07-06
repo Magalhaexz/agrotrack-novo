@@ -1,0 +1,49 @@
+/* Visão Geral de Pagamentos dentro de Finanças (Sprint 3). */
+
+.pagamentos-bucket {
+  margin-bottom: var(--space-4);
+}
+
+.pagamentos-bucket--danger .ui-card {
+  border-left: 4px solid var(--color-danger);
+}
+
+.pagamentos-bucket--warning .ui-card {
+  border-left: 4px solid var(--color-warning);
+}
+
+.pagamentos-bucket--info .ui-card {
+  border-left: 4px solid var(--color-info);
+}
+
+.pagamentos-bucket--success .ui-card {
+  border-left: 4px solid var(--color-success);
+}
+
+.pagamentos-bucket--neutral .ui-card {
+  border-left: 4px solid var(--color-text-muted);
+}
+
+.pagamentos-alerta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  align-items: center;
+  padding: var(--space-3) var(--space-4);
+  margin-bottom: var(--space-4);
+  border-radius: var(--radius-md);
+  background: var(--color-surface-2);
+  border: 1px solid var(--card-border);
+}
+
+.pagamentos-alerta--ok {
+  color: var(--color-success);
+  font-size: 0.9rem;
+}
+
+@media (max-width: 640px) {
+  .pagamentos-alerta {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+}

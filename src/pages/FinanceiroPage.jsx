@@ -15,6 +15,7 @@ import { gerarNovoId } from '../utils/id';
 import { useAuth } from '../auth/useAuth';
 import { useToast } from '../hooks/useToast';
 import { createOperationalRecord, updateOperationalRecord } from '../services/operationalPersistence';
+import '../styles/pagamentos.css';
 
 const tabs = ['dre', 'lote', 'lanc', 'pag'];
 const despCats = ['Compra Animal', 'Racao', 'Suplemento', 'Medicamento', 'Vacina', 'Frete', 'Funcionario', 'Arrendamento', 'Manutencao', 'Outro'];
@@ -225,6 +226,24 @@ export default function FinanceiroPage({ db, setDb, navigationIntent = null }) {
       ...prev,
       movimentacoes_financeiras: (prev.movimentacoes_financeiras || []).map((row) => row.id === item.id ? { ...row, ...(persisted.data || patch) } : row),
     }));
+  }
+
+  // Marca qualquer conta da Visão Geral de Pagamentos como paga, registrando a
+  // data de pagamento — mesmo padrão de `alternarPagamentoPago`, só que
+  // disponível para qualquer despesa (não só as da categoria "Pagamento Diário").
+  async function marcarComoPago(item) {
+    if (!podeEditarFinanceiro()) return;
+    const patch = { status: 'pago', pago: true, data_pagamento: getTodayIso() };
+    const persisted = await updateOperationalRecord('movimentacoes_financeiras', item.id, patch, session);
+    if (!persisted.persisted) {
+      showToast({ type: 'warning', message: persisted.error || 'Não foi possível confirmar o pagamento agora.' });
+      return;
+    }
+    setDb((prev) => ({
+      ...prev,
+      movimentacoes_financeiras: (prev.movimentacoes_financeiras || []).map((row) => row.id === item.id ? { ...row, ...(persisted.data || patch) } : row),
+    }));
+    showToast({ type: 'success', message: 'Pagamento confirmado.' });
   }
 
   if (detalhe) {
@@ -444,6 +463,8 @@ export default function FinanceiroPage({ db, setDb, navigationIntent = null }) {
 
       {tab === 'pag' ? (
         <>
+          <PagamentosAlerta visaoGeral={pagamentosVisaoGeral} />
+
           <PagamentosBucket
             titulo="Contas vencidas"
             statusLabel="Vencida"
@@ -451,6 +472,9 @@ export default function FinanceiroPage({ db, setDb, navigationIntent = null }) {
             itens={pagamentosVisaoGeral.vencidas}
             loteNomeById={loteNomeById}
             vazio="Nenhuma conta vencida."
+            vazioSubtitle="Tudo em dia por aqui."
+            onMarcarPago={marcarComoPago}
+            podeEditar={podeEditarFinanceiroUi}
           />
           <PagamentosBucket
             titulo="Vencendo hoje"
@@ -459,6 +483,8 @@ export default function FinanceiroPage({ db, setDb, navigationIntent = null }) {
             itens={pagamentosVisaoGeral.vencendoHoje}
             loteNomeById={loteNomeById}
             vazio="Nenhuma conta vence hoje."
+            onMarcarPago={marcarComoPago}
+            podeEditar={podeEditarFinanceiroUi}
           />
           <PagamentosBucket
             titulo="Vencendo nos próximos 7 dias"
@@ -467,6 +493,8 @@ export default function FinanceiroPage({ db, setDb, navigationIntent = null }) {
             itens={pagamentosVisaoGeral.proximosSeteDias}
             loteNomeById={loteNomeById}
             vazio="Nenhuma conta vencendo nos próximos 7 dias."
+            onMarcarPago={marcarComoPago}
+            podeEditar={podeEditarFinanceiroUi}
           />
           <PagamentosBucket
             titulo="Previstas / pendentes"
@@ -475,6 +503,8 @@ export default function FinanceiroPage({ db, setDb, navigationIntent = null }) {
             itens={pagamentosVisaoGeral.previstas}
             loteNomeById={loteNomeById}
             vazio="Nenhuma conta prevista sem data próxima."
+            onMarcarPago={marcarComoPago}
+            podeEditar={podeEditarFinanceiroUi}
           />
           <PagamentosBucket
             titulo="Pagas"
@@ -789,40 +819,93 @@ function buildFinanceTimeline(db, loteId) {
   });
 }
 
-function PagamentosBucket({ titulo, statusLabel, variant, itens, loteNomeById, vazio }) {
+function PagamentosBucket({
+  titulo,
+  statusLabel,
+  variant,
+  itens,
+  loteNomeById,
+  vazio,
+  vazioSubtitle,
+  onMarcarPago,
+  podeEditar = false,
+}) {
   return (
-    <Card title={`${titulo} (${itens.length})`}>
-      {itens.length === 0 ? (
-        <EmptyState compact title={vazio} />
-      ) : (
-        <div className="table-responsive">
-          <table className="data-table">
-            <thead>
-              <tr>
-                <th>Descrição</th>
-                <th>Fornecedor</th>
-                <th>Lote</th>
-                <th>Vencimento</th>
-                <th>Valor</th>
-                <th>Situação</th>
-              </tr>
-            </thead>
-            <tbody>
-              {itens.map((item) => (
-                <tr key={item.id}>
-                  <td>{item.descricao || item.categoria || 'Despesa'}</td>
-                  <td>{item.fornecedor || '-'}</td>
-                  <td>{item.lote_id ? (loteNomeById.get(Number(item.lote_id)) || `Lote ${item.lote_id}`) : '-'}</td>
-                  <td>{formatDate(item.data_vencimento || item.data)}</td>
-                  <td>{formatCurrency(item.valor || 0)}</td>
-                  <td><Badge variant={variant}>{statusLabel}</Badge></td>
+    <div className={`pagamentos-bucket pagamentos-bucket--${variant}`}>
+      <Card title={`${titulo} (${itens.length})`}>
+        {itens.length === 0 ? (
+          <EmptyState compact title={vazio} subtitle={vazioSubtitle} />
+        ) : (
+          <div className="table-responsive">
+            <table className="data-table">
+              <thead>
+                <tr>
+                  <th>Descrição</th>
+                  <th>Fornecedor</th>
+                  <th>Lote</th>
+                  <th>Vencimento</th>
+                  <th>Valor</th>
+                  <th>Situação</th>
+                  {onMarcarPago ? <th>Ação</th> : null}
                 </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      )}
-    </Card>
+              </thead>
+              <tbody>
+                {itens.map((item) => (
+                  <tr key={item.id}>
+                    <td>{item.descricao || item.categoria || 'Despesa'}</td>
+                    <td>{item.fornecedor || '-'}</td>
+                    <td>{item.lote_id ? (loteNomeById.get(Number(item.lote_id)) || `Lote ${item.lote_id}`) : '-'}</td>
+                    <td>{formatDate(item.data_vencimento || item.data)}</td>
+                    <td>{formatCurrency(item.valor || 0)}</td>
+                    <td><Badge variant={variant}>{statusLabel}</Badge></td>
+                    {onMarcarPago ? (
+                      <td>
+                        <Button size="sm" disabled={!podeEditar} onClick={() => onMarcarPago(item)}>Marcar como pago</Button>
+                      </td>
+                    ) : null}
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </Card>
+    </div>
+  );
+}
+
+/**
+ * Alerta financeiro interno — só resume, dentro da própria área financeira, as
+ * contagens já calculadas em `pagamentosVisaoGeral` (mesmos dados dos blocos
+ * abaixo). Não é um sistema de alerta novo nem paralelo: nenhuma severidade,
+ * id ou persistência própria — reaproveita as mesmas listas exibidas na tela.
+ */
+function PagamentosAlerta({ visaoGeral }) {
+  const totalVencidas = visaoGeral.vencidas.length;
+  const totalHoje = visaoGeral.vencendoHoje.length;
+  const totalProximos = visaoGeral.proximosSeteDias.length;
+  const semUrgencia = totalVencidas === 0 && totalHoje === 0 && totalProximos === 0;
+
+  if (semUrgencia) {
+    return (
+      <div className="pagamentos-alerta pagamentos-alerta--ok">
+        ✓ Nenhuma conta vencida ou vencendo nos próximos 7 dias.
+      </div>
+    );
+  }
+
+  return (
+    <div className="pagamentos-alerta">
+      {totalVencidas > 0 ? (
+        <Badge variant="danger">{totalVencidas} conta{totalVencidas > 1 ? 's' : ''} vencida{totalVencidas > 1 ? 's' : ''}</Badge>
+      ) : null}
+      {totalHoje > 0 ? (
+        <Badge variant="warning">{totalHoje} vencendo hoje</Badge>
+      ) : null}
+      {totalProximos > 0 ? (
+        <Badge variant="info">{totalProximos} vencendo em até 7 dias</Badge>
+      ) : null}
+    </div>
   );
 }
 
