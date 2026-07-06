@@ -1,5 +1,5 @@
-import { useRef, useState } from 'react';
-import { AlertTriangle, FileText, Plus, X } from 'lucide-react';
+import { useEffect, useRef, useState } from 'react';
+import { AlertTriangle, FileText, MessageCircle, Plus, X } from 'lucide-react';
 import Card from '../components/ui/Card';
 import Button from '../components/ui/Button';
 import { perfilPodeGerenciarAcessos } from '../auth/perfis';
@@ -12,11 +12,18 @@ import {
   deleteOwnerScopedCollection,
   upsertOperationalRecord,
 } from '../services/operationalPersistence';
+import {
+  fetchTelegramConnection,
+  generateTelegramCode,
+  updateTelegramPreferences,
+  disconnectTelegram,
+} from '../services/telegramConnection';
 import '../styles/configuracoes.css';
 
 const TABS = [
   { id: 'geral', label: 'Geral' },
   { id: 'notificacoes', label: 'Notificações' },
+  { id: 'integracoes', label: 'Integrações' },
   { id: 'dados', label: 'Dados e Segurança' },
 ];
 
@@ -56,6 +63,72 @@ export default function ConfiguracoesPage({ db, setDb, onConfirmAction, onNaviga
     lote_data_saida: configNotificacoes.lote_data_saida ?? true,
     dias_antecedencia: configNotificacoes.dias_antecedencia ?? 3,
   });
+  const [telegramConnection, setTelegramConnection] = useState(null);
+  const [telegramLoading, setTelegramLoading] = useState(false);
+  const [telegramCode, setTelegramCode] = useState(null);
+
+  useEffect(() => {
+    let ativo = true;
+    fetchTelegramConnection(session).then(({ connection }) => {
+      if (ativo) setTelegramConnection(connection);
+    });
+    return () => { ativo = false; };
+  }, [session]);
+
+  // Enquanto há um código pendente, consulta a conexão a cada poucos
+  // segundos para refletir a confirmação assim que o webhook do Telegram
+  // processar a mensagem do usuário — sem exigir F5.
+  useEffect(() => {
+    if (!telegramCode || telegramConnection?.is_active) return undefined;
+    const intervalId = setInterval(() => {
+      fetchTelegramConnection(session).then(({ connection }) => {
+        if (connection?.is_active) {
+          setTelegramConnection(connection);
+          setTelegramCode(null);
+        }
+      });
+    }, 4000);
+    return () => clearInterval(intervalId);
+  }, [telegramCode, telegramConnection, session]);
+
+  async function gerarCodigoTelegram() {
+    setTelegramLoading(true);
+    const result = await generateTelegramCode(session);
+    setTelegramLoading(false);
+    if (!result.ok) {
+      showToast({ type: 'error', message: result.message });
+      return;
+    }
+    setTelegramCode(result.code);
+  }
+
+  async function salvarPreferenciaTelegram(patch) {
+    if (!telegramConnection?.id) return;
+    const { connection, error } = await updateTelegramPreferences(telegramConnection.id, patch);
+    if (error) {
+      showToast({ type: 'warning', message: 'Não foi possível salvar a preferência agora.' });
+      return;
+    }
+    setTelegramConnection(connection);
+  }
+
+  async function desconectarTelegram() {
+    if (!telegramConnection?.id) return;
+    const confirmado = onConfirmAction
+      ? await onConfirmAction({ title: 'Desconectar Telegram', message: 'Você deixará de receber relatórios e alertas pelo Telegram. Deseja continuar?', tone: 'danger' })
+      : window.confirm('Desconectar o Telegram?');
+    if (!confirmado) return;
+
+    const { connection, error } = await disconnectTelegram(telegramConnection.id);
+    if (error) {
+      showToast({ type: 'warning', message: 'Não foi possível desconectar agora.' });
+      return;
+    }
+    setTelegramConnection(connection);
+    setTelegramCode(null);
+    showToast({ type: 'success', message: 'Telegram desconectado.' });
+  }
+
   // Gestão de equipe/acessos mudou para a página dedicada "Equipe e Acessos"
   // (Sprint 6, src/pages/EquipePage.jsx) — aqui fica só o atalho abaixo.
   const podeGerenciarAcessos = perfilPodeGerenciarAcessos(perfil);
@@ -435,6 +508,51 @@ export default function ConfiguracoesPage({ db, setDb, onConfirmAction, onNaviga
             </label>
           </div>
           <div className="config-actions"><Button onClick={salvarNotificacoes}>Salvar preferências de notificação</Button></div>
+        </Card>
+      ) : null}
+
+      {tab === 'integracoes' ? (
+        <Card title="Telegram" subtitle="Receba o relatório diário e alertas do HERDON direto no seu Telegram.">
+          {telegramConnection?.is_active ? (
+            <div className="config-data-stack">
+              <p>
+                Conectado como <strong>{telegramConnection.telegram_username ? `@${telegramConnection.telegram_username}` : telegramConnection.telegram_first_name || 'usuário do Telegram'}</strong>.
+              </p>
+              <div className="config-grid">
+                <SwitchRow label="Receber relatório diário" checked={telegramConnection.daily_report_enabled} onChange={(value) => salvarPreferenciaTelegram({ daily_report_enabled: value })} />
+                <SwitchRow label="Alertas de pagamentos" checked={telegramConnection.alert_payments_enabled} onChange={(value) => salvarPreferenciaTelegram({ alert_payments_enabled: value })} />
+                <SwitchRow label="Alertas de estoque" checked={telegramConnection.alert_stock_enabled} onChange={(value) => salvarPreferenciaTelegram({ alert_stock_enabled: value })} />
+                <SwitchRow label="Alertas de tarefas" checked={telegramConnection.alert_tasks_enabled} onChange={(value) => salvarPreferenciaTelegram({ alert_tasks_enabled: value })} />
+                <SwitchRow label="Alertas de sanidade" checked={telegramConnection.alert_health_enabled} onChange={(value) => salvarPreferenciaTelegram({ alert_health_enabled: value })} />
+                <label className="ui-input-wrap">
+                  <span className="ui-input-label">Horário do relatório diário</span>
+                  <input className="ui-input" type="time" value={String(telegramConnection.report_time || '07:00:00').slice(0, 5)} onChange={(e) => salvarPreferenciaTelegram({ report_time: e.target.value })} />
+                </label>
+              </div>
+              <div className="config-actions">
+                <Button variant="outline" onClick={desconectarTelegram}>Desconectar Telegram</Button>
+              </div>
+            </div>
+          ) : (
+            <div className="config-data-stack">
+              <p>Conecte seu Telegram para receber o relatório diário e alertas importantes do HERDON.</p>
+              {telegramCode ? (
+                <div className="config-panel-intro">
+                  <span className="config-panel-kicker">Código gerado</span>
+                  <p>
+                    Abra o bot do HERDON no Telegram e envie: <strong>{telegramCode}</strong>
+                    <br />
+                    O código expira em 15 minutos. A tela atualiza sozinha assim que o Telegram confirmar.
+                  </p>
+                </div>
+              ) : null}
+              <div className="config-actions">
+                <Button icon={<MessageCircle size={14} />} loading={telegramLoading} onClick={gerarCodigoTelegram}>
+                  {telegramCode ? 'Gerar novo código' : 'Conectar Telegram'}
+                </Button>
+              </div>
+            </div>
+          )}
         </Card>
       ) : null}
 

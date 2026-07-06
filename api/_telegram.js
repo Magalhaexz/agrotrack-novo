@@ -13,10 +13,9 @@ export function getTelegramEnvStatus() {
   };
 }
 
-/** Envia uma mensagem de texto simples ao chat configurado via env. Lança erro classificado em caso de falha. */
-export async function enviarMensagemTelegram(texto) {
+/** Envia texto simples para um chat_id específico (Sprint 7 — multiusuário). Lança erro classificado em caso de falha. */
+export async function enviarMensagemTelegramParaChat(chatId, texto) {
   const botToken = readEnv('TELEGRAM_BOT_TOKEN');
-  const chatId = readEnv('TELEGRAM_CHAT_ID');
 
   if (!botToken || !chatId) {
     const error = new Error('telegram_env_missing');
@@ -48,4 +47,15 @@ export async function enviarMensagemTelegram(texto) {
   }
 
   return { messageId: payload.result?.message_id || null };
+}
+
+/** Envia uma mensagem de texto simples ao chat configurado via env legado (Sprint 6, TELEGRAM_CHAT_ID). Lança erro classificado em caso de falha. */
+export async function enviarMensagemTelegram(texto) {
+  const chatId = readEnv('TELEGRAM_CHAT_ID');
+  if (!chatId) {
+    const error = new Error('telegram_env_missing');
+    error.code = 'MISSING_TELEGRAM_ENV';
+    throw error;
+  }
+  return enviarMensagemTelegramParaChat(chatId, texto);
 }

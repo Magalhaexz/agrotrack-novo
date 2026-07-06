@@ -2,6 +2,12 @@
   "rewrites": [
     { "source": "/((?!api/).*)", "destination": "/index.html" }
   ],
+  "crons": [
+    {
+      "path": "/api/telegram-relatorio-diario",
+      "schedule": "0 10 * * *"
+    }
+  ],
   "headers": [
     {
       "source": "/(.*)",
