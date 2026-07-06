@@ -2,11 +2,12 @@ import { supabase } from '../lib/supabase.js';
 import { extractAccessToken } from './asaasBilling.js';
 
 /**
- * Deep link oficial do Telegram (`?start=`): abrir o link já envia
- * "/start CODIGO" ao bot, que o webhook (api/telegram-webhook.js) processa
- * exatamente como o código digitado manualmente — nenhuma lógica de
- * validação nova. Retorna null sem `botUsername`/`code` (fallback: só o
- * código textual continua funcionando).
+ * Deep link oficial do Telegram (`?start=`), mesma lógica de
+ * `api/_telegramConnections.js#buildTelegramUrl`. A tela prefere o
+ * `telegramUrl` que já vem pronto de `generateTelegramCode` (montado no
+ * servidor com `TELEGRAM_BOT_USERNAME`, nunca com env de frontend) — este
+ * helper fica só como utilitário puro caso outro lugar precise montar o link
+ * a partir de um username conhecido localmente.
  */
 export function buildTelegramDeepLink(botUsername, code) {
   const username = String(botUsername || '').trim().replace(/^@/, '');
@@ -53,7 +54,7 @@ export async function generateTelegramCode(session) {
     return { ok: false, code: payload?.code || null, message: payload?.message || 'Não foi possível gerar o código agora.' };
   }
 
-  return { ok: true, code: payload.code, expiresAt: payload.expiresAt };
+  return { ok: true, code: payload.code, telegramUrl: payload.telegramUrl || null, expiresAt: payload.expiresAt };
 }
 
 export async function updateTelegramPreferences(connectionId, patch) {

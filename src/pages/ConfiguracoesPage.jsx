@@ -18,11 +18,8 @@ import {
   generateTelegramCode,
   updateTelegramPreferences,
   disconnectTelegram,
-  buildTelegramDeepLink,
 } from '../services/telegramConnection';
 import '../styles/configuracoes.css';
-
-const TELEGRAM_BOT_USERNAME = String(import.meta.env.VITE_TELEGRAM_BOT_USERNAME || '').trim();
 
 const TABS = [
   { id: 'geral', label: 'Geral' },
@@ -70,6 +67,7 @@ export default function ConfiguracoesPage({ db, setDb, onConfirmAction, onNaviga
   const [telegramConnection, setTelegramConnection] = useState(null);
   const [telegramLoading, setTelegramLoading] = useState(false);
   const [telegramCode, setTelegramCode] = useState(null);
+  const [telegramUrl, setTelegramUrl] = useState(null);
 
   useEffect(() => {
     let ativo = true;
@@ -89,17 +87,16 @@ export default function ConfiguracoesPage({ db, setDb, onConfirmAction, onNaviga
         if (connection?.is_active) {
           setTelegramConnection(connection);
           setTelegramCode(null);
+          setTelegramUrl(null);
         }
       });
     }, 4000);
     return () => clearInterval(intervalId);
   }, [telegramCode, telegramConnection, session]);
 
-  const telegramDeepLink = buildTelegramDeepLink(TELEGRAM_BOT_USERNAME, telegramCode);
-
   function abrirTelegram() {
-    if (!telegramDeepLink) return;
-    window.open(telegramDeepLink, '_blank', 'noopener,noreferrer');
+    if (!telegramUrl) return;
+    window.open(telegramUrl, '_blank', 'noopener,noreferrer');
   }
 
   async function gerarCodigoTelegram() {
@@ -111,6 +108,7 @@ export default function ConfiguracoesPage({ db, setDb, onConfirmAction, onNaviga
       return;
     }
     setTelegramCode(result.code);
+    setTelegramUrl(result.telegramUrl || null);
   }
 
   async function salvarPreferenciaTelegram(patch) {
@@ -137,6 +135,7 @@ export default function ConfiguracoesPage({ db, setDb, onConfirmAction, onNaviga
     }
     setTelegramConnection(connection);
     setTelegramCode(null);
+    setTelegramUrl(null);
     showToast({ type: 'success', message: 'Telegram desconectado.' });
   }
 
@@ -554,19 +553,21 @@ export default function ConfiguracoesPage({ db, setDb, onConfirmAction, onNaviga
                     <p>
                       Abra o bot do HERDON no Telegram e envie: <strong>{telegramCode}</strong>
                       <br />
-                      Ou use o botão/QR Code ao lado — eles já levam o código embutido.
+                      {telegramUrl
+                        ? 'Ou use o botão/QR Code ao lado — eles já levam o código embutido.'
+                        : 'Envie exatamente esse código para o bot do HERDON no Telegram.'}
                       <br />
                       O código expira em 15 minutos. A tela atualiza sozinha assim que o Telegram confirmar.
                     </p>
-                    {telegramDeepLink ? (
+                    {telegramUrl ? (
                       <div className="config-actions">
                         <Button icon={<MessageCircle size={14} />} onClick={abrirTelegram}>Abrir no Telegram</Button>
                       </div>
                     ) : null}
                   </div>
-                  {telegramDeepLink ? (
+                  {telegramUrl ? (
                     <div className="telegram-qrcode" aria-label="QR Code para conectar o Telegram">
-                      <QRCodeSVG value={telegramDeepLink} size={152} bgColor="#ffffff" fgColor="#0a0f0d" />
+                      <QRCodeSVG value={telegramUrl} size={152} bgColor="#ffffff" fgColor="#0a0f0d" />
                     </div>
                   ) : null}
                 </div>

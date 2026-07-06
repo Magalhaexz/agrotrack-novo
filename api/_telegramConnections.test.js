@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { generateConnectionCode, extractHerdonCodeFromText, isCodeUsable } from './_telegramConnections.js';
+import { generateConnectionCode, extractHerdonCodeFromText, isCodeUsable, buildTelegramUrl } from './_telegramConnections.js';
 
 test('generateConnectionCode gera HERDON-000000..999999', () => {
   const code = generateConnectionCode();
@@ -19,4 +19,18 @@ test('isCodeUsable rejeita código usado ou expirado', () => {
   assert.equal(isCodeUsable({ used_at: '2026-07-06T11:00:00Z', expires_at: '2026-07-06T12:05:00Z' }, now), false);
   assert.equal(isCodeUsable({ used_at: null, expires_at: '2026-07-06T11:59:00Z' }, now), false);
   assert.equal(isCodeUsable(null, now), false);
+});
+
+test('buildTelegramUrl monta o link t.me com start=código', () => {
+  assert.equal(buildTelegramUrl('herdon_alertas_bot', 'HERDON-269187'), 'https://t.me/herdon_alertas_bot?start=HERDON-269187');
+});
+
+test('buildTelegramUrl remove @ inicial do username', () => {
+  assert.equal(buildTelegramUrl('@herdon_alertas_bot', 'HERDON-269187'), 'https://t.me/herdon_alertas_bot?start=HERDON-269187');
+});
+
+test('buildTelegramUrl retorna null sem username ou sem código', () => {
+  assert.equal(buildTelegramUrl('', 'HERDON-269187'), null);
+  assert.equal(buildTelegramUrl('herdon_alertas_bot', ''), null);
+  assert.equal(buildTelegramUrl(null, null), null);
 });

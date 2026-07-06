@@ -27,3 +27,17 @@ export function isCodeUsable(codeRow, now = new Date()) {
   if (codeRow.used_at) return false;
   return new Date(codeRow.expires_at).getTime() > now.getTime();
 }
+
+/**
+ * Deep link oficial do Telegram (`?start=`): abrir o link já envia
+ * "/start CODIGO" ao bot, que api/telegram-webhook.js processa exatamente
+ * como o código digitado manualmente — nenhuma lógica de validação nova.
+ * Retorna null sem `botUsername`/`code` (a tela cai para só o código
+ * textual quando TELEGRAM_BOT_USERNAME não está configurado no servidor).
+ */
+export function buildTelegramUrl(botUsername, code) {
+  const username = String(botUsername || '').trim().replace(/^@/, '');
+  const trimmedCode = String(code || '').trim();
+  if (!username || !trimmedCode) return null;
+  return `https://t.me/${username}?start=${encodeURIComponent(trimmedCode)}`;
+}

@@ -4,7 +4,7 @@
 // usuário autenticado + profiles.owner_user_id (mesmo padrão de
 // api/_asaas.js), evitando que alguém peça um código para outra conta.
 import { getSupabaseAdminClient, resolveAuthenticatedUser } from './_supabaseAdmin.js';
-import { generateConnectionCode, CODE_TTL_MINUTES, CODE_COOLDOWN_SECONDS, isCodeUsable } from './_telegramConnections.js';
+import { generateConnectionCode, CODE_TTL_MINUTES, CODE_COOLDOWN_SECONDS, isCodeUsable, buildTelegramUrl } from './_telegramConnections.js';
 
 function readEnv(name) {
   return String(process.env[name] || '').trim();
@@ -50,6 +50,7 @@ export default async function handler(req, res) {
       return res.status(200).json({
         ok: true,
         code: ultimoCodigo.code,
+        telegramUrl: buildTelegramUrl(readEnv('TELEGRAM_BOT_USERNAME'), ultimoCodigo.code),
         expiresAt: ultimoCodigo.expires_at,
         ttlMinutes: CODE_TTL_MINUTES,
       });
@@ -88,5 +89,11 @@ export default async function handler(req, res) {
     return res.status(502).json({ ok: false, code: 'CODE_GENERATION_FAILED', message: 'Não foi possível gerar o código agora. Tente novamente.' });
   }
 
-  return res.status(200).json({ ok: true, code, expiresAt, ttlMinutes: CODE_TTL_MINUTES });
+  return res.status(200).json({
+    ok: true,
+    code,
+    telegramUrl: buildTelegramUrl(readEnv('TELEGRAM_BOT_USERNAME'), code),
+    expiresAt,
+    ttlMinutes: CODE_TTL_MINUTES,
+  });
 }

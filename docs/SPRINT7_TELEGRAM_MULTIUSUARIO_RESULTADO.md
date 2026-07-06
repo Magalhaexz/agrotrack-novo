@@ -37,6 +37,9 @@ Migration: `supabase/migrations/20260706120000_telegram_multiuser_connections.sq
   `profiles.owner_user_id` do usuário autenticado (nunca aceita
   `owner_user_id` do corpo da requisição). Gera código, invalida códigos
   anteriores não usados, aplica cooldown de 15s contra clique repetido.
+  Resposta: `{ ok, code, telegramUrl, expiresAt, ttlMinutes }` —
+  `telegramUrl` vem `null` se `TELEGRAM_BOT_USERNAME` não estiver
+  configurado no servidor; `TELEGRAM_BOT_TOKEN` nunca aparece na resposta.
 - `POST /api/telegram-webhook` — recebe updates do Telegram. Extrai
   `HERDON-XXXXXX` da mensagem, valida o código em
   `telegram_connection_codes`, faz upsert em `telegram_connections` e
@@ -57,8 +60,8 @@ Migration: `supabase/migrations/20260706120000_telegram_multiuser_connections.sq
 
 1. Em **Configurações → Integrações → Telegram**, clica em "Conectar Telegram".
 2. HERDON mostra um código (`HERDON-482913`), válido por 15 minutos, e — se
-   `VITE_TELEGRAM_BOT_USERNAME` estiver configurado — também um botão "Abrir
-   no Telegram" e um QR Code, ambos apontando para
+   `TELEGRAM_BOT_USERNAME` estiver configurado no servidor — também um botão
+   "Abrir no Telegram" e um QR Code, ambos apontando para
    `https://t.me/<bot>?start=HERDON-482913` (deep link oficial do Telegram:
    abrir o link já envia `/start HERDON-482913` ao bot).
 3. O usuário abre o bot do HERDON no Telegram (pelo botão, QR Code, ou
@@ -67,20 +70,25 @@ Migration: `supabase/migrations/20260706120000_telegram_multiuser_connections.sq
    mesma lógica de sempre, o deep link/QR só evitam digitar o código.
 5. A tela em Configurações consulta a conexão a cada 4s enquanto o código
    está pendente e atualiza sozinha para "Conectado" — sem precisar de F5.
+6. Desconectar marca `is_active = false` (não apaga o histórico).
 
 ### Deep link + QR Code (UX)
 
-`src/services/telegramConnection.js` exporta `buildTelegramDeepLink(botUsername,
-code)`, que só monta o link — nenhuma validação nova, o webhook trata a
-mensagem recebida da mesma forma de sempre. Sem `VITE_TELEGRAM_BOT_USERNAME`
-configurado, a tela cai de volta para só o código textual (comportamento
-anterior).
+`POST /api/telegram-gerar-codigo` monta o `telegramUrl` no servidor com
+`process.env.TELEGRAM_BOT_USERNAME` (`api/_telegramConnections.js#buildTelegramUrl`)
+e devolve pronto na resposta — o frontend nunca monta o link sozinho nem lê
+username de bot de variável de cliente. Sem `TELEGRAM_BOT_USERNAME`
+configurado no servidor, `telegramUrl` vem `null` e a tela cai de volta para
+só o código textual (nenhum erro, só menos UX).
+
+`src/services/telegramConnection.js` ainda exporta `buildTelegramDeepLink`
+como utilitário puro (mesma lógica), mas a tela usa o `telegramUrl` que já
+vem da API.
 
 QR Code renderizado com [`qrcode.react`](https://www.npmjs.com/package/qrcode.react)
 (sem dependências além do `react` já usado no projeto, ~6kB gzip no chunk da
 página) — gerado 100% no navegador, sem chamada a serviço externo (evita
 vazar o código de pareamento para terceiros).
-6. Desconectar marca `is_active = false` (não apaga o histórico).
 
 ## Configurar o bot
 
@@ -99,6 +107,13 @@ vazar o código de pareamento para terceiros).
 Multiusuário (novas):
 
 - `TELEGRAM_BOT_TOKEN` — token do bot (server-only).
+- `TELEGRAM_BOT_USERNAME` — username público do bot (sem `@`), server-only.
+  Usado só para montar `telegramUrl` (deep link + QR Code) em
+  `api/telegram-gerar-codigo.js`; nunca lido pelo frontend. **Não existe
+  variável `VITE_TELEGRAM_BOT_USERNAME`** — uma versão anterior deste sprint
+  tentou montar o link no frontend com uma env `VITE_`, mas isso deixava o
+  botão/QR Code quebrados sempre que a env de cliente não estava configurada
+  no deploy; a fonte da verdade agora é o servidor.
 - `TELEGRAM_WEBHOOK_SECRET` — secret do webhook (server-only).
 - `TELEGRAM_REPORT_SECRET` — secret do endpoint de relatório (já existia).
 - `CRON_SECRET` — opcional; se definido, a Vercel injeta automaticamente
