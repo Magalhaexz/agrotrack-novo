@@ -68,3 +68,37 @@ test('gerarAlertasUnificados não quebra com db vazio e não gera alertas de est
   const alertas = gerarAlertasUnificados({}, { agora: AGORA });
   assert.deepEqual(alertas, []);
 });
+
+test('gerarAlertasUnificados sinaliza carência ativa e carência vencendo em breve (Sprint 10)', () => {
+  const db = {
+    lotes: [
+      { id: 1, nome: 'Lote Carência Longa' },
+      { id: 2, nome: 'Lote Carência Vencendo' },
+    ],
+    sanitario: [
+      { id: 100, tipo: 'medicamento', desc: 'Antibiótico', lote_id: 1, data_fim_carencia: '2026-07-20' },
+      { id: 101, tipo: 'medicamento', desc: 'Antiparasitário', lote_id: 2, data_fim_carencia: '2026-07-12' },
+      { id: 102, tipo: 'medicamento', desc: 'Carência já terminada', lote_id: 1, data_fim_carencia: '2026-07-01' },
+    ],
+  };
+
+  const alertas = gerarAlertasUnificados(db, { agora: AGORA });
+
+  const ativa = alertaPorTipo(alertas, 'carencia-ativa');
+  assert.ok(ativa, 'deveria gerar alerta de carência ativa');
+  assert.equal(ativa.prioridade, 'atencao');
+  assert.equal(ativa.origem, 'sanidade');
+  assert.match(ativa.descricao, /Lote Carência Longa/);
+  assert.doesNotMatch(ativa.descricao, /Vencendo/);
+
+  const vencendo = alertaPorTipo(alertas, 'carencia-vencendo');
+  assert.ok(vencendo, 'deveria gerar alerta de carência vencendo em breve');
+  assert.match(vencendo.descricao, /Lote Carência Vencendo/);
+});
+
+test('gerarAlertasUnificados não sinaliza carência quando não há data_fim_carencia', () => {
+  const db = { sanitario: [{ id: 1, tipo: 'vacina', lote_id: 1 }] };
+  const alertas = gerarAlertasUnificados(db, { agora: AGORA });
+  assert.equal(alertaPorTipo(alertas, 'carencia-ativa'), undefined);
+  assert.equal(alertaPorTipo(alertas, 'carencia-vencendo'), undefined);
+});

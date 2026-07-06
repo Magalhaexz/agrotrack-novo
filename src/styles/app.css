@@ -9258,6 +9258,51 @@ html, body, #root, .app, .main, .main-content, .page { max-width: 100%; }
   padding: 18px 14px;
 }
 
+/* Agenda Sanitária (Sprint 10) */
+.page--sanitario .sanitario-agenda-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 12px;
+}
+
+.page--sanitario .sanitario-agenda-section {
+  display: grid;
+  gap: 8px;
+  padding: 12px;
+  border-radius: 12px;
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  background: rgba(255, 255, 255, 0.015);
+}
+
+.page--sanitario .sanitario-agenda-section-title {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: 0.85rem;
+  font-weight: 700;
+}
+
+.page--sanitario .sanitario-agenda-item {
+  display: grid;
+  gap: 2px;
+  font-size: 0.8rem;
+  padding: 6px 0;
+  border-top: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+.page--sanitario .sanitario-agenda-item:first-child {
+  border-top: none;
+}
+
+.page--sanitario .sanitario-agenda-item small {
+  color: var(--color-text-secondary);
+}
+
+.page--sanitario .sanitario-agenda-empty {
+  color: var(--color-text-secondary);
+  font-size: 0.8rem;
+}
+
 @media (max-width: 900px) {
   .page--sanitario .sanitario-iatf-event {
     grid-template-columns: 1fr;

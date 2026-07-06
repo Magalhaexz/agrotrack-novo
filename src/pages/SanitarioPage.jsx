@@ -8,12 +8,22 @@ import EmptyState from '../components/EmptyState';
 import PageHeader from '../components/PageHeader';
 import { useToast } from '../hooks/useToast'; // Importar useToast
 import { useAuth } from '../auth/useAuth';
+import { construirAgendaSanitaria } from '../domain/agendaSanitaria';
 import {
   createOperationalRecord,
   deleteOperationalRecord,
   persistCollectionMutation,
   updateOperationalRecord,
 } from '../services/operationalPersistence';
+
+const AGENDA_SECOES = [
+  { chave: 'vencidos', titulo: 'Vencidos', badge: 'badge-r' },
+  { chave: 'vencendoHoje', titulo: 'Vencendo hoje', badge: 'badge-a' },
+  { chave: 'proximos7Dias', titulo: 'Próximos 7 dias', badge: 'badge-a' },
+  { chave: 'proximos30Dias', titulo: 'Próximos 30 dias', badge: 'badge-n' },
+  { chave: 'emCarencia', titulo: 'Em carência', badge: 'badge-a' },
+  { chave: 'realizados', titulo: 'Realizados recentemente', badge: 'badge-g' },
+];
 
 export default function SanitarioPage({ db, setDb, onConfirmAction, navigationIntent = null }) {
   const { hasPermission, session } = useAuth();
@@ -38,6 +48,11 @@ export default function SanitarioPage({ db, setDb, onConfirmAction, navigationIn
   }, [db?.funcionarios]);
 
   const sanitario = useMemo(() => (Array.isArray(db?.sanitario) ? db.sanitario : []), [db]);
+
+  // Agenda Sanitária (Sprint 10) — visão bucketizada por janela de
+  // vencimento sobre os mesmos registros de `db.sanitario`, sem recalcular
+  // nada que a tabela abaixo já não mostre.
+  const agendaSanitaria = useMemo(() => construirAgendaSanitaria(db), [db]);
 
   const dadosTabela = useMemo(() => {
     return [...sanitario]
@@ -215,6 +230,7 @@ export default function SanitarioPage({ db, setDb, onConfirmAction, navigationIn
       data_aplic: dados.data_aplic,
       proxima: dados.proxima ?? null,
       alerta_dias_antes: dados.alerta_dias_antes,
+      data_fim_carencia: dados.data_fim_carencia ?? null,
       qtd: dados.qtd,
       obs: dados.obs,
       funcionario_responsavel_id: dados.funcionario_responsavel_id ?? null,
@@ -405,6 +421,38 @@ export default function SanitarioPage({ db, setDb, onConfirmAction, navigationIn
         </Card>
       </div>
 
+      <Card title="Agenda Sanitária" subtitle="Vacinas, vermífugos, reaplicações e carência — vencidos, vencendo e já feitos.">
+        <div className="sanitario-agenda-grid">
+          {AGENDA_SECOES.map((secao) => {
+            const itens = agendaSanitaria[secao.chave] || [];
+            return (
+              <div key={secao.chave} className="sanitario-agenda-section">
+                <div className="sanitario-agenda-section-title">
+                  <span>{secao.titulo}</span>
+                  <span className={`badge ${secao.badge}`}>{itens.length}</span>
+                </div>
+                {itens.length === 0 ? (
+                  <span className="sanitario-agenda-empty">Nada por aqui.</span>
+                ) : (
+                  itens.slice(0, 5).map((item) => (
+                    <div key={`${secao.chave}-${item.id}`} className="sanitario-agenda-item">
+                      <strong>{item.produto}</strong>
+                      <small>
+                        {item.loteNome}
+                        {item.dataPrevista ? ` · ${formatarData(item.dataPrevista)}` : ''}
+                      </small>
+                      {item.acaoSugerida ? <small>{item.acaoSugerida}</small> : null}
+                    </div>
+                  ))
+                )}
+                {itens.length > 5 ? (
+                  <small className="sanitario-agenda-empty">+{itens.length - 5} mais</small>
+                ) : null}
+              </div>
+            );
+          })}
+        </div>
+      </Card>
 
       <Card title="Planejamento IATF / Reprodução" subtitle="Programe o protocolo com datas automáticas ajustáveis por dias de offset.">
         <div className="sanitario-iatf-layout">

@@ -15,6 +15,7 @@ const FORM_VAZIO = {
   data_aplic: '',
   proxima: '',
   alerta_dias_antes: 30,
+  data_fim_carencia: '',
   qtd: '',
   obs: '',
   funcionario_responsavel_id: '',
@@ -58,6 +59,7 @@ function sharedFromInitial(data) {
     data_aplic: data.data_aplic || '',
     proxima: data.proxima || '',
     alerta_dias_antes: data.alerta_dias_antes ?? 30,
+    data_fim_carencia: data.data_fim_carencia || '',
     qtd: data.qtd ?? '',
     obs: data.obs || '',
     funcionario_responsavel_id: data.funcionario_responsavel_id ?? '',
@@ -167,6 +169,7 @@ export default function SanitarioForm({
       data_aplic: form.data_aplic,
       proxima: form.proxima || null,
       alerta_dias_antes: Number(form.alerta_dias_antes || 0),
+      data_fim_carencia: form.data_fim_carencia || null,
       qtd: Number(form.qtd || 0),
       obs: form.obs.trim(),
       funcionario_responsavel_id: form.funcionario_responsavel_id
@@ -331,6 +334,17 @@ export default function SanitarioForm({
               value={form.alerta_dias_antes}
               onChange={handleChange}
               placeholder="Ex: 15"
+            />
+          </label>
+
+          <label className="ui-input-wrap">
+            <span className="ui-input-label">Fim da carência (opcional)</span>
+            <input
+              className="ui-input"
+              name="data_fim_carencia"
+              type="date"
+              value={form.data_fim_carencia}
+              onChange={handleChange}
             />
           </label>
         </div>

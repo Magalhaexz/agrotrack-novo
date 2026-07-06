@@ -1,4 +1,4 @@
-// Motor Único de Alertas Internos do HERDON (Sprint 5, ampliado no Sprint 9).
+// Motor Único de Alertas Internos do HERDON (Sprint 5, ampliado nos Sprints 9 e 10).
 //
 // Fonte canônica para exibir alertas: agrupa e padroniza o que já é
 // calculado por `alertasInteligentes.js` (GMD, peso alvo, estoque, tarefas
@@ -16,10 +16,15 @@
 // sinais que só existiam no legado (`utils/alerts.js`) lendo os mesmos
 // campos brutos (`lote.saida`, `estoque.data_validade`) que o legado já lia
 // — não duplicam nenhum cálculo existente, só fecham uma lacuna de
-// cobertura. O legado (`utils/alerts.js`, `hojeNaFazenda.construirHojeNaFazenda`)
-// continua existindo e alimentando o painel acionável (resolver/adiar) — ver
-// docs/SPRINT9_CENTRAL_ALERTAS_FINAL_RESULTADO.md para a auditoria completa
-// e docs/SPRINT5_MOTOR_UNICO_ALERTAS_RESULTADO.md para o mapa original.
+// cobertura. `agruparCarenciaAtiva` (Sprint 10) segue o mesmo princípio:
+// lê `sanitario.data_fim_carencia` (campo novo, migration
+// `add_sanitario_carencia_field`), sem alterar o detector de "manejo
+// sanitário vencido/vencendo" (`alertasInteligentes.js#detectarSanidadeProxima`,
+// que só olha `sanitario.proxima`). O legado (`utils/alerts.js`,
+// `hojeNaFazenda.construirHojeNaFazenda`) continua existindo e alimentando o
+// painel acionável (resolver/adiar) — ver
+// docs/SPRINT9_CENTRAL_ALERTAS_FINAL_RESULTADO.md e
+// docs/SPRINT10_AGENDA_SANITARIA_RESULTADO.md para as auditorias completas.
 import { toDateKey, daysBetween } from './calcHelpers.js';
 import { gerarAlertasPriorizados, SEVERIDADE } from './alertasInteligentes.js';
 import {
@@ -388,6 +393,68 @@ function agruparEstoqueValidade(db, hoje) {
   return alertas;
 }
 
+// Janela de "vencendo em breve" para carência — mesmo espírito da janela de
+// pagamentos "vence hoje" (Sprint 9 já usa 0 dias para essa faixa).
+const CARENCIA_DIAS_VENCENDO = 3;
+
+/**
+ * Carência de manejo sanitário ativa / vencendo em breve (Sprint 10) — lê
+ * `sanitario.data_fim_carencia` (campo novo desta sprint). O detector de
+ * "manejo sanitário vencido/vencendo" (`alertasInteligentes.js#detectarSanidadeProxima`,
+ * que já olha `sanitario.proxima`) não muda — carência é um sinal
+ * complementar, não substitui nem duplica aquele.
+ */
+function agruparCarenciaAtiva(db, hoje) {
+  const registros = Array.isArray(db?.sanitario) ? db.sanitario : [];
+  const lotesMap = new Map((Array.isArray(db?.lotes) ? db.lotes : []).map((l) => [Number(l.id), l]));
+  const nomeLote = (loteId) => lotesMap.get(Number(loteId))?.nome || (loteId ? `Lote ${loteId}` : 'sem lote vinculado');
+
+  const vencendoEmBreve = [];
+  const ativos = [];
+
+  registros.forEach((item) => {
+    if (!item?.data_fim_carencia) return;
+    const fimCarencia = toDateKey(item.data_fim_carencia);
+    if (!fimCarencia) return;
+    const diasRestantes = daysBetween(hoje, fimCarencia);
+    if (diasRestantes < 0) return; // carência já terminou — nada a avisar
+
+    const nome = nomeLote(item.lote_id);
+    if (diasRestantes <= CARENCIA_DIAS_VENCENDO) {
+      vencendoEmBreve.push(nome);
+    } else {
+      ativos.push(nome);
+    }
+  });
+
+  const alertas = [];
+  if (vencendoEmBreve.length > 0) {
+    alertas.push(alertaPadrao({
+      id: 'unificado-carencia-vencendo',
+      tipo: 'carencia-vencendo',
+      prioridade: PRIORIDADE.ATENCAO,
+      origem: 'sanidade',
+      titulo: `${vencendoEmBreve.length} ${pluralizar(vencendoEmBreve.length, 'lote termina', 'lotes terminam')} a carência em breve`,
+      descricao: vencendoEmBreve.slice(0, 3).join(' · '),
+      acaoSugerida: 'Confirmar o fim da carência antes de liberar a venda.',
+      pageId: 'sanitario',
+    }));
+  }
+  if (ativos.length > 0) {
+    alertas.push(alertaPadrao({
+      id: 'unificado-carencia-ativa',
+      tipo: 'carencia-ativa',
+      prioridade: PRIORIDADE.ATENCAO,
+      origem: 'sanidade',
+      titulo: `${ativos.length} ${pluralizar(ativos.length, 'lote está', 'lotes estão')} em período de carência`,
+      descricao: ativos.slice(0, 3).join(' · '),
+      acaoSugerida: 'Não vender ou abater até o fim da carência.',
+      pageId: 'sanitario',
+    }));
+  }
+  return alertas;
+}
+
 /**
  * Tarefas com vencimento hoje (ainda não atrasadas). `alertasInteligentes.js`
  * só cobre tarefas já atrasadas — esta é a única checagem nova desta sprint,
@@ -434,6 +501,7 @@ export function gerarAlertasUnificados(db = {}, opcoes = {}) {
     ...agruparTarefasHoje(db, hoje),
     ...agruparSaidaLote(db, hoje),
     ...agruparEstoqueValidade(db, hoje),
+    ...agruparCarenciaAtiva(db, hoje),
   ];
 
   return alertas.slice().sort((a, b) => {
