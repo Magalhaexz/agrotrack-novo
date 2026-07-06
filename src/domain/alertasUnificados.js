@@ -1,4 +1,4 @@
-// Motor Único de Alertas Internos do HERDON (Sprint 5).
+// Motor Único de Alertas Internos do HERDON (Sprint 5, ampliado no Sprint 9).
 //
 // Fonte canônica para exibir alertas: agrupa e padroniza o que já é
 // calculado por `alertasInteligentes.js` (GMD, peso alvo, estoque, tarefas
@@ -11,11 +11,16 @@
 // origem ∈ {financeiro, estoque, rebanho, sanidade, tarefas, decisao}
 //
 // Não recalcula nada — só lê os arrays/severidades que essas funções já
-// produzem e monta um alerta resumido por categoria. Os sistemas legados
-// (`utils/alerts.js`, `hojeNaFazenda.construirHojeNaFazenda`) continuam
-// existindo e não foram alterados — ver
-// docs/SPRINT5_MOTOR_UNICO_ALERTAS_RESULTADO.md para o mapa completo.
-import { toDateKey } from './calcHelpers.js';
+// produzem e monta um alerta resumido por categoria. `agruparSaidaLote` e
+// `agruparEstoqueValidade` (Sprint 9) são exceção controlada: cobrem dois
+// sinais que só existiam no legado (`utils/alerts.js`) lendo os mesmos
+// campos brutos (`lote.saida`, `estoque.data_validade`) que o legado já lia
+// — não duplicam nenhum cálculo existente, só fecham uma lacuna de
+// cobertura. O legado (`utils/alerts.js`, `hojeNaFazenda.construirHojeNaFazenda`)
+// continua existindo e alimentando o painel acionável (resolver/adiar) — ver
+// docs/SPRINT9_CENTRAL_ALERTAS_FINAL_RESULTADO.md para a auditoria completa
+// e docs/SPRINT5_MOTOR_UNICO_ALERTAS_RESULTADO.md para o mapa original.
+import { toDateKey, daysBetween } from './calcHelpers.js';
 import { gerarAlertasPriorizados, SEVERIDADE } from './alertasInteligentes.js';
 import {
   listarContasFinanceiras,
@@ -276,6 +281,113 @@ function agruparPastos(db) {
   return alertas;
 }
 
+// Janela de "próxima" saída de lote — mesmo valor usado pelo legado
+// (`utils/alerts.js`, LOTE_SAIDA_ALERT_DIAS), para não introduzir um terceiro
+// limite divergente para o mesmo sinal (Sprint 9 — auditoria de alertas).
+const LOTE_SAIDA_DIAS_PROXIMA = 7;
+
+/**
+ * Data de saída prevista vencida / próxima (Sprint 9) — sinal que só existia
+ * no legado (`utils/alerts.js`) até esta sprint. Lê `lotes[].saida`
+ * diretamente (mesmo campo que o legado usa), sem recalcular nada que já
+ * exista em outro detector.
+ */
+function agruparSaidaLote(db, hoje) {
+  const lotes = Array.isArray(db?.lotes) ? db.lotes : [];
+  const ativosComSaida = lotes.filter((l) => l?.status === 'ativo' && l?.saida);
+
+  const vencidas = [];
+  const proximas = [];
+  ativosComSaida.forEach((lote) => {
+    const saida = toDateKey(lote.saida);
+    if (!saida) return;
+    const dias = daysBetween(hoje, saida);
+    if (dias < 0) vencidas.push(lote);
+    else if (dias <= LOTE_SAIDA_DIAS_PROXIMA) proximas.push(lote);
+  });
+
+  const alertas = [];
+  const nomeDe = (lista) => lista.slice(0, 3).map((lote) => lote.nome || `Lote ${lote.id}`).join(' · ');
+
+  if (vencidas.length > 0) {
+    alertas.push(alertaPadrao({
+      id: 'unificado-lote-saida-vencida',
+      tipo: 'lote-saida-vencida',
+      prioridade: PRIORIDADE.CRITICO,
+      origem: 'rebanho',
+      titulo: `${vencidas.length} ${pluralizar(vencidas.length, 'lote tinha', 'lotes tinham')} saída prevista vencida`,
+      descricao: nomeDe(vencidas),
+      acaoSugerida: 'Confirmar a venda/saída ou atualizar a data prevista do lote.',
+      pageId: 'lotes',
+    }));
+  }
+  if (proximas.length > 0) {
+    alertas.push(alertaPadrao({
+      id: 'unificado-lote-saida-proxima',
+      tipo: 'lote-saida-proxima',
+      prioridade: PRIORIDADE.ATENCAO,
+      origem: 'rebanho',
+      titulo: `${proximas.length} ${pluralizar(proximas.length, 'lote tem', 'lotes têm')} saída prevista próxima`,
+      descricao: nomeDe(proximas),
+      acaoSugerida: 'Planejar a saída/venda do lote.',
+      pageId: 'lotes',
+    }));
+  }
+  return alertas;
+}
+
+/**
+ * Validade de produto no estoque vencida / próxima (Sprint 9) — sinal que só
+ * existia no legado (`utils/alerts.js`) até esta sprint. `alertasInteligentes.js`
+ * só cobre risco de faltar por quantidade/consumo, nunca data de validade.
+ * Reaproveita `item.alerta_dias_antes` (mesmo campo configurado pelo usuário
+ * na página de Estoque) em vez de inventar um limite novo.
+ */
+function agruparEstoqueValidade(db, hoje) {
+  const itens = Array.isArray(db?.estoque) ? db.estoque : [];
+
+  const vencidos = [];
+  const proximos = [];
+  itens.forEach((item) => {
+    if (!item?.data_validade) return;
+    const validade = toDateKey(item.data_validade);
+    if (!validade) return;
+    const dias = daysBetween(hoje, validade);
+    const alertaDiasAntes = Number(item.alerta_dias_antes) || 0;
+    if (dias < 0) vencidos.push(item);
+    else if (dias <= alertaDiasAntes) proximos.push(item);
+  });
+
+  const alertas = [];
+  const nomeDe = (lista) => lista.slice(0, 3).map((item) => item.produto || 'Produto').join(' · ');
+
+  if (vencidos.length > 0) {
+    alertas.push(alertaPadrao({
+      id: 'unificado-estoque-vencido',
+      tipo: 'estoque-vencido',
+      prioridade: PRIORIDADE.CRITICO,
+      origem: 'estoque',
+      titulo: `${vencidos.length} ${pluralizar(vencidos.length, 'produto está', 'produtos estão')} vencido${vencidos.length > 1 ? 's' : ''} no estoque`,
+      descricao: nomeDe(vencidos),
+      acaoSugerida: 'Retirar ou descartar o produto vencido do estoque.',
+      pageId: 'estoque',
+    }));
+  }
+  if (proximos.length > 0) {
+    alertas.push(alertaPadrao({
+      id: 'unificado-estoque-validade-proxima',
+      tipo: 'estoque-validade-proxima',
+      prioridade: PRIORIDADE.ATENCAO,
+      origem: 'estoque',
+      titulo: `${proximos.length} ${pluralizar(proximos.length, 'produto está', 'produtos estão')} perto do vencimento no estoque`,
+      descricao: nomeDe(proximos),
+      acaoSugerida: 'Priorizar o uso do produto antes do vencimento.',
+      pageId: 'estoque',
+    }));
+  }
+  return alertas;
+}
+
 /**
  * Tarefas com vencimento hoje (ainda não atrasadas). `alertasInteligentes.js`
  * só cobre tarefas já atrasadas — esta é a única checagem nova desta sprint,
@@ -320,6 +432,8 @@ export function gerarAlertasUnificados(db = {}, opcoes = {}) {
     ...agruparDecisao(db),
     ...agruparPastos(db),
     ...agruparTarefasHoje(db, hoje),
+    ...agruparSaidaLote(db, hoje),
+    ...agruparEstoqueValidade(db, hoje),
   ];
 
   return alertas.slice().sort((a, b) => {
