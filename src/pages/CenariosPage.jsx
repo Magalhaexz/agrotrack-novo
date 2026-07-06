@@ -13,6 +13,26 @@ import {
   createOperationalRecord,
   updateOperationalRecord,
 } from '../services/operationalPersistence';
+import '../styles/simulador.css';
+
+const SIMULADOR_INTRO_CARDS = [
+  {
+    titulo: 'Simular compra',
+    descricao: 'Informe cabeças, peso e preço de compra para estimar custo e retorno antes de fechar negócio.',
+  },
+  {
+    titulo: 'Simular venda',
+    descricao: 'Compare preço de venda, arrobas de carcaça e frete para saber se o momento é bom para vender.',
+  },
+  {
+    titulo: 'Simular manutenção/confinamento',
+    descricao: 'Projete dias de confinamento, GMD e custo diário para saber quanto custa manter o lote mais tempo.',
+  },
+  {
+    titulo: 'Analisar viabilidade',
+    descricao: 'Veja margem, ROI e break-even calculados automaticamente antes de decidir.',
+  },
+];
 
 function nowDate() {
   return new Date().toISOString().slice(0, 10);
@@ -76,6 +96,7 @@ export default function CenariosPage({ db, setDb, session }) {
   const [editando, setEditando] = useState(null);
   const [cenarioSelecionadoId, setCenarioSelecionadoId] = useState(null);
   const [decisao, setDecisao] = useState(emptyDecisao());
+  const [mostrarFormulario, setMostrarFormulario] = useState(false);
 
   const mensagemSemPermissao = 'Você não tem permissão para executar esta ação.';
   const cenarios = useMemo(() => (Array.isArray(db?.cenarios) ? db.cenarios : []), [db]);
@@ -204,9 +225,35 @@ export default function CenariosPage({ db, setDb, session }) {
   const p = comparativo?.projecao || {};
   const b = comparativo?.baseline || {};
 
+  if (!mostrarFormulario) {
+    return (
+      <div className="page">
+        <PageHeader title="Simulador de Decisão" subtitle="Simule compra, manutenção ou venda de lote sem alterar dados operacionais." />
+
+        <div className="simulador-intro">
+          <div className="simulador-intro-hero">
+            <h2>Antes de decidir, simule.</h2>
+            <p>Veja o impacto financeiro de comprar, manter ou vender um lote — sem alterar nenhum dado real da fazenda.</p>
+            <Button className="simulador-intro-cta" onClick={() => setMostrarFormulario(true)}>Simular agora</Button>
+          </div>
+
+          <div className="simulador-intro-grid">
+            {SIMULADOR_INTRO_CARDS.map((item) => (
+              <Card key={item.titulo} className="simulador-intro-card" title={item.titulo}>
+                <p>{item.descricao}</p>
+              </Card>
+            ))}
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="page">
       <PageHeader title="Simulador de Decisão" subtitle="Simule compra, manutenção ou venda de lote sem alterar dados operacionais." />
+
+      <button type="button" className="simulador-voltar" onClick={() => setMostrarFormulario(false)}>← Voltar à apresentação</button>
 
       <Card title={editando ? 'Editar cenário' : 'Novo cenário'}>
         <div className="form-grid two">

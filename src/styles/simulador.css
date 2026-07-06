@@ -1,0 +1,76 @@
+/* Simulador de Decisão — tela de apresentação antes do formulário (Sprint 2). */
+
+.simulador-intro {
+  display: grid;
+  gap: var(--space-8);
+}
+
+.simulador-intro-hero {
+  display: grid;
+  gap: var(--space-3);
+  padding: var(--space-8) var(--space-6);
+  border-radius: var(--radius-xl);
+  border: 1px solid var(--card-border);
+  background: linear-gradient(180deg, var(--color-primary-subtle), var(--color-surface) 70%);
+  text-align: center;
+  justify-items: center;
+}
+
+.simulador-intro-hero h2 {
+  margin: 0;
+  font-size: var(--text-2xl);
+  color: var(--color-text);
+}
+
+.simulador-intro-hero p {
+  margin: 0;
+  max-width: 560px;
+  color: var(--color-text-secondary);
+  font-size: var(--text-base);
+  line-height: 1.5;
+}
+
+.simulador-intro-cta {
+  margin-top: var(--space-2);
+  padding: var(--space-3) var(--space-8);
+  font-size: var(--text-lg);
+  box-shadow: var(--shadow-glow);
+}
+
+.simulador-intro-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: var(--space-5);
+}
+
+.simulador-intro-card p {
+  margin: 0;
+  color: var(--color-text-secondary);
+  font-size: 0.9rem;
+  line-height: 1.5;
+}
+
+.simulador-voltar {
+  justify-self: start;
+  background: none;
+  border: none;
+  color: var(--color-text-secondary);
+  font-size: var(--text-sm);
+  cursor: pointer;
+  padding: var(--space-1) 0;
+  margin-bottom: var(--space-2);
+}
+
+.simulador-voltar:hover {
+  color: var(--color-primary-light);
+}
+
+@media (max-width: 640px) {
+  .simulador-intro-hero {
+    padding: var(--space-6) var(--space-4);
+  }
+
+  .simulador-intro-cta {
+    width: 100%;
+  }
+}
