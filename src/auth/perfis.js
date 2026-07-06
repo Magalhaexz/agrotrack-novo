@@ -147,6 +147,10 @@ export const permissoesPorPerfil = {
 
 export const permissoesPorPagina = {
   dashboard: 'dashboard:ver',
+  // Sprint 11 — Central de Alertas: mesma permissão do Dashboard, já que
+  // reúne sinais de todos os módulos (financeiro, estoque, sanidade etc.),
+  // sem uma permissão própria por módulo.
+  alertas: 'dashboard:ver',
   decisoesFazenda: 'dashboard:ver',
   fazendas: 'fazendas:ver',
   lotes: 'lotes:ver',

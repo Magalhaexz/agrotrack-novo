@@ -50,6 +50,7 @@ import './styles/layout.css';
 
 
 const DashboardPage = lazy(() => import('./pages/DashboardPage'));
+const AlertasPage = lazy(() => import('./pages/AlertasPage'));
 const FazendasPage = lazy(() => import('./pages/FazendasPage'));
 const LotesPage = lazy(() => import('./pages/LotesPage'));
 const CalendarioOperacionalPage = lazy(() => import('./pages/CalendarioOperacionalPage'));
@@ -184,6 +185,7 @@ function readSidebarCollapsedState() {
 
 const pageMap = {
   dashboard: DashboardPage,
+  alertas: AlertasPage,
   decisoesFazenda: DecisoesFazendaPage,
   fazendas: FazendasPage,
   lotes: LotesPage,

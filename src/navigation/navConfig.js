@@ -2,6 +2,7 @@ import {
   Activity,
   BarChart3,
   Beef,
+  BellRing,
   Calculator,
   CalendarDays,
   CheckSquare,
@@ -34,9 +35,9 @@ export const navSections = [
     title: 'Painel',
     items: [
       { id: 'dashboard', label: 'Painel Geral', icon: LayoutDashboard },
-      // "Alertas" não entra aqui nesta fase — evita duplicar pageId com "Decisões da
-      // Fazenda" (grupo Decisão) e dois itens de sidebar ativos ao mesmo tempo.
-      // Fica para uma Central de Alertas própria (ver auditoria/backlog).
+      // Sprint 11 — Central de Alertas própria (pageId distinto de
+      // "Decisões da Fazenda", que fica no grupo Decisão abaixo).
+      { id: 'alertas', label: 'Central de Alertas', icon: BellRing },
     ],
   },
   {
