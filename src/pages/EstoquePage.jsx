@@ -6,12 +6,15 @@ import Button from '../components/ui/Button';
 import EmptyState from '../components/EmptyState';
 import Modal from '../components/ui/Modal';
 import Input from '../components/ui/Input';
+import ExportActions from '../components/ExportActions';
 import { formatCurrency, formatDate, formatNumber } from '../utils/calculations';
 import { exportarCsvCompatExcel, exportarExcelXmlCompat } from '../utils/exportadores';
 import { gerarNovoId } from '../utils/id';
 import { useToast } from '../hooks/useToast';
 import { useAuth } from '../auth/useAuth';
 import { createOperationalRecord, updateOperationalRecord } from '../services/operationalPersistence';
+import { formatarDataExportacao, montarNomeArquivo } from '../domain/exportacaoRelatorios';
+import { baixarCsv, abrirRelatorioParaImpressao } from '../utils/exportacaoArquivos';
 
 const CATEGORIAS_ESTOQUE_GERAL = [
   'Medicamento',
@@ -206,6 +209,38 @@ export default function EstoquePage({ db, setDb, onRegistrarSaidaEstoque, naviga
     exportarExcelXmlCompat({ filename: 'movimentacoes-estoque', sheets: [{ name: 'Estoque', rows, columns }] });
   }
 
+  // Exportação da lista de itens (Sprint 19) — separada da exportação de
+  // movimentações acima; reflete `itensView` (já com o saldo atualizado pela
+  // integração Sanidade→Estoque da Sprint 15, sem recalcular nada aqui).
+  const STATUS_ESTOQUE_LABEL = { critico: 'Crítico', baixo: 'Baixo', normal: 'Normal' };
+  const colunasExportacaoEstoque = [
+    { key: 'item', label: 'Item', accessor: (item) => item.nome || item.produto || '' },
+    { key: 'categoria', label: 'Categoria' },
+    { key: 'unidade', label: 'Unidade', accessor: (item) => item.unidade || item.unidade_medida || '' },
+    { key: 'saldo', label: 'Quantidade atual' },
+    { key: 'quantidade_minima', label: 'Mínimo' },
+    { key: 'validade', label: 'Validade', accessor: (item) => formatarDataExportacao(item.data_validade || item.validade) },
+    { key: 'status', label: 'Status', accessor: (item) => STATUS_ESTOQUE_LABEL[item.status] || item.status },
+  ];
+
+  function exportarItensCsv() {
+    baixarCsv({
+      colunas: colunasExportacaoEstoque,
+      linhas: itensView,
+      nomeArquivo: montarNomeArquivo({ prefixo: 'estoque-itens' }),
+    });
+  }
+
+  function imprimirItensEstoque() {
+    abrirRelatorioParaImpressao({
+      titulo: 'Estoque — itens',
+      subtitulo: showOnlyCrit ? 'Somente itens críticos/baixos.' : 'Todos os itens do escopo selecionado.',
+      colunas: colunasExportacaoEstoque,
+      linhas: itensView,
+      metadados: { 'Total de itens': itensView.length },
+    });
+  }
+
   return (
     <div className="page rebanho-page page--estoque">
       <div className="rebanho-header">
@@ -252,6 +287,12 @@ export default function EstoquePage({ db, setDb, onRegistrarSaidaEstoque, naviga
           </Button>
         </div>
       </div>
+
+      <ExportActions
+        disabled={itensView.length === 0}
+        onExportCsv={exportarItensCsv}
+        onPrint={imprimirItensEstoque}
+      />
 
       <div className="dashboard-strip">
         <div className="kpi-card">

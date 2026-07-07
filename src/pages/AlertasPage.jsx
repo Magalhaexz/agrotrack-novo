@@ -3,6 +3,7 @@ import { AlertCircle, Beef, CheckCircle2, CheckSquare, DollarSign, FileSearch, L
 import Card from '../components/ui/Card';
 import EmptyState from '../components/EmptyState';
 import PageHeader from '../components/PageHeader';
+import ExportActions from '../components/ExportActions';
 import { useAuth } from '../auth/useAuth';
 import { useToast } from '../hooks/useToast';
 import { formatarData } from '../utils/formatters';
@@ -16,6 +17,8 @@ import {
 } from '../domain/centralAlertas';
 import { aplicarTratativasAosAlertas, resumirTratativas, STATUS_TRATATIVA } from '../domain/tratativasAlertas';
 import { listarTratativasAlertas, salvarTratativaAlerta } from '../services/tratativasAlertas';
+import { formatarDataExportacao, montarNomeArquivo } from '../domain/exportacaoRelatorios';
+import { baixarCsv, abrirRelatorioParaImpressao } from '../utils/exportacaoArquivos';
 import '../styles/alertas.css';
 
 const ORIGEM_LABEL = {
@@ -263,6 +266,44 @@ export default function AlertasPage({
     chave === 'somenteCriticos' ? Boolean(valor) : Boolean(valor)
   ));
 
+  // Exportação (Sprint 19) — sempre a partir de `alertasFiltrados`, a mesma
+  // lista já renderizada abaixo: nunca duplica a lógica de filtro/tratativa,
+  // e nunca exporta um alerta que o usuário não está vendo na tela.
+  const colunasExportacaoAlertas = [
+    { key: 'titulo', label: 'Título' },
+    { key: 'origem', label: 'Origem', accessor: (a) => ORIGEM_LABEL[a.origem] || a.origem },
+    { key: 'prioridade', label: 'Prioridade', accessor: (a) => PRIORIDADE_LABEL[a.prioridade] || a.prioridade },
+    { key: 'prazo', label: 'Prazo', accessor: (a) => PRAZO_LABEL[a.prazoCategoria] || '' },
+    { key: 'dataReferencia', label: 'Data de referência', accessor: (a) => formatarDataExportacao(a.dataReferencia) },
+    { key: 'loteNome', label: 'Lote' },
+    {
+      key: 'statusTratativa',
+      label: 'Status',
+      accessor: (a) => STATUS_TRATATIVA_LABEL[a.statusTratativa] || 'Ativo (sem tratativa)',
+    },
+    { key: 'acaoRecomendada', label: 'Ação recomendada' },
+  ];
+
+  function exportarAlertasCsv() {
+    baixarCsv({
+      colunas: colunasExportacaoAlertas,
+      linhas: alertasFiltrados,
+      nomeArquivo: montarNomeArquivo({ prefixo: 'central-de-alertas-filtrados' }),
+    });
+  }
+
+  function imprimirAlertas() {
+    abrirRelatorioParaImpressao({
+      titulo: 'Central de Alertas — filtrados',
+      subtitulo: filtrosAtivos || filtroTratativa !== 'ativos'
+        ? 'Lista com os filtros atualmente aplicados na tela — não é a lista completa de alertas.'
+        : 'Alertas ativos (sem filtro adicional aplicado).',
+      colunas: colunasExportacaoAlertas,
+      linhas: alertasFiltrados,
+      metadados: { 'Total exportado': alertasFiltrados.length },
+    });
+  }
+
   return (
     <div className="page page--alertas">
       <PageHeader
@@ -378,6 +419,13 @@ export default function AlertasPage({
           ) : null}
         </div>
       </Card>
+
+      <ExportActions
+        label="Alertas filtrados:"
+        disabled={alertasFiltrados.length === 0}
+        onExportCsv={exportarAlertasCsv}
+        onPrint={imprimirAlertas}
+      />
 
       <div className="alertas-lista">
         {alertasNormalizados.length === 0 ? (

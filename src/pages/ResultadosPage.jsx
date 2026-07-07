@@ -657,6 +657,8 @@ function buildReportBundle(db, filters) {
       gmd: Number(item.indicadores.gmdMedio || 0),
       pesoAtual: Number(item.indicadores.pesoAtualMedio || 0),
       custoPeriodo: item.custosPeriodo.reduce((total, custo) => total + Number(custo.valor || 0), 0),
+      custoTotal: Number(item.indicadores.custoTotalLote || 0),
+      receita: Number(item.indicadores.receitaTotal || 0),
       margem: Number(item.indicadores.margem || 0),
       custoPorArroba: Number(item.indicadores.custoPorArroba || 0),
       lucroPorArroba: Number(item.indicadores.lucroPorArroba || 0),
@@ -698,8 +700,28 @@ function buildReportBundle(db, filters) {
         createSummary('Margem estimada', formatCurrency(lotMarginTotal), 'Receita potencial menos custo total', lotMarginTotal >= 0 ? 'success' : 'danger'),
       ],
       highlights: buildLotHighlights(lotReportRows),
+      // Sprint 19 — exportação alinhada com a tabela em tela (antes só
+      // exportava lote/fazenda/animais/margem); mesmos indicadores da Sprint 14
+      // (custo/lucro por @ carcaça sempre base carcaça), sem recalcular nada.
       exportConfig: createExportConfig('relatorio-lote', filters, [
-        { name: 'Resumo', rows: lotReportRows.map((row) => ({ lote: row.lote, fazenda: row.fazenda, animais: row.animais, margem: row.margem })) },
+        {
+          name: 'Resumo',
+          rows: lotReportRows.map((row) => ({
+            lote: row.lote,
+            fazenda: row.fazenda,
+            status: row.status,
+            animais: row.animais,
+            peso_medio_kg: row.pesoAtual,
+            gmd_kg_dia: row.gmd,
+            custo_total: row.custoTotal,
+            receita_total: row.receita,
+            lucro: row.margem,
+            custo_por_arroba_carcaca: row.custoPorArroba,
+            lucro_por_arroba_carcaca: row.lucroPorArroba,
+            lucro_por_cabeca: row.lucroPorCabeca,
+            decisao_venda: row.decisaoVenda?.statusLabel || '',
+          })),
+        },
         { name: 'Sanidade', rows: sanitaryRows.map((row) => ({ lote: row.lote, status: row.status, proxima: row.proxima })) },
       ]),
       tables: [
@@ -1181,6 +1203,15 @@ function formatCsvHeader(key) {
     consumoEstimado: 'Consumo estimado',
     custoEstimado: 'Custo estimado',
     dataPrevistaSaida: 'Data prevista de saída',
+    // Sprint 19 — labels oficiais da Sprint 14 (custo/lucro sempre base carcaça).
+    peso_medio_kg: 'Peso médio (kg)',
+    gmd_kg_dia: 'GMD (kg/dia)',
+    custo_total: 'Custo total',
+    receita_total: 'Receita total',
+    custo_por_arroba_carcaca: 'Custo/@ carcaça',
+    lucro_por_arroba_carcaca: 'Lucro/@ carcaça',
+    lucro_por_cabeca: 'Lucro/cabeça',
+    decisao_venda: 'Decisão de venda',
   };
   if (map[key]) return map[key];
   return String(key)

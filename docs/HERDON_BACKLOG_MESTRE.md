@@ -201,6 +201,7 @@ Ver [SPRINT13_AUDITORIA_360_HERDON.md](SPRINT13_AUDITORIA_360_HERDON.md) para o 
 - **Dependências:** nenhuma, pode começar imediatamente.
 - **Sprint sugerido:** 19.
 - **Critério de aceite:** Financeiro/DRE, Relatório de Lote e Relatório Sanitário têm export CSV e/ou PDF funcional testado manualmente; bundle de export carregado sob demanda (lazy), não no chunk principal.
+- **Status (Sprint 19):** **resolvido para o escopo pedido.** A auditoria da Sprint 19 encontrou que a premissa deste item já estava parcialmente desatualizada — `AcoesRelatorio.jsx`/`exportarPDF.js`/`exportadores.js` já existiam e já cobriam PDF/CSV em 6+ páginas (Lotes, Relatório do Lote, Relatórios Financeiro/Pastagens/Pesagens/Resumo Geral, `ResultadosPage`). Esta sprint fechou os 2 gaps reais (Sanidade e Central de Alertas, que não tinham exportação nenhuma), completou a exportação de Resultado por Lote (CSV só tinha 4 de ~11 colunas) e adicionou exportação a Estoque (itens) e Financeiro/DRE (`FinanceiroPage`, que não tinha nenhuma). Criado `src/domain/exportacaoRelatorios.js` (puro, testado, 20 casos) como base oficial para exportações futuras. Ver [SPRINT19_EXPORTACAO_RELATORIOS.md](SPRINT19_EXPORTACAO_RELATORIOS.md) e [HERDON_RELATORIOS_EXPORTACOES.md](HERDON_RELATORIOS_EXPORTACOES.md).
 
 ## Integrações
 

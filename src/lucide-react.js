@@ -418,3 +418,11 @@ export const LineChart = icon([
   createElement('path', { d: 'M4 4v16h16' }),
   createElement('path', { d: 'm7 15 3-4 3 2 5-7' }),
 ]);
+
+/* Sprint 19 — exportação de relatórios */
+
+export const Printer = icon([
+  createElement('path', { d: 'M6 9V3h12v6' }),
+  createElement('rect', { x: 4, y: 9, width: 16, height: 8, rx: 1.5 }),
+  createElement('path', { d: 'M6 17v4h12v-4' }),
+]);

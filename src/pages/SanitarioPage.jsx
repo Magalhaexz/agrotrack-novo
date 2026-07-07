@@ -6,6 +6,7 @@ import Card from '../components/ui/Card';
 import Button from '../components/ui/Button';
 import EmptyState from '../components/EmptyState';
 import PageHeader from '../components/PageHeader';
+import ExportActions from '../components/ExportActions';
 import { useToast } from '../hooks/useToast'; // Importar useToast
 import { useAuth } from '../auth/useAuth';
 import { construirAgendaSanitaria } from '../domain/agendaSanitaria';
@@ -16,6 +17,8 @@ import {
   updateOperationalRecord,
 } from '../services/operationalPersistence';
 import { sincronizarEstoqueSanidade, reverterEstoqueSanidadeExcluido } from '../services/estoqueSanidade';
+import { formatarDataExportacao, montarNomeArquivo } from '../domain/exportacaoRelatorios';
+import { baixarCsv, abrirRelatorioParaImpressao } from '../utils/exportacaoArquivos';
 
 const AGENDA_SECOES = [
   { chave: 'vencidos', titulo: 'Vencidos', badge: 'badge-r' },
@@ -47,6 +50,13 @@ export default function SanitarioPage({ db, setDb, onConfirmAction, navigationIn
     (db?.funcionarios || []).forEach(f => map.set(f.id, f));
     return map;
   }, [db?.funcionarios]);
+
+  // Sprint 19 — só para exportação: nome do produto vinculado (metadata.item_estoque_id).
+  const estoqueMap = useMemo(() => {
+    const map = new Map();
+    (db?.estoque || []).forEach((item) => map.set(item.id, item));
+    return map;
+  }, [db?.estoque]);
 
   const sanitario = useMemo(() => (Array.isArray(db?.sanitario) ? db.sanitario : []), [db]);
 
@@ -484,12 +494,58 @@ export default function SanitarioPage({ db, setDb, onConfirmAction, navigationIn
     await salvarItem(dados);
   }
 
+  // Exportação (Sprint 19) — mesmos registros já exibidos na tabela abaixo
+  // (`dadosTabela`). `qtd` é cabeças tratadas; `quantidade_utilizada` (em
+  // `metadata`, Sprint 15) é a quantidade do produto — nunca confundir os dois.
+  const colunasExportacaoSanitario = [
+    { key: 'loteNome', label: 'Lote' },
+    { key: 'tipo', label: 'Tipo/Procedimento' },
+    { key: 'desc', label: 'Descrição' },
+    {
+      key: 'produto',
+      label: 'Produto vinculado',
+      accessor: (row) => (row?.metadata?.item_estoque_id
+        ? (estoqueMap.get(row.metadata.item_estoque_id)?.produto || estoqueMap.get(row.metadata.item_estoque_id)?.nome || '')
+        : ''),
+    },
+    { key: 'quantidade_utilizada', label: 'Quantidade utilizada (produto)', accessor: (row) => row?.metadata?.quantidade_utilizada ?? '' },
+    { key: 'qtd', label: 'Cabeças tratadas' },
+    { key: 'data_aplic', label: 'Data de aplicação', accessor: (row) => formatarDataExportacao(row.data_aplic) },
+    { key: 'proxima', label: 'Próxima aplicação', accessor: (row) => formatarDataExportacao(row.proxima) },
+    { key: 'data_fim_carencia', label: 'Fim da carência', accessor: (row) => formatarDataExportacao(row.data_fim_carencia) },
+    { key: 'status', label: 'Status' },
+  ];
+
+  function exportarSanitarioCsv() {
+    baixarCsv({
+      colunas: colunasExportacaoSanitario,
+      linhas: dadosTabela,
+      nomeArquivo: montarNomeArquivo({ prefixo: 'sanidade' }),
+    });
+  }
+
+  function imprimirSanitario() {
+    abrirRelatorioParaImpressao({
+      titulo: 'Sanidade — manejos e agenda',
+      subtitulo: 'Registros de manejo sanitário, produto utilizado e carência.',
+      colunas: colunasExportacaoSanitario,
+      linhas: dadosTabela,
+      metadados: { 'Total de registros': dadosTabela.length },
+    });
+  }
+
   return (
     <div className="page page--sanitario page--kpi-compact">
       <PageHeader
         title="Sanitário / Manejo"
         subtitle="Controle de vacinas, medicações e manejos com status e responsáveis."
         actions={<Button className="sanitario-cta" disabled={!hasPermission('sanitario:editar')} onClick={abrirNovo}>Registrar manejo</Button>}
+      />
+
+      <ExportActions
+        disabled={dadosTabela.length === 0}
+        onExportCsv={exportarSanitarioCsv}
+        onPrint={imprimirSanitario}
       />
 
       <div className="summary-cards-grid sanitario-summary-grid">

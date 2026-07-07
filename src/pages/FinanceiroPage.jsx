@@ -7,6 +7,7 @@ import EmptyState from '../components/EmptyState';
 import Input from '../components/ui/Input';
 import Modal from '../components/ui/Modal';
 import PageHeader from '../components/PageHeader';
+import ExportActions from '../components/ExportActions';
 import { getResumoLote } from '../domain/resumoLote';
 import { listarContasFinanceiras } from '../domain/hojeNaFazenda';
 import { isMovimentacaoPaga, isMovimentacaoCancelada, getDataVencimento } from '../domain/financeiroStatus';
@@ -15,6 +16,8 @@ import { gerarNovoId } from '../utils/id';
 import { useAuth } from '../auth/useAuth';
 import { useToast } from '../hooks/useToast';
 import { createOperationalRecord, updateOperationalRecord } from '../services/operationalPersistence';
+import { formatarMoedaExportacao, montarNomeArquivo } from '../domain/exportacaoRelatorios';
+import { baixarCsv, abrirRelatorioParaImpressao } from '../utils/exportacaoArquivos';
 import '../styles/pagamentos.css';
 
 const tabs = ['dre', 'lote', 'lanc', 'pag'];
@@ -151,6 +154,59 @@ export default function FinanceiroPage({ db, setDb, navigationIntent = null }) {
   ), [filters, movimentacoes]);
 
   const dre = useMemo(() => computeDRE(db, lotesRows), [db, lotesRows]);
+
+  // Exportação do DRE (Sprint 19) — mesmos números já calculados por
+  // `computeDRE` acima, sem recalcular nem alterar regra de caixa/competência.
+  const linhasExportacaoDre = useMemo(() => {
+    const linhas = [
+      { tipo: 'Resumo geral', label: 'Total', receita: dre.receita, despesa: dre.despesa, saldo: dre.resultado },
+      ...dre.mensal.map((item) => ({
+        tipo: 'Mensal',
+        label: item.mes,
+        receita: item.receita,
+        despesa: item.despesa,
+        saldo: item.receita - item.despesa,
+      })),
+      ...Object.entries(dre.despesaPorCategoria).map(([categoria, valor]) => ({
+        tipo: 'Despesa por categoria',
+        label: categoria,
+        receita: null,
+        despesa: valor,
+        saldo: null,
+      })),
+    ];
+    return linhas;
+  }, [dre]);
+
+  const colunasExportacaoDre = [
+    { key: 'tipo', label: 'Tipo' },
+    { key: 'label', label: 'Referência' },
+    { key: 'receita', label: 'Receita', accessor: (l) => (l.receita == null ? '' : formatarMoedaExportacao(l.receita)) },
+    { key: 'despesa', label: 'Despesa', accessor: (l) => (l.despesa == null ? '' : formatarMoedaExportacao(l.despesa)) },
+    { key: 'saldo', label: 'Saldo/Lucro-Prejuízo', accessor: (l) => (l.saldo == null ? '' : formatarMoedaExportacao(l.saldo)) },
+  ];
+
+  function exportarDreCsv() {
+    baixarCsv({
+      colunas: colunasExportacaoDre,
+      linhas: linhasExportacaoDre,
+      nomeArquivo: montarNomeArquivo({ prefixo: 'dre' }),
+    });
+  }
+
+  function imprimirDre() {
+    abrirRelatorioParaImpressao({
+      titulo: 'DRE — Demonstrativo de Resultado',
+      subtitulo: 'Resumo geral, evolução mensal e despesas por categoria (todos os lançamentos).',
+      colunas: colunasExportacaoDre,
+      linhas: linhasExportacaoDre,
+      metadados: {
+        'Receita total': formatarMoedaExportacao(dre.receita),
+        'Despesa total': formatarMoedaExportacao(dre.despesa),
+        Resultado: formatarMoedaExportacao(dre.resultado),
+      },
+    });
+  }
 
   const margemBars = useMemo(() => {
     const ordered = lotesRows.slice().sort((a, b) => b.margemPct - a.margemPct);
@@ -334,6 +390,12 @@ export default function FinanceiroPage({ db, setDb, navigationIntent = null }) {
 
       {tab === 'dre' ? (
         <>
+          <ExportActions
+            disabled={linhasExportacaoDre.length === 0}
+            onExportCsv={exportarDreCsv}
+            onPrint={imprimirDre}
+          />
+
           <div className="dashboard-grid dashboard-grid--kpi-main">
             <Card title="Receita total" className="kpi-panel kpi-panel--success">
               <strong>{formatCurrency(dre.receita)}</strong>
