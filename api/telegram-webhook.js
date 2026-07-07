@@ -1,11 +1,14 @@
 /* global process */
-// Webhook do Telegram (Sprint 7 + Sprint 8) — recebe updates do Bot API e
-// diferencia três tipos de mensagem:
+// Webhook do Telegram (Sprint 7 + Sprint 8 + hotfix comandos) — recebe
+// updates do Bot API e diferencia quatro tipos de mensagem:
 //   1. código HERDON-XXXXXX de pareamento (Sprint 7, fluxo inalterado);
-//   2. comando fixo (/relatorio, /prioridades, /pagamentos, /estoque,
-//      /tarefas, /lotes, /ajuda) ou pergunta livre por palavra-chave
-//      (Sprint 8, `src/domain/telegramIntent.js`) — SEM IA generativa,
-//      só reaproveita o Motor Único de Alertas (Sprint 5) já calculado.
+//   2. comando novo (/start, /status, /contas, /alertas, /ajuda — hotfix,
+//      `src/domain/telegramComandos.js`);
+//   3. comando fixo do Sprint 8 (/relatorio, /prioridades, /pagamentos,
+//      /estoque, /tarefas, /lotes) ou pergunta livre por palavra-chave
+//      (`src/domain/telegramIntent.js`) — SEM IA generativa, só reaproveita
+//      o Motor Único de Alertas (Sprint 5) já calculado;
+//   4. texto sem código nem comando: orienta a enviar o código de vínculo.
 //
 // O usuário é sempre identificado pelo `telegram_chat_id` já salvo em
 // `telegram_connections` — nunca por um `owner_user_id` vindo do texto da
@@ -18,6 +21,7 @@ import { extractHerdonCodeFromText, isCodeUsable } from './_telegramConnections.
 import { montarDbDaConta } from './_herdonDb.js';
 import { gerarAlertasUnificados } from '../src/domain/alertasUnificados.js';
 import { classificarIntencaoTelegram, INTENCOES } from '../src/domain/telegramIntent.js';
+import { interpretarComandoTelegram, gerarRespostaComandoTelegram } from '../src/domain/telegramComandos.js';
 import {
   gerarRelatorioDiarioTelegram,
   gerarRespostaAjudaTelegram,
@@ -147,6 +151,31 @@ export default async function handler(req, res) {
   // salva. Nunca aceita owner_user_id vindo do texto da mensagem.
   const client = getSupabaseAdminClient();
   const conexao = await buscarConexaoAtiva(client, chatId).catch(() => null);
+
+  // Comandos novos do hotfix (/start, /status, /contas, /alertas) — checados
+  // antes do "sem código", pois eles têm resposta própria mesmo sem vínculo.
+  // Comandos do Sprint 8 (/relatorio etc.) devolvem null aqui e seguem para
+  // o classificador de intenção mais abaixo, sem duplicar lógica.
+  const comando = interpretarComandoTelegram(texto);
+  if (comando) {
+    if (comando === 'alertas' && conexao) {
+      try {
+        const db = await montarDbDaConta(client, conexao.owner_user_id);
+        const alertas = gerarAlertasUnificados(db);
+        const resposta = gerarRespostaComandoTelegram(comando, { vinculado: true, alertas });
+        await enviarMensagemTelegramParaChat(chatId, resposta).catch(() => null);
+        return res.status(200).json({ ok: true, comando });
+      } catch (error) {
+        console.error('[telegram-webhook] erro ao carregar alertas para /alertas', error);
+        const resposta = gerarRespostaComandoTelegram(comando, { vinculado: true, alertasErro: true });
+        await enviarMensagemTelegramParaChat(chatId, resposta).catch(() => null);
+        return res.status(200).json({ ok: true, comando, erro: true });
+      }
+    }
+    const resposta = gerarRespostaComandoTelegram(comando, { vinculado: Boolean(conexao) });
+    await enviarMensagemTelegramParaChat(chatId, resposta).catch(() => null);
+    return res.status(200).json({ ok: true, comando });
+  }
 
   if (!conexao) {
     await enviarMensagemTelegramParaChat(chatId, MSG_SEM_CODIGO).catch(() => null);
