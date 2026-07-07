@@ -159,9 +159,11 @@ Ver [SPRINT13_AUDITORIA_360_HERDON.md](SPRINT13_AUDITORIA_360_HERDON.md) para o 
 - **Problema:** `ComparativoPage`, `RotinaPage`, `AcompanhamentoPesoPage`, `CustosPage`, `EvolucaoRebanhoPage`, `DashboardPremiumPage`, `PlanejamentoPage` existem e funcionam mas não aparecem no menu.
 - **Impacto para o produtor:** funcionalidades possivelmente úteis ficam invisíveis.
 - **Prioridade:** P2. **Esforço:** pequeno (decisão + link, ou remoção formal). **Sprint sugerido:** 18.
+- **Status (Sprint 18):** **concluído** para 5 das 7 (`ComparativoPage`, `RotinaPage`, `AcompanhamentoPesoPage`, `CustosPage`, `EvolucaoRebanhoPage`) — adicionadas ao menu em `src/navigation/navConfig.js`. `DashboardPremiumPage`/`PlanejamentoPage` mantidas fora do menu por decisão (duplicam KPIs/abas já acessíveis por outros caminhos após esta sprint) — ver [SPRINT18_NAVEGACAO_UX_PAGINAS_ORFAS.md](SPRINT18_NAVEGACAO_UX_PAGINAS_ORFAS.md) §Etapa 9.
 
 ### BM-25 — Duplicação funcionarios × equipeAcessos não limpa
 - **Prioridade:** P2. **Esforço:** pequeno. **Sprint sugerido:** 18.
+- **Status (Sprint 18):** **confirmado, não alterado** — decisão existente (equipeAcessos é o ponto de entrada único) reafirmada, `FuncionariosPage` segue registrada e intencionalmente fora do menu.
 
 ### BM-26 — `calculateGmd30` duplicado verbatim em 2 páginas
 - **Prioridade:** P2. **Esforço:** pequeno. **Sprint sugerido:** 15.

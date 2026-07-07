@@ -1,5 +1,6 @@
 import { useMemo, useState } from 'react';
 import CustoForm from '../components/CustoForm';
+import PageHeader from '../components/PageHeader';
 import { formatarNumero, formatarData } from '../utils/formatters';
 import { gerarNovoId } from '../utils/id'; // Importa a função de gerar ID
 import { useAuth } from '../auth/useAuth';
@@ -269,18 +270,15 @@ export default function CustosPage({ db, setDb, onConfirmAction }) {
 
   return (
     <div className="page">
-      <div className="page-header page-topbar">
-        <div>
-          <h1>Custos Operacionais</h1>
-          <p>Lançamento e acompanhamento dos custos por lote.</p>
-        </div>
-
-        <div className="page-topbar-actions">
+      <PageHeader
+        title="Custos Operacionais"
+        subtitle="Lançamento e acompanhamento dos custos por lote."
+        actions={(
           <button className="primary-btn" onClick={abrirNovo}>
             + Novo custo
           </button>
-        </div>
-      </div>
+        )}
+      />
 
       <div className="kpi-grid-3">
         <div className="kpi-card">

@@ -1,4 +1,5 @@
 import { useMemo, useState } from 'react';
+import PageHeader from '../components/PageHeader';
 import PesoChart from '../components/PesoChart';
 import { useAuth } from '../auth/useAuth';
 import { useToast } from '../hooks/useToast';
@@ -507,12 +508,10 @@ export default function AcompanhamentoPesoPage({ db, setDb }) {
 
   return (
     <div className="page page--pesagens">
-      <div className="page-header page-topbar">
-        <div>
-          <h1>Acompanhamento de Peso</h1>
-          <p>Histórico de lotes e fluxo operacional de pesagem individual por lote.</p>
-        </div>
-      </div>
+      <PageHeader
+        title="Acompanhamento de Peso"
+        subtitle="Histórico de lotes e fluxo operacional de pesagem individual por lote."
+      />
 
       <div className="fazendas-card pesagens-mode-shell" style={{ marginBottom: 16 }}>
         <div className="segmented-control" role="tablist" aria-label="Abas de pesagem">

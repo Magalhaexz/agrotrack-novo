@@ -8,17 +8,21 @@ import {
   CheckSquare,
   ClipboardList,
   CreditCard,
+  DollarSign,
   FileBarChart,
   FileUp,
+  GitCompare,
   HelpCircle,
   Layers,
   Leaf,
   LayoutDashboard,
+  LineChart,
   ListChecks,
   MapPin,
   Package,
   Receipt,
   RefreshCw,
+  Repeat,
   Scale,
   Settings,
   ShieldPlus,
@@ -27,6 +31,7 @@ import {
   TrendingUp,
   User,
   Warehouse,
+  Weight,
 } from 'lucide-react';
 
 export const navSections = [
@@ -46,13 +51,24 @@ export const navSections = [
     items: [
       { id: 'lotes', label: 'Lotes e Rebanho', icon: Beef },
       { id: 'pesagens', label: 'Pesagens', icon: Scale },
+      // Sprint 18 — órfã (existia no código, sem entrada de menu): peso
+      // individual por animal, complementar à pesagem em lote acima.
+      { id: 'acompanhamentoPeso', label: 'Acompanhamento de Peso', icon: Weight },
       { id: 'modoCurral', label: 'Modo Curral', icon: Warehouse },
       { id: 'pastagens', label: 'Pastos', icon: Tractor },
       { id: 'suplementacao', label: 'Nutrição e Suplementação', icon: Leaf },
       { id: 'sanitario', label: 'Sanidade', icon: Syringe },
       { id: 'tarefas', label: 'Tarefas', icon: CheckSquare },
+      // Sprint 18 — órfã: gestão de rotinas recorrentes por funcionário/lote;
+      // o Calendário já lista esses eventos em modo leitura, mas faltava o
+      // ponto de entrada para criar/editar.
+      { id: 'rotina', label: 'Rotinas da Equipe', icon: Repeat },
       { id: 'animais', label: 'Animais', icon: ClipboardList },
       { id: 'calendarioOperacional', label: 'Calendário', icon: CalendarDays },
+      // Sprint 18 — órfã: comparação lado a lado de lotes ativos.
+      { id: 'comparativo', label: 'Comparativo de Lotes', icon: GitCompare },
+      // Sprint 18 — órfã: série histórica de entradas/saídas do rebanho.
+      { id: 'evolucaoRebanho', label: 'Evolução do Rebanho', icon: LineChart },
     ],
   },
   {
@@ -67,6 +83,9 @@ export const navSections = [
     title: 'Finanças',
     items: [
       { id: 'financeiro', label: 'Visão Financeira', icon: Receipt },
+      // Sprint 18 — órfã: lançamento de custo por lote (espelha em
+      // movimentacoes_financeiras automaticamente, ver CustosPage.jsx).
+      { id: 'custos', label: 'Custos por Lote', icon: DollarSign },
       { id: 'fluxoCaixa', label: 'Fluxo de Caixa', icon: TrendingUp },
       { id: 'custosCompartilhados', label: 'Rateio de Custos', icon: Layers },
       { id: 'relatorioFinanceiro', label: 'Relatórios Financeiros', icon: FileBarChart },

@@ -434,6 +434,9 @@ export default function DashboardPage({
                 <Badge variant={hojeNaFazenda.detalhes.alertasCriticosTotal.length > 0 ? 'danger' : 'success'}>
                   {hojeNaFazenda.detalhes.alertasCriticosTotal.length > 0 ? `${hojeNaFazenda.detalhes.alertasCriticosTotal.length} críticos` : 'Sem críticos'}
                 </Badge>
+                <button className="btn-secondary btn-sm" onClick={() => onNavigate?.('alertas')} type="button">
+                  Ver Central de Alertas
+                </button>
               </div>
             </div>
 
@@ -723,7 +726,8 @@ export default function DashboardPage({
             </table>
             {(!db.estoque || db.estoque.length === 0) && (
               <div className="empty-state">
-                <p>Nenhum item no estoque.</p>
+                <p>Nenhum item de estoque cadastrado.</p>
+                <span>Cadastre insumos para controlar consumo, validade e reposição.</span>
               </div>
             )}
           </div>

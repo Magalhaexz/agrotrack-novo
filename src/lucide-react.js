@@ -404,3 +404,17 @@ export const MapPinned = icon([
   createElement('circle', { cx: 12, cy: 10, r: 2.5 }),
   createElement('path', { d: 'M4 21h16' }),
 ]);
+
+/* Sprint 18 — ícones de navegação (páginas órfãs adicionadas ao menu) */
+
+export const GitCompare = icon([
+  createElement('circle', { cx: 7, cy: 6, r: 2 }),
+  createElement('circle', { cx: 17, cy: 18, r: 2 }),
+  createElement('path', { d: 'M7 8v6a4 4 0 0 0 4 4h4' }),
+  createElement('path', { d: 'M17 16V10a4 4 0 0 0-4-4H9' }),
+]);
+
+export const LineChart = icon([
+  createElement('path', { d: 'M4 4v16h16' }),
+  createElement('path', { d: 'm7 15 3-4 3 2 5-7' }),
+]);
