@@ -25,8 +25,8 @@ test('gerarResumoLoteTexto inclui linha de custo/lucro por arroba e status de de
   const relatorio = buildRelatorioLote(db, 10);
   const texto = gerarResumoLoteTexto(relatorio);
 
-  assert.match(texto, /Custo\/@: R\$ \d/);
-  assert.match(texto, /Lucro\/@: R\$ -?\d/);
+  assert.match(texto, /Custo\/@ carcaça: R\$ \d/);
+  assert.match(texto, /Lucro\/@ carcaça: R\$ -?\d/);
   assert.match(texto, /Status: (Pronto para avaliar venda|Acompanhar por mais alguns dias|Abaixo da meta de ganho|Custo alto por arroba|Dados insuficientes)$/m);
 });
 

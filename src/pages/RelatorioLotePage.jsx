@@ -70,11 +70,11 @@ export default function RelatorioLotePage({ db, onNavigate }) {
 
             <Card title="Decisão de venda e custo por arroba">
               <div className="summary-list">
-                <Row label="Arrobas estimadas" value={`${formatNumber(relatorio.arrobasCarcaca, 1)} @`} />
-                <Row label="Custo por arroba" value={formatCurrency(relatorio.custoPorArroba)} />
-                <Row label="Lucro por arroba" value={formatCurrency(relatorio.lucroPorArroba)} />
-                <Row label="Ponto de equilíbrio da arroba" value={formatCurrency(relatorio.custoPorArroba)} />
-                <Row label="Preço-alvo da arroba" value={formatCurrency(relatorio.precoArroba)} />
+                <Row label="Arrobas estimadas (carcaça)" value={`${formatNumber(relatorio.arrobasCarcaca, 1)} @`} />
+                <Row label="Custo/@ carcaça" value={formatCurrency(relatorio.custoPorArroba)} />
+                <Row label="Lucro/@ carcaça" value={formatCurrency(relatorio.lucroPorArroba)} />
+                <Row label="Ponto de equilíbrio da @ carcaça" value={formatCurrency(relatorio.custoPorArroba)} />
+                <Row label="Preço-alvo da @ carcaça" value={formatCurrency(relatorio.precoArroba)} />
                 <Row label="Status" value={relatorio.decisaoVenda?.statusLabel} />
               </div>
               <p className="ui-input-hint">{relatorio.decisaoVenda?.mensagem}</p>
@@ -108,7 +108,7 @@ export default function RelatorioLotePage({ db, onNavigate }) {
                     {relatorio.manejoResultado.suplementacao?.temRegistro ? (
                       <>
                         <Row label="Custo de suplemento/cabeça" value={formatCurrency(relatorio.manejoResultado.suplementacao.custoPorCabeca)} />
-                        <Row label="Custo de suplemento/@" value={formatCurrency(relatorio.manejoResultado.suplementacao.custoPorArroba)} />
+                        <Row label="Custo de suplemento/@ carcaça" value={formatCurrency(relatorio.manejoResultado.suplementacao.custoPorArroba)} />
                       </>
                     ) : null}
                   </div>

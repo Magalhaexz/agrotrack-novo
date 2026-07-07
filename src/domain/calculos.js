@@ -1,5 +1,6 @@
 import { isAnimalAtivo, safeDivide, toNonNegativeNumber, toNumber } from './calcHelpers.js';
 import { deveEntrarNoResultadoLote } from './financeiroStatus.js';
+import { calcularArrobasCarcaca, calcularArrobasPesoVivo, calcularCustoPorArrobaCarcaca, calcularLucroPorArrobaCarcaca } from './arroba.js';
 
 /**
  * Verifica se um item pertence a um lote específico.
@@ -127,7 +128,8 @@ export function calcularResultadoLote(db, loteId) {
   const lotes = Array.isArray(db?.lotes) ? db.lotes : [];
   const lote = lotes.find((l) => toNumber(l.id) === toNumber(loteId)) ?? null;
   // F-04: usa rendimento_carcaca configurado no lote (padrão 52% — zebuínos/Nelore)
-  const rendimentoCarcaca = toNumber(lote?.rendimento_carcaca || 52) / 100;
+  // normalizarRendimentoCarcaca (arroba.js) aceita tanto 52 quanto 0.52.
+  const rendimentoCarcaca = lote?.rendimento_carcaca || 52;
 
   const animais = Array.isArray(db?.animais) ? db.animais : [];
   const animaisLote = animais.filter((item) => pertenceAoLote(item, loteId) && isAnimalAtivo(item));
@@ -138,13 +140,18 @@ export function calcularResultadoLote(db, loteId) {
         qtdCabecas
       )
     : 0;
+  const pesoTotalKg = qtdCabecas * pesoMedioAtual;
 
-  const arrobaViva = safeDivide(pesoMedioAtual, 15);
-  // F-04: arrobas pelo peso de carcaça = peso vivo × rendimento / 15
-  const arrobasCarcaca = safeDivide(qtdCabecas * pesoMedioAtual * rendimentoCarcaca, 15);
+  const arrobaViva = calcularArrobasPesoVivo(pesoMedioAtual);
+  // F-04: arrobas pelo peso de carcaça = peso vivo total × rendimento / 15
+  const arrobasCarcaca = calcularArrobasCarcaca(pesoTotalKg, rendimentoCarcaca);
 
   const lucroPorCabeca = safeDivide(lucroTotal, qtdCabecas);
-  const lucroPorArroba = safeDivide(lucroTotal, arrobasCarcaca);
+  // Sprint 14: custo/@ e lucro/@ usam a MESMA base (arroba de carcaça) — antes
+  // custoPorArroba só existia em resumoLote.js com base de arroba de ganho,
+  // divergente do lucroPorArroba daqui (ver docs/DECISAO_CALCULO_ARROBA_HERDON.md).
+  const custoPorArroba = calcularCustoPorArrobaCarcaca(custoTotal, pesoTotalKg, rendimentoCarcaca);
+  const lucroPorArroba = calcularLucroPorArrobaCarcaca(lucroTotal, pesoTotalKg, rendimentoCarcaca);
   const margemPct = receitaTotal > 0 ? safeDivide(lucroTotal * 100, receitaTotal) : 0;
 
   return {
@@ -157,6 +164,7 @@ export function calcularResultadoLote(db, loteId) {
     pesoMedioAtual,
     arrobaViva,
     arrobasCarcaca,
+    custoPorArroba,
     lucroPorArroba,
   };
 }

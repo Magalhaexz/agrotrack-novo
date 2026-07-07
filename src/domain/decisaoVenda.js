@@ -1,5 +1,6 @@
 import { toNumber, safeDivide } from './calcHelpers.js';
 import { getResumoLote } from './resumoLote.js';
+import { calcularArrobasCarcaca } from './arroba.js';
 
 export const DIAS_MINIMOS_PARA_AVALIACAO = 30;
 export const LIMIAR_CUSTO_ALTO_PCT = 0.85;
@@ -72,8 +73,7 @@ export function montarDadosDecisaoVenda(db, loteId) {
  * atual dos animais reais.
  */
 export function calcularArrobasEstimadas({ qtdCabecas, peso, rendimentoCarcaca } = {}) {
-  const rendimento = toNumber(rendimentoCarcaca) > 0 ? toNumber(rendimentoCarcaca) / 100 : 0.52;
-  return safeDivide(toNumber(qtdCabecas) * toNumber(peso) * rendimento, 15);
+  return calcularArrobasCarcaca(toNumber(qtdCabecas) * toNumber(peso), rendimentoCarcaca);
 }
 
 export function calcularCustoPorArroba({ custoTotal, arrobas } = {}) {

@@ -383,7 +383,7 @@ function responderValeAPenaLote(db, agora, options = {}) {
     severidade: SEVERIDADE_POR_CLASSIFICACAO_SAUDE[resumo.saudeLote?.classificacao] || null,
     dadosInsuficientes: resumo.receitaIndisponivel,
     evidencias: [
-      resumo.custoPorArroba != null ? `Custo por arroba: ${formatCurrency(resumo.custoPorArroba)}` : null,
+      resumo.custoPorArroba != null ? `Custo/@ carcaça: ${formatCurrency(resumo.custoPorArroba)}` : null,
       resumo.gmd != null ? `GMD atual: ${resumo.gmd.toFixed(2)} kg/dia` : null,
     ].filter(Boolean),
     acoesSugeridas: resumo.decisoes || [],

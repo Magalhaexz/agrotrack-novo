@@ -113,7 +113,7 @@ export default function RelatorioLotePreview({ relatorio }) {
           <div className="summary-list">
             <Row label="Custo total" value={formatCurrency(custoTotal)} />
             <Row label="Custo por cabeça" value={formatCurrency(custoPorCabeca)} />
-            <Row label="Custo por arroba" value={formatCurrency(custoPorArroba)} />
+            <Row label="Custo/@ carcaça" value={formatCurrency(custoPorArroba)} />
           </div>
         )}
         {receitaIndisponivel ? (

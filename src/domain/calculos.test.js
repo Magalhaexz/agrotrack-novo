@@ -275,6 +275,34 @@ test('calcularResultadoLote lucroPorArroba é maior com rendimento menor (F-04)'
   assert.ok(r50.lucroPorArroba > r52.lucroPorArroba, 'rendimento 50% deve dar lucroPorArroba maior que 52%');
 });
 
+// ----------------------------------------------------------------
+// calcularResultadoLote — Sprint 14: custoPorArroba e lucroPorArroba
+// devem usar a MESMA base (arroba de carcaça) — ver docs/DECISAO_CALCULO_ARROBA_HERDON.md
+// ----------------------------------------------------------------
+
+test('calcularResultadoLote: custoPorArroba usa @ carcaça, mesma base de lucroPorArroba (Sprint 14)', () => {
+  const db = makeDb({
+    animais: [makeAnimal({ qtd: 10, p_at: 450, status: 'ativo' })],
+    movimentacoes: [
+      makeMov({ tipo: 'receita', valor: 100000 }),
+      makeMov({ tipo: 'despesa', valor: 60000 }),
+    ],
+    lotes: [makeLote({ rendimento_carcaca: '52' })],
+  });
+  const result = calcularResultadoLote(db, 1);
+  // arrobasCarcaca = 10 * 450 * 0.52 / 15 = 156
+  assert.equal(result.custoPorArroba, 60000 / 156);
+  assert.equal(result.lucroPorArroba, 40000 / 156);
+  // Ambos usam o mesmo denominador — dividir um pelo outro deve reproduzir custo/lucro.
+  assert.ok(Math.abs(result.custoPorArroba / result.lucroPorArroba - 60000 / 40000) < 0.0001);
+});
+
+test('calcularResultadoLote: custoPorArroba não quebra sem animais (arrobas zero)', () => {
+  const db = makeDb({ animais: [], movimentacoes: [makeMov({ tipo: 'despesa', valor: 1000 })] });
+  const result = calcularResultadoLote(db, 1);
+  assert.equal(result.custoPorArroba, 0);
+});
+
 test('calcularResultadoLote mantém arrobaViva no retorno (F-04 — backward compat)', () => {
   const db = makeDb({
     animais: [makeAnimal({ qtd: 10, p_at: 450, status: 'ativo' })],

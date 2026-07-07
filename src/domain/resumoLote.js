@@ -50,7 +50,9 @@ export function getResumoLote(db, loteId) {
   const margemPct = toNumber(financeiro?.margemPct);
 
   const custoPorCabeca = safeDivide(custoTotal, totalAnimais);
-  const custoPorArroba = safeDivide(custoTotal, arrobasProduzidas);
+  // Sprint 14: custoPorArroba usa @ carcaça (mesma base de lucroPorArroba),
+  // não @ de ganho (arrobasProduzidas) — ver docs/DECISAO_CALCULO_ARROBA_HERDON.md.
+  const custoPorArroba = toNumber(financeiro?.custoPorArroba) || safeDivide(custoTotal, arrobasCarcaca);
   const lucroPorCabeca = toNumber(financeiro?.lucroPorCabeca) || safeDivide(lucroTotal, totalAnimais);
   const lucroPorArroba = toNumber(financeiro?.lucroPorArroba) || safeDivide(lucroTotal, arrobasCarcaca);
 

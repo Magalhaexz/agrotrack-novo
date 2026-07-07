@@ -4,6 +4,7 @@ import {
   calcularUaPorAnimal,
 } from './unidadeAnimal.js';
 import { computeEvolucaoRebanho } from './evolucaoRebanho.js';
+import { calcularRendimentoCarcaca } from './indicadores.js';
 import { safeDivide, toDateKey, toNonNegativeNumber, toNumber } from './calcHelpers.js';
 
 function isDateInPeriod(value, start, end) {
@@ -161,8 +162,10 @@ function calculateTecnicos(db, evolucao, periodStart, periodEnd, areaPastagemHa)
       const qtd = toNumber(m?.qtd);
       const pesoMedio = toNumber(m?.peso_medio);
       const lote = lotesMap.get(Number(m?.lote_id));
-      const rendimento = toNumber(lote?.rendimento_carcaca || 52) / 100;
-      const pesoCarcacaMov = qtd * pesoMedio * rendimento;
+      // Dedup Sprint 14: mesma fórmula de calcularRendimentoCarcaca (calculos.js
+      // já usa a via arroba.js) — aqui somamos kg de carcaça por movimentação
+      // antes de dividir por 15, não arrobas por movimentação.
+      const pesoCarcacaMov = calcularRendimentoCarcaca(qtd * pesoMedio, lote?.rendimento_carcaca || 52);
       return sum + pesoCarcacaMov;
     }, 0);
   const arrobasVendidas = totalPesoCarcacaKg > 0 ? totalPesoCarcacaKg / 15 : null;

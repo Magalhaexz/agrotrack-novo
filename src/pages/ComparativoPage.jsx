@@ -120,7 +120,7 @@ export default function ComparativoPage({ db, onNavigate }) {
       { key: 'metaPeso', label: 'Meta de peso', format: (v) => `${formatNumber(v, 0)} kg` },
       { key: 'pctMeta', label: '% da meta', highlight: 'max', format: (v) => `${formatNumber(v, 1)}%` },
       { key: 'diasSaida', label: 'Dias p/ saída', highlight: 'min', format: (v) => `~${formatNumber(v, 0)} dias` },
-      { key: 'arrobasCabeca', label: 'Arrobas/cabeça', highlight: 'max', format: (v) => `${formatNumber(v, 2)} @` },
+      { key: 'arrobasCabeca', label: 'Arrobas/cabeça (peso vivo)', highlight: 'max', format: (v) => `${formatNumber(v, 2)} @` },
       { key: 'custoTotal', label: 'Custo total', highlight: 'min', format: (v) => formatarMoeda(v) },
       { key: 'custoCabeca', label: 'Custo/cabeça', highlight: 'min', format: (v) => formatarMoeda(v) },
       { key: 'margemPct', label: 'Margem estimada', highlight: 'max', format: (v) => `${formatNumber(v, 1)}%` },

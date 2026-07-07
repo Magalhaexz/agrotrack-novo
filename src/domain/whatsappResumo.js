@@ -50,7 +50,7 @@ export function gerarResumoLoteTexto(relatorio) {
   ];
 
   if (decisaoVenda) {
-    linhas.push(`Custo/@: ${formatCurrency(custoPorArroba)} · Lucro/@: ${formatCurrency(lucroPorArroba)} · Status: ${decisaoVenda.statusLabel}`);
+    linhas.push(`Custo/@ carcaça: ${formatCurrency(custoPorArroba)} · Lucro/@ carcaça: ${formatCurrency(lucroPorArroba)} · Status: ${decisaoVenda.statusLabel}`);
   }
 
   if (relatorio.manejoResultado !== undefined) {
