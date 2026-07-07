@@ -65,6 +65,7 @@ Ver [SPRINT13_AUDITORIA_360_HERDON.md](SPRINT13_AUDITORIA_360_HERDON.md) para o 
 - **Prioridade:** P0.
 - **Esforço:** pequeno.
 - **Sprint sugerido:** 14.
+- **Status (Sprint 17):** **parcial.** 3 arquivos com timestamp divergente do remoto foram renomeados (sem mudança de schema). As 2 migrations só-remoto e a 1 só-local-sem-registro seguem pendentes — exigem `supabase` CLI autenticado, não disponível nesta sessão. Plano detalhado em [HERDON_PLANO_RECONCILIACAO_SUPABASE.md](HERDON_PLANO_RECONCILIACAO_SUPABASE.md).
 - **Critério de aceite:** `supabase db pull` roda sem gerar diffs inesperados; pasta de migrations reflete exatamente o que está aplicado no remoto.
 
 ### BM-07 — `pastagens` tem `faz_id` (bigint) e `fazenda_id` (uuid) simultaneamente
@@ -87,6 +88,7 @@ Ver [SPRINT13_AUDITORIA_360_HERDON.md](SPRINT13_AUDITORIA_360_HERDON.md) para o 
 
 ### BM-11 — 16 chaves estrangeiras sem índice, 38 índices duplicados
 - **Prioridade:** P2. **Esforço:** pequeno (script de criação/remoção de índices). **Sprint sugerido:** 17.
+- **Status (Sprint 17):** **parcial.** As 13 FKs ainda sem índice (a contagem caiu de 16 para 13 nas sprints intermediárias) foram indexadas via migration `20260707161920`. Os ~40 índices duplicados **não foram removidos** — dropar índice é ação de maior risco que criar; plano de remoção segura em [HERDON_PLANO_RECONCILIACAO_SUPABASE.md](HERDON_PLANO_RECONCILIACAO_SUPABASE.md).
 
 ### BM-12 — `usuarios` vs `profiles`: duas tabelas de identidade
 - **Problema:** não fica claro qual é autoritativa para papel/perfil.
@@ -95,6 +97,7 @@ Ver [SPRINT13_AUDITORIA_360_HERDON.md](SPRINT13_AUDITORIA_360_HERDON.md) para o 
 ### BM-13 — Hardening de segurança (baixo risco, fácil de fechar)
 - 5 funções com `search_path` mutável, extensão `citext` fora de schema dedicado, proteção de senha vazada desabilitada.
 - **Prioridade:** P3. **Esforço:** pequeno. **Sprint sugerido:** 17 (pode ser feito junto com BM-10/BM-11).
+- **Status (Sprint 17):** **concluído** para as 5 funções com `search_path` mutável (migration `20260707161920`, confirmado sem regressão no advisor). `citext` fora de schema dedicado e proteção de senha vazada seguem pendentes (a primeira exige recriar a extensão; a segunda é configuração do painel Auth, não migration SQL).
 
 ## Decisão operacional
 
