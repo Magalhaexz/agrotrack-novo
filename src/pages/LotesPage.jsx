@@ -554,6 +554,12 @@ export default function LotesPage({ db, setDb, onRegistrarSaidaAnimal, session, 
               ...prev,
               animais: (prev.animais || []).map((a) => (Number(a.id) === Number(grupoAuto.id) ? { ...a, ...grupoPatch } : a)),
             }));
+          } else {
+            // Sprint 15: antes falhava em silêncio — cabeças/peso do lote ficavam
+            // desatualizados no grupo de animais sem nenhum aviso, e Resultado/
+            // Decisão de Venda/Manejo (que leem `animais`, não `lotes`) passavam
+            // a mostrar números defasados sem o usuário saber o motivo.
+            showToast({ type: 'warning', message: 'Lote atualizado, mas não foi possível sincronizar cabeças/peso com o grupo de animais. Resultado e Decisão de Venda podem ficar desatualizados até uma nova tentativa.' });
           }
         }
       }
@@ -587,15 +593,26 @@ export default function LotesPage({ db, setDb, onRegistrarSaidaAnimal, session, 
     // nunca `lotes.qtd`. Criamos o grupo automaticamente, sem pedir nada
     // novo ao produtor (Sprint 35).
     const grupoAutoPatch = buildGrupoAnimaisAutoPatch({ ...novoLote, id: loteIdReal });
+    let grupoAutoFalhou = false;
     if (grupoAutoPatch) {
       const grupoPersistido = await createOperationalRecord('animais', grupoAutoPatch, session);
       if (grupoPersistido?.persisted) {
         const novoGrupo = grupoPersistido.data || { id: gerarNovoId(animais), ...grupoAutoPatch };
         setDb((prev) => ({ ...prev, animais: [...(prev.animais || []), novoGrupo] }));
+      } else {
+        // Sprint 15: sem isso, o lote aparecia "criado com sucesso" mas ficava
+        // operacionalmente quebrado — Resultado/Decisão de Venda/Manejo leem
+        // `animais`, não `lotes.qtd`, e mostrariam "dados insuficientes" sem
+        // nenhuma pista do motivo (falha silenciosa apontada na Sprint 13).
+        grupoAutoFalhou = true;
       }
     }
 
-    showToast({ type: 'success', message: 'Lote criado com sucesso.' });
+    if (grupoAutoFalhou) {
+      showToast({ type: 'warning', message: 'Lote criado, mas não foi possível registrar o grupo de animais automaticamente. Resultado, Decisão de Venda e Manejo vão mostrar "dados insuficientes" até você cadastrar os animais deste lote manualmente.' });
+    } else {
+      showToast({ type: 'success', message: 'Lote criado com sucesso.' });
+    }
     setOpenNovoLote(false);
   }
 

@@ -15,6 +15,7 @@ import {
   persistCollectionMutation,
   updateOperationalRecord,
 } from '../services/operationalPersistence';
+import { sincronizarEstoqueSanidade, reverterEstoqueSanidadeExcluido } from '../services/estoqueSanidade';
 
 const AGENDA_SECOES = [
   { chave: 'vencidos', titulo: 'Vencidos', badge: 'badge-r' },
@@ -141,6 +142,24 @@ export default function SanitarioPage({ db, setDb, onConfirmAction, navigationIn
     setAbrirForm(true);
   }, [hasPermission, showToast]);
 
+  /** Aplica no estado local os patches de estoque/movimentações já persistidos pela sincronização Sanidade→Estoque, e mostra avisos, se houver. */
+  const aplicarSincronizacaoEstoque = useCallback(({ avisos, estoquePatches, movimentacoes }) => {
+    if (estoquePatches.length || movimentacoes.length) {
+      setDb((prev) => ({
+        ...prev,
+        estoque: (prev.estoque || []).map((item) => {
+          const patch = estoquePatches.find((p) => Number(p.id) === Number(item.id));
+          return patch ? { ...item, ...patch.changes } : item;
+        }),
+        movimentacoes_estoque: [
+          ...(prev.movimentacoes_estoque || []),
+          ...movimentacoes.map((mov) => ({ id: mov.id ?? gerarNovoId(prev.movimentacoes_estoque || []), ...mov })),
+        ],
+      }));
+    }
+    avisos.forEach((mensagem) => showToast({ type: 'warning', message: mensagem }));
+  }, [setDb, showToast]);
+
   const excluirItem = useCallback(async (id) => {
     if (!hasPermission('sanitario:excluir')) {
       showToast({ type: 'error', message: mensagemSemPermissao });
@@ -186,8 +205,23 @@ export default function SanitarioPage({ db, setDb, onConfirmAction, navigationIn
         rotinas: novasRotinas,
       };
     });
+
+    // Sprint 15: excluir um manejo com produto vinculado devolve 100% da
+    // quantidade utilizada ao estoque — sem isso, o saldo ficaria "consumido"
+    // para sempre por um registro que não existe mais.
+    if (current?.metadata?.item_estoque_id && Number(current?.metadata?.quantidade_utilizada) > 0) {
+      const resultadoEstoque = await reverterEstoqueSanidadeExcluido(db, session, {
+        sanitarioId: id,
+        produtoId: current.metadata.item_estoque_id,
+        loteId: current.lote_id,
+        quantidade: current.metadata.quantidade_utilizada,
+        data: current.data_aplic,
+      });
+      aplicarSincronizacaoEstoque(resultadoEstoque);
+    }
+
     showToast({ type: 'success', message: 'Manejo sanitário excluído com sucesso!' });
-  }, [db?.sanitario, hasPermission, onConfirmAction, session, setDb, showToast]);
+  }, [aplicarSincronizacaoEstoque, db, hasPermission, onConfirmAction, session, setDb, showToast]);
 
   // Normaliza o payload do formulário (que envia `procedimentos`) e também o
   // payload legado/IATF (que envia tipo/desc no topo) numa lista de procedimentos.
@@ -210,6 +244,11 @@ export default function SanitarioPage({ db, setDb, onConfirmAction, navigationIn
       metadata: {
         ...(metadataBase && typeof metadataBase === 'object' ? metadataBase : {}),
         item_estoque_id: proc.item_estoque_id ? Number(proc.item_estoque_id) : null,
+        // Sprint 15: quantidade de PRODUTO consumida (distinta de `qtd` =
+        // cabeças atendidas) — usada para baixar/devolver estoque.
+        quantidade_utilizada: proc.item_estoque_id && Number(proc.quantidade_utilizada) > 0
+          ? Number(proc.quantidade_utilizada)
+          : null,
         ...(grupoId ? { grupo_manejo_id: grupoId } : {}),
       },
     };
@@ -296,6 +335,21 @@ export default function SanitarioPage({ db, setDb, onConfirmAction, navigationIn
         };
       });
 
+      // Sprint 15: sincroniza a baixa/devolução de estoque com base na
+      // diferença entre o produto/quantidade anteriores (metadata do registro
+      // antigo) e os novos — troca de produto reverte 100% do antigo e baixa
+      // 100% do novo; remoção do produto só reverte.
+      const resultadoEstoque = await sincronizarEstoqueSanidade(db, session, {
+        sanitarioId: itemEditando.id,
+        loteId: registro.lote_id,
+        data: registro.data_aplic,
+        produtoIdAnterior: itemEditando?.metadata?.item_estoque_id || null,
+        quantidadeAnterior: itemEditando?.metadata?.quantidade_utilizada || 0,
+        produtoIdNovo: registro?.metadata?.item_estoque_id || null,
+        quantidadeNova: registro?.metadata?.quantidade_utilizada || 0,
+      });
+      aplicarSincronizacaoEstoque(resultadoEstoque);
+
       showToast({ type: 'success', message: 'Manejo sanitário atualizado com sucesso!' });
       setAbrirForm(false);
       setItemEditando(null);
@@ -326,6 +380,33 @@ export default function SanitarioPage({ db, setDb, onConfirmAction, navigationIn
       return;
     }
 
+    // Sprint 15: sincroniza baixa de estoque para cada procedimento com
+    // produto + quantidade utilizada. Mantém uma cópia local do estoque
+    // atualizada a cada iteração, para não duplicar/perder baixa quando dois
+    // procedimentos do mesmo manejo usam o mesmo produto.
+    let estoqueTrabalho = db?.estoque || [];
+    const avisosEstoque = [];
+    const estoquePatchesAcumulados = [];
+    const movimentacoesAcumuladas = [];
+    for (const criado of criados) {
+      const produtoId = criado?.metadata?.item_estoque_id || null;
+      const quantidadeUtilizada = criado?.metadata?.quantidade_utilizada || 0;
+      if (!produtoId || !quantidadeUtilizada) continue;
+      const resultado = await sincronizarEstoqueSanidade({ ...db, estoque: estoqueTrabalho }, session, {
+        sanitarioId: criado.id,
+        loteId: criado.lote_id,
+        data: criado.data_aplic,
+        produtoIdNovo: produtoId,
+        quantidadeNova: quantidadeUtilizada,
+      });
+      avisosEstoque.push(...resultado.avisos);
+      estoquePatchesAcumulados.push(...resultado.estoquePatches);
+      movimentacoesAcumuladas.push(...resultado.movimentacoes);
+      resultado.estoquePatches.forEach((patch) => {
+        estoqueTrabalho = estoqueTrabalho.map((item) => (Number(item.id) === Number(patch.id) ? { ...item, ...patch.changes } : item));
+      });
+    }
+
     // Tarefa automática: uma por manejo (não uma por procedimento), ligada ao 1º registro.
     let novaRotina = null;
     if (shouldManageAutomaticRoutine) {
@@ -346,6 +427,8 @@ export default function SanitarioPage({ db, setDb, onConfirmAction, navigationIn
       sanitario: [...(prev.sanitario || []), ...criados],
       rotinas: novaRotina ? [...(prev.rotinas || []), novaRotina] : (prev.rotinas || []),
     }));
+
+    aplicarSincronizacaoEstoque({ avisos: avisosEstoque, estoquePatches: estoquePatchesAcumulados, movimentacoes: movimentacoesAcumuladas });
 
     if (falhas.length) {
       showToast({ type: 'warning', message: `Parte do manejo foi salva, mas ${falhas.length} procedimento(s) falharam.` });

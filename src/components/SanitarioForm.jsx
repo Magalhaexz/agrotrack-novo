@@ -38,7 +38,7 @@ const PALAVRAS_POR_TIPO = {
 };
 
 function novoProcedimento(overrides = {}) {
-  return { tipo: 'vacina', item_estoque_id: '', desc: '', ...overrides };
+  return { tipo: 'vacina', item_estoque_id: '', quantidade_utilizada: '', desc: '', ...overrides };
 }
 
 function procedimentosFromInitial(data) {
@@ -46,6 +46,7 @@ function procedimentosFromInitial(data) {
     return [novoProcedimento({
       tipo: data.tipo || 'vacina',
       item_estoque_id: data.item_estoque_id ?? data.metadata?.item_estoque_id ?? '',
+      quantidade_utilizada: data.metadata?.quantidade_utilizada ?? '',
       desc: data.desc || '',
     })];
   }
@@ -179,6 +180,9 @@ export default function SanitarioForm({
       procedimentos: procedimentos.map((proc) => ({
         tipo: proc.tipo,
         item_estoque_id: proc.item_estoque_id ? Number(proc.item_estoque_id) : null,
+        quantidade_utilizada: proc.item_estoque_id && Number(proc.quantidade_utilizada) > 0
+          ? Number(proc.quantidade_utilizada)
+          : null,
         desc: String(proc.desc || '').trim(),
       })),
     });
@@ -277,6 +281,34 @@ export default function SanitarioForm({
                     ))}
                   </select>
                 </label>
+
+                {proc.item_estoque_id ? (() => {
+                  const produtoSelecionado = produtosSanitarios.find((item) => String(item.id) === String(proc.item_estoque_id));
+                  const saldoProduto = Number(produtoSelecionado?.quantidade_atual ?? produtoSelecionado?.quantidade ?? 0);
+                  const quantidadeInformada = Number(proc.quantidade_utilizada || 0);
+                  const saldoInsuficiente = quantidadeInformada > 0 && quantidadeInformada > saldoProduto;
+                  return (
+                    <label className="ui-input-wrap">
+                      <span className="ui-input-label">Quantidade utilizada</span>
+                      <input
+                        className="ui-input"
+                        type="number"
+                        min={0}
+                        step="0.01"
+                        value={proc.quantidade_utilizada}
+                        onChange={(e) => atualizarProcedimento(index, { quantidade_utilizada: e.target.value })}
+                        placeholder={`Ex: 1 (saldo atual: ${saldoProduto})`}
+                      />
+                      {quantidadeInformada > 0 ? (
+                        <small style={{ color: saldoInsuficiente ? 'var(--color-danger)' : 'var(--color-text-secondary)' }}>
+                          {saldoInsuficiente
+                            ? 'Estoque insuficiente para esta aplicação.'
+                            : 'Ao salvar, esta quantidade será baixada do estoque.'}
+                        </small>
+                      ) : null}
+                    </label>
+                  );
+                })() : null}
 
                 <label className="ui-input-wrap">
                   <span className="ui-input-label">Descrição (opcional)</span>
