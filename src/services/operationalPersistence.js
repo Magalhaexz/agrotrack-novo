@@ -614,6 +614,7 @@ const EXPECTED_SCHEMA_TABLES = Object.freeze([
   'invites',
   'alertas_resolvidos',
   'alertas_adiados',
+  'alertas_tratativas',
   'configuracoes',
   'cenarios',
 ]);

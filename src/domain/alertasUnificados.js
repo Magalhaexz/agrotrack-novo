@@ -35,6 +35,7 @@ import {
   construirResumoPastos,
 } from './hojeNaFazenda.js';
 import { getDataVencimento } from './financeiroStatus.js';
+import { PROXIMOS_7_DIAS, CARENCIA_CRITICA_DIAS } from './janelasAlertas.js';
 
 export const PRIORIDADE = {
   CRITICO: 'critico',
@@ -203,7 +204,7 @@ function loteUnicoFinanceiro(lista, lotesMap) {
 /** Contas a pagar vencidas / vencendo hoje / vencendo em 7 dias — reaproveita `listarContasFinanceiras` (mesma função da Visão Geral de Pagamentos, Sprint 3). */
 function agruparFinanceiro(db, hoje) {
   const alertas = [];
-  const { vencidas, proximas } = listarContasFinanceiras(db, 7);
+  const { vencidas, proximas } = listarContasFinanceiras(db, PROXIMOS_7_DIAS);
   const vencendoHoje = proximas.filter((mov) => getDataVencimento(mov) === hoje);
   const proximos7Dias = proximas.filter((mov) => getDataVencimento(mov) !== hoje);
   const lotesMap = new Map((Array.isArray(db?.lotes) ? db.lotes : []).map((l) => [Number(l.id), l]));
@@ -381,7 +382,9 @@ function agruparPastos(db) {
 // Janela de "próxima" saída de lote — mesmo valor usado pelo legado
 // (`utils/alerts.js`, LOTE_SAIDA_ALERT_DIAS), para não introduzir um terceiro
 // limite divergente para o mesmo sinal (Sprint 9 — auditoria de alertas).
-const LOTE_SAIDA_DIAS_PROXIMA = 7;
+// Sprint 16: valor movido para janelasAlertas.js (mesmo número, só nomeado
+// numa fonte única — ver docs/DECISAO_ALERTAS_CENTRAL_UNICA.md).
+const LOTE_SAIDA_DIAS_PROXIMA = PROXIMOS_7_DIAS;
 
 /**
  * Data de saída prevista vencida / próxima (Sprint 9) — sinal que só existia
@@ -492,9 +495,11 @@ function agruparEstoqueValidade(db, hoje) {
   return alertas;
 }
 
-// Janela de "vencendo em breve" para carência — mesmo espírito da janela de
-// pagamentos "vence hoje" (Sprint 9 já usa 0 dias para essa faixa).
-const CARENCIA_DIAS_VENCENDO = 3;
+// Janela de "vencendo em breve" para carência — deliberadamente mais curta
+// que a janela financeira de 7 dias (risco de segurança alimentar, não bug —
+// ver docs/DECISAO_ALERTAS_CENTRAL_UNICA.md). Sprint 16: valor movido para
+// janelasAlertas.js (mesmo número, só nomeado numa fonte única).
+const CARENCIA_DIAS_VENCENDO = CARENCIA_CRITICA_DIAS;
 
 /**
  * Carência de manejo sanitário ativa / vencendo em breve (Sprint 10) — lê

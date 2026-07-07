@@ -22,6 +22,7 @@ const OPERACIONAL_TABLES = [
   'rotinas',
   'alertas_resolvidos',
   'alertas_adiados',
+  'alertas_tratativas',
   'usuarios',
   'auditoria',
   'consumo_suplementacao',

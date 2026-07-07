@@ -11,6 +11,7 @@ import { getSupabaseAdminClient, extractBearerToken } from './_supabaseAdmin.js'
 import { enviarMensagemTelegramParaChat, getTelegramEnvStatus } from './_telegram.js';
 import { montarDbDaConta } from './_herdonDb.js';
 import { gerarAlertasUnificados } from '../src/domain/alertasUnificados.js';
+import { aplicarTratativasAosAlertas } from '../src/domain/tratativasAlertas.js';
 import { gerarRelatorioDiarioTelegram } from '../src/domain/telegramRelatorio.js';
 
 function readEnv(name) {
@@ -36,7 +37,11 @@ async function registrarLog(client, { ownerUserId, connectionId, status, errorMe
 async function processarConexao(client, conexao, { dryRun }) {
   try {
     const db = await montarDbDaConta(client, conexao.owner_user_id);
-    const alertas = gerarAlertasUnificados(db);
+    const alertasBrutos = gerarAlertasUnificados(db);
+    // Sprint 16: o relatório diário não deve repetir alertas já resolvidos/
+    // ignorados/adiados-para-o-futuro — mesma tratativa da Central.
+    const alertas = aplicarTratativasAosAlertas(alertasBrutos, db.alertas_tratativas, new Date())
+      .filter((alerta) => alerta.visivel);
     const mensagem = gerarRelatorioDiarioTelegram(alertas);
 
     if (dryRun) {

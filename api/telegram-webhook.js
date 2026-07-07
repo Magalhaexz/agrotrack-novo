@@ -20,6 +20,7 @@ import { enviarMensagemTelegramParaChat } from './_telegram.js';
 import { extractHerdonCodeFromText, isCodeUsable } from './_telegramConnections.js';
 import { montarDbDaConta } from './_herdonDb.js';
 import { gerarAlertasUnificados } from '../src/domain/alertasUnificados.js';
+import { aplicarTratativasAosAlertas } from '../src/domain/tratativasAlertas.js';
 import { classificarIntencaoTelegram, INTENCOES } from '../src/domain/telegramIntent.js';
 import { interpretarComandoTelegram, gerarRespostaComandoTelegram } from '../src/domain/telegramComandos.js';
 import {
@@ -161,7 +162,11 @@ export default async function handler(req, res) {
     if (comando === 'alertas' && conexao) {
       try {
         const db = await montarDbDaConta(client, conexao.owner_user_id);
-        const alertas = gerarAlertasUnificados(db);
+        const alertasBrutos = gerarAlertasUnificados(db);
+        // Sprint 16: alertas resolvidos/ignorados/adiados-para-o-futuro não
+        // devem aparecer como prioridade no /alertas — mesma tratativa da Central.
+        const alertas = aplicarTratativasAosAlertas(alertasBrutos, db.alertas_tratativas, new Date())
+          .filter((alerta) => alerta.visivel);
         const resposta = gerarRespostaComandoTelegram(comando, { vinculado: true, alertas });
         await enviarMensagemTelegramParaChat(chatId, resposta).catch(() => null);
         return res.status(200).json({ ok: true, comando });

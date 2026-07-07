@@ -774,9 +774,19 @@ export default function DashboardPage({
           <div className="card dashboard-alerts-card">
             <div className="card-header dashboard-tab-header">
               <h3>Todos os alertas</h3>
-              <button className="btn-primary btn-sm" onClick={() => setTabAtiva?.('geral')} type="button">
-                Voltar ao geral
-              </button>
+              <div style={{ display: 'flex', gap: 8 }}>
+                {/* Sprint 16: este painel usa o motor legado (utils/alerts.js) com
+                    resolver/adiar simples; a Central (alertasUnificados.js +
+                    tratativasAlertas.js) tem também "em análise"/"ignorar" e
+                    histórico consultável — atalho aqui em vez de duplicar essa
+                    tratativa dentro do Dashboard. */}
+                <button className="btn-secondary btn-sm" onClick={() => onNavigate?.('alertas')} type="button">
+                  Ver Central de Alertas
+                </button>
+                <button className="btn-primary btn-sm" onClick={() => setTabAtiva?.('geral')} type="button">
+                  Voltar ao geral
+                </button>
+              </div>
             </div>
 
             {alertasFormatados.length === 0 ? (

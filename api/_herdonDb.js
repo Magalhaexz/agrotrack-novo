@@ -16,6 +16,9 @@ export const TABELAS_NECESSARIAS = [
   'tarefas',
   'sanitario',
   'pastagens',
+  // Sprint 16: tratativa da Central de Alertas — sem isso, o bot mostraria
+  // alertas já resolvidos/ignorados/adiados como se ainda fossem prioridade.
+  'alertas_tratativas',
 ];
 
 export async function montarDbDaConta(client, ownerUserId) {

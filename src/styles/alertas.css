@@ -197,6 +197,27 @@
   color: #eaf7ef;
 }
 
+/* Sprint 16 — ações de tratativa (em análise/resolver/ignorar/adiar) */
+.page--alertas .alertas-card-tratativa-acoes {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 8px;
+}
+
+.page--alertas .alertas-card-adiar-inline {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+}
+
+.page--alertas .alertas-card-adiar-inline .ui-input {
+  width: auto;
+  padding: 5px 8px;
+  font-size: 0.78rem;
+}
+
 @media (max-width: 900px) {
   .page--alertas .alertas-filtros-grid {
     grid-template-columns: 1fr;

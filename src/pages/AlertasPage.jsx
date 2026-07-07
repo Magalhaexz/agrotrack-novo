@@ -3,6 +3,8 @@ import { AlertCircle, Beef, CheckCircle2, CheckSquare, DollarSign, FileSearch, L
 import Card from '../components/ui/Card';
 import EmptyState from '../components/EmptyState';
 import PageHeader from '../components/PageHeader';
+import { useAuth } from '../auth/useAuth';
+import { useToast } from '../hooks/useToast';
 import { formatarData } from '../utils/formatters';
 import { gerarAlertasUnificados } from '../domain/alertasUnificados';
 import {
@@ -12,6 +14,8 @@ import {
   resumirCentralAlertas,
   PRAZO,
 } from '../domain/centralAlertas';
+import { aplicarTratativasAosAlertas, resumirTratativas, STATUS_TRATATIVA } from '../domain/tratativasAlertas';
+import { listarTratativasAlertas, salvarTratativaAlerta } from '../services/tratativasAlertas';
 import '../styles/alertas.css';
 
 const ORIGEM_LABEL = {
@@ -73,8 +77,39 @@ const FILTROS_VAZIO = {
   somenteCriticos: false,
 };
 
-export default function AlertasPage({ db = {}, fazendaSelecionada = null, onNavigate = null }) {
+// Sprint 16 — filtro de tratativa, separado dos filtros acima (que vêm de
+// `centralAlertas.js` e não sabem nada sobre tratativa). "ativos" é o padrão:
+// mesma coisa que a Central sempre mostrou, menos o que já foi tratado.
+const FILTRO_TRATATIVA_OPCOES = [
+  { valor: 'ativos', label: 'Ativos' },
+  { valor: 'em_analise', label: 'Em análise' },
+  { valor: 'adiados', label: 'Adiados' },
+  { valor: 'historico', label: 'Histórico (resolvidos/ignorados)' },
+];
+
+const STATUS_TRATATIVA_LABEL = {
+  [STATUS_TRATATIVA.EM_ANALISE]: 'Em análise',
+  [STATUS_TRATATIVA.RESOLVIDO]: 'Resolvido',
+  [STATUS_TRATATIVA.ADIADO]: 'Adiado',
+  [STATUS_TRATATIVA.IGNORADO]: 'Ignorado',
+};
+
+const MENSAGEM_SEM_PERMISSAO = 'Você não tem permissão para executar esta ação.';
+
+export default function AlertasPage({
+  db = {},
+  setDb = null,
+  session = null,
+  fazendaSelecionada = null,
+  onNavigate = null,
+  onConfirmAction = null,
+}) {
+  const { hasPermission } = useAuth();
+  const { showToast } = useToast();
   const [filtros, setFiltros] = useState(FILTROS_VAZIO);
+  const [filtroTratativa, setFiltroTratativa] = useState('ativos');
+  const [adiandoAlertaId, setAdiandoAlertaId] = useState(null);
+  const [dataAdiamento, setDataAdiamento] = useState('');
 
   const pastagensFazendaAtiva = useMemo(() => {
     const pastagens = Array.isArray(db.pastagens) ? db.pastagens : [];
@@ -96,7 +131,18 @@ export default function AlertasPage({ db = {}, fazendaSelecionada = null, onNavi
     [alertasBrutos, lotes]
   );
 
-  const resumo = useMemo(() => resumirCentralAlertas(alertasNormalizados), [alertasNormalizados]);
+  // Sprint 16 — camada de tratativa (em_analise/resolvido/adiado/ignorado)
+  // por cima dos alertas já normalizados. Nunca substitui a regra de origem:
+  // só anota `statusTratativa`/`visivel`, nunca remove um alerta da lista.
+  const tratativas = useMemo(() => listarTratativasAlertas(db), [db]);
+  const alertasComTratativa = useMemo(
+    () => aplicarTratativasAosAlertas(alertasNormalizados, tratativas, new Date()),
+    [alertasNormalizados, tratativas]
+  );
+
+  const alertasAtivos = useMemo(() => alertasComTratativa.filter((a) => a.visivel), [alertasComTratativa]);
+  const resumo = useMemo(() => resumirCentralAlertas(alertasAtivos), [alertasAtivos]);
+  const resumoTratativas = useMemo(() => resumirTratativas(alertasComTratativa), [alertasComTratativa]);
 
   // Só oferece no filtro os lotes que a heurística de texto conseguiu
   // vincular a algum alerta agora — evita opções que sempre dão zero resultado.
@@ -115,9 +161,21 @@ export default function AlertasPage({ db = {}, fazendaSelecionada = null, onNavi
     [alertasNormalizados]
   );
 
+  // Filtro de tratativa aplicado depois de origem/prioridade/prazo/lote/busca
+  // (que vêm de `centralAlertas.js` e ignoram tratativa) — "ativos" é o
+  // padrão: resolvido/ignorado somem daqui, mas continuam existindo/consultáveis.
+  const alertasPorTratativa = useMemo(() => {
+    if (filtroTratativa === 'em_analise') return alertasComTratativa.filter((a) => a.statusTratativa === STATUS_TRATATIVA.EM_ANALISE);
+    if (filtroTratativa === 'adiados') return alertasComTratativa.filter((a) => a.statusTratativa === STATUS_TRATATIVA.ADIADO && !a.visivel);
+    if (filtroTratativa === 'historico') {
+      return alertasComTratativa.filter((a) => a.statusTratativa === STATUS_TRATATIVA.RESOLVIDO || a.statusTratativa === STATUS_TRATATIVA.IGNORADO);
+    }
+    return alertasComTratativa.filter((a) => a.visivel);
+  }, [alertasComTratativa, filtroTratativa]);
+
   const alertasFiltrados = useMemo(
-    () => ordenarAlertasCentral(filtrarAlertasCentral(alertasNormalizados, filtros)),
-    [alertasNormalizados, filtros]
+    () => ordenarAlertasCentral(filtrarAlertasCentral(alertasPorTratativa, filtros)),
+    [alertasPorTratativa, filtros]
   );
 
   function atualizarFiltro(campo, valor) {
@@ -126,6 +184,79 @@ export default function AlertasPage({ db = {}, fazendaSelecionada = null, onNavi
 
   function limparFiltros() {
     setFiltros(FILTROS_VAZIO);
+  }
+
+  /** Persiste a tratativa e mescla o resultado em `db.alertas_tratativas` local. */
+  async function registrarTratativa(alerta, status, extra = {}) {
+    if (!hasPermission('tarefas:editar')) {
+      showToast({ type: 'error', message: MENSAGEM_SEM_PERMISSAO });
+      return;
+    }
+    const resultado = await salvarTratativaAlerta(db, session, {
+      alertaId: alerta.id,
+      alertaTipo: alerta?.alertaOriginal?.tipo || alerta.origem,
+      origem: alerta.origem,
+      status,
+      ownerUserId: session?.user?.id || null,
+      ...extra,
+    });
+    if (!resultado.persisted) {
+      showToast({ type: 'warning', message: resultado.error || 'Não foi possível salvar agora. Tente novamente.' });
+      return;
+    }
+    setDb?.((prev) => {
+      const atuais = Array.isArray(prev?.alertas_tratativas) ? prev.alertas_tratativas : [];
+      if (resultado.isUpdate) {
+        return {
+          ...prev,
+          alertas_tratativas: atuais.map((t) => (String(t.alerta_id) === String(alerta.id) ? { ...t, ...resultado.data } : t)),
+        };
+      }
+      return { ...prev, alertas_tratativas: [...atuais, resultado.data] };
+    });
+  }
+
+  async function marcarEmAnalise(alerta) {
+    await registrarTratativa(alerta, STATUS_TRATATIVA.EM_ANALISE);
+    showToast({ type: 'success', message: 'Alerta marcado como em análise.' });
+  }
+
+  async function resolverAlerta(alerta) {
+    const confirmado = typeof onConfirmAction === 'function'
+      ? await onConfirmAction({ title: 'Resolver alerta', message: 'Marcar este alerta como resolvido? Ele sai da lista de ativos, mas continua no histórico.', tone: 'default' })
+      : window.confirm('Marcar este alerta como resolvido?');
+    if (!confirmado) return;
+    await registrarTratativa(alerta, STATUS_TRATATIVA.RESOLVIDO);
+    showToast({ type: 'success', message: 'Alerta resolvido.' });
+  }
+
+  async function ignorarAlerta(alerta) {
+    const confirmado = typeof onConfirmAction === 'function'
+      ? await onConfirmAction({ title: 'Ignorar alerta', message: 'Ignorar este alerta? Ele sai da lista de ativos, mas continua no histórico.', tone: 'default' })
+      : window.confirm('Ignorar este alerta?');
+    if (!confirmado) return;
+    await registrarTratativa(alerta, STATUS_TRATATIVA.IGNORADO);
+    showToast({ type: 'success', message: 'Alerta ignorado.' });
+  }
+
+  function iniciarAdiamento(alertaId) {
+    setAdiandoAlertaId(alertaId);
+    setDataAdiamento('');
+  }
+
+  function cancelarAdiamento() {
+    setAdiandoAlertaId(null);
+    setDataAdiamento('');
+  }
+
+  async function confirmarAdiamento(alerta) {
+    if (!dataAdiamento) {
+      showToast({ type: 'warning', message: 'Informe até quando adiar.' });
+      return;
+    }
+    await registrarTratativa(alerta, STATUS_TRATATIVA.ADIADO, { adiadoAte: dataAdiamento });
+    showToast({ type: 'success', message: `Alerta adiado até ${formatarData(dataAdiamento)}.` });
+    cancelarAdiamento();
   }
 
   const filtrosAtivos = Object.entries(filtros).some(([chave, valor]) => (
@@ -155,10 +286,25 @@ export default function AlertasPage({ db = {}, fazendaSelecionada = null, onNavi
         <Card title="Próximos 7 dias" className="alertas-summary-card">
           <strong>{resumo.proximos7Dias}</strong>
         </Card>
+        <Card title="Em análise" className="alertas-summary-card">
+          <strong>{resumoTratativas.emAnalise}</strong>
+        </Card>
+        <Card title="Adiados" className="alertas-summary-card">
+          <strong>{resumoTratativas.adiados}</strong>
+        </Card>
       </div>
 
       <Card title="Filtros" className="alertas-filtros-card">
         <div className="alertas-filtros-grid">
+          <label className="ui-input-wrap">
+            <span className="ui-input-label">Status</span>
+            <select className="ui-input" value={filtroTratativa} onChange={(e) => setFiltroTratativa(e.target.value)}>
+              {FILTRO_TRATATIVA_OPCOES.map((opcao) => (
+                <option key={opcao.valor} value={opcao.valor}>{opcao.label}</option>
+              ))}
+            </select>
+          </label>
+
           <label className="ui-input-wrap">
             <span className="ui-input-label">Origem</span>
             <select className="ui-input" value={filtros.origem} onChange={(e) => atualizarFiltro('origem', e.target.value)}>
@@ -264,6 +410,14 @@ export default function AlertasPage({ db = {}, fazendaSelecionada = null, onNavi
                     {PRAZO_LABEL[alerta.prazoCategoria]}
                     {alerta.dataReferencia ? ` · ${formatarData(alerta.dataReferencia)}` : ''}
                   </span>
+                  {alerta.statusTratativa ? (
+                    <span className="badge badge-info">
+                      {STATUS_TRATATIVA_LABEL[alerta.statusTratativa]}
+                      {alerta.statusTratativa === STATUS_TRATATIVA.ADIADO && alerta.tratativa?.adiado_ate
+                        ? ` até ${formatarData(alerta.tratativa.adiado_ate)}`
+                        : ''}
+                    </span>
+                  ) : null}
                 </div>
 
                 <h3 className="alertas-card-titulo">{alerta.titulo}</h3>
@@ -273,6 +427,33 @@ export default function AlertasPage({ db = {}, fazendaSelecionada = null, onNavi
                 <div className="alertas-card-acao">
                   <span className="alertas-card-acao-label">Ação recomendada</span>
                   <p>{alerta.acaoRecomendada}</p>
+                </div>
+
+                <div className="alertas-card-tratativa-acoes">
+                  {alerta.statusTratativa !== STATUS_TRATATIVA.EM_ANALISE ? (
+                    <button type="button" className="alertas-card-abrir" onClick={() => marcarEmAnalise(alerta)}>Em análise</button>
+                  ) : null}
+                  {alerta.statusTratativa !== STATUS_TRATATIVA.RESOLVIDO ? (
+                    <button type="button" className="alertas-card-abrir" onClick={() => resolverAlerta(alerta)}>Resolver</button>
+                  ) : null}
+                  {alerta.statusTratativa !== STATUS_TRATATIVA.IGNORADO ? (
+                    <button type="button" className="alertas-card-abrir" onClick={() => ignorarAlerta(alerta)}>Ignorar</button>
+                  ) : null}
+                  {adiandoAlertaId === alerta.id ? (
+                    <span className="alertas-card-adiar-inline">
+                      <input
+                        type="date"
+                        className="ui-input"
+                        value={dataAdiamento}
+                        min={new Date().toISOString().slice(0, 10)}
+                        onChange={(e) => setDataAdiamento(e.target.value)}
+                      />
+                      <button type="button" className="alertas-card-abrir" onClick={() => confirmarAdiamento(alerta)}>Confirmar</button>
+                      <button type="button" className="alertas-card-abrir" onClick={cancelarAdiamento}>Cancelar</button>
+                    </span>
+                  ) : (
+                    <button type="button" className="alertas-card-abrir" onClick={() => iniciarAdiamento(alerta.id)}>Adiar</button>
+                  )}
                 </div>
 
                 {alerta.pageId ? (

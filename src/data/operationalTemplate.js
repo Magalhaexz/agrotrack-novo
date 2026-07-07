@@ -2,6 +2,10 @@ export function createEmptyOperationalDb() {
   return {
     alertas_resolvidos: [],
     alertas_adiados: [],
+    // Sprint 16: tratativa da Central de Alertas (em_analise/resolvido/
+    // adiado/ignorado) — não confundir com alertas_resolvidos/alertas_adiados
+    // acima, que continuam servindo o painel legado do header (App.jsx).
+    alertas_tratativas: [],
     fazendas: [],
     lotes: [],
     pastagens: [],
@@ -51,6 +55,7 @@ export function createEmptyOperationalDb() {
 export const OPERATIONAL_ARRAY_COLLECTIONS = new Set([
   'alertas_resolvidos',
   'alertas_adiados',
+  'alertas_tratativas',
   'fazendas',
   'lotes',
   'pastagens',
@@ -76,6 +81,7 @@ export const OPERATIONAL_ARRAY_COLLECTIONS = new Set([
 export const OPERATIONAL_COLLECTIONS_WITH_IDS = new Set([
   'alertas_resolvidos',
   'alertas_adiados',
+  'alertas_tratativas',
   'fazendas',
   'lotes',
   'pastagens',
