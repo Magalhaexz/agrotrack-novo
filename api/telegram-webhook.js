@@ -16,7 +16,7 @@
 // secret_token que o Telegram reenvia no header quando o webhook é
 // registrado com `secret_token` (ver docs/SPRINT7_TELEGRAM_MULTIUSUARIO_RESULTADO.md).
 import { getSupabaseAdminClient } from './_supabaseAdmin.js';
-import { enviarMensagemTelegramParaChat } from './_telegram.js';
+import { enviarMensagemTelegramParaChat as enviarMensagemTelegramParaChatBase } from './_telegram.js';
 import { extractHerdonCodeFromText, isCodeUsable } from './_telegramConnections.js';
 import { montarDbDaConta } from './_herdonDb.js';
 import { gerarAlertasUnificados } from '../src/domain/alertasUnificados.js';
@@ -41,6 +41,18 @@ const MSG_SUCESSO = 'Telegram conectado ao HERDON com sucesso. Você já pode fe
 const MSG_INVALIDO = 'Código inválido ou expirado. Gere um novo código no HERDON.';
 const MSG_SEM_CODIGO = 'Envie o código gerado no HERDON, por exemplo: HERDON-482913';
 const MSG_ERRO_RESPOSTA = 'Não consegui processar agora. Tente novamente ou use /ajuda.';
+
+/** Envolve o envio real só para logar sucesso/falha de forma segura (sem token, sem texto da mensagem). Mesmo contrato (lança em caso de falha) — quem chama decide se ignora com `.catch()`. */
+async function enviarMensagemTelegramParaChat(chatId, texto) {
+  try {
+    const resultado = await enviarMensagemTelegramParaChatBase(chatId, texto);
+    console.log('[telegram-webhook] resposta enviada com sucesso');
+    return resultado;
+  } catch (error) {
+    console.error('[telegram-webhook] sendMessage falhou', { code: error?.code || null });
+    throw error;
+  }
+}
 
 function isWebhookAuthorized(req) {
   const secret = readEnv('TELEGRAM_WEBHOOK_SECRET');
@@ -88,6 +100,12 @@ export default async function handler(req, res) {
   }
 
   if (!isWebhookAuthorized(req)) {
+    // Log seguro (sem token, sem secret, sem corpo da mensagem): confirma se
+    // o rejeitado é por header ausente (webhook registrado sem secret_token)
+    // ou por valor divergente (secret_token diferente do TELEGRAM_WEBHOOK_SECRET).
+    console.warn('[telegram-webhook] rejeitado: secret_token ausente ou divergente', {
+      headerPresente: Boolean(req.headers?.['x-telegram-bot-api-secret-token']),
+    });
     return res.status(401).json({ ok: false, message: 'Não autorizado.' });
   }
 
@@ -95,6 +113,7 @@ export default async function handler(req, res) {
   const message = body.message || body.edited_message || null;
   const chatId = message?.chat?.id;
   const texto = message?.text || '';
+  console.log('[telegram-webhook] update recebido', { temChatId: Boolean(chatId) });
 
   // Sempre responde 200: sem isso o Telegram reenvia o mesmo update.
   if (!chatId) {
@@ -159,6 +178,7 @@ export default async function handler(req, res) {
   // o classificador de intenção mais abaixo, sem duplicar lógica.
   const comando = interpretarComandoTelegram(texto);
   if (comando) {
+    console.log('[telegram-webhook] comando recebido', { comando });
     if (comando === 'alertas' && conexao) {
       try {
         const db = await montarDbDaConta(client, conexao.owner_user_id);
