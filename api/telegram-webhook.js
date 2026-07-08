@@ -23,6 +23,7 @@ import { gerarAlertasUnificados } from '../src/domain/alertasUnificados.js';
 import { aplicarTratativasAosAlertas } from '../src/domain/tratativasAlertas.js';
 import { classificarIntencaoTelegram, INTENCOES } from '../src/domain/telegramIntent.js';
 import { interpretarComandoTelegram, gerarRespostaComandoTelegram } from '../src/domain/telegramComandos.js';
+import { avaliarRateLimitTelegram, LIMITE_PADRAO, LIMITE_VINCULO } from '../src/domain/telegramRateLimit.js';
 import {
   gerarRelatorioDiarioTelegram,
   gerarRespostaAjudaTelegram,
@@ -52,6 +53,24 @@ async function enviarMensagemTelegramParaChat(chatId, texto) {
     console.error('[telegram-webhook] sendMessage falhou', { code: error?.code || null });
     throw error;
   }
+}
+
+// Rate limit em memória, por chat_id (Sprint 20). Sobrevive só enquanto a
+// function Vercel ficar "quente" entre invocações — reseta em cold start.
+// Suficiente para o caso que importa (rajada de spam/loop no mesmo chat em
+// segundos), documentado em docs/DECISAO_TELEGRAM_PRODUCAO.md.
+// ponytail: Map sem limite de entradas distintas; se virar problema real de
+// memória, trocar por tabela (telegram_eventos) com persistência real.
+const eventosPorChat = new Map();
+
+function registrarEventoEAvaliarRateLimit(chatId, agora, limite) {
+  const anteriores = eventosPorChat.get(chatId) || [];
+  const resultado = avaliarRateLimitTelegram({ chatId, agora, eventosRecentes: anteriores, limite });
+  const janelaMs = 60 * 1000;
+  const eventosRecentes = anteriores.filter((ts) => ts > agora.getTime() - janelaMs);
+  if (resultado.permitido) eventosRecentes.push(agora.getTime());
+  eventosPorChat.set(chatId, eventosRecentes);
+  return resultado;
 }
 
 function isWebhookAuthorized(req) {
@@ -121,6 +140,14 @@ export default async function handler(req, res) {
   }
 
   const codigo = extractHerdonCodeFromText(texto);
+  const comandoParaLimite = interpretarComandoTelegram(texto);
+  const limite = (codigo || comandoParaLimite === 'start') ? LIMITE_VINCULO : LIMITE_PADRAO;
+  const rateLimit = registrarEventoEAvaliarRateLimit(String(chatId), new Date(), limite);
+  if (!rateLimit.permitido) {
+    console.warn('[telegram-webhook] rate limit excedido', { quantidadeNaJanela: rateLimit.quantidadeNaJanela });
+    return res.status(200).json({ ok: true, rateLimited: true });
+  }
+
   if (codigo) {
     try {
       const client = getSupabaseAdminClient();
@@ -176,7 +203,7 @@ export default async function handler(req, res) {
   // antes do "sem código", pois eles têm resposta própria mesmo sem vínculo.
   // Comandos do Sprint 8 (/relatorio etc.) devolvem null aqui e seguem para
   // o classificador de intenção mais abaixo, sem duplicar lógica.
-  const comando = interpretarComandoTelegram(texto);
+  const comando = comandoParaLimite;
   if (comando) {
     console.log('[telegram-webhook] comando recebido', { comando });
     if (comando === 'alertas' && conexao) {

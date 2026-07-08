@@ -11,7 +11,8 @@
     "lint": "eslint .",
     "preview": "vite preview --host 0.0.0.0",
     "e2e": "node scripts/run-e2e.mjs",
-    "e2e:headed": "node scripts/run-e2e.mjs --headed"
+    "e2e:headed": "node scripts/run-e2e.mjs --headed",
+    "telegram:diagnostico": "node scripts/telegram-diagnostico.mjs"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.103.3",

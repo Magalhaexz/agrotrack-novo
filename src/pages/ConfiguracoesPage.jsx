@@ -21,6 +21,13 @@ import {
 } from '../services/telegramConnection';
 import '../styles/configuracoes.css';
 
+/** Mascara o chat_id do Telegram para exibição (Sprint 20) — mantém só os últimos 4 dígitos. */
+function mascararChatId(chatId) {
+  const texto = String(chatId || '');
+  if (texto.length <= 4) return texto || '—';
+  return `${'•'.repeat(texto.length - 4)}${texto.slice(-4)}`;
+}
+
 const TABS = [
   { id: 'geral', label: 'Geral' },
   { id: 'notificacoes', label: 'Notificações' },
@@ -527,6 +534,10 @@ export default function ConfiguracoesPage({ db, setDb, onConfirmAction, onNaviga
             <div className="config-data-stack">
               <p>
                 Conectado como <strong>{telegramConnection.telegram_username ? `@${telegramConnection.telegram_username}` : telegramConnection.telegram_first_name || 'usuário do Telegram'}</strong>.
+              </p>
+              <p className="config-meta-text">
+                Chat: {mascararChatId(telegramConnection.telegram_chat_id)}
+                {telegramConnection.created_at ? ` · conectado em ${new Date(telegramConnection.created_at).toLocaleDateString('pt-BR')}` : ''}
               </p>
               <div className="config-grid">
                 <SwitchRow label="Receber relatório diário" checked={telegramConnection.daily_report_enabled} onChange={(value) => salvarPreferenciaTelegram({ daily_report_enabled: value })} />

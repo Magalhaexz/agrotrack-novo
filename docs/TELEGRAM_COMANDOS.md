@@ -175,3 +175,26 @@ próxima vez:
   (`/start`, `/status` etc.), nunca texto livre.
 - `[telegram-webhook] resposta enviada com sucesso` / `sendMessage falhou`
   (com `error.code`, nunca o corpo da resposta do Telegram nem o token).
+
+## Rate limit (Sprint 20)
+
+Todo update autorizado passa por `avaliarRateLimitTelegram`
+(`src/domain/telegramRateLimit.js`) antes de qualquer processamento: 10
+eventos/60s por `chat_id`, 20/60s para `/start` e o código
+`HERDON-XXXXXX`. Excedido o limite, o webhook responde
+`{ ok: true, rateLimited: true }` (HTTP 200, para não gerar reenvio) e loga
+`[telegram-webhook] rate limit excedido` (sem texto da mensagem). Detalhes
+da decisão de persistência (em memória, sem migration) em
+`docs/DECISAO_TELEGRAM_PRODUCAO.md`.
+
+## Script de diagnóstico (Sprint 20)
+
+```bash
+TELEGRAM_BOT_TOKEN=xxxx npm run telegram:diagnostico
+```
+
+Roda `scripts/telegram-diagnostico.mjs`: chama `getWebhookInfo` e imprime
+`url`, `pending_update_count`, `last_error_date`, `last_error_message`,
+`max_connections`, `allowed_updates` — nunca o token. Avisa automaticamente
+se a `url` não é a de produção ou se `last_error_message` indica 401
+(mesmo sintoma do incidente documentado acima).
