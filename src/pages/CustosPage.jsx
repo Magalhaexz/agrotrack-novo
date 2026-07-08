@@ -270,7 +270,7 @@ export default function CustosPage({ db, setDb, onConfirmAction }) {
   }
 
   return (
-    <div className="page">
+    <div className="page page--custos">
       <PageHeader
         title="Custos Operacionais"
         subtitle="Lançamento e acompanhamento dos custos por lote."

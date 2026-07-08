@@ -1,4 +1,4 @@
-# Matriz de Homologação — Teste com Produtor (Sprints 21-24)
+# Matriz de Homologação — Teste com Produtor (Sprints 21-25)
 
 Método: Sprint 21 foi auditoria de código (leitura de fonte + schema real
 via MCP Supabase), sem credencial de teste disponível naquela sessão.
@@ -35,12 +35,29 @@ corrigido para a aba renderizar o formulário direto. Botão "Registrar
 manejo" de Sanidade renderizava com 180px de altura (banner) — corrigido
 para altura normal (44-56px).
 
+**Sprint 25** — ver `docs/SPRINT25_AJUSTES_USO_REAL_PRODUTOR.md`:
+- **Pesagens corrigido**: o fix da Sprint 24 fazia a aba "Nova pesagem"
+  (padrão ao abrir a página) já renderizar o formulário automaticamente —
+  ou seja, entrar em Pesagens pelo menu abria o modal na hora. Aba padrão
+  trocada para "Histórico"; só pula para "Nova pesagem" com o atalho
+  explícito do Dashboard.
+- **Custos corrigido**: valores de KPI usavam fonte monoespaçada (DM
+  Mono) — trocado para a fonte padrão do app (Inter), escopado à página.
+- **Ações rápidas revisadas**: de 6 para 10 botões (Novo pasto, Saída de
+  estoque, Resultado por lote, Central de Alertas adicionados).
+- **Previsão de duração do estoque alimentar**: implementada e testada
+  (`src/domain/previsaoConsumoEstoque.js`, 16 testes) — soma o consumo
+  diário esperado por lote (`consumo_suplementacao`, modo `por_cabeca`) e
+  calcula dias restantes por produto. Exibida em Estoque e
+  Nutrição/Suplementação. Limitação: modo por percentual do peso vivo
+  ainda não é somado (documentado).
+
 | Área | Funcionalidade | Fazenda 1 ok? | Fazenda 2 ok? | Cadastro ok? | Edição ok? | Exclusão/inativação ok? | Importação ok? | Mobile ok? | Exportação ok? | Status | Observação | Prioridade |
 |---|---|---|---|---|---|---|---|---|---|---|---|---|
 | Menu lateral/topbar | Navegação | N/A (conta) | N/A | — | — | — | — | **Corrigido (Sprint 22)** | — | Corrigido | Bottom-nav mobile aparecia até 1024px, coexistindo com o header de abas do desktop em telas de tablet/laptop — breakpoint corrigido para 767px | P0 |
 | Dashboard | Visão geral | Sim | Sim | — | — | — | — | Sim (Sprint 22) | — | OK | Já tinha `dbDashboard` próprio antes da sprint | — |
 | Lotes | CRUD de lote | Sim | Sim | Sim | Sim | Inativação (status) | Sim (via ImportacaoPage) | Sim (Sprint 22) | Sim | OK | Já filtrava por `fazendaSelecionada` antes | — |
-| Pesagens | Lançar/editar pesagem | **Corrigido** | **Corrigido** | Sim | Sim | Cancelar registro | Sim | **Corrigido (Sprint 22/23)** | — | Corrigido | Fazenda: recorte central em `App.jsx` (Sprint 21). Visual: 4ª aba "Alertas" invisível sem scroll (Sprint 22); "Nova pesagem" sem estilo de botão e GMD médio com fonte de número gigante para texto de status — corrigidos (Sprint 23) | P0/P1 |
+| Pesagens | Lançar/editar pesagem | **Corrigido** | **Corrigido** | Sim | Sim | Cancelar registro | Sim | **Corrigido (Sprint 22/23/24/25)** | — | Corrigido | Fazenda (Sprint 21); aba "Alertas" invisível (Sprint 22); botão sem estilo/GMD gigante (Sprint 23); formulário fantasma dentro da aba (Sprint 24); abria modal automaticamente ao entrar pelo menu — aba padrão trocada para Histórico (Sprint 25) | P0/P1 |
 | Acompanhamento de Peso | Evolução/GMD | Sim | Sim | — | — | — | — | **Corrigido (Sprint 22)** | — | Corrigido | Abas sobrepostas e ilegíveis no mobile — corrigido (Sprint 22) | P0 |
 | Resultado por Lote | Custo/lucro por @ | Sim | Sim | — | — | — | — | Sim (Sprint 22) | Sim | OK | Lê `db.lotes`/`db.custos`, já escopados. Card de ações vazio no topo é P2 visual (ver Sprint 22) | — |
 | Comparativo de Lotes | Comparar lotes | **Corrigido** | **Corrigido** | — | — | — | — | Sim (Sprint 22) | — | Corrigido nesta sprint | Não tinha nenhuma menção a fazenda antes | P0 |

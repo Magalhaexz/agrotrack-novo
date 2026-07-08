@@ -10,6 +10,7 @@ import { useAuth } from '../auth/useAuth';
 import { gerarNovoId } from '../utils/id';
 import { formatNumber } from '../utils/calculations';
 import { createOperationalRecord, updateOperationalRecord } from '../services/operationalPersistence';
+import { calcularConsumoDiarioTotalPorProduto, calcularDiasRestantesEstoque } from '../domain/previsaoConsumoEstoque';
 
 function getActiveFarmId(fazendaSelecionada) {
   const direct = fazendaSelecionada?.id ?? fazendaSelecionada?.fazenda_id ?? fazendaSelecionada?.fazendaSelecionadaId ?? null;
@@ -101,6 +102,24 @@ export default function SuplementacaoPage({ db, setDb, session, fazendaSeleciona
   const dietas = useMemo(() => getDietasNormalizadas(db), [db]);
   const consumo = useMemo(() => (db.consumo_suplementacao || []), [db]);
 
+  // Sprint 25: duração estimada por produto, pelo consumo diário planejado
+  // dos lotes (não recalcula o saldo do produto, só lê quantidade_atual).
+  const coberturaPorProduto = useMemo(() => {
+    const map = new Map();
+    produtos.forEach((produto) => {
+      const { consumoDiario } = calcularConsumoDiarioTotalPorProduto({
+        produtoId: produto.id,
+        lotes: db.lotes || [],
+        consumos: consumo,
+      });
+      map.set(produto.id, calcularDiasRestantesEstoque({
+        quantidadeAtual: produto.quantidade_atual || 0,
+        consumoDiario,
+      }));
+    });
+    return map;
+  }, [produtos, db.lotes, consumo]);
+
   const planejamento = useMemo(() => lotesAtivos.map((lote) => {
     const dieta = dietas.find((d) => Number(d.lote_id) === Number(lote.id));
     const cabecas = (db.animais || [])
@@ -170,6 +189,7 @@ export default function SuplementacaoPage({ db, setDb, session, fazendaSeleciona
                   <th>Categoria</th>
                   <th>Estoque</th>
                   <th>Unidade</th>
+                  <th>Duração estimada</th>
                   <th>Custo unitário</th>
                   <th>Fornecedor</th>
                   <th>Ações</th>
@@ -182,6 +202,16 @@ export default function SuplementacaoPage({ db, setDb, session, fazendaSeleciona
                     <td><Badge variant="info">{produto.subcategoria || 'Nutrição'}</Badge></td>
                     <td>{formatNumber(produto.quantidade_atual || 0, 2)}</td>
                     <td>{produto.unidade_medida || 'kg'}</td>
+                    <td>
+                      {(() => {
+                        const cobertura = coberturaPorProduto.get(produto.id);
+                        if (!cobertura?.podeCalcular) return <Badge variant="neutral">Sem consumo configurado</Badge>;
+                        const variant = cobertura.status === 'critico' || cobertura.status === 'sem_estoque'
+                          ? 'danger'
+                          : cobertura.status === 'atencao' ? 'warning' : 'success';
+                        return <Badge variant={variant}>{cobertura.diasRestantes} dias</Badge>;
+                      })()}
+                    </td>
                     <td>R$ {formatNumber(produto.valor_unitario || 0, 2)}</td>
                     <td>{produto.fornecedor || '-'}</td>
                     <td>
@@ -200,7 +230,7 @@ export default function SuplementacaoPage({ db, setDb, session, fazendaSeleciona
                   </tr>
                 )) : (
                   <tr>
-                    <td colSpan="7" className="empty-state-td">
+                    <td colSpan="8" className="empty-state-td">
                       <strong>Nenhum produto nutricional cadastrado.</strong>
                       <div>Cadastre rações, suplementos, sal mineral ou dietas para vincular ao estoque.</div>
                       <Button

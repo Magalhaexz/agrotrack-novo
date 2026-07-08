@@ -8245,6 +8245,14 @@ body {
   }
 }
 
+/* Sprint 25: valores de KPI em Custos usavam a fonte monoespaçada (DM
+   Mono) padrão de .kpi-value — lia como número de painel técnico, não
+   como valor financeiro. Escopado só a esta página para não alterar o
+   visual já validado de outras telas que usam o mesmo .kpi-value. */
+.page--custos .kpi-value {
+  font-family: var(--font-sans);
+}
+
 /* Sprint 23: mesma correção de breakpoint (900px → 767px) do bloco acima. */
 @media (max-width: 767px) {
   .mobile-topbar {

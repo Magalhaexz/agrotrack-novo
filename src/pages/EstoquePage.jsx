@@ -15,6 +15,7 @@ import { useAuth } from '../auth/useAuth';
 import { createOperationalRecord, updateOperationalRecord } from '../services/operationalPersistence';
 import { formatarDataExportacao, montarNomeArquivo } from '../domain/exportacaoRelatorios';
 import { baixarCsv, abrirRelatorioParaImpressao } from '../utils/exportacaoArquivos';
+import { calcularConsumoDiarioTotalPorProduto, calcularDiasRestantesEstoque } from '../domain/previsaoConsumoEstoque';
 
 const CATEGORIAS_ESTOQUE_GERAL = [
   'Medicamento',
@@ -155,6 +156,18 @@ export default function EstoquePage({ db, setDb, onRegistrarSaidaEstoque, naviga
       const mediaConsumo = consumos.length ? consumos.reduce((s, c) => s + (parseSafeNumber(c.quantidade) ?? 0), 0) / Math.max(consumos.length, 1) : 0;
       const diasRest = mediaConsumo > 0 ? saldo / mediaConsumo : 999;
       const status = ratio < 10 ? 'critico' : ratio < 20 ? 'baixo' : 'normal';
+
+      // Sprint 25: cobertura pelo consumo diário PLANEJADO (nutrição por
+      // lote, consumo_suplementacao) — sinal diferente do "Dias restantes"
+      // acima (que usa a média histórica de saídas). Não substitui o
+      // cálculo existente, só complementa quando há plano de consumo.
+      const { consumoDiario } = calcularConsumoDiarioTotalPorProduto({
+        produtoId: item.id,
+        lotes: db.lotes || [],
+        consumos: db.consumo_suplementacao || [],
+      });
+      const coberturaPlanejada = calcularDiasRestantesEstoque({ quantidadeAtual: saldo, consumoDiario });
+
       return {
         ...item,
         pico,
@@ -162,11 +175,12 @@ export default function EstoquePage({ db, setDb, onRegistrarSaidaEstoque, naviga
         ratio,
         mediaConsumo,
         diasRest,
+        coberturaPlanejada,
         valorTotal: saldo * Number(item.valor_unitario || item.preco_unitario || 0),
         status,
       };
     });
-  }, [db.estoque, db.movimentacoes_estoque, escopoEstoque]);
+  }, [db.estoque, db.movimentacoes_estoque, db.lotes, db.consumo_suplementacao, escopoEstoque]);
 
   const itensView = useMemo(() => (showOnlyCrit ? itens.filter((i) => i.status !== 'normal') : itens), [itens, showOnlyCrit]);
 
@@ -362,6 +376,22 @@ export default function EstoquePage({ db, setDb, onRegistrarSaidaEstoque, naviga
                   <div className="estoque-detail-row"><span>Valor total</span><span>{formatCurrency(item.valorTotal)}</span></div>
                   <div className="estoque-detail-row"><span>Consumo médio diário</span><span>{formatNumber(item.mediaConsumo, 2)} {item.unidade}</span></div>
                   <div className="estoque-detail-row"><span>Dias restantes</span><span>{item.diasRest > 900 ? '—' : `${formatNumber(item.diasRest, 0)} dias`}</span></div>
+                  <div className="estoque-detail-row">
+                    <span>Duração estimada (consumo planejado)</span>
+                    <span>
+                      {item.coberturaPlanejada.podeCalcular ? (
+                        <Badge variant={
+                          item.coberturaPlanejada.status === 'critico' || item.coberturaPlanejada.status === 'sem_estoque' ? 'danger'
+                            : item.coberturaPlanejada.status === 'atencao' ? 'warning'
+                            : 'success'
+                        }>
+                          {item.coberturaPlanejada.diasRestantes} dias
+                        </Badge>
+                      ) : (
+                        <Badge variant="neutral">Sem consumo configurado</Badge>
+                      )}
+                    </span>
+                  </div>
                 </div>
                 <div className="estoque-card-actions lote-actions">
                   <button type="button" className="btn-entrada" disabled={!hasPermission('estoque:editar')} onClick={() => { setSelectedItem(item); setOpenEntrada(true); }}>

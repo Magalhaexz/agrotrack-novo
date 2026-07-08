@@ -17,6 +17,7 @@ import {
   Scale,
   Syringe,
   Tractor,
+  TrendingUp,
   Users,
 } from 'lucide-react';
 import Badge from '../components/ui/Badge';
@@ -417,10 +418,14 @@ export default function DashboardPage({
             <div className="dashboard-action-grid dashboard-action-grid--quick">
               <Button variant="primary" icon={<Scale size={14} />} onClick={() => onNavigate?.('pesagens', { action: 'novo' })}>Nova pesagem</Button>
               <Button variant="primary" icon={<Beef size={14} />} onClick={() => onNavigate?.('lotes', { action: 'novo' })}>Novo lote</Button>
+              <Button variant="outline" icon={<MapPin size={14} />} onClick={() => onNavigate?.('pastagens')}>Novo pasto</Button>
               <Button variant="outline" icon={<Receipt size={14} />} onClick={() => onNavigate?.('financeiro', { action: 'novo' })}>Novo custo</Button>
-              <Button variant="outline" icon={<CheckSquare size={14} />} onClick={() => onNavigate?.('tarefas', { action: 'novo' })}>Nova tarefa</Button>
-              <Button variant="outline" icon={<Syringe size={14} />} onClick={() => onNavigate?.('sanitario', { action: 'novo' })}>Novo manejo/sanidade</Button>
               <Button variant="outline" icon={<Package size={14} />} onClick={() => onNavigate?.('estoque', { action: 'novo' })}>Novo produto/estoque</Button>
+              <Button variant="outline" icon={<ArrowDown size={14} />} onClick={() => onNavigate?.('estoque')}>Saída de estoque</Button>
+              <Button variant="outline" icon={<Syringe size={14} />} onClick={() => onNavigate?.('sanitario', { action: 'novo' })}>Novo manejo/sanidade</Button>
+              <Button variant="outline" icon={<CheckSquare size={14} />} onClick={() => onNavigate?.('tarefas', { action: 'novo' })}>Nova tarefa</Button>
+              <Button variant="outline" icon={<TrendingUp size={14} />} onClick={() => onNavigate?.('resultados')}>Resultado por lote</Button>
+              <Button variant="outline" icon={<Bell size={14} />} onClick={() => onNavigate?.('alertas')}>Central de Alertas</Button>
             </div>
           </section>
 

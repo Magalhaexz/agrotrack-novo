@@ -806,7 +806,10 @@ export default function PesagensPage({ db, setDb, onConfirmAction, navigationInt
     setPesagemEditando(null);
   }
 
-  const [abaAtiva, setAbaAtiva] = useState('nova');
+  // Sprint 25: abrir direto no Histórico ao entrar pelo menu — só pula para
+  // "Nova pesagem" quando o usuário veio de um atalho explícito (Ações
+  // rápidas do Dashboard), nunca automaticamente.
+  const [abaAtiva, setAbaAtiva] = useState(shouldStartWithNewPesagem ? 'nova' : 'historico');
 
   const alertas = useMemo(() => {
     const hoje = new Date();
