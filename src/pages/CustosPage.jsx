@@ -1,7 +1,7 @@
 import { useMemo, useState } from 'react';
 import CustoForm from '../components/CustoForm';
 import PageHeader from '../components/PageHeader';
-import { formatarNumero, formatarData } from '../utils/formatters';
+import { formatarMoeda, formatarData } from '../utils/formatters';
 import { gerarNovoId } from '../utils/id'; // Importa a função de gerar ID
 import { useAuth } from '../auth/useAuth';
 import { useToast } from '../hooks/useToast';
@@ -283,7 +283,7 @@ export default function CustosPage({ db, setDb, onConfirmAction }) {
       <div className="kpi-grid-3">
         <div className="kpi-card">
           <div className="kpi-label">Total lançado</div>
-          <div className="kpi-value">R$ {formatarNumero(resumo.total)}</div>
+          <div className="kpi-value">{formatarMoeda(resumo.total)}</div>
           <div className="kpi-sub">somando todos os custos</div>
         </div>
 
@@ -300,7 +300,7 @@ export default function CustosPage({ db, setDb, onConfirmAction }) {
           </div>
           <div className="kpi-sub">
             {resumo.categoriaTop
-              ? `R$ ${formatarNumero(resumo.categoriaTop[1])}`
+              ? formatarMoeda(resumo.categoriaTop[1])
               : 'sem dados'}
           </div>
         </div>
@@ -340,7 +340,7 @@ export default function CustosPage({ db, setDb, onConfirmAction }) {
                       </span>
                     </td>
                     <td>{custo.desc}</td>
-                    <td>R$ {formatarNumero(custo.val)}</td>
+                    <td>{formatarMoeda(custo.val)}</td>
                     <td>
                       <div className="row-actions">
                         <button

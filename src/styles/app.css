@@ -2915,7 +2915,7 @@ a:hover {
 }
 
 .segmented-control { display: inline-grid; grid-template-columns: repeat(2,minmax(0,1fr)); gap: 8px; padding: 6px; border-radius: 14px; border: 1px solid var(--color-border); background: rgba(255,255,255,.02); }
-.segment { border: 1px solid transparent; background: transparent; color: var(--color-text-secondary); border-radius: 10px; padding: 10px 14px; font-weight: 600; }
+.segment { border: 1px solid transparent; background: transparent; color: var(--color-text-secondary); border-radius: 10px; padding: 10px 14px; font-weight: 600; white-space: normal; text-align: center; line-height: 1.2; }
 .segment.active { border-color: color-mix(in srgb, var(--color-primary) 45%, var(--color-border)); background: var(--color-primary-subtle); color: var(--color-text); }
 .animais-mode-actions { margin-top: 14px; display: flex; justify-content: space-between; gap: 12px; align-items: center; }
 .animais-mode-actions p { margin: 0; color: var(--color-text-secondary); }
@@ -8020,7 +8020,9 @@ button:hover,
   border: 1px solid rgba(255, 255, 255, 0.08);
   background: rgba(255, 255, 255, 0.03);
   gap: 8px;
+  display: flex;
   flex-wrap: wrap;
+  white-space: normal;
 }
 
 .financeiro-page .financeiro-tab-btn {
@@ -8348,6 +8350,22 @@ body {
   .kpi-grid-3,
   .kpi-grid-4 {
     grid-template-columns: 1fr;
+  }
+
+  /* Sprint 22: label/valor/sub em linha única estourava a largura do card
+     em telas estreitas (valor grande, ex. "R$ 10.000,00", cortava o sub). */
+  .kpi-card {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .kpi-card .kpi-value {
+    font-size: clamp(1.3rem, 6vw, 1.8rem);
+  }
+
+  .kpi-card .kpi-sub,
+  .kpi-card .kpi-sub-value {
+    width: auto;
   }
 }
 
@@ -9008,6 +9026,21 @@ html, body, #root, .app, .main, .main-content, .page { max-width: 100%; }
   .config-tabs > * {
     min-height: 44px;
     flex-shrink: 0;
+  }
+
+  /* Sprint 22: abas curtas (Pesagens, Animais, Suplementação) usam
+     .segmented-control junto com .tab-bar — com 3-4 abas isso exigia
+     scroll horizontal sem nenhuma indicação visual, escondendo a última
+     aba (ex.: "Alertas" em Pesagens). Preferir quebrar linha a esconder. */
+  .segmented-control.tab-bar {
+    flex-wrap: wrap;
+    overflow-x: visible;
+    white-space: normal;
+  }
+
+  .segmented-control.tab-bar > * {
+    flex: 1 1 calc(50% - 4px);
+    min-width: 120px;
   }
 
   .table-responsive,

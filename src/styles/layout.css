@@ -540,7 +540,10 @@ body {
   display: none;
 }
 
-@media (max-width: 1024px) {
+/* Sprint 22: 1024px cobria tablets e janelas de laptop não maximizadas,
+   forçando hambúrguer + bottom-nav onde cabia a sidebar de desktop.
+   767px é o corte real de "celular" (abaixo do preset "tablet" 768px). */
+@media (max-width: 767px) {
   .app-shell {
     display: flex;
     height: 100dvh;
