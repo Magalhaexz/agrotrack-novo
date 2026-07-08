@@ -11,6 +11,7 @@ import Toast from './components/Toast';
 import Modal from './components/ui/Modal';
 import Button from './components/ui/Button';
 import { useOperationalData } from './hooks/useOperationalData';
+import { filtrarDbPorFazenda } from './domain/escopoFazenda';
 import { useToast } from './hooks/useToast';
 import { useCloudControls } from './hooks/useCloudControls';
 import { useOfflineQueueStatus } from './hooks/useOfflineQueueStatus';
@@ -182,6 +183,25 @@ function readSidebarCollapsedState() {
     return false;
   }
 }
+
+// Sprint 21: páginas de conta (não de operação de uma fazenda específica)
+// continuam recebendo o `db` completo — ex.: "Exportar todos os dados" em
+// Configurações precisa das outras fazendas, não só da ativa.
+const FULL_DB_PAGE_KEYS = new Set([
+  'fazendas',
+  'equipeAcessos',
+  'funcionarios',
+  'perfil',
+  'minhaAssinatura',
+  'configuracoes',
+  'guiaCriador',
+  'sincronizacao',
+  'decisoesFazenda',
+  // Importação cria/casa registros de várias fazendas na mesma planilha
+  // (coluna codigo_fazenda) — precisa enxergar lotes/pastos/estoque de
+  // todas as fazendas para checar duplicidade, não só da fazenda ativa.
+  'importacao',
+]);
 
 const pageMap = {
   dashboard: DashboardPage,
@@ -516,34 +536,13 @@ export default function App() {
     return () => window.clearTimeout(timer);
   }, [db?.fazendas]);
 
-  const dbDashboard = useMemo(() => {
-    if (!fazendaSelecionada?.id) {
-      return db;
-    }
-
-    const loteIds = new Set(
-      (db.lotes || [])
-        .filter((lote) => Number(lote.faz_id) === Number(fazendaSelecionada.id))
-        .map((lote) => lote.id)
-    );
-
-    const scopedDb = {
-      ...db,
-      lotes: (db.lotes || []).filter((lote) => loteIds.has(lote.id)),
-      animais: (db.animais || []).filter((animal) => loteIds.has(animal.lote_id)),
-      custos: (db.custos || []).filter((custo) => loteIds.has(custo.lote_id)),
-      pesagens: (db.pesagens || []).filter((pesagem) => loteIds.has(pesagem.lote_id)),
-      sanitario: (db.sanitario || []).filter((item) => loteIds.has(item.lote_id)),
-      tarefas: (db.tarefas || []).filter(
-        (tarefa) =>
-          !tarefa.fazenda_id ||
-          Number(tarefa.fazenda_id) === Number(fazendaSelecionada.id) ||
-          loteIds.has(tarefa.lote_id)
-      ),
-      movimentacoes_animais: (db.movimentacoes_animais || []).filter((movimento) => loteIds.has(movimento.lote_id)),
-    };
-    return scopedDb;
-  }, [db, fazendaSelecionada]);
+  // Sprint 21: db recortado pela fazenda ativa (src/domain/escopoFazenda.js)
+  // — usado por todas as páginas operacionais (ver FULL_DB_PAGE_KEYS abaixo
+  // para as exceções de conta/importação, que precisam do db completo).
+  const dbFazendaAtiva = useMemo(
+    () => filtrarDbPorFazenda(db, fazendaSelecionada?.id),
+    [db, fazendaSelecionada]
+  );
 
   function atualizarUsuario(dadosAtualizados) {
     setUsuarioLogado((prev) => {
@@ -622,13 +621,16 @@ export default function App() {
     return Array.from(merged.values());
   }, [alertasAdiados]);
 
+  // Sprint 21: alertas gerados só a partir dos dados da fazenda ativa —
+  // antes usava `db` completo e misturava alertas de todas as fazendas na
+  // Central de Alertas e no Dashboard.
   const rawAlerts = useMemo(() => {
-    return buildAlerts(db).map((alert) => ({
+    return buildAlerts(dbFazendaAtiva).map((alert) => ({
       ...alert,
       route: alert?.pagina || null,
       ackKey: getAlertAckKey(alert),
     }));
-  }, [db]);
+  }, [dbFazendaAtiva]);
 
   const alerts = useMemo(
     () => rawAlerts.filter((alert) => {
@@ -1121,7 +1123,7 @@ export default function App() {
                 onIrParaAssinatura={() => navigateWithPermission('minhaAssinatura', { action: 'upgrade', motivo: 'modulo_bloqueado', modulo: pageKey })}
               >
                 <ActivePage
-                  db={pageKey === 'dashboard' ? dbDashboard : db}
+                  db={FULL_DB_PAGE_KEYS.has(pageKey) ? db : dbFazendaAtiva}
                   setDb={setDb}
                   session={session}
                   fazendaSelecionada={fazendaSelecionada}

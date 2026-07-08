@@ -119,7 +119,7 @@ function itemEhNutricao(item) {
   );
 }
 
-export default function EstoquePage({ db, setDb, onRegistrarSaidaEstoque, navigationIntent = null }) {
+export default function EstoquePage({ db, setDb, onRegistrarSaidaEstoque, navigationIntent = null, fazendaSelecionada = null }) {
   const { showToast } = useToast();
   const { hasPermission, session } = useAuth();
   const mensagemSemPermissao = 'Você não tem permissão para executar esta ação.';
@@ -439,6 +439,7 @@ export default function EstoquePage({ db, setDb, onRegistrarSaidaEstoque, naviga
           hasPermission={hasPermission}
           showToast={showToast}
           session={session}
+          fazendaSelecionada={fazendaSelecionada}
         />
       )}
       {openEntrada && (
@@ -451,7 +452,7 @@ export default function EstoquePage({ db, setDb, onRegistrarSaidaEstoque, naviga
   );
 }
 
-function CadastroItemModal({ setDb, initialData = null, onClose, hasPermission, showToast, session }) {
+function CadastroItemModal({ setDb, initialData = null, onClose, hasPermission, showToast, session, fazendaSelecionada = null }) {
   const [form, setForm] = useState(() => getCadastroItemInicial(initialData));
   const [erro, setErro] = useState('');
 
@@ -481,6 +482,10 @@ function CadastroItemModal({ setDb, initialData = null, onClose, hasPermission, 
     }
 
     const payload = {
+      // Sprint 21: sem isto, o item ficava sem fazenda_id e sumia do
+      // recorte por fazenda ativa (App.jsx dbFazendaAtiva). Edição preserva
+      // a fazenda já salva; criação usa a fazenda ativa no momento.
+      fazenda_id: initialData?.fazenda_id ?? (fazendaSelecionada?.id ? Number(fazendaSelecionada.id) : null),
       produto: String(form.produto || '').trim(),
       nome: String(form.produto || '').trim(),
       categoria: form.categoria || 'Outro',
