@@ -1,4 +1,4 @@
-# Matriz de Homologação — Teste com Produtor (Sprints 21-22)
+# Matriz de Homologação — Teste com Produtor (Sprints 21-23)
 
 Método: Sprint 21 foi auditoria de código (leitura de fonte + schema real
 via MCP Supabase), sem credencial de teste disponível naquela sessão.
@@ -8,12 +8,19 @@ visualmente as telas — coluna "Mobile ok?" atualizada onde verificado
 de cada correção visual). "Fazenda 1/2 ok?" reflete se o código lê `db`
 já recortado pela fazenda ativa (`src/domain/escopoFazenda.js`, Sprint 21).
 
+**Sprint 23** corrigiu um P0 fora desta matriz (Rateio de Custos —
+`CustosCompartilhadosPage.jsx`, não listado abaixo por não ser uma tela
+de operação por fazenda) e um bug de breakpoint que deixava a sidebar de
+desktop invisível entre 768-900px, afetando **todas** as telas nessa
+faixa de largura — não só as listadas aqui. Ver
+`docs/SPRINT23_CORRECAO_VISUAL_FINAL.md` para o detalhe completo.
+
 | Área | Funcionalidade | Fazenda 1 ok? | Fazenda 2 ok? | Cadastro ok? | Edição ok? | Exclusão/inativação ok? | Importação ok? | Mobile ok? | Exportação ok? | Status | Observação | Prioridade |
 |---|---|---|---|---|---|---|---|---|---|---|---|---|
 | Menu lateral/topbar | Navegação | N/A (conta) | N/A | — | — | — | — | **Corrigido (Sprint 22)** | — | Corrigido | Bottom-nav mobile aparecia até 1024px, coexistindo com o header de abas do desktop em telas de tablet/laptop — breakpoint corrigido para 767px | P0 |
 | Dashboard | Visão geral | Sim | Sim | — | — | — | — | Sim (Sprint 22) | — | OK | Já tinha `dbDashboard` próprio antes da sprint | — |
 | Lotes | CRUD de lote | Sim | Sim | Sim | Sim | Inativação (status) | Sim (via ImportacaoPage) | Sim (Sprint 22) | Sim | OK | Já filtrava por `fazendaSelecionada` antes | — |
-| Pesagens | Lançar/editar pesagem | **Corrigido** | **Corrigido** | Sim | Sim | Cancelar registro | Sim | **Corrigido (Sprint 22)** | — | Corrigido | Fazenda: recorte central em `App.jsx` (Sprint 21). Visual: 4ª aba "Alertas" ficava invisível sem indicação de scroll — corrigido (Sprint 22) | P0/P1 |
+| Pesagens | Lançar/editar pesagem | **Corrigido** | **Corrigido** | Sim | Sim | Cancelar registro | Sim | **Corrigido (Sprint 22/23)** | — | Corrigido | Fazenda: recorte central em `App.jsx` (Sprint 21). Visual: 4ª aba "Alertas" invisível sem scroll (Sprint 22); "Nova pesagem" sem estilo de botão e GMD médio com fonte de número gigante para texto de status — corrigidos (Sprint 23) | P0/P1 |
 | Acompanhamento de Peso | Evolução/GMD | Sim | Sim | — | — | — | — | **Corrigido (Sprint 22)** | — | Corrigido | Abas sobrepostas e ilegíveis no mobile — corrigido (Sprint 22) | P0 |
 | Resultado por Lote | Custo/lucro por @ | Sim | Sim | — | — | — | — | Sim (Sprint 22) | Sim | OK | Lê `db.lotes`/`db.custos`, já escopados. Card de ações vazio no topo é P2 visual (ver Sprint 22) | — |
 | Comparativo de Lotes | Comparar lotes | **Corrigido** | **Corrigido** | — | — | — | — | Sim (Sprint 22) | — | Corrigido nesta sprint | Não tinha nenhuma menção a fazenda antes | P0 |

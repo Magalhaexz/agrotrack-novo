@@ -2,6 +2,7 @@ import { useMemo, useState } from 'react';
 import CustoForm from '../components/CustoForm';
 import PageHeader from '../components/PageHeader';
 import { formatarMoeda, formatarData } from '../utils/formatters';
+import Button from '../components/ui/Button';
 import { gerarNovoId } from '../utils/id'; // Importa a função de gerar ID
 import { useAuth } from '../auth/useAuth';
 import { useToast } from '../hooks/useToast';
@@ -274,9 +275,9 @@ export default function CustosPage({ db, setDb, onConfirmAction }) {
         title="Custos Operacionais"
         subtitle="Lançamento e acompanhamento dos custos por lote."
         actions={(
-          <button className="primary-btn" onClick={abrirNovo}>
+          <Button onClick={abrirNovo}>
             + Novo custo
-          </button>
+          </Button>
         )}
       />
 

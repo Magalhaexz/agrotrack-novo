@@ -1,5 +1,7 @@
 import { useMemo, useState } from 'react';
 import Card from '../components/ui/Card';
+import Input from '../components/ui/Input';
+import Button from '../components/ui/Button';
 import PageHeader from '../components/PageHeader';
 import { useAuth } from '../auth/useAuth';
 import { useToast } from '../hooks/useToast';
@@ -175,21 +177,17 @@ export default function CustosCompartilhadosPage({ db, setDb }) {
       <div className="dashboard-grid dashboard-grid--dual">
         {/* ── Formulário ── */}
         <Card title="Dados do custo">
-          <div className="form-group">
-            <label className="form-label">Descrição *</label>
-            <input
-              className="form-input"
+          <div className="form-grid">
+            <Input
+              label="Descrição *"
               type="text"
               placeholder="Ex: Energia elétrica de junho"
               value={form.descricao}
               onChange={(e) => setField('descricao', e.target.value)}
             />
-          </div>
 
-          <div className="form-group">
-            <label className="form-label">Valor total (R$) *</label>
-            <input
-              className="form-input"
+            <Input
+              label="Valor total (R$) *"
               type="number"
               min="0"
               step="0.01"
@@ -197,70 +195,44 @@ export default function CustosCompartilhadosPage({ db, setDb }) {
               value={form.valor}
               onChange={(e) => setField('valor', e.target.value)}
             />
-          </div>
 
-          <div className="form-group">
-            <label className="form-label">Data *</label>
-            <input
-              className="form-input"
+            <Input
+              label="Data *"
               type="date"
               value={form.data}
               onChange={(e) => setField('data', e.target.value)}
             />
-          </div>
 
-          <div className="form-group">
-            <label className="form-label">Categoria</label>
-            <select
-              className="form-input"
-              value={form.categoria}
-              onChange={(e) => setField('categoria', e.target.value)}
-            >
+            <Input as="select" label="Categoria" value={form.categoria} onChange={(e) => setField('categoria', e.target.value)}>
               {CATEGORIAS.map((c) => (
                 <option key={c.id} value={c.id}>{c.label}</option>
               ))}
-            </select>
-          </div>
+            </Input>
 
-          <div className="form-group">
-            <label className="form-label">Critério de rateio *</label>
-            <select
-              className="form-input"
-              value={form.criterio}
-              onChange={(e) => setField('criterio', e.target.value)}
-            >
+            <Input as="select" label="Critério de rateio *" value={form.criterio} onChange={(e) => setField('criterio', e.target.value)}>
               {CRITERIOS.map((c) => (
                 <option key={c.id} value={c.id}>{c.label}</option>
               ))}
-            </select>
+            </Input>
           </div>
 
-          <div className="form-group">
-            <label className="form-label">
-              Lotes participantes *
-              <span style={{ marginLeft: 8 }}>
-                <button
-                  type="button"
-                  className="btn btn-xs btn-outline"
-                  onClick={selecionarTodos}
-                  style={{ marginRight: 4 }}
-                >
-                  Todos
-                </button>
-                <button
-                  type="button"
-                  className="btn btn-xs btn-outline"
-                  onClick={limparSelecao}
-                >
-                  Limpar
-                </button>
-              </span>
-            </label>
+          <div className="form-group" style={{ marginTop: 16 }}>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 8 }}>
+              <span className="ui-input-label" style={{ margin: 0 }}>Lotes participantes *</span>
+              {lotesAtivos.length > 0 && (
+                <span style={{ display: 'flex', gap: 6 }}>
+                  <Button type="button" variant="outline" size="sm" onClick={selecionarTodos}>Todos</Button>
+                  <Button type="button" variant="outline" size="sm" onClick={limparSelecao}>Limpar</Button>
+                </span>
+              )}
+            </div>
 
             {lotesAtivos.length === 0 ? (
-              <p className="empty-state-text">Nenhum lote ativo encontrado.</p>
+              <p style={{ color: 'var(--color-text-secondary)', fontSize: 13, marginTop: 8 }}>
+                Nenhum lote ativo encontrado. Cadastre ou ative um lote para fazer rateio de custos.
+              </p>
             ) : (
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 6, marginTop: 8 }}>
                 {lotesAtivos.map((lote) => (
                   <label
                     key={lote.id}
@@ -283,11 +255,11 @@ export default function CustosCompartilhadosPage({ db, setDb }) {
         </Card>
 
         {/* ── Prévia e confirmação ── */}
-        <div>
+        <div style={{ alignSelf: 'start' }}>
           <div style={{ marginBottom: 16 }}>
             <Card title="Prévia do rateio">
               {previa.length === 0 ? (
-                <p className="empty-state-text">
+                <p style={{ color: 'var(--color-text-secondary)', fontSize: 13 }}>
                   Preencha o valor, o critério e selecione ao menos um lote para ver a prévia.
                 </p>
               ) : (
@@ -321,15 +293,17 @@ export default function CustosCompartilhadosPage({ db, setDb }) {
             </Card>
           </div>
 
-          <button
+          <Button
             type="button"
-            className="btn btn-primary"
-            style={{ width: '100%' }}
+            variant="primary"
+            fullWidth
             disabled={!formValido || confirmando || !podeLancar}
+            loading={confirmando}
+            loadingLabel="Lançando..."
             onClick={handleConfirmar}
           >
-            {confirmando ? 'Lançando...' : 'Confirmar e gerar despesas'}
-          </button>
+            Confirmar e gerar despesas
+          </Button>
 
           {!podeLancar && (
             <p style={{ color: 'var(--color-danger)', marginTop: 8, fontSize: 13 }}>

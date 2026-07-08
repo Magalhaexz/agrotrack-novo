@@ -1347,7 +1347,14 @@ a:hover {
 }
 
 /* --- Responsive Design --- */
-@media (max-width: 900px) {
+/* Sprint 23: .sidebar aqui usava 900px, mas o breakpoint real do shell
+   (bottom-nav/hambúrguer, layout.css) é 767px desde a Sprint 22 — entre
+   768-900px a sidebar ficava fora da tela (translateX) e o bottom-nav já
+   não aparecia mais, criando uma faixa de largura sem navegação nenhuma.
+   As outras regras deste bloco (.main-content, .header-tabs, .grid-2/3/4)
+   continuam em 900px, propositalmente — .grid-2/3/4 ainda empilha
+   formulários reais nessa faixa e mudar isso não é o bug relatado. */
+@media (max-width: 767px) {
   .sidebar {
     transform: translateX(calc(-1 * var(--sidebar-width)));
     position: fixed;
@@ -1358,6 +1365,9 @@ a:hover {
   .sidebar.mobile-open {
     transform: translateX(0);
   }
+}
+
+@media (max-width: 900px) {
   .main-content {
     margin-left: 0; /* No fixed sidebar space */
     padding-left: 16px;
@@ -2264,7 +2274,11 @@ a:hover {
   }
 }
 
-@media (max-width: 900px) {
+/* Sprint 23: mesma correção de breakpoint (900px → 767px) — este bloco
+   também controla o dreno de sidebar mobile e precisa trocar junto com
+   os outros ou a sidebar some da tela entre 768-900px sem o bottom-nav
+   nem o header de abas do desktop para compensar. */
+@media (max-width: 767px) {
   .mobile-topbar {
     position: fixed;
     top: 0;
@@ -4736,7 +4750,10 @@ body,
   min-width: 0;
 }
 
-@media (max-width: 900px) {
+/* Sprint 23: era 900px — deixava a sidebar fora da tela entre 768-900px
+   junto com o bottom-nav já escondido (breakpoint de layout.css, 767px
+   desde a Sprint 22), criando uma faixa sem navegação nenhuma. */
+@media (max-width: 767px) {
   .sidebar {
     width: min(92vw, 320px);
     min-width: min(92vw, 320px);
@@ -8220,7 +8237,8 @@ body {
   }
 }
 
-@media (max-width: 900px) {
+/* Sprint 23: mesma correção de breakpoint (900px → 767px) do bloco acima. */
+@media (max-width: 767px) {
   .mobile-topbar {
     display: flex;
     position: fixed;

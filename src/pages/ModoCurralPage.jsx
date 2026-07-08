@@ -3,6 +3,7 @@ import Card from '../components/ui/Card';
 import Button from '../components/ui/Button';
 import PageHeader from '../components/PageHeader';
 import ConnectionIndicator from '../components/ConnectionIndicator';
+import EmptyState from '../components/EmptyState';
 import { useAuth } from '../auth/useAuth';
 import { useOfflineQueueStatus } from '../hooks/useOfflineQueueStatus';
 import { useRegistroRapido } from '../hooks/useRegistroRapido';
@@ -51,6 +52,9 @@ export default function ModoCurralPage({ db, setDb, session, onNavigate }) {
 
   const resumo = construirResumoModoCurral(db);
   const mensagemEstadoVazio = obterMensagemEstadoVazio(resumo, status.online);
+  const tituloEstadoVazio = !resumo?.temFazenda
+    ? (status.online ? 'Nenhuma fazenda cadastrada' : 'Sem conexão')
+    : 'Nenhum lote disponível';
 
   return (
     <div className="page page--modo-curral">
@@ -79,9 +83,14 @@ export default function ModoCurralPage({ db, setDb, session, onNavigate }) {
       </Card>
 
       {mensagemEstadoVazio ? (
-        <div className="empty-state">
-          <p>{mensagemEstadoVazio}</p>
-        </div>
+        <EmptyState
+          compact
+          title={tituloEstadoVazio}
+          subtitle={mensagemEstadoVazio}
+          action={resumo?.temFazenda && onNavigate ? (
+            <Button size="sm" variant="outline" onClick={() => onNavigate('lotes')}>Ir para Lotes</Button>
+          ) : null}
+        />
       ) : (
         <>
           <div className="modo-curral-grid">

@@ -832,7 +832,7 @@ export default function PesagensPage({ db, setDb, onConfirmAction, navigationInt
           <h1>Pesagens</h1>
           <p>Registre pesagens para acompanhar ganho de peso, desempenho e resultado.</p>
         </div>
-        <button className="primary-btn" onClick={() => abrirNovaPesagem(modoPesagem)}>Nova pesagem</button>
+        <Button size="sm" onClick={() => abrirNovaPesagem(modoPesagem)}>Nova pesagem</Button>
       </section>
       <div className="segmented-control tab-bar">
         <button type="button" className={`segment ${abaAtiva === 'nova' ? 'active' : ''}`} onClick={() => setAbaAtiva('nova')}>Nova pesagem</button>
@@ -863,7 +863,11 @@ export default function PesagensPage({ db, setDb, onConfirmAction, navigationInt
         <div className="kpi-card kpi-card--compact">
           <div className="kpi-content">
             <div className="kpi-label">GMD médio</div>
-            <div className="kpi-value">{resumo.gmdMedioDisponivel ? `${formatarNumero(resumo.gmdMedio, 3)} kg/dia` : 'Sem dados suficientes'}</div>
+            {resumo.gmdMedioDisponivel ? (
+              <div className="kpi-value">{formatarNumero(resumo.gmdMedio, 3)} kg/dia</div>
+            ) : (
+              <div className="kpi-hint" style={{ fontSize: '0.95rem', marginTop: 4 }}>Sem dados suficientes</div>
+            )}
           </div>
         </div>
       </div>
@@ -957,7 +961,7 @@ export default function PesagensPage({ db, setDb, onConfirmAction, navigationInt
         <div className="fazendas-card">
           <p>Lotes sem pesagem há mais de {alertas.diasSemPesagem} dias: {alertas.lotesSemPesagem.length}</p>
           <p>Animais sem pesagem recente: {alertas.animaisSemPesagem.length}</p>
-          <button className="primary-btn" onClick={() => { setAbaAtiva('nova'); abrirNovaPesagem('lote'); }}>Registrar pesagem</button>
+          <Button size="sm" onClick={() => { setAbaAtiva('nova'); abrirNovaPesagem('lote'); }}>Registrar pesagem</Button>
         </div>
       )}
 
