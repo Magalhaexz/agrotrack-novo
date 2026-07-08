@@ -52,6 +52,19 @@ para altura normal (44-56px).
   Nutrição/Suplementação. Limitação: modo por percentual do peso vivo
   ainda não é somado (documentado).
 
+**Sprint 26** — ver `docs/SPRINT26_CORRECAO_LAYOUT_FINANCEIRO.md`:
+- **Custos Operacionais visual corrigido**: `.kpi-grid-3` nunca tinha
+  `display: grid` definido — os 3 KPIs empilhavam como banners de largura
+  total. Regra base adicionada; markup dos KPIs alinhado ao padrão
+  `kpi-card--compact` já usado em Pesagens.
+- **Financeiro/DRE visual corrigido**: gráficos "DRE mensal" e
+  "Distribuição de despesas" ocupavam 220px fixos mesmo sem dados —
+  agora mostram `EmptyState` compacto quando não há lançamentos.
+  `ExportActions` ganhou espaçamento próprio (antes ficava colado entre
+  abas e cards).
+- **Exportação preservada**: nenhuma mudança em CSV/PDF, cálculo ou
+  regra de caixa/competência.
+
 | Área | Funcionalidade | Fazenda 1 ok? | Fazenda 2 ok? | Cadastro ok? | Edição ok? | Exclusão/inativação ok? | Importação ok? | Mobile ok? | Exportação ok? | Status | Observação | Prioridade |
 |---|---|---|---|---|---|---|---|---|---|---|---|---|
 | Menu lateral/topbar | Navegação | N/A (conta) | N/A | — | — | — | — | **Corrigido (Sprint 22)** | — | Corrigido | Bottom-nav mobile aparecia até 1024px, coexistindo com o header de abas do desktop em telas de tablet/laptop — breakpoint corrigido para 767px | P0 |
@@ -61,8 +74,8 @@ para altura normal (44-56px).
 | Acompanhamento de Peso | Evolução/GMD | Sim | Sim | — | — | — | — | **Corrigido (Sprint 22)** | — | Corrigido | Abas sobrepostas e ilegíveis no mobile — corrigido (Sprint 22) | P0 |
 | Resultado por Lote | Custo/lucro por @ | Sim | Sim | — | — | — | — | Sim (Sprint 22) | Sim | OK | Lê `db.lotes`/`db.custos`, já escopados. Card de ações vazio no topo é P2 visual (ver Sprint 22) | — |
 | Comparativo de Lotes | Comparar lotes | **Corrigido** | **Corrigido** | — | — | — | — | Sim (Sprint 22) | — | Corrigido nesta sprint | Não tinha nenhuma menção a fazenda antes | P0 |
-| Custos por Lote | Lançar/editar custo | Sim | Sim | Sim | Sim | — | — | **Corrigido (Sprint 22)** | Sim | Corrigido | Valores monetários sem formatação pt-BR (`formatarNumero` em vez de `formatarMoeda`) causavam corte de texto no card mobile — corrigido (Sprint 22) | P1 |
-| Financeiro | Contas a pagar/receber | **Corrigido** | **Corrigido** | Sim | Sim | Status pago/pendente | — | **Corrigido (Sprint 22)** | Sim | Corrigido | Fazenda: `App.jsx` (Sprint 21). Visual: aba "Pagamentos" cortada no mobile — corrigido (Sprint 22) | P0/P1 |
+| Custos por Lote | Lançar/editar custo | Sim | Sim | Sim | Sim | — | — | **Corrigido (Sprint 22/26)** | Sim | Corrigido | Valores monetários sem formatação pt-BR — corrigido (Sprint 22). KPIs em banner de largura total por `.kpi-grid-3` sem `display:grid` — corrigido (Sprint 26) | P1 |
+| Financeiro | Contas a pagar/receber | **Corrigido** | **Corrigido** | Sim | Sim | Status pago/pendente | — | **Corrigido (Sprint 22/26)** | Sim | Corrigido | Fazenda: `App.jsx` (Sprint 21). Visual: aba "Pagamentos" cortada no mobile — corrigido (Sprint 22). Gráficos DRE vazios sem EmptyState — corrigido (Sprint 26) | P0/P1 |
 | DRE | Relatório financeiro | **Corrigido** | **Corrigido** | — | — | — | — | Sim (Sprint 22) | Sim | Corrigido nesta sprint | Mesma correção do Financeiro (mesma tabela e mesma tela de abas) | P0 |
 | Estoque | CRUD de item + movimentação | **Corrigido** | **Corrigido** | Sim (corrigido) | Sim | — | — | Sim (Sprint 22) | Sim | Corrigido nesta sprint | Não filtrava por fazenda **e** novo item não gravava `fazenda_id` — ambos corrigidos (Sprint 21) | P0 |
 | Sanidade | Aplicação sanitária | **Corrigido** | **Corrigido** | Sim | Sim | — | — | Sim (Sprint 22) | Sim | Corrigido nesta sprint | Só o sub-formulário IATF usava fazenda; lista principal não era escopada fora do Dashboard | P0 |

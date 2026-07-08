@@ -5560,6 +5560,15 @@ body,
   gap: 8px;
 }
 
+/* Sprint 26: .kpi-grid-3 (used by CustosPage) had grid-template-columns
+   overrides scattered across breakpoints but no base `display: grid` rule
+   anywhere in this file — cards fell back to block layout (full-width
+   stack) on desktop, which read as oversized/banner KPIs. */
+.kpi-grid-3 {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
 .grid-2,
 .grid-3,
 .grid-4,
@@ -10337,6 +10346,12 @@ html, body, #root, .app, .main, .main-content, .page { max-width: 100%; }
   flex-wrap: wrap;
   align-items: center;
   gap: 10px;
+}
+
+/* Sprint 26: ExportActions had no spacing rule of its own, so it sat
+   flush between the tab buttons above and the KPI cards below. */
+.export-actions {
+  margin: 4px 0 16px;
 }
 
 .page-actions > *,

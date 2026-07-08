@@ -410,36 +410,52 @@ export default function FinanceiroPage({ db, setDb, navigationIntent = null }) {
 
           <div className="dashboard-grid dashboard-grid--dual">
             <Card title="DRE mensal">
-              <div style={{ height: 220 }}>
-                <ResponsiveContainer width="100%" height={200}>
-                  <BarChart data={dre.mensal}>
-                    <CartesianGrid strokeDasharray="3 3" />
-                    <XAxis dataKey="mes" />
-                    <YAxis formatter={(value) => formatCurrency(value)} />
-                    <Tooltip formatter={(value) => formatCurrency(value)} />
-                    <Bar dataKey="receita" fill="#1b4332" name="Receita" />
-                    <Bar dataKey="despesa" fill="#c53030" name="Despesa" />
-                  </BarChart>
-                </ResponsiveContainer>
-              </div>
+              {dre.mensal.length === 0 ? (
+                <EmptyState
+                  compact
+                  title="Sem dados suficientes para gerar o gráfico."
+                  subtitle="Cadastre receitas e despesas para visualizar a análise."
+                />
+              ) : (
+                <div style={{ height: 220 }}>
+                  <ResponsiveContainer width="100%" height={200}>
+                    <BarChart data={dre.mensal}>
+                      <CartesianGrid strokeDasharray="3 3" />
+                      <XAxis dataKey="mes" />
+                      <YAxis formatter={(value) => formatCurrency(value)} />
+                      <Tooltip formatter={(value) => formatCurrency(value)} />
+                      <Bar dataKey="receita" fill="#1b4332" name="Receita" />
+                      <Bar dataKey="despesa" fill="#c53030" name="Despesa" />
+                    </BarChart>
+                  </ResponsiveContainer>
+                </div>
+              )}
             </Card>
 
             <Card title="Distribuição de despesas">
-              <div style={{ height: 220 }}>
-                <ResponsiveContainer width="100%" height={200}>
-                  <PieChart>
-                    <Pie
-                      data={Object.entries(dre.despesaPorCategoria).map(([name, value]) => ({ name, value }))}
-                      dataKey="value"
-                      nameKey="name"
-                      outerRadius={80}
-                      fill="#8884d8"
-                      label={({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`}
-                    />
-                    <Tooltip formatter={(value) => formatCurrency(value)} />
-                  </PieChart>
-                </ResponsiveContainer>
-              </div>
+              {Object.keys(dre.despesaPorCategoria).length === 0 ? (
+                <EmptyState
+                  compact
+                  title="Sem dados suficientes para gerar o gráfico."
+                  subtitle="Cadastre receitas e despesas para visualizar a análise."
+                />
+              ) : (
+                <div style={{ height: 220 }}>
+                  <ResponsiveContainer width="100%" height={200}>
+                    <PieChart>
+                      <Pie
+                        data={Object.entries(dre.despesaPorCategoria).map(([name, value]) => ({ name, value }))}
+                        dataKey="value"
+                        nameKey="name"
+                        outerRadius={80}
+                        fill="#8884d8"
+                        label={({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`}
+                      />
+                      <Tooltip formatter={(value) => formatCurrency(value)} />
+                    </PieChart>
+                  </ResponsiveContainer>
+                </div>
+              )}
             </Card>
           </div>
         </>

@@ -281,28 +281,34 @@ export default function CustosPage({ db, setDb, onConfirmAction }) {
         )}
       />
 
-      <div className="kpi-grid-3">
-        <div className="kpi-card">
-          <div className="kpi-label">Total lançado</div>
-          <div className="kpi-value">{formatarMoeda(resumo.total)}</div>
-          <div className="kpi-sub">somando todos os custos</div>
-        </div>
-
-        <div className="kpi-card">
-          <div className="kpi-label">Lançamentos</div>
-          <div className="kpi-value">{resumo.quantidade}</div>
-          <div className="kpi-sub">registros cadastrados</div>
-        </div>
-
-        <div className="kpi-card">
-          <div className="kpi-label">Maior categoria</div>
-          <div className="kpi-value kpi-value--large"> {/* Adicionada classe para o tamanho da fonte */}
-            {resumo.categoriaTop ? normalizarCategoria(resumo.categoriaTop[0]) : '—'}
+      <div className="kpi-grid-3 kpi-grid-3--compact">
+        <div className="kpi-card kpi-card--compact">
+          <div className="kpi-content">
+            <div className="kpi-label">Total lançado</div>
+            <div className="kpi-value">{formatarMoeda(resumo.total)}</div>
+            <div className="kpi-sub">somando todos os custos</div>
           </div>
-          <div className="kpi-sub">
-            {resumo.categoriaTop
-              ? formatarMoeda(resumo.categoriaTop[1])
-              : 'sem dados'}
+        </div>
+
+        <div className="kpi-card kpi-card--compact">
+          <div className="kpi-content">
+            <div className="kpi-label">Lançamentos</div>
+            <div className="kpi-value">{resumo.quantidade}</div>
+            <div className="kpi-sub">registros cadastrados</div>
+          </div>
+        </div>
+
+        <div className="kpi-card kpi-card--compact">
+          <div className="kpi-content">
+            <div className="kpi-label">Maior categoria</div>
+            <div className="kpi-value">
+              {resumo.categoriaTop ? normalizarCategoria(resumo.categoriaTop[0]) : '—'}
+            </div>
+            <div className="kpi-sub">
+              {resumo.categoriaTop
+                ? formatarMoeda(resumo.categoriaTop[1])
+                : 'sem dados'}
+            </div>
           </div>
         </div>
       </div>
