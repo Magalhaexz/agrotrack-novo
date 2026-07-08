@@ -961,7 +961,23 @@ export default function PesagensPage({ db, setDb, onConfirmAction, navigationInt
       )}
 
       {(abrirForm || (abaAtiva === 'nova' && (lotes || []).length > 0)) && (
-        <PesagemForm initialData={pesagemEditando} lotes={lotes || []} animais={animais || []} pesagens={pesagens || []} onSave={salvarPesagem} onCancel={() => { setAbrirForm(false); setPesagemEditando(null); }} />
+        <PesagemForm
+          initialData={pesagemEditando}
+          lotes={lotes || []}
+          animais={animais || []}
+          pesagens={pesagens || []}
+          onSave={salvarPesagem}
+          onCancel={() => {
+            // A Sprint 25 passou a renderizar o formulário sempre que
+            // abaAtiva === 'nova' (não só quando abrirForm=true) — sem
+            // também trocar de aba aqui, Cancelar fechava abrirForm mas o
+            // modal reaparecia na hora pela outra condição, prendendo o
+            // usuário no formulário.
+            setAbrirForm(false);
+            setPesagemEditando(null);
+            setAbaAtiva('historico');
+          }}
+        />
       )}
     </div>
   );
