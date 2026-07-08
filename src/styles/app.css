@@ -5873,6 +5873,14 @@ body,
 
 .sanitario-cta {
   min-height: 42px;
+  /* !important necessário: alguma outra regra de altura (não localizada
+     com certeza entre as várias definições de .ph-actions/.page--sanitario
+     deste arquivo) vence em especificidade e forçava ~180px de altura,
+     fazendo o botão parecer um banner. */
+  height: auto !important;
+  max-height: 56px !important;
+  align-self: center;
+  flex: 0 0 auto;
 }
 
 .sanitario-table-shell {

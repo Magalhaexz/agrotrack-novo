@@ -328,10 +328,15 @@ export default function PesagemForm({
 
   const titulo = initialData?.id ? 'Editar pesagem' : 'Nova pesagem';
 
+  // Checagem leve só para o estado do botão — handleSubmit roda a validação
+  // completa (validarForm) e mostra a mensagem de erro específica no submit.
+  const faltaCampoObrigatorio = !form.lote_id || !form.data
+    || (form.tipo === 'lote' && !form.peso_medio);
+
   const footer = (
     <div className="modal-footer action-row" style={{ width: '100%' }}>
       <Button variant="ghost" onClick={onCancel}>Cancelar</Button>
-      <Button onClick={handleSubmit}>Salvar pesagem</Button>
+      <Button onClick={handleSubmit} disabled={faltaCampoObrigatorio}>Salvar pesagem</Button>
     </div>
   );
 

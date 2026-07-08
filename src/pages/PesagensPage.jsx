@@ -209,14 +209,13 @@ function shouldUpdateLote(record) {
   return resolveTipoPesagem(record) === 'lote' && Number(record?.lote_id) > 0;
 }
 
-export default function PesagensPage({ db, setDb, onConfirmAction, navigationIntent = null }) {
+export default function PesagensPage({ db, setDb, onConfirmAction, navigationIntent = null, onNavigate }) {
   const { hasPermission, session } = useAuth();
   const { showToast } = useToast();
   const mensagemSemPermissao = 'Você não tem permissão para executar esta ação.';
 
   const shouldStartWithNewPesagem = navigationIntent?.page === 'pesagens' && navigationIntent?.action === 'novo';
   const [abrirForm, setAbrirForm] = useState(shouldStartWithNewPesagem);
-  const [modoPesagem, setModoPesagem] = useState('lote');
   const [pesagemEditando, setPesagemEditando] = useState(null);
   const [ultimoResumoBatch, setUltimoResumoBatch] = useState(null);
 
@@ -328,14 +327,13 @@ export default function PesagensPage({ db, setDb, onConfirmAction, navigationInt
     };
   }, [pesagens]);
 
-  function abrirNovaPesagem(tipo = 'lote') {
+  function abrirNovaPesagem() {
     if (!hasPermission('pesagens:editar')) {
       showToast({ type: 'error', message: mensagemSemPermissao });
       return;
     }
-    setPesagemEditando({ tipo, origem: tipo });
-    setModoPesagem(tipo);
-    setAbrirForm(true);
+    setPesagemEditando(null);
+    setAbaAtiva('nova');
   }
 
   function editarPesagem(item) {
@@ -344,7 +342,6 @@ export default function PesagensPage({ db, setDb, onConfirmAction, navigationInt
       return;
     }
     setPesagemEditando(item);
-    setModoPesagem(resolveTipoPesagem(item));
     setAbrirForm(true);
   }
 
@@ -832,7 +829,6 @@ export default function PesagensPage({ db, setDb, onConfirmAction, navigationInt
           <h1>Pesagens</h1>
           <p>Registre pesagens para acompanhar ganho de peso, desempenho e resultado.</p>
         </div>
-        <Button size="sm" onClick={() => abrirNovaPesagem(modoPesagem)}>Nova pesagem</Button>
       </section>
       <div className="segmented-control tab-bar">
         <button type="button" className={`segment ${abaAtiva === 'nova' ? 'active' : ''}`} onClick={() => setAbaAtiva('nova')}>Nova pesagem</button>
@@ -887,16 +883,12 @@ export default function PesagensPage({ db, setDb, onConfirmAction, navigationInt
         </Card>
       ) : null}
 
-      {abaAtiva === 'nova' && (
-        <Card className="form-section-card" title="Nova pesagem" subtitle="Escolha o tipo e preencha os dados para registrar.">
-          <div className="segmented-control tab-bar">
-            <button type="button" className={`segment ${modoPesagem === 'lote' ? 'active' : ''}`} onClick={() => setModoPesagem('lote')}>Por lote</button>
-            <button type="button" className={`segment ${modoPesagem === 'animal' ? 'active' : ''}`} onClick={() => setModoPesagem('animal')}>Por animal</button>
-          </div>
-          <div style={{ marginTop: 12 }}>
-            <Button onClick={() => abrirNovaPesagem(modoPesagem)}>Salvar pesagem</Button>
-          </div>
-        </Card>
+      {abaAtiva === 'nova' && (lotes || []).length === 0 && (
+        <EmptyState
+          title="Nenhum lote disponível para pesagem."
+          subtitle="Cadastre um lote antes de registrar pesagens."
+          action={onNavigate ? <Button size="sm" onClick={() => onNavigate('lotes')}>Ir para Lotes</Button> : null}
+        />
       )}
 
       {abaAtiva === 'historico' && (
@@ -906,7 +898,7 @@ export default function PesagensPage({ db, setDb, onConfirmAction, navigationInt
               <EmptyState
                 title="Você ainda não registrou nenhuma pesagem."
                 subtitle="Registre a primeira pesagem para acompanhar evolução, GMD e desempenho."
-                action={<Button size="sm" onClick={() => abrirNovaPesagem(modoPesagem)}>Registrar pesagem</Button>}
+                action={<Button size="sm" onClick={abrirNovaPesagem}>Registrar pesagem</Button>}
               />
             ) : (
               <table className="data-table herdon-table herdon-table--pesagens">
@@ -961,11 +953,11 @@ export default function PesagensPage({ db, setDb, onConfirmAction, navigationInt
         <div className="fazendas-card">
           <p>Lotes sem pesagem há mais de {alertas.diasSemPesagem} dias: {alertas.lotesSemPesagem.length}</p>
           <p>Animais sem pesagem recente: {alertas.animaisSemPesagem.length}</p>
-          <Button size="sm" onClick={() => { setAbaAtiva('nova'); abrirNovaPesagem('lote'); }}>Registrar pesagem</Button>
+          <Button size="sm" onClick={abrirNovaPesagem}>Registrar pesagem</Button>
         </div>
       )}
 
-      {abrirForm && (
+      {(abrirForm || (abaAtiva === 'nova' && (lotes || []).length > 0)) && (
         <PesagemForm initialData={pesagemEditando} lotes={lotes || []} animais={animais || []} pesagens={pesagens || []} onSave={salvarPesagem} onCancel={() => { setAbrirForm(false); setPesagemEditando(null); }} />
       )}
     </div>

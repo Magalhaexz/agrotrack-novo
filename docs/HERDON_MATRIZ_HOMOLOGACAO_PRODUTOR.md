@@ -1,4 +1,4 @@
-# Matriz de Homologação — Teste com Produtor (Sprints 21-23)
+# Matriz de Homologação — Teste com Produtor (Sprints 21-24)
 
 Método: Sprint 21 foi auditoria de código (leitura de fonte + schema real
 via MCP Supabase), sem credencial de teste disponível naquela sessão.
@@ -14,6 +14,26 @@ de operação por fazenda) e um bug de breakpoint que deixava a sidebar de
 desktop invisível entre 768-900px, afetando **todas** as telas nessa
 faixa de largura — não só as listadas aqui. Ver
 `docs/SPRINT23_CORRECAO_VISUAL_FINAL.md` para o detalhe completo.
+
+**Sprint 24** logou de fato e navegou pelas 25 telas internas obrigatórias
+(não só as desta matriz, que é focada em independência de fazenda) —
+detalhe completo e checklist tela a tela em
+`docs/SPRINT24_CORRECAO_VISUAL_TOTAL.md`. Resumo:
+
+| Pergunta | Resposta |
+|---|---|
+| Visual validado? | Sim — 25/25 telas, logado, 375px; subconjunto também em 768px e 1280px |
+| Mobile validado? | Sim — sem overflow, sem NaN/undefined/Infinity, sem erro de console em nenhuma das 25 |
+| Layout bloqueia produtor? | Não, após as correções desta sprint (ver P0 abaixo) |
+| Pendência visual? | Só P2 já documentados (card vazio em Resultado/Custos, estado vazio sem texto no Comparativo, 2 botões sem estilo em Acompanhamento de Peso — task separada) |
+
+P0 encontrados e corrigidos na Sprint 24: botão "Nova pesagem" do
+cabeçalho de Pesagens virava banner (grid 2 colunas com `justify-self:
+stretch` padrão) e a aba "Nova pesagem" não mostrava campo nenhum, só um
+botão que abria o formulário real escondido em outro ponto da página —
+corrigido para a aba renderizar o formulário direto. Botão "Registrar
+manejo" de Sanidade renderizava com 180px de altura (banner) — corrigido
+para altura normal (44-56px).
 
 | Área | Funcionalidade | Fazenda 1 ok? | Fazenda 2 ok? | Cadastro ok? | Edição ok? | Exclusão/inativação ok? | Importação ok? | Mobile ok? | Exportação ok? | Status | Observação | Prioridade |
 |---|---|---|---|---|---|---|---|---|---|---|---|---|
