@@ -16,6 +16,7 @@ import { createOperationalRecord, updateOperationalRecord } from '../services/op
 import { formatarDataExportacao, montarNomeArquivo } from '../domain/exportacaoRelatorios';
 import { baixarCsv, abrirRelatorioParaImpressao } from '../utils/exportacaoArquivos';
 import { calcularConsumoDiarioTotalPorProduto, calcularDiasRestantesEstoque } from '../domain/previsaoConsumoEstoque';
+import { isModoConsolidado, construirMapaFazendas } from '../domain/escopoFazenda';
 
 const CATEGORIAS_ESTOQUE_GERAL = [
   'Medicamento',
@@ -137,6 +138,8 @@ export default function EstoquePage({ db, setDb, onRegistrarSaidaEstoque, naviga
 
   const lotesMap = useMemo(() => new Map((db.lotes || []).map((l) => [l.id, l])), [db.lotes]);
   const estoqueMap = useMemo(() => new Map((db.estoque || []).map((i) => [i.id, i])), [db.estoque]);
+  const consolidado = isModoConsolidado(fazendaSelecionada);
+  const fazendasMap = useMemo(() => construirMapaFazendas(db), [db]);
 
   const itens = useMemo(() => {
     const base = (db.estoque || []).filter((item) => (
@@ -176,11 +179,12 @@ export default function EstoquePage({ db, setDb, onRegistrarSaidaEstoque, naviga
         mediaConsumo,
         diasRest,
         coberturaPlanejada,
+        fazendaNome: fazendasMap.get(Number(item.fazenda_id)) || 'Sem fazenda',
         valorTotal: saldo * Number(item.valor_unitario || item.preco_unitario || 0),
         status,
       };
     });
-  }, [db.estoque, db.movimentacoes_estoque, db.lotes, db.consumo_suplementacao, escopoEstoque]);
+  }, [db.estoque, db.movimentacoes_estoque, db.lotes, db.consumo_suplementacao, escopoEstoque, fazendasMap]);
 
   const itensView = useMemo(() => (showOnlyCrit ? itens.filter((i) => i.status !== 'normal') : itens), [itens, showOnlyCrit]);
 
@@ -372,6 +376,7 @@ export default function EstoquePage({ db, setDb, onRegistrarSaidaEstoque, naviga
                   <div className="progress-bar-container"><div className={`progress-bar-fill ${item.status === 'critico' ? 'danger' : item.status === 'baixo' ? 'warning' : ''}`} style={{ width: `${Math.min(Math.max(item.ratio, 4), 100)}%`, background: bar }} /></div>
                 </div>
                 <div className="estoque-card-details">
+                  {consolidado ? <div className="estoque-detail-row"><span>Fazenda</span><span>{item.fazendaNome}</span></div> : null}
                   <div className="estoque-detail-row"><span>Valor unitário</span><span>{formatCurrency(item.valor_unitario || item.preco_unitario || 0)}</span></div>
                   <div className="estoque-detail-row"><span>Valor total</span><span>{formatCurrency(item.valorTotal)}</span></div>
                   <div className="estoque-detail-row"><span>Consumo médio diário</span><span>{formatNumber(item.mediaConsumo, 2)} {item.unidade}</span></div>

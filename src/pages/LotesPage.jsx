@@ -7,6 +7,7 @@ import LoteForm from '../components/LoteForm';
 import { useAuth } from '../auth/useAuth';
 import { useToast } from '../hooks/useToast';
 import { getResumoLote } from '../domain/resumoLote';
+import { isModoConsolidado } from '../domain/escopoFazenda';
 import { calcularSaudeLote } from '../domain/saudeLote';
 import { gerarResumoRelatorioLote } from '../domain/relatorioLote';
 import { gerarResumoLoteTexto } from '../domain/whatsappResumo';
@@ -67,9 +68,14 @@ function getActiveFarmId(fazendaSelecionada) {
   return Number.isFinite(value) && value > 0 ? value : null;
 }
 
-function filterLotesByActiveFarm(lotes = [], activeFarmId = null) {
+function filterLotesByActiveFarm(lotes = [], activeFarmId = null, consolidado = false) {
+  const lista = Array.isArray(lotes) ? lotes : [];
+  // Sprint 28: visão "Todas as fazendas" mostra todos os lotes (o db já vem
+  // completo do App); sem fazenda ativa e fora do modo consolidado, mantém o
+  // comportamento antigo de não vazar lote nenhum.
+  if (consolidado) return lista;
   if (!activeFarmId) return [];
-  return (Array.isArray(lotes) ? lotes : []).filter((lote) => Number(lote?.faz_id) === Number(activeFarmId));
+  return lista.filter((lote) => Number(lote?.faz_id) === Number(activeFarmId));
 }
 
 function buildLoteConsumptionHistoryRows(consumos = [], loteId = null) {
@@ -296,7 +302,8 @@ export default function LotesPage({ db, setDb, onRegistrarSaidaAnimal, session, 
     };
   }), [db, lotes, pesagens, fazendas, pastagensMap]);
 
-  const lotesDaFazendaAtiva = useMemo(() => filterLotesByActiveFarm(lotesEnriquecidos, activeFarmId), [lotesEnriquecidos, activeFarmId]);
+  const consolidado = useMemo(() => isModoConsolidado(fazendaSelecionada), [fazendaSelecionada]);
+  const lotesDaFazendaAtiva = useMemo(() => filterLotesByActiveFarm(lotesEnriquecidos, activeFarmId, consolidado), [lotesEnriquecidos, activeFarmId, consolidado]);
 
   const lotesFiltrados = useMemo(() => lotesDaFazendaAtiva.filter((lote) => {
     if (filters.status !== 'todos' && lote.status !== filters.status) return false;

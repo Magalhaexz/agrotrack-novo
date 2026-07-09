@@ -10,6 +10,7 @@
 import { getSupabaseAdminClient, extractBearerToken } from './_supabaseAdmin.js';
 import { enviarMensagemTelegramParaChat, getTelegramEnvStatus } from './_telegram.js';
 import { montarDbDaConta } from './_herdonDb.js';
+import { prepararAlertasEscopados, enriquecerAlertasComFazenda } from '../src/domain/telegramFazenda.js';
 import { gerarAlertasUnificados } from '../src/domain/alertasUnificados.js';
 import { aplicarTratativasAosAlertas } from '../src/domain/tratativasAlertas.js';
 import { gerarRelatorioDiarioTelegram } from '../src/domain/telegramRelatorio.js';
@@ -36,12 +37,14 @@ async function registrarLog(client, { ownerUserId, connectionId, status, errorMe
 
 async function processarConexao(client, conexao, { dryRun }) {
   try {
-    const db = await montarDbDaConta(client, conexao.owner_user_id);
+    const dbConta = await montarDbDaConta(client, conexao.owner_user_id);
+    const { db, identificarFazenda } = prepararAlertasEscopados(dbConta, conexao.fazenda_id);
     const alertasBrutos = gerarAlertasUnificados(db);
     // Sprint 16: o relatório diário não deve repetir alertas já resolvidos/
     // ignorados/adiados-para-o-futuro — mesma tratativa da Central.
-    const alertas = aplicarTratativasAosAlertas(alertasBrutos, db.alertas_tratativas, new Date())
+    const alertasVisiveis = aplicarTratativasAosAlertas(alertasBrutos, db.alertas_tratativas, new Date())
       .filter((alerta) => alerta.visivel);
+    const alertas = enriquecerAlertasComFazenda(alertasVisiveis, db, identificarFazenda);
     const mensagem = gerarRelatorioDiarioTelegram(alertas);
 
     if (dryRun) {
@@ -90,7 +93,7 @@ export default async function handler(req, res) {
   const client = getSupabaseAdminClient();
   const { data: conexoes, error } = await client
     .from('telegram_connections')
-    .select('id, owner_user_id, telegram_chat_id')
+    .select('id, owner_user_id, telegram_chat_id, fazenda_id')
     .eq('is_active', true)
     .eq('daily_report_enabled', true);
 

@@ -19,6 +19,7 @@ import { getSupabaseAdminClient } from './_supabaseAdmin.js';
 import { enviarMensagemTelegramParaChat as enviarMensagemTelegramParaChatBase } from './_telegram.js';
 import { extractHerdonCodeFromText, isCodeUsable } from './_telegramConnections.js';
 import { montarDbDaConta } from './_herdonDb.js';
+import { prepararAlertasEscopados, enriquecerAlertasComFazenda } from '../src/domain/telegramFazenda.js';
 import { gerarAlertasUnificados } from '../src/domain/alertasUnificados.js';
 import { aplicarTratativasAosAlertas } from '../src/domain/tratativasAlertas.js';
 import { classificarIntencaoTelegram, INTENCOES } from '../src/domain/telegramIntent.js';
@@ -84,7 +85,10 @@ function isWebhookAuthorized(req) {
 async function buscarConexaoAtiva(client, chatId) {
   const { data } = await client
     .from('telegram_connections')
-    .select('id, owner_user_id, telegram_chat_id')
+    // Sprint 28: `fazenda_id` recupera o recorte por fazenda da conexão (quando
+    // ela foi vinculada a uma fazenda específica) — sem isso o /alertas de uma
+    // conta multi-fazenda misturava alertas de todas as fazendas.
+    .select('id, owner_user_id, telegram_chat_id, fazenda_id')
     .eq('telegram_chat_id', String(chatId))
     .eq('is_active', true)
     .maybeSingle();
@@ -208,12 +212,14 @@ export default async function handler(req, res) {
     console.log('[telegram-webhook] comando recebido', { comando });
     if (comando === 'alertas' && conexao) {
       try {
-        const db = await montarDbDaConta(client, conexao.owner_user_id);
+        const dbConta = await montarDbDaConta(client, conexao.owner_user_id);
+        const { db, identificarFazenda } = prepararAlertasEscopados(dbConta, conexao.fazenda_id);
         const alertasBrutos = gerarAlertasUnificados(db);
         // Sprint 16: alertas resolvidos/ignorados/adiados-para-o-futuro não
         // devem aparecer como prioridade no /alertas — mesma tratativa da Central.
-        const alertas = aplicarTratativasAosAlertas(alertasBrutos, db.alertas_tratativas, new Date())
+        const alertasVisiveis = aplicarTratativasAosAlertas(alertasBrutos, db.alertas_tratativas, new Date())
           .filter((alerta) => alerta.visivel);
+        const alertas = enriquecerAlertasComFazenda(alertasVisiveis, db, identificarFazenda);
         const resposta = gerarRespostaComandoTelegram(comando, { vinculado: true, alertas });
         await enviarMensagemTelegramParaChat(chatId, resposta).catch(() => null);
         return res.status(200).json({ ok: true, comando });
@@ -235,8 +241,9 @@ export default async function handler(req, res) {
   }
 
   try {
-    const db = await montarDbDaConta(client, conexao.owner_user_id);
-    const alertas = gerarAlertasUnificados(db);
+    const dbConta = await montarDbDaConta(client, conexao.owner_user_id);
+    const { db, identificarFazenda } = prepararAlertasEscopados(dbConta, conexao.fazenda_id);
+    const alertas = enriquecerAlertasComFazenda(gerarAlertasUnificados(db), db, identificarFazenda);
     const intencao = classificarIntencaoTelegram(texto);
     const resposta = gerarRespostaIntencao(intencao, { db, alertas });
     await enviarMensagemTelegramParaChat(chatId, resposta).catch(() => null);

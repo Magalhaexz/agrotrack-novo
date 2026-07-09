@@ -4,6 +4,42 @@
 // somente os dados da fazenda selecionada, evitando misturar lotes, estoque,
 // custos, sanidade, pastos e alertas entre fazendas diferentes.
 
+// Sprint 28: sentinela de "Todas as fazendas" (visão consolidada). `id: null`
+// faz `filtrarDbPorFazenda` devolver o db inteiro; `todas: true` distingue a
+// escolha explícita do usuário do estado "ainda não selecionou" (id null puro).
+export const TODAS_FAZENDAS = { id: null, nome: 'Todas as fazendas', todas: true };
+
+/** Está em visão consolidada (Todas as fazendas)? */
+export function isModoConsolidado(fazenda) {
+  return Boolean(fazenda?.todas);
+}
+
+/** Map<id(Number) → nome> de todas as fazendas do db (não filtrado por escopo). */
+export function construirMapaFazendas(db) {
+  const map = new Map();
+  (Array.isArray(db?.fazendas) ? db.fazendas : []).forEach((f) => {
+    map.set(Number(f.id), f.nome);
+  });
+  return map;
+}
+
+/**
+ * Nome da fazenda de origem de um lote (via `faz_id`/`fazenda_id`). Usado na
+ * visão consolidada para identificar de qual fazenda vem cada item que se
+ * ancora em um lote (custos, pesagens, sanidade, financeiro por lote).
+ * @param {Map} [mapa] mapa pré-construído por `construirMapaFazendas` (opcional).
+ */
+export function nomeFazendaDoLote(db, loteId, mapa = null) {
+  if (loteId == null) return null;
+  const lote = (Array.isArray(db?.lotes) ? db.lotes : []).find(
+    (l) => Number(l.id) === Number(loteId)
+  );
+  if (!lote) return null;
+  const fid = lote.faz_id ?? lote.fazenda_id;
+  const nomes = mapa || construirMapaFazendas(db);
+  return nomes.get(Number(fid)) || null;
+}
+
 /** Registros sem fazenda_id (legado) ficam visíveis em qualquer fazenda — nunca desaparecem silenciosamente. */
 function pertenceAFazenda(valor, farmId) {
   return !valor || Number(valor) === farmId;

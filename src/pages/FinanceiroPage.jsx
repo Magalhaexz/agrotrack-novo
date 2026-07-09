@@ -9,6 +9,7 @@ import Modal from '../components/ui/Modal';
 import PageHeader from '../components/PageHeader';
 import ExportActions from '../components/ExportActions';
 import { getResumoLote } from '../domain/resumoLote';
+import { isModoConsolidado, construirMapaFazendas } from '../domain/escopoFazenda';
 import { listarContasFinanceiras } from '../domain/hojeNaFazenda';
 import { isMovimentacaoPaga, isMovimentacaoCancelada, getDataVencimento } from '../domain/financeiroStatus';
 import { formatCurrency, formatDate, formatNumber } from '../utils/calculations';
@@ -53,7 +54,7 @@ function buildPagamentosVisaoGeral(db, hoje) {
   return { vencidas, vencendoHoje, proximosSeteDias, previstas, pagas };
 }
 
-export default function FinanceiroPage({ db, setDb, navigationIntent = null }) {
+export default function FinanceiroPage({ db, setDb, navigationIntent = null, fazendaSelecionada = null }) {
   const { hasPermission, session } = useAuth();
   const { showToast } = useToast();
   const abrirLancamentoPorIntent = navigationIntent?.page === 'financeiro' && navigationIntent?.action === 'novo';
@@ -68,6 +69,8 @@ export default function FinanceiroPage({ db, setDb, navigationIntent = null }) {
     () => (Array.isArray(db?.movimentacoes_financeiras) ? db.movimentacoes_financeiras : []),
     [db]
   );
+  const consolidado = isModoConsolidado(fazendaSelecionada);
+  const fazendasMap = useMemo(() => construirMapaFazendas(db), [db]);
   const podeEditarFinanceiroUi = hasPermission('financeiro:editar');
 
   function podeEditarFinanceiro() {
@@ -104,6 +107,7 @@ export default function FinanceiroPage({ db, setDb, navigationIntent = null }) {
       return {
         lote,
         status: lote.status,
+        fazendaNome: fazendasMap.get(Number(lote.faz_id ?? lote.fazenda_id)) || 'Sem fazenda',
         custoTotal,
         receitaTotal: resumo.receitaTotal,
         lucroTotal,
@@ -114,7 +118,7 @@ export default function FinanceiroPage({ db, setDb, navigationIntent = null }) {
         deducoes,
       };
     })
-  ), [db, lotes, movFinMapByLote]);
+  ), [db, lotes, movFinMapByLote, fazendasMap]);
 
   const detalhe = useMemo(
     () => lotesRows.find((row) => Number(row.lote.id) === Number(detailLoteId)) || null,
@@ -469,6 +473,7 @@ export default function FinanceiroPage({ db, setDb, navigationIntent = null }) {
                 <thead>
                   <tr>
                     <th>Lote</th>
+                    {consolidado ? <th>Fazenda</th> : null}
                     <th>Status</th>
                     <th>Custo total</th>
                     <th>Receita</th>
@@ -483,12 +488,13 @@ export default function FinanceiroPage({ db, setDb, navigationIntent = null }) {
                 <tbody>
                   {lotesRows.length === 0 ? (
                     <tr>
-                      <td colSpan="10" className="empty-state-td">Nenhum lote disponível para análise financeira.</td>
+                      <td colSpan={consolidado ? 11 : 10} className="empty-state-td">Nenhum lote disponível para análise financeira.</td>
                     </tr>
                   ) : (
                     lotesRows.map((row) => (
                       <tr key={row.lote.id}>
                         <td>{row.lote.nome}</td>
+                        {consolidado ? <td>{row.fazendaNome}</td> : null}
                         <td><Badge variant={row.status === 'ativo' ? 'info' : 'neutral'}>{row.status}</Badge></td>
                         <td>{formatCurrency(row.custoTotal)}</td>
                         <td>{formatCurrency(row.receitaTotal)}</td>
@@ -506,6 +512,7 @@ export default function FinanceiroPage({ db, setDb, navigationIntent = null }) {
                   <tfoot>
                     <tr>
                       <td>Total</td>
+                      {consolidado ? <td>-</td> : null}
                       <td>-</td>
                       <td>{formatCurrency(lotesRows.reduce((sum, row) => sum + row.custoTotal, 0))}</td>
                       <td>{formatCurrency(lotesRows.reduce((sum, row) => sum + row.receitaTotal, 0))}</td>

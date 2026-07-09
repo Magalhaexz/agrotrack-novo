@@ -562,7 +562,7 @@ export default function AcompanhamentoPesoPage({ db, setDb }) {
                 <div className="empty-box" style={{ marginBottom: 12 }}>
                   <strong>Este lote possui {headCount} cabeças e {animaisIndividuais.length} animais individuais registrados.</strong>
                   <span>Gere os animais faltantes para pesar todos individualmente.</span>
-                  <button type="button" className="primary-btn" onClick={gerarAnimais}>
+                  <button type="button" className="ui-button ui-button--primary" onClick={gerarAnimais}>
                     Gerar animais individuais para este lote
                   </button>
                 </div>
@@ -618,7 +618,7 @@ export default function AcompanhamentoPesoPage({ db, setDb }) {
                 <button type="button" className="ui-button ui-button--outline" disabled={saving} onClick={onSalvarProgresso}>
                   Salvar progresso
                 </button>
-                <button type="button" className="primary-btn" disabled={saving} onClick={onFinalizar}>
+                <button type="button" className="ui-button ui-button--primary" disabled={saving} onClick={onFinalizar}>
                   Finalizar pesagem do lote
                 </button>
               </div>

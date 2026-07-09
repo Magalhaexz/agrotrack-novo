@@ -79,6 +79,25 @@ real (ver `docs/SPRINT27_AUDITORIA_TOTAL_APP.md`):
 - Pendências P2/P3 em `docs/HERDON_PENDENCIAS_POS_TESTE_PRODUTOR.md`.
 - **Decisão: liberado para teste de produtor por 1 mês.**
 
+**Sprint 28** — fechamento de pendências pré-piloto (ver
+`docs/SPRINT28_FECHAMENTO_PENDENCIAS_PILOTO.md`):
+- **"Todas as fazendas" (visão consolidada)** no seletor (desktop + mobile,
+  só com >1 fazenda). Identificação da fazenda de origem em Lotes, Custos,
+  Financeiro Por Lote, Estoque (Pastagens e Resultado já tinham). Filtro
+  interno de Lotes corrigido (mostrava vazio no consolidado).
+- **Dados órfãos:** `integridadeDados.js` (detector + 8 testes) + aviso
+  admin em Configurações; órfãos também ficam visíveis no consolidado como
+  "Sem fazenda". Nenhum dado apagado.
+- **Telegram multi-fazenda (P1):** recorte por `fazenda_id` da conexão e
+  identificação da fazenda por alerta em conta multi-fazenda (`/alertas`,
+  assistente e relatório diário). Isolamento entre contas intacto. Sem
+  migration (coluna já existia). +6 testes.
+- **Pastos:** CTA "Cadastrar pasto" nos estados vazios.
+- **Acompanhamento de Peso:** 2 botões sem estilo (`primary-btn` sem regra
+  base) → `ui-button ui-button--primary`.
+- `npm test`: 987 (0 falhas). Multi-fazenda sem overflow/erro nos 3 tamanhos.
+- **Decisão mantida: liberado para teste de produtor por 1 mês.**
+
 | Área | Funcionalidade | Fazenda 1 ok? | Fazenda 2 ok? | Cadastro ok? | Edição ok? | Exclusão/inativação ok? | Importação ok? | Mobile ok? | Exportação ok? | Status | Observação | Prioridade |
 |---|---|---|---|---|---|---|---|---|---|---|---|---|
 | Menu lateral/topbar | Navegação | N/A (conta) | N/A | — | — | — | — | **Corrigido (Sprint 22)** | — | Corrigido | Bottom-nav mobile aparecia até 1024px, coexistindo com o header de abas do desktop em telas de tablet/laptop — breakpoint corrigido para 767px | P0 |

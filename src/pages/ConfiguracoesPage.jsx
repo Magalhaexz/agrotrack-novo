@@ -8,6 +8,7 @@ import { supabase } from '../lib/supabase'; // Assumindo que supabase está conf
 import { useAuth } from '../auth/useAuth';
 import { useToast } from '../hooks/useToast'; // Importa o hook de toast
 import { normalizeBackupPayload } from '../utils/backupValidation';
+import { resumirProblemasIntegridade } from '../domain/integridadeDados';
 import {
   createAuditEvent,
   deleteOwnerScopedCollection,
@@ -454,6 +455,23 @@ export default function ConfiguracoesPage({ db, setDb, onConfirmAction, onNaviga
         <h1>Configurações</h1>
         <p>Parâmetros globais, notificações e segurança dos dados.</p>
       </header>
+
+      {(() => {
+        const integridade = resumirProblemasIntegridade(db);
+        if (!integridade.temProblemas) return null;
+        const partes = Object.entries(integridade.porTabela)
+          .filter(([, n]) => n > 0)
+          .map(([tabela, n]) => `${n} em ${tabela}`);
+        return (
+          <div className="config-integridade-aviso" role="status">
+            <AlertTriangle size={18} aria-hidden="true" />
+            <div>
+              <strong>{integridade.mensagem}</strong>
+              <span>{partes.join(' · ')}. Use o seletor “Todas as fazendas” para localizá-los e reatribuir a fazenda correta.</span>
+            </div>
+          </div>
+        );
+      })()}
 
       {podeGerenciarAcessos ? (
         <Card title="Equipe e acessos" subtitle="Convide pessoas, altere papéis e gerencie quem acessa sua conta HERDON.">

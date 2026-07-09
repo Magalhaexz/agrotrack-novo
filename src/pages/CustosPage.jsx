@@ -2,6 +2,7 @@ import { useMemo, useState } from 'react';
 import CustoForm from '../components/CustoForm';
 import PageHeader from '../components/PageHeader';
 import { formatarMoeda, formatarData } from '../utils/formatters';
+import { isModoConsolidado, construirMapaFazendas } from '../domain/escopoFazenda';
 import Button from '../components/ui/Button';
 import { gerarNovoId } from '../utils/id'; // Importa a função de gerar ID
 import { useAuth } from '../auth/useAuth';
@@ -62,7 +63,7 @@ function upsertMovimentacaoFinanceiraDeCusto(movimentacoes, custo) {
  * @param {function} props.setDb - Função para atualizar o banco de dados.
  * @param {function} [props.onConfirmAction] - Função para exibir um modal de confirmação customizado.
  */
-export default function CustosPage({ db, setDb, onConfirmAction }) {
+export default function CustosPage({ db, setDb, onConfirmAction, fazendaSelecionada = null }) {
   const { hasPermission, session } = useAuth();
   const { showToast } = useToast();
   const [abrirForm, setAbrirForm] = useState(false);
@@ -71,25 +72,29 @@ export default function CustosPage({ db, setDb, onConfirmAction }) {
 
   const lotes = useMemo(() => (Array.isArray(db?.lotes) ? db.lotes : []), [db]);
   const custos = useMemo(() => (Array.isArray(db?.custos) ? db.custos : []), [db]);
+  const consolidado = isModoConsolidado(fazendaSelecionada);
 
   // Otimização: Criar um mapa de lotes para busca eficiente (O(1))
   const lotesMap = useMemo(() => {
     return new Map(lotes.map((l) => [l.id, l]));
   }, [lotes]);
+  const fazendasMap = useMemo(() => construirMapaFazendas(db), [db]);
 
   const dadosTabela = useMemo(() => {
     return [...custos]
       .map((custo) => {
         const lote = lotesMap.get(custo.lote_id); // Usar o mapa para buscar o lote
+        const fid = lote?.faz_id ?? lote?.fazenda_id;
         return {
           ...custo,
           loteNome: lote?.nome || '—',
+          fazendaNome: fazendasMap.get(Number(fid)) || 'Sem fazenda',
           dataKey: toDateKey(custo?.data),
         };
       })
       .filter((item) => item.dataKey)
       .sort((a, b) => b.dataKey.localeCompare(a.dataKey));
-  }, [custos, lotesMap]); // Depende de custos e do mapa de lotes
+  }, [custos, lotesMap, fazendasMap]); // Depende de custos e do mapa de lotes
 
   const resumo = useMemo(() => {
     const total = custos.reduce((acc, item) => acc + Number(item.val || 0), 0);
@@ -330,6 +335,7 @@ export default function CustosPage({ db, setDb, onConfirmAction }) {
                 <tr>
                   <th>Data</th>
                   <th>Lote</th>
+                  {consolidado ? <th>Fazenda</th> : null}
                   <th>Categoria</th>
                   <th>Descrição</th>
                   <th>Valor</th>
@@ -341,6 +347,7 @@ export default function CustosPage({ db, setDb, onConfirmAction }) {
                   <tr key={custo.id}>
                     <td>{formatarData(custo.data)}</td>
                     <td className="text-h">{custo.loteNome}</td>
+                    {consolidado ? <td>{custo.fazendaNome}</td> : null}
                     <td>
                       <span className="badge b-blue">
                         {normalizarCategoria(custo.cat)}

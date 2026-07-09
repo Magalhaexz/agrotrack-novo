@@ -7481,8 +7481,7 @@ body,
   .page--pesagens .kpi-grid-3--compact { grid-template-columns: 1fr; }
   .animais-page .ui-card,
   .page--pesagens .fazendas-card { padding: 12px; }
-  .animais-list-card .ui-card-header > .ui-button,
-  .page--pesagens .primary-btn { width: 100%; }
+  .animais-list-card .ui-card-header > .ui-button { width: 100%; }
   .segmented-control { width: 100%; }
 }
 

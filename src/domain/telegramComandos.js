@@ -60,7 +60,10 @@ function formatarResumoAlertas(alertas) {
     '',
   ];
   lista.slice(0, LIMITE_ALERTAS_LISTADOS).forEach((alerta) => {
-    linhas.push(`${PRIORIDADE_EMOJI[alerta.prioridade] || '•'} ${alerta.titulo}`);
+    // Sprint 28: em conta multi-fazenda sem recorte fixo, identifica a fazenda
+    // de origem quando o alerta se ancora num lote (evita misturar sem rótulo).
+    const sufixoFazenda = alerta.fazendaNome ? ` — ${alerta.fazendaNome}` : '';
+    linhas.push(`${PRIORIDADE_EMOJI[alerta.prioridade] || '•'} ${alerta.titulo}${sufixoFazenda}`);
   });
   if (lista.length > LIMITE_ALERTAS_LISTADOS) {
     linhas.push(`• +${lista.length - LIMITE_ALERTAS_LISTADOS} outro(s) alerta(s)`);

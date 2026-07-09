@@ -293,3 +293,32 @@
     flex: 1 1 200px;
   }
 }
+
+/* Sprint 28: aviso de integridade (registros sem fazenda vinculada). */
+.config-integridade-aviso {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  padding: 14px 16px;
+  border-radius: 14px;
+  border: 1px solid rgba(230, 168, 60, 0.35);
+  background: rgba(230, 168, 60, 0.08);
+  color: var(--color-text);
+}
+
+.config-integridade-aviso svg {
+  color: #e6a83c;
+  flex-shrink: 0;
+  margin-top: 2px;
+}
+
+.config-integridade-aviso strong {
+  display: block;
+  font-size: 0.94rem;
+  margin-bottom: 3px;
+}
+
+.config-integridade-aviso span {
+  font-size: 0.84rem;
+  color: var(--color-text-secondary);
+}

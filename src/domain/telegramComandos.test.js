@@ -86,6 +86,18 @@ test('/alertas com vínculo resume total, prioridades e até 5 alertas', () => {
   assert.doesNotMatch(resposta, /ignorado/);
 });
 
+test('/alertas identifica a fazenda de origem quando o alerta traz fazendaNome (multi-fazenda)', () => {
+  const alertas = [
+    { prioridade: 'critico', titulo: 'GMD baixo', fazendaNome: 'Boa Vista' },
+    { prioridade: 'atencao', titulo: 'Conta vencida' }, // sem fazenda → sem sufixo
+  ];
+  const resposta = gerarRespostaComandoTelegram('alertas', { vinculado: true, alertas });
+  assert.match(resposta, /GMD baixo — Boa Vista/);
+  // alerta sem fazendaNome não ganha " — " pendurado
+  assert.match(resposta, /Conta vencida\n?/);
+  assert.doesNotMatch(resposta, /Conta vencida —/);
+});
+
 test('comando desconhecido pede para usar /ajuda', () => {
   assert.match(gerarRespostaComandoTelegram('desconhecido'), /Comando não reconhecido/);
 });

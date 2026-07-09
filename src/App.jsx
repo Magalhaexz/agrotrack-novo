@@ -526,6 +526,9 @@ export default function App() {
       }
 
       setFazendaSelecionada((prev) => {
+        // Sprint 28: preserva a escolha explícita de "Todas as fazendas"
+        // (visão consolidada) — sem isto o efeito forçaria fazendas[0].
+        if (prev?.todas) return prev;
         if (prev && fazendas.some((fazenda) => Number(fazenda.id) === Number(prev.id))) {
           return fazendas.find((fazenda) => Number(fazenda.id) === Number(prev.id));
         }

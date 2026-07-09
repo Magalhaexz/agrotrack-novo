@@ -3,6 +3,7 @@ import { createPortal } from 'react-dom';
 import { useEffect, useRef, useState } from 'react';
 import { obterLabelPerfil } from '../auth/perfis';
 import { getNavLabel } from '../navigation/navConfig';
+import { TODAS_FAZENDAS } from '../domain/escopoFazenda';
 import UserAvatar from './ui/UserAvatar';
 import ConnectionIndicator from './ConnectionIndicator';
 
@@ -346,21 +347,37 @@ export default function AppHeader({
             {fazendas.length === 0 ? (
               <div className="header-farm-item-empty">Nenhuma fazenda cadastrada.</div>
             ) : (
-              fazendas.map((fazenda) => (
-                <button
-                  key={fazenda.id}
-                  type="button"
-                  className={`header-farm-item ${Number(fazendaSelecionada?.id) === Number(fazenda.id) ? 'active' : ''}`}
-                  onClick={() => {
-                    onSelectFazenda?.(fazenda);
-                    setOpenFarms(false);
-                  }}
-                  aria-current={Number(fazendaSelecionada?.id) === Number(fazenda.id) ? 'page' : undefined}
-                >
-                  <span>{fazenda.nome}</span>
-                  <small>{fazenda.cidade} / {fazenda.estado}</small>
-                </button>
-              ))
+              <>
+                {fazendas.length > 1 ? (
+                  <button
+                    type="button"
+                    className={`header-farm-item header-farm-item--todas ${fazendaSelecionada?.todas ? 'active' : ''}`}
+                    onClick={() => {
+                      onSelectFazenda?.(TODAS_FAZENDAS);
+                      setOpenFarms(false);
+                    }}
+                    aria-current={fazendaSelecionada?.todas ? 'page' : undefined}
+                  >
+                    <span>Todas as fazendas</span>
+                    <small>Visão consolidada</small>
+                  </button>
+                ) : null}
+                {fazendas.map((fazenda) => (
+                  <button
+                    key={fazenda.id}
+                    type="button"
+                    className={`header-farm-item ${!fazendaSelecionada?.todas && Number(fazendaSelecionada?.id) === Number(fazenda.id) ? 'active' : ''}`}
+                    onClick={() => {
+                      onSelectFazenda?.(fazenda);
+                      setOpenFarms(false);
+                    }}
+                    aria-current={!fazendaSelecionada?.todas && Number(fazendaSelecionada?.id) === Number(fazenda.id) ? 'page' : undefined}
+                  >
+                    <span>{fazenda.nome}</span>
+                    <small>{fazenda.cidade} / {fazenda.estado}</small>
+                  </button>
+                ))}
+              </>
             )}
           </div>
         )}
@@ -449,20 +466,35 @@ export default function AppHeader({
                       {fazendas.length === 0 ? (
                         <div className="header-farm-item-empty">Nenhuma fazenda cadastrada.</div>
                       ) : (
-                        fazendas.map((fazenda) => (
-                          <button
-                            key={`mobile-farm-${fazenda.id}`}
-                            type="button"
-                            className={`header-farm-item ${Number(fazendaSelecionada?.id) === Number(fazenda.id) ? 'active' : ''}`}
-                            onClick={() => {
-                              onSelectFazenda?.(fazenda);
-                              setOpenMobilePanel(false);
-                            }}
-                          >
-                            <span>{fazenda.nome}</span>
-                            <small>{fazenda.cidade} / {fazenda.estado}</small>
-                          </button>
-                        ))
+                        <>
+                          {fazendas.length > 1 ? (
+                            <button
+                              type="button"
+                              className={`header-farm-item header-farm-item--todas ${fazendaSelecionada?.todas ? 'active' : ''}`}
+                              onClick={() => {
+                                onSelectFazenda?.(TODAS_FAZENDAS);
+                                setOpenMobilePanel(false);
+                              }}
+                            >
+                              <span>Todas as fazendas</span>
+                              <small>Visão consolidada</small>
+                            </button>
+                          ) : null}
+                          {fazendas.map((fazenda) => (
+                            <button
+                              key={`mobile-farm-${fazenda.id}`}
+                              type="button"
+                              className={`header-farm-item ${!fazendaSelecionada?.todas && Number(fazendaSelecionada?.id) === Number(fazenda.id) ? 'active' : ''}`}
+                              onClick={() => {
+                                onSelectFazenda?.(fazenda);
+                                setOpenMobilePanel(false);
+                              }}
+                            >
+                              <span>{fazenda.nome}</span>
+                              <small>{fazenda.cidade} / {fazenda.estado}</small>
+                            </button>
+                          ))}
+                        </>
                       )}
                     </div>
                   </section>

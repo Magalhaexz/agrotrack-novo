@@ -25,33 +25,30 @@ contínuo, não são bugs conhecidos):
 
 ## Polimentos (P2)
 
-- **"Todas as fazendas" não exposta na UI.** A função de domínio
-  `filtrarDbPorFazenda(db, null)` (`src/domain/escopoFazenda.js`) já
-  devolve o consolidado de todas as fazendas, mas o seletor de fazenda do
-  header (`src/components/AppHeader.jsx`) só lista fazendas específicas —
-  não há opção "Todas". Expor isso exigiria: (a) item no seletor, (b)
-  decidir como cada tela identifica a fazenda de origem de cada item no
-  modo consolidado, (c) revisar agregações (DRE, KPIs) para somar entre
-  fazendas. É **feature nova**, não bug — fora do escopo de uma sprint de
-  correção. Priorizar conforme demanda real de quem tem >1 fazenda.
-- **Empty state de Pastos sem CTA inline.** A tela tem "+ Novo pasto" no
-  header, mas o bloco de estado vazio não repete o CTA (outros estados
-  vazios — Estoque, Sanidade, Animais, Comparativo — têm botão inline).
-  Consistência; baixo impacto.
+- ~~**"Todas as fazendas" não exposta na UI.**~~ **RESOLVIDO (Sprint 28).**
+  Opção "Todas as fazendas — Visão consolidada" adicionada ao seletor
+  (desktop + mobile, só com >1 fazenda); identificação da fazenda de origem
+  nas páginas-chave (Lotes, Custos, Financeiro Por Lote, Estoque; Pastagens
+  e Resultado já tinham). Ver `docs/SPRINT28_FECHAMENTO_PENDENCIAS_PILOTO.md`.
+- ~~**Empty state de Pastos sem CTA inline.**~~ **RESOLVIDO (Sprint 28)** —
+  CTA "Cadastrar pasto" adicionado aos dois estados vazios.
 - **Página Importação:** o `<h1>` só aparece após o carregamento do bundle
   pesado (453KB). Não é bug (a página tem título), mas o tempo de
   first-paint é perceptível; candidato a code-splitting/lazy melhor.
+- **Identificação por linha no consolidado** ainda pendente em Pesagens,
+  Sanidade, Nutrição, Tarefas e Central de Alertas (na tela). Renderizam o
+  consolidado corretamente, mas sem rótulo de fazenda por registro — são
+  telas ancoradas em lote ou sem dado no piloto. No Telegram os alertas já
+  vêm identificados.
 
 ## Higiene de dados (P2/P3)
 
-- **Lote órfão id 9 "recria" sem `faz_id`.** Dado legado (provável lixo de
-  sessão de teste anterior) que não pertence a nenhuma fazenda. O filtro
-  estrito de lotes (`Number(lote.faz_id) === farmId`) o esconde de **todas**
-  as fazendas — ou seja, é invisível na UI, mas continua na base com um
-  custo (id 1, R$ 3.000) apontando para ele. **Não removido** nesta sprint
-  (regra: não apagar dado real sem certeza de que é lixo). Recomendação:
-  confirmar com o dono da conta e, se for lixo, limpar lote 9 + custo 1;
-  ou reatribuir a uma fazenda.
+- **Lote órfão id 9 "recria" sem `faz_id`.** **Tratado (Sprint 28):** agora
+  é detectado (`src/domain/integridadeDados.js`), sinalizado num aviso em
+  Configurações e **visível** na visão "Todas as fazendas" (rotulado como
+  "Sem fazenda"/"—" em Lotes, Custos e no CSV de Resultado). **Não removido**
+  (regra: não apagar dado real sem certeza). Recomendação mantida: confirmar
+  com o dono e limpar lote 9 + custo 1, ou reatribuir a uma fazenda.
 
 ## Futuro (P3 — não é escopo de correção)
 

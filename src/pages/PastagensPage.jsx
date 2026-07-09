@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useMemo, useRef, useState } from 'react';
 import { Plus } from 'lucide-react';
 import Button from '../components/ui/Button';
 import Card from '../components/ui/Card';
@@ -77,6 +77,16 @@ export default function PastagensPage({ db, setDb, session, onConfirmAction }) {
   const { showToast } = useToast();
   const [form, setForm] = useState(emptyForm());
   const [editando, setEditando] = useState(null);
+  const formCardRef = useRef(null);
+
+  // Sprint 28: CTA do estado vazio leva o produtor ao formulário (que já fica
+  // no topo da página) em vez de deixá-lo sem próximo passo.
+  function focarFormularioPasto() {
+    const card = formCardRef.current;
+    if (!card) return;
+    card.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    card.querySelector('input, select, textarea')?.focus();
+  }
 
   const mensagemSemPermissao = 'Você não tem permissão para executar esta ação.';
   const pastagens = useMemo(() => (Array.isArray(db?.pastagens) ? db.pastagens : []), [db]);
@@ -252,6 +262,7 @@ export default function PastagensPage({ db, setDb, session, onConfirmAction }) {
         subtitle="Cadastre os pastos da fazenda para acompanhar onde cada lote está e receber alertas de lotação."
       />
 
+      <div ref={formCardRef}>
       <Card title={editando ? 'Editar pasto' : 'Cadastrar pasto'}>
         <div className="form-grid two">
           <Input
@@ -308,12 +319,16 @@ export default function PastagensPage({ db, setDb, session, onConfirmAction }) {
           ) : null}
         </div>
       </Card>
+      </div>
 
       {!pastagens.length ? (
         <Card title="Capacidade dos pastos">
           <div className="empty-state">
             <strong>Nenhum pasto cadastrado.</strong>
-            <span>Cadastre os pastos para organizar a ocupação e acompanhar a lotação.</span>
+            <span>Cadastre pastos para acompanhar lotação, capacidade e movimentação dos lotes.</span>
+            {hasPermission('pastagens:editar') ? (
+              <Button icon={<Plus size={14} />} onClick={focarFormularioPasto} style={{ marginTop: 12 }}>Cadastrar pasto</Button>
+            ) : null}
           </div>
         </Card>
       ) : (
@@ -417,7 +432,10 @@ export default function PastagensPage({ db, setDb, session, onConfirmAction }) {
         {!pastagens.length ? (
           <div className="empty-state">
             <strong>Nenhum pasto cadastrado.</strong>
-            <span>Cadastre os pastos para organizar a ocupação e acompanhar a lotação.</span>
+            <span>Cadastre pastos para acompanhar lotação, capacidade e movimentação dos lotes.</span>
+            {hasPermission('pastagens:editar') ? (
+              <Button icon={<Plus size={14} />} onClick={focarFormularioPasto} style={{ marginTop: 12 }}>Cadastrar pasto</Button>
+            ) : null}
           </div>
         ) : (
           <div className="table-responsive">

@@ -43,6 +43,17 @@ Troque a fazenda ativa no seletor do topo e repita os passos 3 a 10 para a
 segunda fazenda. O mais importante: **confira se os dados de uma fazenda
 nunca aparecem misturados com os da outra.**
 
+Depois, no seletor do topo, escolha **"Todas as fazendas"** (aparece só
+quando você tem mais de uma). Nessa visão consolidada você vê tudo junto —
+e cada lote, custo, item de estoque e resultado mostra **de qual fazenda
+veio** (coluna/etiqueta "Fazenda"). Confira se cada item aparece com a
+fazenda certa. Para cadastrar algo novo, volte a escolher uma fazenda
+específica (não dá para cadastrar no modo "Todas").
+
+> Se aparecer um aviso em **Configurações** dizendo que há "registros sem
+> fazenda vinculada", use a visão "Todas as fazendas" para localizá-los
+> (aparecem como "Sem fazenda") e edite para vincular à fazenda correta.
+
 ## Tabela de feedback
 
 Preencha uma linha por teste que fizer:
