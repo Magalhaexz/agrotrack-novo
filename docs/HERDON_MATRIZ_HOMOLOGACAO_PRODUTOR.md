@@ -65,6 +65,20 @@ para altura normal (44-56px).
 - **Exportação preservada**: nenhuma mudança em CSV/PDF, cálculo ou
   regra de caixa/competência.
 
+**Sprint 27** — auditoria total logado, 35 telas × 3 viewports, navegação
+real (ver `docs/SPRINT27_AUDITORIA_TOTAL_APP.md`):
+- **Independência entre fazendas revalidada com dado real** (alternando
+  fazenda ativa): sem vazamento em Lotes, Custos, Financeiro. PASS.
+- **P1 corrigido — botão gigante no mobile:** o botão de ação do
+  `PageHeader` virava bloco de ~180px em `≤720px` (Custos, Sanidade,
+  Pastos, Animais, Tarefas, Estoque…). Causa: `.ph-actions` vira coluna e
+  herdava `flex: 1 1 180px` de `.page-actions > *` (basis vira altura em
+  coluna). Uma regra em `app.css` corrigiu todas as páginas de uma vez.
+- Sweep sem overflow / NaN / erro de console em nenhuma tela nos 3
+  tamanhos. Exportação CSV revalidada (sem NaN/undefined). Nenhum P0.
+- Pendências P2/P3 em `docs/HERDON_PENDENCIAS_POS_TESTE_PRODUTOR.md`.
+- **Decisão: liberado para teste de produtor por 1 mês.**
+
 | Área | Funcionalidade | Fazenda 1 ok? | Fazenda 2 ok? | Cadastro ok? | Edição ok? | Exclusão/inativação ok? | Importação ok? | Mobile ok? | Exportação ok? | Status | Observação | Prioridade |
 |---|---|---|---|---|---|---|---|---|---|---|---|---|
 | Menu lateral/topbar | Navegação | N/A (conta) | N/A | — | — | — | — | **Corrigido (Sprint 22)** | — | Corrigido | Bottom-nav mobile aparecia até 1024px, coexistindo com o header de abas do desktop em telas de tablet/laptop — breakpoint corrigido para 767px | P0 |
@@ -74,11 +88,11 @@ para altura normal (44-56px).
 | Acompanhamento de Peso | Evolução/GMD | Sim | Sim | — | — | — | — | **Corrigido (Sprint 22)** | — | Corrigido | Abas sobrepostas e ilegíveis no mobile — corrigido (Sprint 22) | P0 |
 | Resultado por Lote | Custo/lucro por @ | Sim | Sim | — | — | — | — | Sim (Sprint 22) | Sim | OK | Lê `db.lotes`/`db.custos`, já escopados. Card de ações vazio no topo é P2 visual (ver Sprint 22) | — |
 | Comparativo de Lotes | Comparar lotes | **Corrigido** | **Corrigido** | — | — | — | — | Sim (Sprint 22) | — | Corrigido nesta sprint | Não tinha nenhuma menção a fazenda antes | P0 |
-| Custos por Lote | Lançar/editar custo | Sim | Sim | Sim | Sim | — | — | **Corrigido (Sprint 22/26)** | Sim | Corrigido | Valores monetários sem formatação pt-BR — corrigido (Sprint 22). KPIs em banner de largura total por `.kpi-grid-3` sem `display:grid` — corrigido (Sprint 26) | P1 |
+| Custos por Lote | Lançar/editar custo | Sim | Sim | Sim | Sim | — | — | **Corrigido (Sprint 22/26/27)** | Sim | Corrigido | Formatação pt-BR (S22). KPIs em banner por `.kpi-grid-3` sem `display:grid` (S26). Botão "+ Novo custo" virava bloco de 180px no mobile (S27) | P1 |
 | Financeiro | Contas a pagar/receber | **Corrigido** | **Corrigido** | Sim | Sim | Status pago/pendente | — | **Corrigido (Sprint 22/26)** | Sim | Corrigido | Fazenda: `App.jsx` (Sprint 21). Visual: aba "Pagamentos" cortada no mobile — corrigido (Sprint 22). Gráficos DRE vazios sem EmptyState — corrigido (Sprint 26) | P0/P1 |
 | DRE | Relatório financeiro | **Corrigido** | **Corrigido** | — | — | — | — | Sim (Sprint 22) | Sim | Corrigido nesta sprint | Mesma correção do Financeiro (mesma tabela e mesma tela de abas) | P0 |
-| Estoque | CRUD de item + movimentação | **Corrigido** | **Corrigido** | Sim (corrigido) | Sim | — | — | Sim (Sprint 22) | Sim | Corrigido nesta sprint | Não filtrava por fazenda **e** novo item não gravava `fazenda_id` — ambos corrigidos (Sprint 21) | P0 |
-| Sanidade | Aplicação sanitária | **Corrigido** | **Corrigido** | Sim | Sim | — | — | Sim (Sprint 22) | Sim | Corrigido nesta sprint | Só o sub-formulário IATF usava fazenda; lista principal não era escopada fora do Dashboard | P0 |
+| Estoque | CRUD de item + movimentação | **Corrigido** | **Corrigido** | Sim (corrigido) | Sim | — | — | **Corrigido (Sprint 22/27)** | Sim | Corrigido | Não filtrava por fazenda **e** novo item não gravava `fazenda_id` — ambos corrigidos (Sprint 21). Botões de ação do header viravam blocos de 180px no mobile (S27) | P0 |
+| Sanidade | Aplicação sanitária | **Corrigido** | **Corrigido** | Sim | Sim | — | — | **Corrigido (Sprint 22/27)** | Sim | Corrigido | Só o sub-formulário IATF usava fazenda; lista principal não era escopada fora do Dashboard. Botão "Registrar manejo" virava bloco de 180px no mobile (S27) | P0 |
 | Agenda Sanitária | Carência/próxima aplicação | **Corrigido** | **Corrigido** | — | — | — | — | Sim (Sprint 22) | — | Corrigido nesta sprint | Mesma tabela `sanitario` do item acima | P0 |
 | Pastagens | CRUD de pasto | **Corrigido** | **Corrigido** | Sim (campo obrigatório) | Sim | — | Sim | Sim (Sprint 22) | — | Corrigido nesta sprint | Formulário já exige fazenda no cadastro — não é P0 de dado ausente, só de recorte na listagem | P0 |
 | Rotinas/Tarefas | CRUD de tarefa | **Corrigido** | **Corrigido** | Sim | Sim | Concluir | — | Sim (Sprint 22) | — | Corrigido nesta sprint | `tarefas` só era filtrada no widget do Dashboard, não na página | P0 |

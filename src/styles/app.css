@@ -2515,6 +2515,19 @@ a:hover {
     align-items: stretch;
   }
 
+  /* Sprint 27 (P1): aqui .ph-actions vira coluna, mas o elemento também
+     carrega a classe .page-actions, então o botão herda `flex: 1 1 180px`
+     de `.page-actions > *` (media 900px, mais abaixo no arquivo → vence no
+     cascade). Em coluna, esse flex-basis de 180px vira ALTURA — o botão de
+     ação do cabeçalho ("+ Novo custo", "Registrar manejo", "Novo pasto"…)
+     virava um bloco de ~180px. Especificidade dupla (.ph-actions.page-actions)
+     para vencer a regra genérica; a altura volta ao natural (min 44px) e a
+     largura segue full por causa do align-items: stretch acima. */
+  .ph-actions > *,
+  .ph-actions.page-actions > * {
+    flex: 0 0 auto;
+  }
+
   .desktop-table {
     display: none;
   }
