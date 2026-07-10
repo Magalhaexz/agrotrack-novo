@@ -123,3 +123,35 @@ test('calcLote arrobasProduzidas com múltiplos grupos de animais (F-07)', () =>
   const result = calcLote(db, 1, '2025-04-11');
   assert.equal(result.arrobasProduzidas, 140);
 });
+
+// Bug 3.3/3.4/3.5 — peso atual médio segue a pesagem de lote mais recente.
+test('calcLote: peso atual segue a pesagem válida mais recente (não trava no de entrada)', () => {
+  const db = makeDb({
+    lotes: [makeLote({ id: 1, entrada: '2025-01-01' })],
+    animais: [{ id: 1, lote_id: 1, qtd: 10, p_ini: 300, p_at: 300 }],
+    // sem atualizar animais.p_at; a verdade vem das pesagens:
+  });
+  db.pesagens = [
+    { id: 1, lote_id: 1, data: '2025-02-01', peso_medio: 340 },
+    { id: 2, lote_id: 1, data: '2025-03-01', peso_medio: 380 },
+  ];
+  assert.equal(calcLote(db, 1).pesoAtualMedio, 380);
+});
+
+test('calcLote: sem pesagem posterior, peso atual cai para o peso dos animais (entrada)', () => {
+  const db = makeDb({
+    lotes: [makeLote({ id: 1 })],
+    animais: [{ id: 1, lote_id: 1, qtd: 10, p_ini: 300, p_at: 300 }],
+  });
+  db.pesagens = [];
+  assert.equal(calcLote(db, 1).pesoAtualMedio, 300);
+});
+
+test('calcLote: pesagem por animal não define o peso atual do lote', () => {
+  const db = makeDb({
+    lotes: [makeLote({ id: 1 })],
+    animais: [{ id: 1, lote_id: 1, qtd: 10, p_ini: 300, p_at: 300 }],
+  });
+  db.pesagens = [{ id: 1, lote_id: 1, data: '2025-03-01', peso_medio: 500, tipo: 'animal' }];
+  assert.equal(calcLote(db, 1).pesoAtualMedio, 300);
+});

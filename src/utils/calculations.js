@@ -81,6 +81,25 @@ export const calcularDias = daysDiff;
  * @param {string|number} loteId - O ID do lote.
  * @returns {object} Indicadores produtivos do lote + projeção financeira estimada.
  */
+/**
+ * Peso médio atual de um lote seguindo a pesagem de LOTE válida mais recente
+ * (bug 3.3/3.4/3.5): fonte ÚNICA do peso atual para todas as telas. Sem pesagem
+ * posterior à entrada, cai para `fallback` (peso médio dos animais = entrada).
+ * Espelha a regra de PesagensPage.resolveLatestPesagem (tipo 'lote', maior data,
+ * desempate por id) para não haver dois cálculos divergentes.
+ */
+export function pesoMedioAtualDoLote(db, loteId, fallback = 0) {
+  const pesagens = Array.isArray(db?.pesagens) ? db.pesagens : [];
+  const doLote = pesagens
+    .filter((p) => toNumber(p?.lote_id) === toNumber(loteId)
+      && p?.tipo !== 'animal' && p?.origem !== 'animal'
+      && Number.isFinite(Number(p?.peso_medio))
+      && toDateKey(p?.data))
+    .map((p) => ({ data: toDateKey(p.data), peso: Number(p.peso_medio), id: toNumber(p.id) }))
+    .sort((a, b) => (a.data !== b.data ? b.data.localeCompare(a.data) : b.id - a.id));
+  return doLote.length > 0 ? doLote[0].peso : fallback;
+}
+
 export const calcLote = (db, loteId, referenceDate = new Date().toISOString().slice(0, 10)) => {
   // Garante que as coleções são arrays para evitar erros
   const lotes = Array.isArray(db?.lotes) ? db.lotes : [];
@@ -172,9 +191,13 @@ export const calcLote = (db, loteId, referenceDate = new Date().toISOString().sl
   const pesoInicialMedio = totalAnimais
     ? animaisDoLote.reduce((sum, item) => sum + toNumber(item.p_ini) * toNumber(item.qtd), 0) / totalAnimais
     : 0;
-  const pesoAtualMedio = totalAnimais
+  // Peso de entrada / dos animais (fallback), depois a pesagem mais recente.
+  const pesoAtualDeAnimais = totalAnimais
     ? animaisDoLote.reduce((sum, item) => sum + toNumber(item.p_at) * toNumber(item.qtd), 0) / totalAnimais
     : 0;
+  // 3.3/3.4/3.5: peso atual segue a pesagem de lote válida mais recente; sem ela,
+  // usa o peso dos animais. Uma fonte única para Lotes, Detalhes, Dashboard etc.
+  const pesoAtualMedio = pesoMedioAtualDoLote(db, loteId, pesoAtualDeAnimais);
 
   const rendimentoCarcaca = toNumber(lote.rendimento_carcaca || 52) / 100;
   const precoArroba = toNumber(lote.preco_arroba || 270);
