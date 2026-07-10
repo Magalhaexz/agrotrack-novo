@@ -122,6 +122,23 @@ test('mensagem ambígua não vira ação destrutiva', () => {
   assert.equal(r.parametros.lote2, '2');
 });
 
+test('cadastros são reconhecidos e exigem confirmação', () => {
+  assert.equal(i('registre pesagem de 425 kg no lote Engorda 02').intencao, INTENCOES.REGISTRAR_PESAGEM);
+  assert.equal(i('o lote Engorda pesou 470 quilos').intencao, INTENCOES.REGISTRAR_PESAGEM);
+  assert.equal(i('gastei 500 reais com sal').intencao, INTENCOES.CADASTRAR_DESPESA);
+  assert.equal(i('cadastrar despesa').intencao, INTENCOES.CADASTRAR_DESPESA);
+  assert.equal(i('recebi 15 mil pela venda').intencao, INTENCOES.CADASTRAR_RECEITA);
+  assert.equal(i('adicionar 20 sacos de sal no estoque').intencao, INTENCOES.REGISTRAR_ENTRADA_ESTOQUE);
+  for (const txt of ['registre pesagem de 425 kg no lote X', 'gastei 500 reais', 'recebi 15 mil']) {
+    assert.equal(i(txt).requerConfirmacao, true, txt);
+  }
+});
+
+test('pergunta de gasto é consulta, não cadastro', () => {
+  assert.equal(i('quanto gastei este mês').intencao, INTENCOES.CONSULTAR_FINANCEIRO);
+  assert.equal(i('qual meu lucro').intencao, INTENCOES.CONSULTAR_FINANCEIRO);
+});
+
 test('confirmar e cancelar', () => {
   assert.equal(i('/confirmar').intencao, INTENCOES.CONFIRMAR);
   assert.equal(i('confirmo').intencao, INTENCOES.CONFIRMAR);

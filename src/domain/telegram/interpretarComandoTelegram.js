@@ -24,6 +24,11 @@ export const INTENCOES = {
   RESUMO: 'RESUMO',
   TRANSFERIR_ANIMAIS_ENTRE_LOTES: 'TRANSFERIR_ANIMAIS_ENTRE_LOTES',
   RENOMEAR_LOTE: 'RENOMEAR_LOTE',
+  // Cadastros por linguagem natural (conversa em etapas quando faltar dado):
+  REGISTRAR_PESAGEM: 'REGISTRAR_PESAGEM',
+  CADASTRAR_DESPESA: 'CADASTRAR_DESPESA',
+  CADASTRAR_RECEITA: 'CADASTRAR_RECEITA',
+  REGISTRAR_ENTRADA_ESTOQUE: 'REGISTRAR_ENTRADA_ESTOQUE',
   CONFIRMAR: 'CONFIRMAR',
   CANCELAR: 'CANCELAR',
   AMBIGUO: 'AMBIGUO',
@@ -64,6 +69,14 @@ const RE_RENOMEAR = /^\/?(?:renomear|renomeie)\s+(?:o\s+)?lote\s+(.+?)\s+(?:para
 // "trocar lote 1 para lote 2": trocar/mudar + lote, sem qty — ambíguo (Parte 19).
 const RE_TROCAR_LOTE_AMBIGUO = /^\/?(?:trocar|mudar|passar)\s+(?:o\s+)?lote\s+(.+?)\s+(?:para|pra)\s+(?:o\s+)?(?:lote\s+)?(.+?)$/i;
 
+// --- Cadastros (ações mutáveis; a extração de dados fica no orquestrador) ---
+// Gatilho imperativo OU verbo de registro no início — nunca perguntas
+// ("quanto gastei" é consulta, tratada mais abaixo).
+const RE_CAD_DESPESA = /^\/?(?:cadastr\w+|registr\w+|lan[çc]\w+|anot\w+)\s+(?:uma?\s+)?despesa\b|^\/?(?:gastei|paguei)\b|\bdespesa de\b/i;
+const RE_CAD_RECEITA = /^\/?(?:cadastr\w+|registr\w+|lan[çc]\w+|anot\w+)\s+(?:uma?\s+)?receita\b|^\/?recebi\b|\breceita de\b/i;
+const RE_REG_PESAGEM = /^\/?(?:registr\w+|cadastr\w+|anot\w+)\s+(?:uma?\s+)?pesagem\b|\bpesagem de\b|\bpesou\b|\bpeso m[ée]dio de\b/i;
+const RE_REG_ENT_ESTOQUE = /^\/?(?:cadastr\w+|registr\w+|adicion\w+|coloc\w+|dar entrada)\b.*\bestoque\b|\bentr(?:ou|ada de)\b.*\b(?:kg|sacos?|litros?|fardos?|un)\b|^\/?adicion\w+\s+\d+/i;
+
 // --- Fazenda ---
 const RE_SELECIONAR_FAZENDA = /^\/?(?:usar|selecionar|ativar|trocar\s+para|mudar\s+para|trocar|mudar|escolher)\s+(?:a\s+|de\s+|para\s+a\s+)?fazenda\s+(.+?)$/i;
 const RE_LISTAR_FAZENDAS = /^\/?(?:fazendas?|listar\s+fazendas?|mostrar\s+fazendas?|minhas?\s+fazendas?|quais\s+(?:s[ãa]o\s+)?(?:as\s+)?(?:minhas?\s+)?fazendas?|trocar\s+de\s+fazenda|mudar\s+de\s+fazenda)\b/i;
@@ -81,7 +94,7 @@ const RE_ESTOQUE = /^\/?estoque\b|como\s+est[áa]\s+o\s+estoque|ver\s+estoque|in
 // --- Financeiro ---
 const RE_FINANCEIRO_LOTE = /^\/?financeiro\s+lote\s+(.+?)$/i;
 const RE_FINANCEIRO_FILTRO = /^\/?financeiro\s+(vencer|vencidas?|hoje|semana|pagas?)\b/i;
-const RE_FINANCEIRO = /^\/?financeiro\b|contas?\s+(?:a\s+)?(?:vencer|vencidas?|pagar)|conta.*vencid|financeir|movimenta[çc][ãa]o\s+financeira|saldo/i;
+const RE_FINANCEIRO = /^\/?financeiro\b|contas?\s+(?:a\s+)?(?:vencer|vencidas?|pagar)|conta.*vencid|financeir|movimenta[çc][ãa]o\s+financeira|saldo|quanto\s+(?:eu\s+)?(?:gastei|gasto|custou|entrou|recebi|sobrou)|meu\s+lucro|qual\s+(?:o\s+)?(?:meu\s+)?(?:lucro|saldo)/i;
 
 // --- Alertas / manejos / pesagens / resumo ---
 const RE_ALERTAS = /^\/?alertas?\b|ver\s+alertas?|tem\s+alerta|vacina\s+atrasada|o\s+que\s+est[áa]\s+pendente/i;
@@ -153,6 +166,14 @@ export function interpretarComandoTelegram(texto) {
       lote2: limparNome(m[2]),
     });
   }
+
+  // 6b. Cadastros (ações mutáveis). Checados antes das consultas equivalentes
+  //     (ex.: pesagem cadastro antes de VER_PESAGENS). A extração dos dados é
+  //     feita pelo orquestrador (extrairEntidades) — aqui só classifica.
+  if (RE_REG_PESAGEM.test(t)) return intent(INTENCOES.REGISTRAR_PESAGEM, {}, true);
+  if (RE_CAD_DESPESA.test(t)) return intent(INTENCOES.CADASTRAR_DESPESA, {}, true);
+  if (RE_CAD_RECEITA.test(t)) return intent(INTENCOES.CADASTRAR_RECEITA, {}, true);
+  if (RE_REG_ENT_ESTOQUE.test(t)) return intent(INTENCOES.REGISTRAR_ENTRADA_ESTOQUE, {}, true);
 
   // 7. Estoque com item/quantidade (antes do estoque genérico).
   m = t.match(RE_ESTOQUE_QUANTO_TENHO);

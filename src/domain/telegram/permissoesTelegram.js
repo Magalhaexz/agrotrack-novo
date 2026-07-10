@@ -22,7 +22,21 @@ const PERMISSAO_POR_INTENCAO = {
   // Ações mutáveis:
   [INTENCOES.TRANSFERIR_ANIMAIS_ENTRE_LOTES]: 'animais:movimentar',
   [INTENCOES.RENOMEAR_LOTE]: 'lotes:editar',
+  [INTENCOES.REGISTRAR_PESAGEM]: 'pesagens:editar',
+  [INTENCOES.CADASTRAR_DESPESA]: 'financeiro:editar',
+  [INTENCOES.CADASTRAR_RECEITA]: 'financeiro:editar',
+  [INTENCOES.REGISTRAR_ENTRADA_ESTOQUE]: 'estoque:movimentar',
 };
+
+// Cadastros que abrem conversa em etapas (slot-filling) quando falta dado.
+const INTENCOES_CADASTRO = new Set([
+  INTENCOES.REGISTRAR_PESAGEM, INTENCOES.CADASTRAR_DESPESA,
+  INTENCOES.CADASTRAR_RECEITA, INTENCOES.REGISTRAR_ENTRADA_ESTOQUE,
+]);
+
+export function intencaoEhCadastro(intencao) {
+  return INTENCOES_CADASTRO.has(intencao);
+}
 
 // Intenções sem dado sensível: qualquer chat vinculado pode usar.
 const SEM_PERMISSAO = new Set([
@@ -48,5 +62,6 @@ export function podeExecutarComandoTelegram(perfil, intencao) {
 /** Uma intenção altera dados? (usada para negar mutação a visualizador cedo). */
 export function intencaoEhMutavel(intencao) {
   return intencao === INTENCOES.TRANSFERIR_ANIMAIS_ENTRE_LOTES
-    || intencao === INTENCOES.RENOMEAR_LOTE;
+    || intencao === INTENCOES.RENOMEAR_LOTE
+    || INTENCOES_CADASTRO.has(intencao);
 }

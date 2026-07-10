@@ -9,7 +9,7 @@ import { aplicarTratativasAosAlertas } from '../src/domain/tratativasAlertas.js'
 import { prepararAlertasEscopados, enriquecerAlertasComFazenda } from '../src/domain/telegramFazenda.js';
 import { filtrarDbPorFazenda } from '../src/domain/escopoFazenda.js';
 import { interpretarComandoTelegram, INTENCOES } from '../src/domain/telegram/interpretarComandoTelegram.js';
-import { podeExecutarComandoTelegram } from '../src/domain/telegram/permissoesTelegram.js';
+import { podeExecutarComandoTelegram, intencaoEhCadastro } from '../src/domain/telegram/permissoesTelegram.js';
 import { resolverFazendaPorNome, resolverLotePorNome } from '../src/domain/telegram/resolvedores.js';
 import {
   formatarFazendas, formatarLotes, formatarLote, formatarEstoque,
@@ -17,6 +17,13 @@ import {
 } from '../src/domain/telegram/respostasConsulta.js';
 import { prepararTransferenciaAnimais, prepararRenomearLote } from '../src/domain/telegram/acoesLote.js';
 import { calcularExpiraEm, podeConfirmar, STATUS } from '../src/domain/telegram/operacoesPendentes.js';
+import {
+  slotsDoCadastro, extrairDadosIniciais, interpretarResposta, prepararCadastro,
+} from '../src/domain/telegram/cadastros.js';
+import {
+  proximoCampoFaltante, mesclarDados, conversaExpirada,
+  calcularExpiraEm as calcularExpiraConversa, STATUS_CONVERSA,
+} from '../src/domain/telegram/conversas.js';
 
 // Intenções que o novo bot atende; as demais (DESCONHECIDO) caem no fluxo
 // legado (Sprint 8), preservando o comportamento atual.
@@ -26,6 +33,8 @@ const INTENCOES_ATENDIDAS = new Set([
   INTENCOES.CONSULTAR_FINANCEIRO, INTENCOES.VER_ALERTAS, INTENCOES.VER_MANEJOS,
   INTENCOES.VER_PESAGENS, INTENCOES.RESUMO, INTENCOES.TRANSFERIR_ANIMAIS_ENTRE_LOTES,
   INTENCOES.RENOMEAR_LOTE, INTENCOES.CONFIRMAR, INTENCOES.CANCELAR, INTENCOES.AMBIGUO,
+  INTENCOES.REGISTRAR_PESAGEM, INTENCOES.CADASTRAR_DESPESA, INTENCOES.CADASTRAR_RECEITA,
+  INTENCOES.REGISTRAR_ENTRADA_ESTOQUE,
 ]);
 
 // Intenções que exigem uma fazenda definida (recorte). Fazendas e ajuda não.
@@ -33,7 +42,8 @@ const INTENCOES_ESCOPADAS = new Set([
   INTENCOES.LISTAR_LOTES, INTENCOES.VER_LOTE, INTENCOES.CONSULTAR_ESTOQUE,
   INTENCOES.CONSULTAR_FINANCEIRO, INTENCOES.VER_ALERTAS, INTENCOES.VER_MANEJOS,
   INTENCOES.VER_PESAGENS, INTENCOES.RESUMO, INTENCOES.TRANSFERIR_ANIMAIS_ENTRE_LOTES,
-  INTENCOES.RENOMEAR_LOTE,
+  INTENCOES.RENOMEAR_LOTE, INTENCOES.REGISTRAR_PESAGEM, INTENCOES.CADASTRAR_DESPESA,
+  INTENCOES.CADASTRAR_RECEITA, INTENCOES.REGISTRAR_ENTRADA_ESTOQUE,
 ]);
 
 const MSG = {
@@ -52,6 +62,14 @@ const MSG = {
   NOME_VAZIO: 'Informe o novo nome do lote.',
   NOME_DUPLICADO: 'Já existe um lote ativo com esse nome.',
   NOME_IGUAL: 'O novo nome é igual ao atual.',
+  PESO_INVALIDO: 'Informe um peso válido em kg.',
+  VALOR_INVALIDO: 'Informe um valor válido.',
+  DESCRICAO_VAZIA: 'Informe a descrição.',
+  ITEM_VAZIO: 'Informe o item de estoque.',
+  ITEM_NAO_ENCONTRADO: 'Não encontrei esse item no estoque. Envie /estoque para ver os itens.',
+  ITEM_AMBIGUO: 'Há mais de um item com esse nome. Seja mais específico.',
+  LOTE_AMBIGUO: 'Há mais de um lote com esse nome. Seja mais específico.',
+  CADASTRO_CANCELADO: 'Cadastro cancelado.',
 };
 
 function ajuda() {
@@ -115,6 +133,27 @@ async function registrarAuditoria(client, conexao, dados) {
  */
 export async function processarComandoBot({ client, conexao, texto, chatId, agora = new Date() }) {
   const intent = interpretarComandoTelegram(texto);
+  const ehSlash = String(texto || '').trim().startsWith('/');
+  // Cancelamento EXPLÍCITO — não inclui um "não" solto, que dentro de uma
+  // conversa é resposta a um slot opcional (ex.: "pertence a algum lote?").
+  const cancelExplicito = /^\/?(?:cancelar|cancela|desistir|abortar)\b/i.test(String(texto || '').trim());
+
+  // 0. Conversa em etapas ativa? Texto simples (não-slash) é resposta a ela.
+  //    /comando ou cancelamento explícito interrompem. (Parte 4)
+  const conversa = await buscarConversaAtiva(client, chatId, agora);
+  if (conversa) {
+    if (cancelExplicito) {
+      await encerrarConversa(client, conversa.id, STATUS_CONVERSA.CANCELADA);
+      await cancelarPendentesDoChat(client, chatId);
+      return { texto: MSG.CADASTRO_CANCELADO };
+    }
+    if (!ehSlash) {
+      return { texto: await continuarConversa(client, conexao, conversa, texto, agora) };
+    }
+    // Slash-command explícito durante conversa: interrompe a conversa e segue.
+    await encerrarConversa(client, conversa.id, STATUS_CONVERSA.CANCELADA);
+  }
+
   if (!INTENCOES_ATENDIDAS.has(intent.intencao)) return null;
 
   // Confirmação/cancelamento são resolvidos contra a operação pendente.
@@ -164,6 +203,11 @@ export async function processarComandoBot({ client, conexao, texto, chatId, agor
 
   const { db } = prepararAlertasEscopados(dbConta, conexao.fazenda_id);
   const fazendaNome = nomeFazendaAtiva(dbConta, conexao.fazenda_id);
+
+  // Cadastros por conversa: extrai o que der da 1ª mensagem e pergunta o resto.
+  if (intencaoEhCadastro(intent.intencao)) {
+    return { texto: await iniciarCadastro(client, conexao, db, intent.intencao, texto, agora) };
+  }
 
   switch (intent.intencao) {
     case INTENCOES.LISTAR_LOTES:
@@ -304,6 +348,120 @@ async function prepararConfirmacaoRenomear(client, conexao, db, intent, textoOri
   ].join('\n');
 }
 
+// ── Cadastros por conversa (Fase 3) ──────────────────────────────────────────
+async function buscarConversaAtiva(client, chatId, agora) {
+  const { data } = await client.from('telegram_conversas')
+    .select('*')
+    .eq('telegram_chat_id', String(chatId))
+    .eq('status', STATUS_CONVERSA.ATIVA)
+    .order('atualizado_em', { ascending: false })
+    .limit(1)
+    .maybeSingle();
+  if (!data) return null;
+  if (conversaExpirada(data, agora)) {
+    await encerrarConversa(client, data.id, STATUS_CONVERSA.EXPIRADA);
+    return null;
+  }
+  return data;
+}
+
+async function encerrarConversa(client, id, status) {
+  await client.from('telegram_conversas').update({ status, atualizado_em: new Date().toISOString() }).eq('id', id);
+}
+
+async function cancelarPendentesDoChat(client, chatId) {
+  await client.from('telegram_operacoes_pendentes')
+    .update({ status: STATUS.CANCELADA })
+    .eq('telegram_chat_id', String(chatId))
+    .eq('status', STATUS.PENDENTE);
+}
+
+async function iniciarCadastro(client, conexao, db, intencao, texto, agora) {
+  const slots = slotsDoCadastro(intencao);
+  const dados = extrairDadosIniciais(intencao, texto, { hoje: agora, db });
+  const prox = proximoCampoFaltante(slots, dados);
+  if (!prox) return finalizarCadastro(client, conexao, db, intencao, dados, null, agora);
+
+  await client.from('telegram_conversas').insert({
+    owner_user_id: conexao.owner_user_id,
+    user_id: conexao.user_id,
+    telegram_chat_id: conexao.telegram_chat_id,
+    fazenda_id: conexao.fazenda_id ?? null,
+    intencao_atual: intencao,
+    etapa_atual: prox.nome,
+    dados_coletados: dados,
+    status: STATUS_CONVERSA.ATIVA,
+    expira_em: calcularExpiraConversa(agora).toISOString(),
+  });
+  return prox.pergunta;
+}
+
+async function continuarConversa(client, conexao, conversa, texto, agora) {
+  const intencao = conversa.intencao_atual;
+  const slots = slotsDoCadastro(intencao);
+  const slotAtual = slots.find((s) => s.nome === conversa.etapa_atual);
+  let dados = conversa.dados_coletados || {};
+  if (slotAtual) {
+    const valor = interpretarResposta(slotAtual.tipo, texto, { hoje: agora });
+    dados = mesclarDados(dados, { [slotAtual.nome]: valor });
+    // slot opcional respondido com "não" fica como '' — marca como visitado.
+    if (slotAtual.obrigatorio === false && (valor === '' || valor === null)) dados[slotAtual.nome] = '';
+  }
+  const prox = proximoCampoFaltante(slots, dados);
+  if (prox) {
+    await client.from('telegram_conversas')
+      .update({ dados_coletados: dados, etapa_atual: prox.nome, atualizado_em: new Date().toISOString() })
+      .eq('id', conversa.id);
+    return prox.pergunta;
+  }
+  // Recarrega db fresco da fazenda da conversa para resolver nomes/validar.
+  const dbConta = await montarDbDaConta(client, conexao.owner_user_id);
+  const db = filtrarDbPorFazenda(dbConta, conversa.fazenda_id);
+  await encerrarConversa(client, conversa.id, STATUS_CONVERSA.CONCLUIDA);
+  return finalizarCadastro(client, conexao, db, intencao, dados, conversa, agora);
+}
+
+// Slots completos → valida, cria operação pendente e pede /confirmar.
+async function finalizarCadastro(client, conexao, db, intencao, dados, conversa, agora) {
+  const plano = prepararCadastro(intencao, dados, { db, hoje: agora });
+  if (!plano.ok) return MSG[plano.erro] || MSG.FALHA;
+
+  const ok = await salvarOperacaoPendente(client, conexao, 'cadastro', { intencao, dados }, agora);
+  if (!ok) return MSG.FALHA;
+
+  return [...plano.resumo, '', 'Responda /confirmar para concluir ou /cancelar para desistir.'].join('\n');
+}
+
+async function executarCadastro(client, conexao, op) {
+  const { intencao, dados } = op.payload || {};
+  // Revalida permissão na execução (Parte 19).
+  const perfil = await carregarPerfil(client, conexao.user_id);
+  if (!podeExecutarComandoTelegram(perfil, intencao).permitido) throw new Error('SEM_PERMISSAO');
+
+  const dbConta = await montarDbDaConta(client, conexao.owner_user_id);
+  const db = filtrarDbPorFazenda(dbConta, op.fazenda_id);
+  const plano = prepararCadastro(intencao, dados, { db, hoje: new Date() });
+  if (!plano.ok) throw new Error(plano.erro);
+
+  await aplicarWrites(client, conexao, plano.writes);
+  await registrarAuditoria(client, conexao, {
+    acao: plano.tipo, intencao, sucesso: true, dados_posteriores: dados,
+  });
+  return `${plano.resumo[0].replace('Confirme', 'Registrado').replace(':', '.')}`;
+}
+
+async function aplicarWrites(client, conexao, writes) {
+  for (const w of writes) {
+    if (w.tipo === 'insert') {
+      await client.from(w.tabela).insert({ owner_user_id: conexao.owner_user_id, ...w.registro });
+    } else if (w.tipo === 'update') {
+      let q = client.from(w.tabela).update(w.patch);
+      Object.entries(w.match || {}).forEach(([k, v]) => { q = q.eq(k, v); });
+      await q.eq('owner_user_id', conexao.owner_user_id);
+    }
+  }
+}
+
 // ── Confirmar / cancelar (Parte 15/16) ───────────────────────────────────────
 async function buscarPendente(client, chatId) {
   const { data } = await client.from('telegram_operacoes_pendentes')
@@ -342,9 +500,11 @@ async function confirmar(client, conexao, chatId, agora) {
   if (!travada) return MSG.JA_EXECUTADA;
 
   try {
-    const texto = op.tipo_operacao === 'transferir_animais'
-      ? await executarTransferencia(client, conexao, op)
-      : await executarRenomear(client, conexao, op);
+    let texto;
+    if (op.tipo_operacao === 'transferir_animais') texto = await executarTransferencia(client, conexao, op);
+    else if (op.tipo_operacao === 'renomear_lote') texto = await executarRenomear(client, conexao, op);
+    else if (op.tipo_operacao === 'cadastro') texto = await executarCadastro(client, conexao, op);
+    else throw new Error('TIPO_DESCONHECIDO');
     await client.from('telegram_operacoes_pendentes').update({ status: STATUS.EXECUTADA, executado_em: new Date().toISOString() }).eq('id', op.id);
     return texto;
   } catch (e) {

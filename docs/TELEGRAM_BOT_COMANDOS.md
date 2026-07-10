@@ -102,6 +102,22 @@ service role.
 - Financeiro mostra contas a vencer/vencidas (caixa); não mistura competência.
 - Rate limit por chat é em memória (reseta em cold start).
 
+## Cadastros por conversa (interface operacional)
+
+O bot também **cadastra** por linguagem natural, perguntando o que faltar:
+
+| Cadastro | Exemplo | Permissão |
+|----------|---------|-----------|
+| Pesagem | "registre pesagem de 425 kg no lote Engorda 02" | `pesagens:editar` |
+| Despesa | "gastei 500 reais com sal" | `financeiro:editar` |
+| Receita | "recebi 15 mil pela venda" | `financeiro:editar` |
+| Entrada de estoque | "adicionar 20 sacos de sal no estoque" | `estoque:movimentar` |
+
+Fluxo: coleta → pergunta o que falta → resumo → `/confirmar`. Detalhes,
+entidades e frases em [TELEGRAM_LINGUAGEM_NATURAL.md](TELEGRAM_LINGUAGEM_NATURAL.md)
+e [TELEGRAM_CADASTROS_E_OPERACOES.md](TELEGRAM_CADASTROS_E_OPERACOES.md).
+Cobertura funcional atual em [TELEGRAM_PARIDADE_FUNCIONAL_HERDON.md](TELEGRAM_PARIDADE_FUNCIONAL_HERDON.md).
+
 ## Próximos comandos (arquitetura pronta, fora deste sprint — Parte 24)
 
 Registrar pesagem/manejo, marcar conta como paga, entrada/saída de estoque,

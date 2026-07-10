@@ -50,6 +50,7 @@ function baseTables(perfil = 'operador') {
     pesagens: [], movimentacoes_financeiras: [], estoque: [], movimentacoes_estoque: [],
     tarefas: [], sanitario: [], pastagens: [], alertas_tratativas: [],
     telegram_operacoes_pendentes: [], telegram_bot_auditoria: [], movimentacoes_animais: [],
+    telegram_conversas: [],
   };
 }
 
@@ -127,6 +128,60 @@ test('renomear lote cria pendência e /confirmar aplica o novo nome', async () =
   const r = await processarComandoBot({ client, conexao: conexao(), texto: '/confirmar', chatId: '123' });
   assert.match(r.texto, /renomeado/);
   assert.equal(tables.lotes.find((l) => l.id === 10).nome, 'Recria Norte');
+});
+
+test('cadastro de pesagem por mensagem única → confirma → insere pesagem', async () => {
+  const tables = baseTables('operador');
+  const client = makeClient(tables);
+  const c = await processarComandoBot({ client, conexao: conexao(), texto: 'registre pesagem de 425 kg no lote Engorda 02', chatId: '123' });
+  assert.match(c.texto, /Confirme a pesagem/);
+  assert.match(c.texto, /425 kg/);
+  const r = await processarComandoBot({ client, conexao: conexao(), texto: '/confirmar', chatId: '123' });
+  assert.match(r.texto, /Registrado/i);
+  assert.equal(tables.pesagens.length, 1);
+  assert.equal(tables.pesagens[0].lote_id, 11);
+  assert.equal(tables.pesagens[0].peso_medio, 425);
+  assert.equal(tables.pesagens[0].owner_user_id, 'o1');
+});
+
+test('cadastro de despesa em várias etapas (slot-filling)', async () => {
+  const tables = baseTables('gerente');
+  const client = makeClient(tables);
+  const chatId = '123';
+  const c = conexao();
+  let r = await processarComandoBot({ client, conexao: c, texto: 'cadastrar despesa', chatId });
+  assert.match(r.texto, /valor/i);
+  r = await processarComandoBot({ client, conexao: c, texto: '500 reais', chatId });
+  assert.match(r.texto, /descri/i);
+  r = await processarComandoBot({ client, conexao: c, texto: 'Compra de sal mineral', chatId });
+  assert.match(r.texto, /lote/i); // pergunta opcional
+  r = await processarComandoBot({ client, conexao: c, texto: 'não', chatId });
+  assert.match(r.texto, /Confirme o lançamento/);
+  assert.match(r.texto, /R\$ 500,00/);
+  r = await processarComandoBot({ client, conexao: c, texto: '/confirmar', chatId });
+  assert.match(r.texto, /Registrado/i);
+  assert.equal(tables.movimentacoes_financeiras.length, 1);
+  assert.equal(tables.movimentacoes_financeiras[0].tipo, 'despesa');
+  assert.equal(tables.movimentacoes_financeiras[0].valor, 500);
+  assert.equal(tables.movimentacoes_financeiras[0].descricao, 'Compra de sal mineral');
+});
+
+test('visualizador não cadastra despesa', async () => {
+  const tables = baseTables('visualizador');
+  const client = makeClient(tables);
+  const r = await processarComandoBot({ client, conexao: conexao(), texto: 'gastei 500 reais com sal', chatId: '123' });
+  assert.match(r.texto, /permissão/);
+  assert.equal(tables.telegram_conversas.length, 0);
+});
+
+test('/cancelar durante conversa encerra o cadastro', async () => {
+  const tables = baseTables('gerente');
+  const client = makeClient(tables);
+  const c = conexao();
+  await processarComandoBot({ client, conexao: c, texto: 'cadastrar despesa', chatId: '123' });
+  const r = await processarComandoBot({ client, conexao: c, texto: '/cancelar', chatId: '123' });
+  assert.match(r.texto, /cancelad/i);
+  assert.equal(tables.telegram_conversas[0].status, 'cancelada');
 });
 
 test('trocar de fazenda com uma única fazenda funciona; multi-fazenda sem seleção pede escolha', async () => {
