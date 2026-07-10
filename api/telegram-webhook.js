@@ -24,6 +24,7 @@ import { gerarAlertasUnificados } from '../src/domain/alertasUnificados.js';
 import { aplicarTratativasAosAlertas } from '../src/domain/tratativasAlertas.js';
 import { classificarIntencaoTelegram, INTENCOES } from '../src/domain/telegramIntent.js';
 import { interpretarComandoTelegram, gerarRespostaComandoTelegram } from '../src/domain/telegramComandos.js';
+import { processarComandoBot } from './_telegramBot.js';
 import { avaliarRateLimitTelegram, LIMITE_PADRAO, LIMITE_VINCULO } from '../src/domain/telegramRateLimit.js';
 import {
   gerarRelatorioDiarioTelegram,
@@ -202,6 +203,24 @@ export default async function handler(req, res) {
   // salva. Nunca aceita owner_user_id vindo do texto da mensagem.
   const client = getSupabaseAdminClient();
   const conexao = await buscarConexaoAtiva(client, chatId).catch(() => null);
+
+  // Bot interativo (novo): só para usuários já vinculados. Interpreta a
+  // mensagem em uma intenção estruturada; se a intenção for atendida, responde
+  // e encerra. Se não (ex.: /status, /relatorio, perguntas do Sprint 8),
+  // devolve null e o fluxo legado abaixo segue inalterado.
+  if (conexao) {
+    try {
+      const respostaBot = await processarComandoBot({ client, conexao, texto, chatId });
+      if (respostaBot) {
+        await enviarMensagemTelegramParaChat(chatId, respostaBot.texto).catch(() => null);
+        return res.status(200).json({ ok: true, bot: true });
+      }
+    } catch (error) {
+      console.error('[telegram-webhook] erro no bot interativo', error);
+      await enviarMensagemTelegramParaChat(chatId, MSG_ERRO_RESPOSTA).catch(() => null);
+      return res.status(200).json({ ok: true, bot: false });
+    }
+  }
 
   // Comandos novos do hotfix (/start, /status, /contas, /alertas) — checados
   // antes do "sem código", pois eles têm resposta própria mesmo sem vínculo.

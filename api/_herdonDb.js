@@ -7,6 +7,9 @@
 // Tabelas que `gerarAlertasUnificados` precisa para montar o `db` — mesma
 // lista de fontes já auditada no Sprint 5, nada além disso é lido.
 export const TABELAS_NECESSARIAS = [
+  // `fazendas` alimenta o recorte por fazenda (nome nos títulos, seleção e o
+  // rótulo multi-fazenda dos alertas do Sprint 28, que sem isto ficava vazio).
+  'fazendas',
   'lotes',
   'animais',
   'pesagens',
