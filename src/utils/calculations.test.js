@@ -81,7 +81,10 @@ test('calcLote GMD ponderado por qtd entre machos e fêmeas (F-03)', () => {
     lotes: [makeLote({ entrada: '2025-01-01' })],
     animais: [
       makeAnimal({ id: '1', p_ini: 300, p_at: 400, qtd: 10, sexo: 'macho' }),   // ganho 100 kg
-      makeAnimal({ id: '2', p_ini: 250, p_at: 300, qtd: 10, sexo: 'fêmea' }), // ganho 50 kg
+      // Bug 5.1/5.2: valor real gravado pela UI é 'femea' sem acento (ver
+      // AnimalForm.jsx) — este fixture usava 'fêmea' com acento, mascarando
+      // o bug de comparação que existia em calcLote.
+      makeAnimal({ id: '2', p_ini: 250, p_at: 300, qtd: 10, sexo: 'femea' }), // ganho 50 kg
     ],
   });
   // 100 dias; GMD ponderado = ((100/100)*10 + (50/100)*10) / 20 = (10 + 5) / 20 = 0.75 kg/dia
@@ -154,4 +157,68 @@ test('calcLote: pesagem por animal não define o peso atual do lote', () => {
   });
   db.pesagens = [{ id: 1, lote_id: 1, data: '2025-03-01', peso_medio: 500, tipo: 'animal' }];
   assert.equal(calcLote(db, 1).pesoAtualMedio, 300);
+});
+
+// Bug 1.3 — cabeças ativas seguem lote.qtd (fonte canônica), não animais.qtd.
+test('calcLote: totalAnimais usa lote.qtd quando definido, mesmo divergindo de animais.qtd', () => {
+  const db = makeDb({
+    lotes: [makeLote({ id: 1, qtd: 67 })], // após venda de 15 de um total de 82
+    animais: [makeAnimal({ lote_id: 1, qtd: 82, p_ini: 300, p_at: 320, dias: 40 })],
+  });
+  const r = calcLote(db, 1);
+  assert.equal(r.totalAnimais, 67, 'cabeças ativas devem refletir lote.qtd, não a soma desatualizada de animais.qtd');
+});
+
+test('calcLote: sem lote.qtd definido, cai para a soma de animais.qtd (lote legado)', () => {
+  const db = makeDb({
+    lotes: [makeLote({ id: 1 })], // sem campo qtd
+    animais: [makeAnimal({ lote_id: 1, qtd: 82 })],
+  });
+  assert.equal(calcLote(db, 1).totalAnimais, 82);
+});
+
+test('calcLote: lote.qtd = 0 é um total válido (lote esvaziado), não cai no fallback', () => {
+  const db = makeDb({
+    lotes: [makeLote({ id: 1, qtd: 0 })],
+    animais: [makeAnimal({ lote_id: 1, qtd: 82 })],
+  });
+  assert.equal(calcLote(db, 1).totalAnimais, 0);
+});
+
+test('calcLote: médias ponderadas (peso de entrada, dias) continuam corretas mesmo com lote.qtd divergente', () => {
+  const db = makeDb({
+    lotes: [makeLote({ id: 1, qtd: 67, entrada: '2025-01-01' })],
+    animais: [makeAnimal({ lote_id: 1, qtd: 82, p_ini: 300, p_at: 320, data_entrada: '2025-01-01' })],
+  });
+  const r = calcLote(db, 1, '2025-02-10');
+  // peso de entrada é o mesmo de TODOS os 82 registros originais (300kg) —
+  // não deve inflar/deflacionar por causa do denominador ter mudado para 67.
+  assert.equal(r.pesoInicialMedio, 300);
+});
+
+test('calcLote: arrobasCarcaca usa o total canônico (lote.qtd) para a contagem atual real', () => {
+  const db = makeDb({
+    lotes: [makeLote({ id: 1, qtd: 67, rendimento_carcaca: '52' })],
+    animais: [makeAnimal({ lote_id: 1, qtd: 82, p_ini: 300, p_at: 320 })],
+  });
+  db.pesagens = [{ id: 1, lote_id: 1, data: '2025-02-01', peso_medio: 320 }];
+  const r = calcLote(db, 1);
+  const esperado = (67 * 320 * 0.52) / 15;
+  assert.ok(Math.abs(r.arrobasCarcaca - esperado) < 1e-6);
+});
+
+// Bug 5.1/5.2 — o valor gravado pela UI é 'femea' (sem acento); calcLote
+// comparava com 'fêmea' (com acento) e nunca contava fêmeas cadastradas.
+test('calcLote: animais com sexo "femea" (sem acento, valor real gravado pela UI) são contados como fêmeas', () => {
+  const db = makeDb({
+    lotes: [makeLote({ id: 1 })],
+    animais: [
+      makeAnimal({ id: '1', lote_id: 1, qtd: 5, sexo: 'macho', p_ini: 300, p_at: 400 }),
+      makeAnimal({ id: '2', lote_id: 1, qtd: 5, sexo: 'femea', p_ini: 280, p_at: 360 }),
+    ],
+  });
+  const r = calcLote(db, 1);
+  assert.equal(r.qtdFemeas, 5);
+  assert.equal(r.qtdMachos, 5);
+  assert.ok(r.gmdFemea > 0, 'gmdFemea deve ser calculado a partir dos animais cadastrados como fêmea');
 });

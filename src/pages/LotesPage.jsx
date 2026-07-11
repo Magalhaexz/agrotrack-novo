@@ -24,7 +24,7 @@ import MoverPastoModal from '../components/lotes/MoverPastoModal';
 import RelatorioLotePreview from '../components/relatorios/RelatorioLotePreview';
 import AcoesRelatorio from '../components/relatorios/AcoesRelatorio';
 import { moverLoteParaPasto, listarHistoricoPastos } from '../services/movimentacaoPastos';
-import { buildGrupoAnimaisAutoPatch } from './lotesLogic';
+import { buildGrupoAnimaisAutoPatch, buildPesagemInicialPatch } from './lotesLogic';
 import {
   addDaysToDate,
   calculateDailyConsumptionKg,
@@ -615,8 +615,32 @@ export default function LotesPage({ db, setDb, onRegistrarSaidaAnimal, session, 
       }
     }
 
+    // Bug 3.2: sem isso, o histórico de pesagens do lote começava vazio mesmo
+    // quando o produtor já informou o peso de entrada no cadastro — "peso
+    // atual" e GMD ficavam sem base até a primeira pesagem manual. Só roda na
+    // CRIAÇÃO (nunca em edição/retroativamente); não cria nada sem p_ini > 0.
+    const pesagemInicialPatch = buildPesagemInicialPatch({ ...novoLote, id: loteIdReal });
+    let pesagemInicialFalhou = false;
+    if (pesagemInicialPatch) {
+      const pesagemPersistida = await createOperationalRecord('pesagens', pesagemInicialPatch, session);
+      if (pesagemPersistida?.persisted) {
+        const novaPesagem = pesagemPersistida.data || { id: gerarNovoId(pesagens), ...pesagemInicialPatch };
+        setDb((prev) => ({
+          ...prev,
+          pesagens: [...(Array.isArray(prev?.pesagens) ? prev.pesagens : []), novaPesagem],
+          lotes: (prev.lotes || []).map((l) => (
+            Number(l.id) === Number(loteIdReal) ? { ...l, ultima_pesagem: pesagemInicialPatch.data } : l
+          )),
+        }));
+      } else {
+        pesagemInicialFalhou = true;
+      }
+    }
+
     if (grupoAutoFalhou) {
       showToast({ type: 'warning', message: 'Lote criado, mas não foi possível registrar o grupo de animais automaticamente. Resultado, Decisão de Venda e Manejo vão mostrar "dados insuficientes" até você cadastrar os animais deste lote manualmente.' });
+    } else if (pesagemInicialFalhou) {
+      showToast({ type: 'warning', message: 'Lote criado, mas não foi possível registrar a pesagem de entrada automaticamente. Registre a primeira pesagem manualmente.' });
     } else {
       showToast({ type: 'success', message: 'Lote criado com sucesso.' });
     }

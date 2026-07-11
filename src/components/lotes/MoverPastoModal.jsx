@@ -8,6 +8,7 @@ import {
   isMesmoPastoAtual,
   validarMovimentacaoPastoForm,
 } from './movimentacaoPastoLogic';
+import { useSubmitOnce } from '../../hooks/useSubmitOnce.js';
 
 const today = new Date().toISOString().slice(0, 10);
 
@@ -28,6 +29,7 @@ function resolveMotivoLabel(form) {
 }
 
 export default function MoverPastoModal({ open, lote, pastagens, onClose, onSubmit }) {
+  const { executar, isSubmitting } = useSubmitOnce();
   const [form, setForm] = useState(emptyForm());
   const [error, setError] = useState('');
 
@@ -42,7 +44,7 @@ export default function MoverPastoModal({ open, lote, pastagens, onClose, onSubm
     setForm((prev) => ({ ...prev, [field]: value }));
   }
 
-  function handleSave() {
+  async function handleSave() {
     setError('');
 
     if (form.motivo === 'outro' && !form.motivoOutro.trim()) {
@@ -57,14 +59,18 @@ export default function MoverPastoModal({ open, lote, pastagens, onClose, onSubm
       return;
     }
 
-    onSubmit({
-      loteId: lote.id,
-      pastagemDestinoId: form.pastagemDestinoId,
-      dataMovimentacao: form.dataMovimentacao,
-      quantidadeCabecas: form.quantidadeCabecas === '' ? null : Number(form.quantidadeCabecas),
-      motivo: motivoFinal || null,
-      observacoes: form.observacoes.trim() || null,
-    });
+    try {
+      await executar(() => onSubmit({
+        loteId: lote.id,
+        pastagemDestinoId: form.pastagemDestinoId,
+        dataMovimentacao: form.dataMovimentacao,
+        quantidadeCabecas: form.quantidadeCabecas === '' ? null : Number(form.quantidadeCabecas),
+        motivo: motivoFinal || null,
+        observacoes: form.observacoes.trim() || null,
+      }));
+    } catch (err) {
+      setError(err?.message || 'Não foi possível salvar agora. Tente novamente.');
+    }
   }
 
   return (
@@ -75,8 +81,8 @@ export default function MoverPastoModal({ open, lote, pastagens, onClose, onSubm
       subtitle={`Lote ${lote?.nome || ''}`}
       footer={(
         <>
-          <Button variant="ghost" onClick={onClose}>Cancelar</Button>
-          <Button onClick={handleSave}>Confirmar movimentação</Button>
+          <Button variant="ghost" onClick={onClose} disabled={isSubmitting}>Cancelar</Button>
+          <Button onClick={handleSave} loading={isSubmitting} loadingLabel="Salvando...">Confirmar movimentação</Button>
         </>
       )}
     >

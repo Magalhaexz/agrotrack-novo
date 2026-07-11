@@ -64,7 +64,7 @@ export default function LoteDetailsPanel({
           <Button variant="warning" onClick={onRegistrarVendaParcial} disabled={!canMove || lote.bloqueado}>Venda parcial</Button>
           <Button variant="warning" onClick={onRegistrarMorte} disabled={!canMove || lote.bloqueado}>Morte/perda</Button>
           <Button variant="warning" onClick={onRegistrarSaida} disabled={!canMove || lote.bloqueado}>Saída do lote</Button>
-          <Button variant="danger" onClick={onEncerrar} disabled={!canEdit || lote.bloqueado}>Trocar lote</Button>
+          <Button variant="danger" onClick={onEncerrar} disabled={!canEdit || lote.bloqueado}>Finalizar lote</Button>
         </div>
       </div>
 

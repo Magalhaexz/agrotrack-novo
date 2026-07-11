@@ -12,10 +12,9 @@ const PERMISSAO_POR_TIPO = {
 };
 
 /**
- * Lógica de "registrar offline" compartilhada entre a Sincronização e o
- * Modo Curral — mesmo comportamento nas duas telas, um único lugar para
- * manter. Não duplica a fila offline em si (`adicionarOperacaoOffline`
- * continua sendo a única fonte de verdade, em `services/offlineQueue.js`).
+ * Lógica de "registrar offline" usada pela tela de Sincronização. Não duplica
+ * a fila offline em si (`adicionarOperacaoOffline` continua sendo a única
+ * fonte de verdade, em `services/offlineQueue.js`).
  */
 export function useRegistroRapido(session, status) {
   const { hasPermission } = useAuth();

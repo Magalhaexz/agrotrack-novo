@@ -2,6 +2,7 @@
 import Modal from './ui/Modal';
 import Button from './ui/Button';
 import ArrobaPreview from './ArrobaPreview';
+import { useSubmitOnce } from '../hooks/useSubmitOnce.js';
 
 function normalizeIdKey(value) {
   if (value === undefined || value === null) return null;
@@ -118,6 +119,7 @@ export default function PesagemForm({
   onSave,
   onCancel,
 }) {
+  const { executar, isSubmitting } = useSubmitOnce();
   const [form, setForm] = useState(() => normalizarInitialData(initialData));
   const [erro, setErro] = useState('');
   const [pesosAnimais, setPesosAnimais] = useState({});
@@ -268,7 +270,19 @@ export default function PesagemForm({
     });
   }
 
-  function handleSubmit(e) {
+  // Envolve a chamada de onSave (assíncrona, pode lançar) com a trava de
+  // submissão única. Erro fica visível no formulário (setErro), os dados
+  // digitados permanecem e uma nova tentativa é permitida — o form só fecha
+  // por decisão do pai (onSave), nunca aqui.
+  async function submeter(action) {
+    try {
+      await executar(action);
+    } catch (error) {
+      setErro(error?.message || 'Não foi possível salvar agora. Tente novamente.');
+    }
+  }
+
+  async function handleSubmit(e) {
     e.preventDefault();
     const erroValidacao = validarForm(form);
 
@@ -317,16 +331,16 @@ export default function PesagemForm({
         return;
       }
 
-      onSave?.({
+      await submeter(() => onSave?.({
         tipo: 'animal_batch',
         lote_id: form.lote_id ? Number(form.lote_id) : null,
         expectedHeadCount,
         registros,
-      });
+      }));
       return;
     }
 
-    onSave?.({
+    await submeter(() => onSave?.({
       tipo: 'lote',
       origem: 'lote',
       lote_id: form.lote_id ? Number(form.lote_id) : null,
@@ -334,7 +348,7 @@ export default function PesagemForm({
       peso_medio: Number(form.peso_medio),
       quantidade_pesada: form.quantidade_pesada === '' ? null : Number(form.quantidade_pesada),
       observacao: form.observacao.trim(),
-    });
+    }));
   }
 
   const titulo = initialData?.id ? 'Editar pesagem' : 'Nova pesagem';
@@ -346,8 +360,8 @@ export default function PesagemForm({
 
   const footer = (
     <div className="modal-footer action-row" style={{ width: '100%' }}>
-      <Button variant="ghost" onClick={onCancel}>Cancelar</Button>
-      <Button onClick={handleSubmit} disabled={faltaCampoObrigatorio}>Salvar pesagem</Button>
+      <Button variant="ghost" onClick={onCancel} disabled={isSubmitting}>Cancelar</Button>
+      <Button onClick={handleSubmit} disabled={faltaCampoObrigatorio} loading={isSubmitting} loadingLabel="Salvando...">Salvar pesagem</Button>
     </div>
   );
 

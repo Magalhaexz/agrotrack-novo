@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import Modal from './ui/Modal';
 import Button from './ui/Button';
 import Input from './ui/Input';
+import { useSubmitOnce } from '../hooks/useSubmitOnce.js';
 import {
   addDaysToDate,
   calculateDailyConsumptionKg,
@@ -26,6 +27,7 @@ const FORM_VAZIO = {
   pastagem_id: '',
   categoria_animal: '',
   raca: '',
+  sexo: '',
   tipo: 'engorda',
   sistema: 'confinamento',
   entrada: new Date().toISOString().slice(0, 10),
@@ -139,6 +141,7 @@ function normalizarInitialData(data, pastagens = [], fazendaAtiva = null) {
     pastagem_id: data.pastagem_id ?? data.pastagemId ?? data.pastagem_atual_id ?? '',
     categoria_animal: data.categoria_animal ?? data.categoria ?? '',
     raca: data.raca ?? data.raca_animal ?? data.gen ?? '',
+    sexo: data.sexo ?? '',
     tipo: data.tipo || 'engorda',
     sistema: data.sistema || 'confinamento',
     entrada: data.entrada || new Date().toISOString().slice(0, 10),
@@ -217,6 +220,7 @@ function validarForm(form, planejamento, pastagensDisponiveis = []) {
 }
 
 export default function LoteForm({ initialData, fazendas = [], pastagens = [], estoque = [], fazendaAtiva = null, onSave, onCancel }) {
+  const { executar, isSubmitting } = useSubmitOnce();
   const [form, setForm] = useState(() => normalizarInitialData(initialData, pastagens, fazendaAtiva));
   const [erro, setErro] = useState('');
 
@@ -271,7 +275,7 @@ export default function LoteForm({ initialData, fazendas = [], pastagens = [], e
     setForm((prev) => ({ ...prev, [name]: value }));
   }
 
-  function handleSubmit(event) {
+  async function handleSubmit(event) {
     event.preventDefault();
     const erroValidacao = validarForm(form, planejamento, pastagensCompativeis);
 
@@ -298,45 +302,50 @@ export default function LoteForm({ initialData, fazendas = [], pastagens = [], e
     const metaDias = Number(form.supl_meta_dias);
 
     setErro('');
-    onSave?.({
-      nome: form.nome.trim(),
-      faz_id: Number(form.faz_id),
-      pastagem_id: form.pastagem_id || null,
-      categoria_animal: form.categoria_animal || '',
-      raca: form.raca || '',
-      tipo: form.tipo,
-      sistema: form.sistema,
-      entrada: form.entrada,
-      saida: planejamento.dataPrevistaSaida,
-      qtd: Number(form.qtd),
-      p_ini: pesoInicial,
-      p_at: initialData?.p_at ?? pesoInicial,
-      peso_alvo: toNumber(form.peso_alvo),
-      gmd_meta: toNumber(form.gmd_meta),
-      investimento: toNumber(form.investimento),
-      custo_fixo_mensal: toNumber(form.custo_fixo_mensal),
-      preco_arroba: toNumber(form.preco_arroba),
-      rendimento_carcaca: toNumber(form.rendimento_carcaca),
-      dias_estimados: planejamento.diasEstimados,
-      consumo_tipo: form.consumo_tipo,
-      consumo_por_cabeca_dia: toNumber(form.consumo_por_cabeca_dia),
-      consumo_total_estimado: planejamento.consumoTotalEstimado,
-      custo_total_estimado: planejamento.custoEstimadoTotal,
-      preco_kg: toNumber(form.supl_rkg),
-      supl_nome: form.supl_nome.trim(),
-      supl_rkg: toNumber(form.supl_rkg),
-      supl_pv_pct: form.consumo_tipo === 'percentual_pv' ? toNumber(form.consumo_por_cabeca_dia) : 0,
-      supl_meta_dias: metaDias,
-      obs: manualObs ? `${manualObs} | ${planningSummary}` : planningSummary,
-      outras_desp_pc_mes: initialData?.outras_desp_pc_mes ?? 0,
-      tem_recria: initialData?.tem_recria ?? (form.tipo === 'recria' || form.tipo === 'recria+engorda'),
-      tem_engorda: initialData?.tem_engorda ?? (form.tipo === 'engorda' || form.tipo === 'recria+engorda' || form.tipo === 'confinamento'),
-      dias_recria: initialData?.dias_recria ?? 0,
-      p_ini_recria: initialData?.p_ini_recria ?? 0,
-      p_fim_recria: initialData?.p_fim_recria ?? 0,
-      dias_engorda: planejamento.diasEstimados,
-      supl_estoque_kg: initialData?.supl_estoque_kg ?? 0,
-    });
+    try {
+      await executar(() => onSave?.({
+        nome: form.nome.trim(),
+        faz_id: Number(form.faz_id),
+        pastagem_id: form.pastagem_id || null,
+        categoria_animal: form.categoria_animal || '',
+        raca: form.raca || '',
+        sexo: form.sexo || '',
+        tipo: form.tipo,
+        sistema: form.sistema,
+        entrada: form.entrada,
+        saida: planejamento.dataPrevistaSaida,
+        qtd: Number(form.qtd),
+        p_ini: pesoInicial,
+        p_at: initialData?.p_at ?? pesoInicial,
+        peso_alvo: toNumber(form.peso_alvo),
+        gmd_meta: toNumber(form.gmd_meta),
+        investimento: toNumber(form.investimento),
+        custo_fixo_mensal: toNumber(form.custo_fixo_mensal),
+        preco_arroba: toNumber(form.preco_arroba),
+        rendimento_carcaca: toNumber(form.rendimento_carcaca),
+        dias_estimados: planejamento.diasEstimados,
+        consumo_tipo: form.consumo_tipo,
+        consumo_por_cabeca_dia: toNumber(form.consumo_por_cabeca_dia),
+        consumo_total_estimado: planejamento.consumoTotalEstimado,
+        custo_total_estimado: planejamento.custoEstimadoTotal,
+        preco_kg: toNumber(form.supl_rkg),
+        supl_nome: form.supl_nome.trim(),
+        supl_rkg: toNumber(form.supl_rkg),
+        supl_pv_pct: form.consumo_tipo === 'percentual_pv' ? toNumber(form.consumo_por_cabeca_dia) : 0,
+        supl_meta_dias: metaDias,
+        obs: manualObs ? `${manualObs} | ${planningSummary}` : planningSummary,
+        outras_desp_pc_mes: initialData?.outras_desp_pc_mes ?? 0,
+        tem_recria: initialData?.tem_recria ?? (form.tipo === 'recria' || form.tipo === 'recria+engorda'),
+        tem_engorda: initialData?.tem_engorda ?? (form.tipo === 'engorda' || form.tipo === 'recria+engorda' || form.tipo === 'confinamento'),
+        dias_recria: initialData?.dias_recria ?? 0,
+        p_ini_recria: initialData?.p_ini_recria ?? 0,
+        p_fim_recria: initialData?.p_fim_recria ?? 0,
+        dias_engorda: planejamento.diasEstimados,
+        supl_estoque_kg: initialData?.supl_estoque_kg ?? 0,
+      }));
+    } catch (error) {
+      setErro(error?.message || 'Não foi possível salvar agora. Tente novamente.');
+    }
   }
 
   const titulo = initialData ? 'Editar lote' : 'Novo lote';
@@ -353,8 +362,8 @@ export default function LoteForm({ initialData, fazendas = [], pastagens = [], e
 
   const footer = (
     <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8 }}>
-      <Button variant="ghost" onClick={onCancel}>Cancelar</Button>
-      <Button onClick={handleSubmit}>Salvar lote</Button>
+      <Button variant="ghost" onClick={onCancel} disabled={isSubmitting}>Cancelar</Button>
+      <Button onClick={handleSubmit} loading={isSubmitting} loadingLabel="Salvando...">Salvar lote</Button>
     </div>
   );
 
@@ -442,6 +451,15 @@ export default function LoteForm({ initialData, fazendas = [], pastagens = [], e
               {RACOES.map((raca) => (
                 <option key={raca} value={raca}>{raca}</option>
               ))}
+            </Input>
+
+            {/* 5.3: mesmos valores do cadastro de animal (AnimalForm) — 'femea'
+                sem acento, para não repetir o bug 5.1/5.2 de comparação. */}
+            <Input as="select" name="sexo" label="Sexo do grupo" value={form.sexo} onChange={handleChange}>
+              <option value="">Não informado</option>
+              <option value="macho">Macho</option>
+              <option value="femea">Fêmea</option>
+              <option value="misto">Misto</option>
             </Input>
           </div>
 

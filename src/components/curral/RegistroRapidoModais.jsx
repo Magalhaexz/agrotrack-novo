@@ -12,8 +12,8 @@ const MENSAGENS_SUCESSO = {
 
 /**
  * Agrupa os 4 modais de registro rápido (já existentes desde o Modo Campo
- * Offline) para serem reaproveitados tanto pela Sincronização quanto pelo
- * Modo Curral, sem duplicar formulário, validação ou regra de negócio.
+ * Offline) para serem reaproveitados pela tela de Sincronização, sem duplicar
+ * formulário, validação ou regra de negócio.
  */
 export default function RegistroRapidoModais({ modalAberto, fazendas = [], lotes = [], pastagens = [], onClose, registrar }) {
   return (

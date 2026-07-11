@@ -179,7 +179,6 @@ export const permissoesPorPagina = {
   equipeAcessos: 'acessos:gerenciar',
   configuracoes: 'configuracoes:ver',
   sincronizacao: 'dashboard:ver',
-  modoCurral: 'dashboard:ver',
   pastagens: 'pastagens:ver',
   evolucaoRebanho: 'evolucao_rebanho:ver',
   indicadores: 'indicadores:ver',

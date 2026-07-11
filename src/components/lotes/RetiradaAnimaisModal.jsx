@@ -3,12 +3,29 @@ import Button from '../ui/Button';
 import Input from '../ui/Input';
 import Modal from '../ui/Modal';
 import { RETIRADA_TIPOS } from './constants';
+import { useSubmitOnce } from '../../hooks/useSubmitOnce.js';
 
 const today = new Date().toISOString().slice(0, 10);
 
-export default function RetiradaAnimaisModal({ open, lote, onClose, onSubmit, maxCabecas }) {
+// Bug 2.2: os botões "Venda parcial"/"Morte/perda"/"Saída do lote" (LoteDetailsPanel)
+// abrem este modal com uma prop `modo`, mas o tipo inicial ficava sempre fixo em
+// "venda" — "Registrar morte" nunca pré-selecionava o tipo correto. LotesPage já
+// remonta o modal (key muda com `retiradaModo`), então basta mapear modo→tipo aqui.
+const TIPO_POR_MODO = {
+  sale_partial: 'venda',
+  death_loss: 'morte',
+  exit: 'transferencia_saida',
+};
+const TITULO_POR_MODO = {
+  sale_partial: 'Registrar venda',
+  death_loss: 'Registrar morte/perda',
+  exit: 'Registrar saída do lote',
+};
+
+export default function RetiradaAnimaisModal({ open, lote, onClose, onSubmit, maxCabecas, modo = 'sale_partial' }) {
+  const { executar, isSubmitting } = useSubmitOnce();
   const [form, setForm] = useState({
-    tipo: 'venda',
+    tipo: TIPO_POR_MODO[modo] || 'venda',
     data: today,
     quantidade: '',
     pesoMedio: '',
@@ -30,7 +47,7 @@ export default function RetiradaAnimaisModal({ open, lote, onClose, onSubmit, ma
     setForm((prev) => ({ ...prev, [field]: value }));
   }
 
-  function handleSubmit() {
+  async function handleSubmit() {
     setError('');
     const qtd = Number(form.quantidade || 0);
     const peso = Number(form.pesoMedio || 0);
@@ -39,28 +56,32 @@ export default function RetiradaAnimaisModal({ open, lote, onClose, onSubmit, ma
     if (qtd > Number(maxCabecas || 0)) return setError('A retirada não pode superar o total do lote.');
     if (!peso || peso <= 0) return setError('Informe o peso médio.');
 
-    onSubmit({
-      loteId: lote.id,
-      tipoSaida: form.tipo,
-      data: form.data,
-      qtd,
-      pesoMedio: peso,
-      valorTotal: Number(valorCalculado || 0),
-      comprador: form.destino,
-      observacao: form.observacao,
-    });
+    try {
+      await executar(() => onSubmit({
+        loteId: lote.id,
+        tipoSaida: form.tipo,
+        data: form.data,
+        qtd,
+        pesoMedio: peso,
+        valorTotal: Number(valorCalculado || 0),
+        comprador: form.destino,
+        observacao: form.observacao,
+      }));
+    } catch (err) {
+      setError(err?.message || 'Não foi possível salvar agora. Tente novamente.');
+    }
   }
 
   return (
     <Modal
       open={open}
       onClose={onClose}
-      title="Retirada de animais"
+      title={TITULO_POR_MODO[modo] || 'Retirada de animais'}
       subtitle={`Lote ${lote?.nome || ''}`}
       footer={(
         <>
-          <Button variant="ghost" onClick={onClose}>Cancelar</Button>
-          <Button onClick={handleSubmit}>Salvar retirada</Button>
+          <Button variant="ghost" onClick={onClose} disabled={isSubmitting}>Cancelar</Button>
+          <Button onClick={handleSubmit} loading={isSubmitting} loadingLabel="Salvando...">Salvar retirada</Button>
         </>
       )}
     >

@@ -96,7 +96,6 @@ const CustosCompartilhadosPage = lazy(() => import('./pages/CustosCompartilhados
 const FluxoCaixaPage = lazy(() => import('./pages/FluxoCaixaPage'));
 const ImportacaoPage = lazy(() => import('./pages/ImportacaoPage'));
 const SincronizacaoPage = lazy(() => import('./pages/SincronizacaoPage'));
-const ModoCurralPage = lazy(() => import('./pages/ModoCurralPage'));
 
 const publicPageMap = {
   termos: TermosPage,
@@ -245,7 +244,6 @@ const pageMap = {
   planejamento: PlanejamentoPage,
   importacao: ImportacaoPage,
   sincronizacao: SincronizacaoPage,
-  modoCurral: ModoCurralPage,
 };
 
 export default function App() {

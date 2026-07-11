@@ -141,10 +141,23 @@ export const calcLote = (db, loteId, referenceDate = new Date().toISOString().sl
   );
   const custosDoLote = custos.filter((item) => toNumber(item.lote_id) === toNumber(loteId));
 
-  const totalAnimais = animaisDoLote.reduce((sum, item) => sum + toNonNegativeNumber(item.qtd), 0);
+  // Base real dos registros de `animais` — usada nas MÉDIAS ponderadas abaixo
+  // (peso, dias, GMD), cujos numeradores foram somados sobre estes mesmos
+  // registros. Trocar só o denominador por lote.qtd quebraria essas médias
+  // quando as duas fontes divergirem (ex.: peso de entrada ficaria inflado).
+  const totalAnimaisRegistrados = animaisDoLote.reduce((sum, item) => sum + toNonNegativeNumber(item.qtd), 0);
+  // 1.3: cabeças ativas EXIBIDAS/usadas em somas absolutas (custo por cabeça,
+  // arrobas de carcaça) seguem `lote.qtd` — fonte canônica atualizada por
+  // vendas/mortes/transferências/ajuste de lotação, que hoje não sincronizam
+  // `animais.qtd`. `lote.qtd != null` distingue "0 cabeças" (lote esvaziado,
+  // válido) de "campo nunca definido" (lote legado, cai no fallback).
+  const totalAnimais = lote.qtd != null ? Math.max(toNumber(lote.qtd), 0) : totalAnimaisRegistrados;
   const totalCustos = custosDoLote.reduce((sum, item) => sum + toNumber(item.val), 0);
   const machos = animaisDoLote.filter((item) => item.sexo === 'macho');
-  const femeas = animaisDoLote.filter((item) => item.sexo === 'fêmea');
+  // Bug 5.1/5.2: valor gravado pelo formulário (e pela persistência de animais/
+  // lotes) é 'femea' SEM acento — comparar com 'fêmea' fazia gmdFemea/qtdFemeas
+  // nunca contarem nenhum animal cadastrado como fêmea pela UI.
+  const femeas = animaisDoLote.filter((item) => item.sexo === 'femea');
 
   const costByCategory = {
     alimentacao: custosDoLote.filter((item) => item.cat === 'alimentação').reduce((sum, item) => sum + toNumber(item.val), 0),
@@ -174,8 +187,10 @@ export const calcLote = (db, loteId, referenceDate = new Date().toISOString().sl
     (sum, item) => sum + calcularArrobasProduzidas(toNumber(item.p_ini), toNumber(item.p_at), toNonNegativeNumber(item.qtd)),
     0
   );
-  // F-03: dias médio ponderado calculado dinamicamente pelas datas reais
-  const dias = totalAnimais
+  // F-03: dias médio ponderado calculado dinamicamente pelas datas reais.
+  // Denominador é totalAnimaisRegistrados (base real dos registros somados no
+  // numerador) — não totalAnimais (lote.qtd), que pode divergir (1.3).
+  const dias = totalAnimaisRegistrados
     ? safeDivide(
         animaisDoLote.reduce((sum, item) => {
           const dataEntrada = item.data_entrada || lote.entrada;
@@ -184,16 +199,16 @@ export const calcLote = (db, loteId, referenceDate = new Date().toISOString().sl
             : toNumber(item.dias);
           return sum + daysAnimal * toNonNegativeNumber(item.qtd);
         }, 0),
-        totalAnimais
+        totalAnimaisRegistrados
       )
     : 0;
 
-  const pesoInicialMedio = totalAnimais
-    ? animaisDoLote.reduce((sum, item) => sum + toNumber(item.p_ini) * toNumber(item.qtd), 0) / totalAnimais
+  const pesoInicialMedio = totalAnimaisRegistrados
+    ? animaisDoLote.reduce((sum, item) => sum + toNumber(item.p_ini) * toNumber(item.qtd), 0) / totalAnimaisRegistrados
     : 0;
   // Peso de entrada / dos animais (fallback), depois a pesagem mais recente.
-  const pesoAtualDeAnimais = totalAnimais
-    ? animaisDoLote.reduce((sum, item) => sum + toNumber(item.p_at) * toNumber(item.qtd), 0) / totalAnimais
+  const pesoAtualDeAnimais = totalAnimaisRegistrados
+    ? animaisDoLote.reduce((sum, item) => sum + toNumber(item.p_at) * toNumber(item.qtd), 0) / totalAnimaisRegistrados
     : 0;
   // 3.3/3.4/3.5: peso atual segue a pesagem de lote válida mais recente; sem ela,
   // usa o peso dos animais. Uma fonte única para Lotes, Detalhes, Dashboard etc.

@@ -380,8 +380,6 @@ export const LifeBuoy = icon([
   createElement('path', { d: 'm4.9 19.1 4.2-4.2' }),
 ]);
 
-/* Sprint 31 — Modo Curral */
-
 export const Warehouse = icon([
   createElement('path', { d: 'M3 9.5 12 4l9 5.5V20a1 1 0 0 1-1 1h-4v-7H9v7H4a1 1 0 0 1-1-1z' }),
   createElement('path', { d: 'M3 9.5 12 4l9 5.5' }),

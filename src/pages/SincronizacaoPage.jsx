@@ -117,7 +117,7 @@ export default function SincronizacaoPage({ db, setDb, session }) {
         </article>
       </div>
 
-      <Card title="Registrar offline" subtitle="Funciona com ou sem internet. O registro some da lista assim que sincronizar. Para um atalho mais rápido no campo, use o Modo Curral.">
+      <Card title="Registrar offline" subtitle="Funciona com ou sem internet. O registro some da lista assim que sincronizar.">
         <div className="dashboard-action-grid dashboard-action-grid--quick">
           <Button variant="outline" onClick={() => abrirModal('pesagem')} disabled={!hasPermission('pesagens:editar')}>Registrar pesagem</Button>
           <Button variant="outline" onClick={() => abrirModal('movimentacao')} disabled={!hasPermission('lotes:editar')}>Mover lote de pasto</Button>

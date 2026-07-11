@@ -159,6 +159,27 @@ export function buildGrupoAnimaisAutoPatch(lote) {
   };
 }
 
+/**
+ * Bug 3.2 — a primeira pesagem do histórico deve corresponder ao peso médio
+ * de entrada informado no cadastro do lote. Retorna `null` quando não há
+ * peso de entrada informado (não inventa pesagem sem dado real). Só deve ser
+ * chamada na CRIAÇÃO de um lote novo — nunca retroativamente em lotes já
+ * existentes, para não alterar histórico sem diagnóstico.
+ */
+export function buildPesagemInicialPatch(lote) {
+  const pesoInicial = toNumber(lote?.p_ini);
+  if (pesoInicial <= 0) return null;
+
+  return {
+    lote_id: lote?.id ?? null,
+    tipo: 'lote',
+    origem: 'lote',
+    data: lote?.entrada || new Date().toISOString().slice(0, 10),
+    peso_medio: pesoInicial,
+    observacao: 'Peso de entrada do lote (registrado automaticamente no cadastro).',
+  };
+}
+
 export function canCreateLoteInCurrentFarm(activeFarmId, loteEmEdicao = null) {
   return Boolean(activeFarmId) || Boolean(loteEmEdicao);
 }
