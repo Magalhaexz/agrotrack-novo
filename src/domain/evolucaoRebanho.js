@@ -1,4 +1,4 @@
-import { toDateKey, toNonNegativeNumber } from './calcHelpers.js';
+import { toDateKey, toNonNegativeNumber, toNumber } from './calcHelpers.js';
 
 function isAtivo(animal) {
   const status = String(animal?.status || 'ativo').toLowerCase();
@@ -19,6 +19,11 @@ function getTipoBucket(tipo) {
   if (['abate', 'descarte', 'perda', 'outro'].includes(tipo)) return 'vendas';
   if (tipo === 'morte') return 'mortes';
   if (tipo === 'transferencia_saida') return 'transferencias_saida';
+  // Seção 8: Ajuste de lotação (Parte 2) grava movimentacoes_animais tipo
+  // 'ajuste' — sem isso, esses eventos eram ignorados (getDeltaEstoque não
+  // reconhecia o tipo) e a evolução do rebanho ficava incoerente com
+  // lote.qtd sempre que havia um ajuste no período analisado.
+  if (tipo === 'ajuste') return 'ajustes';
   return null;
 }
 
@@ -46,6 +51,7 @@ export function computeEvolucaoRebanho(db, periodStart, periodEnd) {
     nascimentos: 0,
     transferencias_entrada: 0,
     transferencias_saida: 0,
+    ajustes: 0,
     estoque_final: 0,
     variacao_inventario: 0,
   };
@@ -58,10 +64,15 @@ export function computeEvolucaoRebanho(db, periodStart, periodEnd) {
     const data = toDateKey(mov?.data);
     if (!data) return;
     const tipo = normalizeTipo(mov?.tipo);
-    const qtd = toNonNegativeNumber(mov?.qtd);
+
+    // Ajuste de lotação (Seção 2): qtd já é o delta assinado (pode ser
+    // negativo) — os demais tipos gravam qtd sempre positiva e o sinal vem
+    // do tipo (getDeltaEstoque).
+    const ehAjuste = tipo === 'ajuste';
+    const qtd = ehAjuste ? Math.abs(toNumber(mov?.qtd)) : toNonNegativeNumber(mov?.qtd);
     if (!qtd) return;
 
-    const delta = getDeltaEstoque(tipo, qtd);
+    const delta = ehAjuste ? toNumber(mov?.qtd) : getDeltaEstoque(tipo, qtd);
     if (data > end) {
       netAfterEnd += delta;
       return;
@@ -72,7 +83,7 @@ export function computeEvolucaoRebanho(db, periodStart, periodEnd) {
 
     netWithin += delta;
     const bucket = getTipoBucket(tipo);
-    if (bucket) resumo[bucket] += qtd;
+    if (bucket) resumo[bucket] += ehAjuste ? delta : qtd;
     rows.push({
       id: mov?.id || `${data}-${tipo}-${qtd}`,
       data,

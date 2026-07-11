@@ -180,6 +180,64 @@ export function buildPesagemInicialPatch(lote) {
   };
 }
 
+/**
+ * Ajuste de lotação: correção ADMINISTRATIVA da contagem de cabeças do lote
+ * (recontagem, erro de cadastro anterior) — distinta de venda/morte/
+ * transferência. Não gera movimentação financeira nem altera peso médio; só
+ * `lote.qtd` muda. Puro: valida e monta o patch de lote + o registro de
+ * histórico (`movimentacoes_animais`, tipo `'ajuste'`); quem chama aplica.
+ * @returns {{ ok:true, resumo, writes }} | { ok:false, erro }
+ */
+export function buildAjusteLotacaoPatch({ lote, novaQtd, motivo, data }) {
+  if (!lote?.id) return { ok: false, erro: 'LOTE_INVALIDO' };
+
+  const qtdAtual = toNumber(lote?.qtd);
+  const qtdNova = toNumber(novaQtd);
+  if (!Number.isInteger(qtdNova) || qtdNova < 0) return { ok: false, erro: 'QUANTIDADE_INVALIDA' };
+  if (!String(motivo || '').trim()) return { ok: false, erro: 'MOTIVO_VAZIO' };
+  if (qtdNova === qtdAtual) return { ok: false, erro: 'SEM_ALTERACAO' };
+
+  const delta = qtdNova - qtdAtual;
+  const dataAjuste = data || new Date().toISOString().slice(0, 10);
+
+  return {
+    ok: true,
+    resumo: { qtdAnterior: qtdAtual, qtdNova, delta },
+    writes: {
+      loteUpdate: { id: lote.id, qtd: qtdNova },
+      movimentacao: {
+        lote_id: lote.id,
+        tipo: 'ajuste',
+        qtd: delta,
+        peso_medio: 0,
+        valor_total: 0,
+        data: dataAjuste,
+        obs: `${motivo.trim()} (${qtdAtual} → ${qtdNova} cabeças)`,
+      },
+    },
+  };
+}
+
+// Status que bloqueiam novos lançamentos no lote (pesagem, ajuste de lotação,
+// venda/morte/transferência, troca de pasto) — Seção 6: "bloquear lançamentos
+// incompatíveis" após finalização. Único lugar que define quais status
+// bloqueiam, reusado por LotesPage e testável isoladamente.
+const STATUS_BLOQUEADOS = ['encerrado', 'vendido'];
+
+export function loteEstaBloqueado(lote) {
+  return STATUS_BLOQUEADOS.includes(String(lote?.status || 'ativo').toLowerCase());
+}
+
+/**
+ * Seção 6 — finalização do lote. Regra confirmada: um lote com saldo positivo
+ * (qtd > 0) PODE ser finalizado (é uma decisão administrativa válida — ex.:
+ * venda registrada por fora do sistema) — a ação não é bloqueada, mas o
+ * usuário precisa ser avisado da consequência antes de confirmar.
+ */
+export function deveAvisarSaldoPositivoAoFinalizar(lote) {
+  return Number(lote?.qtd || 0) > 0;
+}
+
 export function canCreateLoteInCurrentFarm(activeFarmId, loteEmEdicao = null) {
   return Boolean(activeFarmId) || Boolean(loteEmEdicao);
 }

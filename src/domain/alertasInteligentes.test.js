@@ -268,9 +268,11 @@ test('detectarCustoAcimaDoPrevisto marca crítico para alta de 50% ou mais', () 
   assert.equal(alertas[0].titulo, 'Custo da fazenda subiu nos últimos 30 dias');
 });
 
-test('detectarCustoAcimaDoPrevisto inclui custo por cabeça quando há animais ativos', () => {
+test('detectarCustoAcimaDoPrevisto inclui custo por cabeça quando há lotes ativos', () => {
+  // Seção 8 (auditoria lote.qtd): cabeças ativas somam lote.qtd dos lotes
+  // ativos (fonte canônica), não animais.qtd.
   const db = {
-    animais: [{ id: 1, qtd: 10, status: 'ativo' }],
+    lotes: [{ id: 1, status: 'ativo', qtd: 10 }],
     movimentacoes_financeiras: [movDespesa(1500, 5), movDespesa(1000, 35)],
   };
   const alertas = detectarCustoAcimaDoPrevisto(db, AGORA);

@@ -3,6 +3,7 @@ import Button from '../ui/Button';
 import Input from '../ui/Input';
 import Modal from '../ui/Modal';
 import { useSubmitOnce } from '../../hooks/useSubmitOnce.js';
+import { deveAvisarSaldoPositivoAoFinalizar } from '../../pages/lotesLogic.js';
 
 const today = new Date().toISOString().slice(0, 10);
 
@@ -12,6 +13,12 @@ export default function FechamentoLoteModal({ open, lote, onClose, onSubmit }) {
   const [status, setStatus] = useState('encerrado');
   const [motivo, setMotivo] = useState('');
   const [error, setError] = useState('');
+
+  // Seção 6: finalizar com saldo positivo é PERMITIDO (não bloqueado) — é uma
+  // decisão administrativa válida (ex.: encerramento de ciclo com venda total
+  // registrada por fora). Mas a consequência precisa ficar explícita antes de
+  // confirmar, já que depois lote.bloqueado impede novas pesagens/movimentações.
+  const avisarSaldoPositivo = deveAvisarSaldoPositivoAoFinalizar(lote);
 
   async function handleSave() {
     setError('');
@@ -45,6 +52,15 @@ export default function FechamentoLoteModal({ open, lote, onClose, onSubmit }) {
         </Input>
         <Input as="textarea" label="Motivo" value={motivo} onChange={(e) => setMotivo(e.target.value)} />
       </div>
+      <p className="ui-input-hint">
+        Depois de finalizado, o lote não aceita novas pesagens, ajustes de lotação, vendas, mortes/perdas ou trocas de pasto — o histórico é preservado.
+      </p>
+      {avisarSaldoPositivo ? (
+        <p className="ui-input-hint" role="alert">
+          Atenção: este lote ainda tem {Number(lote?.qtd || 0)} cabeça(s) em aberto. Finalizar não registra
+          venda nem saída dos animais — se eles saíram do lote, registre a venda/morte/transferência antes de finalizar.
+        </p>
+      ) : null}
       {error ? <p className="err">{error}</p> : null}
     </Modal>
   );

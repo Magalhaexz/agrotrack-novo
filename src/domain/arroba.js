@@ -56,9 +56,9 @@ export function calcularIndicadoresArroba({ peso, rendimento = RENDIMENTO_PADRAO
 
 // ── Sprint 14 — fonte única de cálculo de arroba ────────────────────────────
 // Contrato oficial: docs/DECISAO_CALCULO_ARROBA_HERDON.md. `calcularIndicadoresArroba`
-// acima é mantida (usada por ArrobaPreview/useArroba/VendaLoteModal) — as
-// funções abaixo são a base reutilizável para todo cálculo de custo/lucro por
-// arroba a partir daqui (calculos.js, resumoLote.js, indicadoresEstrategicos.js).
+// acima é mantida (usada por ArrobaPreview/useArroba) — as funções abaixo são
+// a base reutilizável para todo cálculo de custo/lucro por arroba a partir
+// daqui (calculos.js, resumoLote.js, indicadoresEstrategicos.js).
 
 /**
  * Normaliza rendimento de carcaça para fração (0–1). Aceita tanto `52` quanto

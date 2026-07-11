@@ -9,7 +9,7 @@
 // Reaproveita regras já existentes e testadas (gmdAlerta.js, resumoLote.js,
 // financeiroStatus.js, calcHelpers.js) em vez de duplicá-las: este motor só
 // decide severidade/mensagem comercial a partir delas.
-import { toNumber, toDateKey, daysBetween, isAnimalAtivo } from './calcHelpers.js';
+import { toNumber, toDateKey, daysBetween } from './calcHelpers.js';
 import { getResumoLote } from './resumoLote.js';
 import { avaliarDesempenhoGmd } from './gmdAlerta.js';
 import { deveEntrarNoResultadoLote } from './financeiroStatus.js';
@@ -357,7 +357,7 @@ export function detectarSanidadeProxima(db = {}, agora = new Date()) {
 export function detectarCustoAcimaDoPrevisto(db = {}, agora = new Date()) {
   const hoje = hojeISO(agora);
   const movimentos = Array.isArray(db?.movimentacoes_financeiras) ? db.movimentacoes_financeiras : [];
-  const animais = Array.isArray(db?.animais) ? db.animais : [];
+  const lotes = Array.isArray(db?.lotes) ? db.lotes : [];
 
   const despesas = movimentos.filter((mov) => mov?.tipo === 'despesa' && deveEntrarNoResultadoLote(mov));
 
@@ -380,7 +380,12 @@ export function detectarCustoAcimaDoPrevisto(db = {}, agora = new Date()) {
       ? SEVERIDADE.ALTO
       : SEVERIDADE.MEDIO;
 
-  const cabecasAtivas = animais.filter(isAnimalAtivo).reduce((soma, a) => soma + toNumber(a?.qtd || 1), 0);
+  // Seção 8 (auditoria lote.qtd): soma lote.qtd dos lotes ativos — fonte
+  // canônica de cabeças (Parte 1.3) — em vez de somar animais.qtd, que pode
+  // divergir após vendas/mortes/transferências que não sincronizam o grupo.
+  const cabecasAtivas = lotes
+    .filter((lote) => String(lote?.status || 'ativo').toLowerCase() === 'ativo')
+    .reduce((soma, lote) => soma + toNumber(lote?.qtd), 0);
   const percentualLabel = `${(variacao * 100).toFixed(0)}%`;
   const descricaoPorCabeca = cabecasAtivas > 0
     ? ` Custo por cabeça foi de R$ ${(custoAnterior / cabecasAtivas).toFixed(2)} para R$ ${(custoAtual / cabecasAtivas).toFixed(2)}.`

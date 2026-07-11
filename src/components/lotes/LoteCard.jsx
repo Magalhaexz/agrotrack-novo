@@ -2,6 +2,7 @@
 import Button from '../ui/Button';
 import Card from '../ui/Card';
 import SaudeLoteCard from './SaudeLoteCard';
+import LoteAcoesMenu from './LoteAcoesMenu';
 import { formatCurrency, formatDate, formatNumber } from '../../utils/calculations';
 import { avaliarDesempenhoGmd } from '../../domain/gmdAlerta';
 
@@ -15,14 +16,24 @@ function statusVariant(status) {
 export default function LoteCard({
   lote,
   onOpen,
-  onEdit,
-  onRegistrarVendaParcial,
-  onRegistrarMorte,
-  onRegistrarSaida,
-  onEncerrar,
+  onEditar,
+  onAjusteLotacao,
+  onVenda,
+  onMortePerda,
+  onTransferenciaSaida,
+  onTrocarPasto,
+  onFinalizar,
   canMove = true,
   canEdit = true,
 }) {
+  // Adapta os dois booleanos pré-calculados que a página já passa para a
+  // interface hasPermission(permissao) que LoteAcoesMenu/loteAcoesConfig usam
+  // — evita duplicar a checagem de permissão aqui.
+  function hasPermission(permissao) {
+    if (permissao === 'lotes:editar') return canEdit;
+    if (permissao === 'animais:movimentar') return canMove;
+    return true;
+  }
   const risco = lote?.gmd30 < 0.3 || lote?.heads <= 0;
   const gmd = avaliarDesempenhoGmd({
     gmdMeta: lote?.gmdMeta,
@@ -83,12 +94,21 @@ export default function LoteCard({
 
       <div className="lote-actions action-row">
         <Button size="sm" variant="outline" onClick={onOpen}>Ver detalhes</Button>
-        <Button size="sm" variant="ghost" onClick={onEdit} disabled={!canEdit || lote.bloqueado}>Editar</Button>
-        <Button size="sm" variant="warning" onClick={onRegistrarVendaParcial} disabled={!canMove || lote.bloqueado}>Venda parcial</Button>
-        <Button size="sm" variant="warning" onClick={onRegistrarMorte} disabled={!canMove || lote.bloqueado}>Morte/perda</Button>
-        <Button size="sm" variant="warning" onClick={onRegistrarSaida} disabled={!canMove || lote.bloqueado}>Saída do lote</Button>
-        <Button size="sm" variant="danger" onClick={onEncerrar} disabled={!canEdit || lote.bloqueado}>Trocar lote</Button>
       </div>
+      <LoteAcoesMenu
+        lote={lote}
+        hasPermission={hasPermission}
+        size="sm"
+        handlers={{
+          onEditar,
+          onAjusteLotacao,
+          onVenda,
+          onMortePerda,
+          onTransferenciaSaida,
+          onTrocarPasto,
+          onFinalizar,
+        }}
+      />
     </Card>
   );
 }

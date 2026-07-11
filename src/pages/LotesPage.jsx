@@ -1,4 +1,4 @@
-﻿import { useEffect, useMemo, useRef, useState } from 'react';
+﻿import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import Input from '../components/ui/Input';
 import Modal from '../components/ui/Modal';
 import Button from '../components/ui/Button';
@@ -21,10 +21,12 @@ import LotesPageHeader from '../components/lotes/LotesPageHeader';
 import RetiradaAnimaisModal from '../components/lotes/RetiradaAnimaisModal';
 import FechamentoLoteModal from '../components/lotes/FechamentoLoteModal';
 import MoverPastoModal from '../components/lotes/MoverPastoModal';
+import AjusteLotacaoModal from '../components/lotes/AjusteLotacaoModal';
 import RelatorioLotePreview from '../components/relatorios/RelatorioLotePreview';
 import AcoesRelatorio from '../components/relatorios/AcoesRelatorio';
 import { moverLoteParaPasto, listarHistoricoPastos } from '../services/movimentacaoPastos';
-import { buildGrupoAnimaisAutoPatch, buildPesagemInicialPatch } from './lotesLogic';
+import { buildGrupoAnimaisAutoPatch, buildPesagemInicialPatch, buildAjusteLotacaoPatch, loteEstaBloqueado } from './lotesLogic';
+import { useUrlState } from '../navigation/useUrlState.js';
 import {
   addDaysToDate,
   calculateDailyConsumptionKg,
@@ -215,8 +217,21 @@ export default function LotesPage({ db, setDb, onRegistrarSaidaAnimal, session, 
   const { hasPermission } = useAuth();
   const { showToast } = useToast();
   const [filters, setFilters] = useState({ status: 'todos', fazenda: 'todas', periodo: 'todos', busca: '' });
-  const [selectedLoteId, setSelectedLoteId] = useState(null);
-  const [activeTab, setActiveTab] = useState('visao_geral');
+  // Seção 9/10 do sprint de fechamento: lote selecionado e aba ativa vivem na
+  // URL (query string), não só em useState local — sem isso, entrar no
+  // detalhe de um lote nunca empilhava histórico, e o botão voltar do
+  // navegador pulava a listagem inteira (causa raiz diagnosticada no
+  // fechamento anterior). Selecionar um lote empilha (permite sair com
+  // voltar); trocar de aba dentro do mesmo lote só substitui a URL atual.
+  const [loteNavState, updateLoteNavState] = useUrlState(
+    { loteId: 'number', tab: 'string' },
+    { loteId: null, tab: 'visao_geral' },
+    ['loteId']
+  );
+  const selectedLoteId = loteNavState.loteId;
+  const activeTab = loteNavState.tab;
+  const setSelectedLoteId = useCallback((id) => updateLoteNavState({ loteId: id }), [updateLoteNavState]);
+  const setActiveTab = useCallback((tab) => updateLoteNavState({ tab }), [updateLoteNavState]);
   const [openRetirada, setOpenRetirada] = useState(false);
   const [retiradaModo, setRetiradaModo] = useState('sale_partial');
   const [openFechamento, setOpenFechamento] = useState(false);
@@ -224,6 +239,7 @@ export default function LotesPage({ db, setDb, onRegistrarSaidaAnimal, session, 
   const [openNovoLote, setOpenNovoLote] = useState(abrirNovoLotePorIntent);
   const [loteEmEdicao, setLoteEmEdicao] = useState(null);
   const [openMoverPasto, setOpenMoverPasto] = useState(false);
+  const [openAjusteLotacao, setOpenAjusteLotacao] = useState(false);
   const [openRelatorio, setOpenRelatorio] = useState(false);
   const relatorioContainerRef = useRef(null);
   const [historicoPastos, setHistoricoPastos] = useState(EMPTY_LIST);
@@ -298,7 +314,7 @@ export default function LotesPage({ db, setDb, onRegistrarSaidaAnimal, session, 
       pastagemNome,
       categoriaAnimal,
       raca,
-      bloqueado: ['encerrado', 'vendido'].includes(normalizeStatus(lote)),
+      bloqueado: loteEstaBloqueado(lote),
     };
   }), [db, lotes, pesagens, fazendas, pastagensMap]);
 
@@ -347,7 +363,7 @@ export default function LotesPage({ db, setDb, onRegistrarSaidaAnimal, session, 
     }, 0);
 
     return () => window.clearTimeout(timer);
-  }, [activeFarmId, selectedLote]);
+  }, [activeFarmId, selectedLote, setSelectedLoteId, setActiveTab]);
 
   function updateFilter(field, value) {
     setFilters((prev) => ({ ...prev, [field]: value }));
@@ -448,7 +464,9 @@ export default function LotesPage({ db, setDb, onRegistrarSaidaAnimal, session, 
       ...prev,
       lotes: (prev.lotes || []).map((l) => (Number(l.id) === Number(loteId) ? { ...l, ...patch } : l)),
     }));
-    showToast({ type: 'success', message: 'Lote trocado com sucesso.' });
+    // Bug 1.4 (resquício): esta mensagem ainda dizia "Lote trocado" — mesmo
+    // texto enganoso já corrigido no rótulo do botão, mas não aqui.
+    showToast({ type: 'success', message: 'Lote finalizado com sucesso.' });
     setOpenFechamento(false);
   }
 
@@ -483,6 +501,49 @@ export default function LotesPage({ db, setDb, onRegistrarSaidaAnimal, session, 
     setHistoricoPastos((prev) => [resultado.data, ...prev]);
     showToast({ type: 'success', message: 'Movimentação de pasto registrada com sucesso.' });
     setOpenMoverPasto(false);
+  }
+
+  const MENSAGENS_ERRO_AJUSTE = {
+    LOTE_INVALIDO: 'Lote inválido.',
+    QUANTIDADE_INVALIDA: 'Informe uma quantidade de cabeças válida (número inteiro, zero ou mais).',
+    MOTIVO_VAZIO: 'Informe o motivo do ajuste.',
+    SEM_ALTERACAO: 'A nova quantidade é igual à atual — nada para ajustar.',
+  };
+
+  // Ajuste de lotação: correção administrativa da contagem (não é venda,
+  // morte ou transferência — sem efeito financeiro, sem alterar peso médio).
+  async function handleAjusteLotacao({ loteId, novaQtd, motivo, data }) {
+    if (!ensurePermission('lotes:editar')) return;
+    if (!selectedLote) return;
+    if (selectedLote.bloqueado) {
+      showToast({ type: 'warning', message: 'Lote encerrado ou vendido não aceita ajuste de lotação.' });
+      return;
+    }
+
+    const plano = buildAjusteLotacaoPatch({ lote: selectedLote, novaQtd, motivo, data });
+    if (!plano.ok) {
+      showToast({ type: 'warning', message: MENSAGENS_ERRO_AJUSTE[plano.erro] || 'Não foi possível ajustar agora.' });
+      return;
+    }
+
+    const loteAtualizado = await updateOperationalRecord('lotes', loteId, plano.writes.loteUpdate, session);
+    const movPersistida = await createOperationalRecord('movimentacoes_animais', plano.writes.movimentacao, session);
+
+    if (!loteAtualizado?.persisted || !movPersistida?.persisted) {
+      showToast({ type: 'warning', message: 'Não foi possível confirmar o ajuste agora.' });
+      return;
+    }
+
+    const novaMovimentacao = movPersistida.data || { id: gerarNovoId(movAnimais), ...plano.writes.movimentacao };
+    setDb((prev) => ({
+      ...prev,
+      lotes: (prev.lotes || []).map((l) => (
+        Number(l.id) === Number(loteId) ? { ...l, qtd: plano.writes.loteUpdate.qtd } : l
+      )),
+      movimentacoes_animais: [...(Array.isArray(prev?.movimentacoes_animais) ? prev.movimentacoes_animais : []), novaMovimentacao],
+    }));
+    showToast({ type: 'success', message: 'Lotação ajustada com sucesso.' });
+    setOpenAjusteLotacao(false);
   }
 
   async function handleSalvarPesagem({ data, pesoMedio, observacao }) {
@@ -675,16 +736,17 @@ export default function LotesPage({ db, setDb, onRegistrarSaidaAnimal, session, 
           canMove={hasPermission('animais:movimentar')}
           canEdit={hasPermission('lotes:editar')}
           canEditPesagem={hasPermission('pesagens:editar')}
-          onEdit={() => {
+          onEditar={() => {
             setLoteEmEdicao(selectedLote);
             setOpenNovoLote(true);
           }}
-          onRegistrarVendaParcial={() => abrirRetirada('sale_partial')}
-          onRegistrarMorte={() => abrirRetirada('death_loss')}
-          onRegistrarSaida={() => abrirRetirada('exit')}
+          onAjusteLotacao={() => setOpenAjusteLotacao(true)}
+          onVenda={() => abrirRetirada('sale_partial')}
+          onMortePerda={() => abrirRetirada('death_loss')}
+          onTransferenciaSaida={() => abrirRetirada('exit')}
           onNovaPesagem={() => setOpenPesagem(true)}
-          onEncerrar={() => setOpenFechamento(true)}
-          onMoverPasto={() => setOpenMoverPasto(true)}
+          onFinalizar={() => setOpenFechamento(true)}
+          onTrocarPasto={() => setOpenMoverPasto(true)}
           onGerarRelatorio={() => setOpenRelatorio(true)}
           animais={loteAnimais}
           pesagens={lotePesagens}
@@ -710,6 +772,18 @@ export default function LotesPage({ db, setDb, onRegistrarSaidaAnimal, session, 
             setRetiradaModo('sale_partial');
           }}
           onSubmit={handleRetirada}
+          onRedirecionar={(tipo) => {
+            // Seção 3: "Trocar lote de pasto"/"Finalizar lote" no dropdown de
+            // retirada nunca reduzem a quantidade — abrem o fluxo próprio.
+            setOpenRetirada(false);
+            setRetiradaModo('sale_partial');
+            if (tipo === 'trocar_pasto') {
+              setActiveTab('pastagem');
+              setOpenMoverPasto(true);
+            } else if (tipo === 'finalizar_lote') {
+              setOpenFechamento(true);
+            }
+          }}
         />
 
         <FechamentoLoteModal
@@ -734,6 +808,15 @@ export default function LotesPage({ db, setDb, onRegistrarSaidaAnimal, session, 
           onClose={() => setOpenMoverPasto(false)}
           onSubmit={handleMoverPasto}
         />
+
+        {openAjusteLotacao ? (
+          <AjusteLotacaoModal
+            open={openAjusteLotacao}
+            lote={selectedLote}
+            onClose={() => setOpenAjusteLotacao(false)}
+            onSubmit={handleAjusteLotacao}
+          />
+        ) : null}
 
         <Modal
           open={openRelatorio}
@@ -818,26 +901,35 @@ export default function LotesPage({ db, setDb, onRegistrarSaidaAnimal, session, 
               setActiveTab('visao_geral');
               setSelectedLoteId(lote.id);
             }}
-            onEdit={() => {
+            onEditar={() => {
               setLoteEmEdicao(lote);
               setOpenNovoLote(true);
             }}
-            onRegistrarVendaParcial={() => {
+            onAjusteLotacao={() => {
+              setSelectedLoteId(lote.id);
+              setOpenAjusteLotacao(true);
+            }}
+            onVenda={() => {
               setActiveTab('retiradas');
               setSelectedLoteId(lote.id);
               abrirRetirada('sale_partial');
             }}
-            onRegistrarMorte={() => {
+            onMortePerda={() => {
               setActiveTab('retiradas');
               setSelectedLoteId(lote.id);
               abrirRetirada('death_loss');
             }}
-            onRegistrarSaida={() => {
+            onTransferenciaSaida={() => {
               setActiveTab('retiradas');
               setSelectedLoteId(lote.id);
               abrirRetirada('exit');
             }}
-            onEncerrar={() => {
+            onTrocarPasto={() => {
+              setActiveTab('pastagem');
+              setSelectedLoteId(lote.id);
+              setOpenMoverPasto(true);
+            }}
+            onFinalizar={() => {
               setSelectedLoteId(lote.id);
               setOpenFechamento(true);
             }}

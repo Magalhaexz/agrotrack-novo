@@ -11,6 +11,7 @@ const LABELS = {
   transferencia_saida: 'Saída por transferência',
   abate: 'Saída por abate',
   consumo: 'Consumo nutricional',
+  ajuste: 'Ajuste de lotação',
 };
 
 export default function LoteHistoricoTab({ historico, onDeleteConsumo }) {

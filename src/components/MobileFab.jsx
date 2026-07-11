@@ -4,7 +4,7 @@ import Button from './ui/Button';
 import Modal from './ui/Modal';
 
 const acoesPorPagina = {
-  lotes: ['Nova Pesagem', 'Registrar Movimentação', 'Novo Lote'],
+  lotes: ['Nova Pesagem', 'Registrar Movimentação', 'Novo Lote', 'Trocar Lote de Pasto'],
   estoque: ['Nova Entrada', 'Registrar Saída', 'Novo Item'],
   financeiro: ['Nova Receita', 'Nova Despesa', 'Fluxo de Caixa'],
 };

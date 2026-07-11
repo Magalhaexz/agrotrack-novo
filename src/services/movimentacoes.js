@@ -121,13 +121,25 @@ function obterResumoLote(db, loteId) {
   const animais = Array.isArray(db?.animais) ? db.animais : [];
   const registrosLote = animais.filter((item) => Number(item.lote_id) === Number(loteId));
 
-  const qtdAtual = registrosLote.reduce((acc, item) => acc + toNumber(item.qtd), 0);
-  const pesoMedioAtual = qtdAtual
+  const qtdRegistrada = registrosLote.reduce((acc, item) => acc + toNumber(item.qtd), 0);
+  const pesoMedioAtual = qtdRegistrada
     ? registrosLote.reduce(
         (acc, item) => acc + toNumber(item.p_at) * toNumber(item.qtd),
         0
-      ) / qtdAtual
+      ) / qtdRegistrada
     : 0;
+
+  // Seção 8 (auditoria lote.qtd): o SALDO usado para validar/decrementar em
+  // vendas, mortes e transferências segue lote.qtd quando definido — fonte
+  // canônica (Parte 1.3). Sem isso, um Ajuste de lotação (que só atualiza
+  // lote.qtd, não animais.qtd) era ignorado ao validar a próxima venda/morte/
+  // transferência, permitindo saldo negativo real mesmo com a checagem
+  // "quantidade > qtdAtual" no lugar. O peso médio continua vindo dos
+  // registros de animais — é a única fonte com esse detalhe, e a MÉDIA não
+  // muda de escala mesmo quando o total canônico diverge do total registrado.
+  const lotes = Array.isArray(db?.lotes) ? db.lotes : [];
+  const lote = lotes.find((item) => Number(item.id) === Number(loteId));
+  const qtdAtual = lote?.qtd != null ? toNumber(lote.qtd) : qtdRegistrada;
 
   return { qtdAtual, pesoMedioAtual };
 }

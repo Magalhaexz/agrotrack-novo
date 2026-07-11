@@ -8,6 +8,7 @@ import LotePastagensTab from './LotePastagensTab';
 import LotePesagensTab from './LotePesagensTab';
 import LoteRetiradasTab from './LoteRetiradasTab';
 import LoteSanitarioTab from './LoteSanitarioTab';
+import LoteAcoesMenu from './LoteAcoesMenu';
 import { LOTE_TABS } from './constants';
 
 export default function LoteDetailsPanel({
@@ -19,13 +20,14 @@ export default function LoteDetailsPanel({
   canMove,
   canEdit,
   canEditPesagem,
-  onEdit,
-  onRegistrarVendaParcial,
-  onRegistrarMorte,
-  onRegistrarSaida,
+  onEditar,
+  onAjusteLotacao,
+  onVenda,
+  onMortePerda,
+  onTransferenciaSaida,
   onNovaPesagem,
-  onEncerrar,
-  onMoverPasto,
+  onFinalizar,
+  onTrocarPasto,
   onGerarRelatorio,
   animais,
   pesagens,
@@ -39,6 +41,11 @@ export default function LoteDetailsPanel({
   consumoAlerta,
   onDeleteHistoricoConsumo,
 }) {
+  function hasPermission(permissao) {
+    if (permissao === 'lotes:editar') return canEdit;
+    if (permissao === 'animais:movimentar') return canMove;
+    return true;
+  }
   return (
     <div className="rebanho-page">
       <div className="rebanho-header page-header">
@@ -59,13 +66,21 @@ export default function LoteDetailsPanel({
         <div className="lote-actions page-actions action-row">
           <Button variant="ghost" onClick={onBack}>Voltar para lotes</Button>
           <Button variant="outline" onClick={onGerarRelatorio}>Gerar relatório do lote</Button>
-          <Button variant="outline" onClick={onEdit} disabled={!canEdit || lote.bloqueado}>Editar lote</Button>
           <Button variant="outline" onClick={onNovaPesagem} disabled={!canEditPesagem || lote.bloqueado}>Nova pesagem</Button>
-          <Button variant="warning" onClick={onRegistrarVendaParcial} disabled={!canMove || lote.bloqueado}>Venda parcial</Button>
-          <Button variant="warning" onClick={onRegistrarMorte} disabled={!canMove || lote.bloqueado}>Morte/perda</Button>
-          <Button variant="warning" onClick={onRegistrarSaida} disabled={!canMove || lote.bloqueado}>Saída do lote</Button>
-          <Button variant="danger" onClick={onEncerrar} disabled={!canEdit || lote.bloqueado}>Finalizar lote</Button>
         </div>
+        <LoteAcoesMenu
+          lote={lote}
+          hasPermission={hasPermission}
+          handlers={{
+            onEditar,
+            onAjusteLotacao,
+            onVenda,
+            onMortePerda,
+            onTransferenciaSaida,
+            onTrocarPasto,
+            onFinalizar,
+          }}
+        />
       </div>
 
       <div className="tabs-row tabs-row-scroll tab-bar">
@@ -89,11 +104,11 @@ export default function LoteDetailsPanel({
           historico={historicoPastos}
           loadingHistorico={loadingHistoricoPastos}
           canMove={canEdit && !lote.bloqueado}
-          onMoverPasto={onMoverPasto}
+          onMoverPasto={onTrocarPasto}
         />
       ) : null}
       {activeTab === 'pesagens' ? <LotePesagensTab pesagens={pesagens} onNovaPesagem={onNovaPesagem} canEditPesagem={canEditPesagem && !lote.bloqueado} /> : null}
-      {activeTab === 'retiradas' ? <LoteRetiradasTab retiradas={retiradas} onNovaRetirada={onRegistrarVendaParcial} canMove={canMove && !lote.bloqueado} /> : null}
+      {activeTab === 'retiradas' ? <LoteRetiradasTab retiradas={retiradas} onNovaRetirada={onVenda} canMove={canMove && !lote.bloqueado} /> : null}
       {activeTab === 'nutricao' ? <LoteNutricaoTab lote={lote} consumo={consumoNutricao} alertaConsumo={consumoAlerta} /> : null}
       {activeTab === 'sanitario' ? <LoteSanitarioTab itens={sanitarios} /> : null}
       {activeTab === 'financeiro' ? <LoteFinanceiroTab movimentos={financeiros} resumo={resumo} /> : null}

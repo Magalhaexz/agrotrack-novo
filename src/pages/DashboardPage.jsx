@@ -11,6 +11,7 @@ import {
   DollarSign,
   FileUp,
   MapPin,
+  MapPinned,
   Package,
   Receipt,
   Repeat,
@@ -419,6 +420,7 @@ export default function DashboardPage({
               <Button variant="primary" icon={<Scale size={14} />} onClick={() => onNavigate?.('pesagens', { action: 'novo' })}>Nova pesagem</Button>
               <Button variant="primary" icon={<Beef size={14} />} onClick={() => onNavigate?.('lotes', { action: 'novo' })}>Novo lote</Button>
               <Button variant="outline" icon={<MapPin size={14} />} onClick={() => onNavigate?.('pastagens')}>Novo pasto</Button>
+              <Button variant="outline" icon={<MapPinned size={14} />} onClick={() => onNavigate?.('lotes')}>Trocar lote de pasto</Button>
               <Button variant="outline" icon={<Receipt size={14} />} onClick={() => onNavigate?.('financeiro', { action: 'novo' })}>Novo custo</Button>
               <Button variant="outline" icon={<Package size={14} />} onClick={() => onNavigate?.('estoque', { action: 'novo' })}>Novo produto/estoque</Button>
               <Button variant="outline" icon={<ArrowDown size={14} />} onClick={() => onNavigate?.('estoque')}>Saída de estoque</Button>

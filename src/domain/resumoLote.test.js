@@ -101,3 +101,21 @@ test('getResumoLote não quebra (NaN/Infinity) quando não há animais', () => {
   assert.ok(Number.isFinite(resumo.custoPorArroba));
   assert.ok(Number.isFinite(resumo.lucroPorArroba));
 });
+
+// Seção 8 (auditoria lote.qtd) — lucroPorCabeca e custoPorCabeca devem usar a
+// MESMA base (lote.qtd, fonte canônica), mesmo quando animais.qtd diverge
+// (ex.: após venda que ainda não sincronizou o grupo de animais).
+test('getResumoLote: lucroPorCabeca e custoPorCabeca usam lote.qtd quando diverge de animais.qtd', () => {
+  const db = makeDb({
+    lotes: [makeLote({ id: 1, qtd: 40 })], // após venda de 10 de um total de 50
+    animais: [makeAnimal({ lote_id: 1, qtd: 50, p_ini: 300, p_at: 400 })],
+    custos: [{ lote_id: 1, val: 4000 }],
+    movimentacoes: [{ tipo: 'receita', lote_id: 1, valor: 12000, status: 'realizado' }],
+  });
+  const resumo = getResumoLote(db, 1);
+  assert.equal(resumo.totalAnimais, 40);
+  assert.equal(resumo.custoPorCabeca, resumo.custoTotal / 40);
+  assert.equal(resumo.lucroPorCabeca, resumo.lucroTotal / 40);
+  // As duas divisões usam o MESMO denominador (nenhuma delas usa os 50 de animais.qtd):
+  assert.equal(resumo.custoTotal / resumo.custoPorCabeca, resumo.lucroTotal / resumo.lucroPorCabeca);
+});

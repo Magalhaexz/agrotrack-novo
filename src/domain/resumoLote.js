@@ -53,7 +53,12 @@ export function getResumoLote(db, loteId) {
   // Sprint 14: custoPorArroba usa @ carcaça (mesma base de lucroPorArroba),
   // não @ de ganho (arrobasProduzidas) — ver docs/DECISAO_CALCULO_ARROBA_HERDON.md.
   const custoPorArroba = toNumber(financeiro?.custoPorArroba) || safeDivide(custoTotal, arrobasCarcaca);
-  const lucroPorCabeca = toNumber(financeiro?.lucroPorCabeca) || safeDivide(lucroTotal, totalAnimais);
+  // Seção 8 (auditoria lote.qtd): antes preferia financeiro?.lucroPorCabeca —
+  // calculado em calculos.js::calcularResultadoLote a partir de animais.qtd,
+  // que pode divergir de lote.qtd (fonte canônica, Parte 1.3). custoPorCabeca
+  // acima já sempre dividia por totalAnimais (calcLote, corrigido); alinhado
+  // aqui para não haver duas divisões diferentes dentro do mesmo resumo.
+  const lucroPorCabeca = safeDivide(lucroTotal, totalAnimais);
   const lucroPorArroba = toNumber(financeiro?.lucroPorArroba) || safeDivide(lucroTotal, arrobasCarcaca);
 
   const classificacao = lucroTotal > 0 ? 'lucro' : lucroTotal < 0 ? 'prejuizo' : 'empate';
