@@ -60,6 +60,34 @@ test('cai para lote.qtd quando não há linhas de animais', () => {
   assert.equal(r.resumo.destinoQtdFinal, 13);
 });
 
+// Auditoria funcional: saldo de validação segue lote.qtd (canônico), mesmo
+// quando `animais.qtd` está desatualizado — paridade com
+// services/movimentacoes.js::obterResumoLote (Seção 8). Sem isso, um Ajuste
+// de lotação (só grava em lote.qtd) ficava invisível para o bot: era possível
+// transferir mais animais do que o saldo real usando a soma desatualizada de
+// `animais`.
+test('transferência via Telegram segue lote.qtd (canônico), não animais.qtd desatualizado', () => {
+  const d = {
+    lotes: [
+      { id: 1, nome: 'A', status: 'ativo', qtd: 40, p_at: 300 },
+      { id: 2, nome: 'B', status: 'ativo', qtd: 5, p_at: 280 },
+    ],
+    // animais ainda mostra 82 (não sincronizado após um Ajuste de lotação que reduziu para 40).
+    animais: [{ id: 1, lote_id: 1, qtd: 82, p_at: 300 }],
+  };
+
+  // Transferir 45 deveria falhar (só há 40 cabeças reais no lote), mesmo animais.qtd dizendo 82:
+  assert.equal(
+    prepararTransferenciaAnimais(d, { loteOrigemId: 1, loteDestinoId: 2, quantidade: 45 }).erro,
+    'ANIMAIS_INSUFICIENTES'
+  );
+
+  // Transferir 40 (o saldo real canônico) deve funcionar:
+  const r = prepararTransferenciaAnimais(d, { loteOrigemId: 1, loteDestinoId: 2, quantidade: 40 });
+  assert.equal(r.ok, true);
+  assert.equal(r.resumo.origemQtdFinal, 0);
+});
+
 test('renomear válido preserva o ID', () => {
   const r = prepararRenomearLote(db(), { loteId: 10, novoNome: 'Recria Norte' });
   assert.equal(r.ok, true);

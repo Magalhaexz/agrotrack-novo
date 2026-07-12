@@ -480,7 +480,8 @@ export function registrarSaidaAnimal(
 export function registrarEntradaEstoque(
   db,
   { itemId, qtd, custo, data, fornecedor, obs },
-  userContext = {}
+  userContext = {},
+  persistContext = {}
 ) {
   const estoque = Array.isArray(db?.estoque) ? db.estoque : [];
   const item = estoque.find((entry) => Number(entry.id) === Number(itemId));
@@ -518,7 +519,7 @@ export function registrarEntradaEstoque(
         lote_id: null, // Entrada de estoque geralmente não tem lote associado diretamente
         tipo: 'entrada',
         quantidade: quantidade,
-        custo_unit: custoUnitario,
+        custo_unitario: custoUnitario,
         valor_total: valorTotal,
         data,
         obs: [fornecedor ? `Fornecedor: ${fornecedor}` : '', obs || '']
@@ -555,6 +556,18 @@ export function registrarEntradaEstoque(
     ],
   };
 
+  const movEstoqueCriado = baseAtualizada.movimentacoes_estoque[baseAtualizada.movimentacoes_estoque.length - 1];
+  const movFinanceiraCriada = baseAtualizada.movimentacoes_financeiras[baseAtualizada.movimentacoes_financeiras.length - 1];
+  const itemAtualizado = baseAtualizada.estoque.find((entry) => Number(entry.id) === Number(itemId));
+  persistirComAviso([
+    createOperationalRecord('movimentacoes_estoque', { ...movEstoqueCriado, id: undefined }, persistContext.session),
+    updateOperationalRecord('estoque', itemId, {
+      quantidade_atual: itemAtualizado?.quantidade_atual ?? 0,
+      valor_unitario: itemAtualizado?.valor_unitario ?? 0,
+    }, persistContext.session),
+    createOperationalRecord('movimentacoes_financeiras', { ...movFinanceiraCriada, id: undefined }, persistContext.session),
+  ], { ...persistContext, source: 'entrada_estoque' });
+
   return registrarAuditoria(baseAtualizada, {
     acao: 'entrada_estoque',
     entidade: 'movimentacoes_estoque',
@@ -563,7 +576,7 @@ export function registrarEntradaEstoque(
     ator_id: userContext?.id || null,
     ator_email: userContext?.email || '',
     criticidade: 'media',
-  });
+  }, persistContext);
 }
 
 /**
@@ -578,7 +591,8 @@ export function registrarEntradaEstoque(
 export function registrarSaidaEstoque(
   db,
   { itemId, loteId, quantidade, tipo = 'consumo', data, obs },
-  userContext = {}
+  userContext = {},
+  persistContext = {}
 ) {
   const tiposValidos = ['consumo', 'ajuste', 'perda', 'venda']; // Adicionado 'venda' como tipo válido
   if (!tiposValidos.includes(tipo)) {
@@ -627,7 +641,7 @@ export function registrarSaidaEstoque(
         lote_id: loteId ? Number(loteId) : null, // Lote associado, se houver
         tipo,
         quantidade: qtd,
-        custo_unit: custoUnit,
+        custo_unitario: custoUnit,
         valor_total: valorTotalSaida,
         data,
         obs: obs || '',
@@ -678,6 +692,22 @@ export function registrarSaidaEstoque(
     ],
   };
 
+  const movEstoqueCriado = baseAtualizada.movimentacoes_estoque[baseAtualizada.movimentacoes_estoque.length - 1];
+  const movFinanceiraCriada = baseAtualizada.movimentacoes_financeiras.length > movimentosFinanceiros.length
+    ? baseAtualizada.movimentacoes_financeiras[baseAtualizada.movimentacoes_financeiras.length - 1]
+    : null;
+  const itemAtualizado = baseAtualizada.estoque.find((entry) => Number(entry.id) === Number(itemId));
+  const mutationsSaida = [
+    createOperationalRecord('movimentacoes_estoque', { ...movEstoqueCriado, id: undefined }, persistContext.session),
+    updateOperationalRecord('estoque', itemId, {
+      quantidade_atual: itemAtualizado?.quantidade_atual ?? 0,
+    }, persistContext.session),
+  ];
+  if (movFinanceiraCriada) {
+    mutationsSaida.push(createOperationalRecord('movimentacoes_financeiras', { ...movFinanceiraCriada, id: undefined }, persistContext.session));
+  }
+  persistirComAviso(mutationsSaida, { ...persistContext, source: 'saida_estoque' });
+
   return registrarAuditoria(baseAtualizada, {
     acao: 'saida_estoque',
     entidade: 'movimentacoes_estoque',
@@ -686,5 +716,5 @@ export function registrarSaidaEstoque(
     ator_id: userContext?.id || null,
     ator_email: userContext?.email || '',
     criticidade: tipo === 'perda' ? 'alta' : 'media',
-  });
+  }, persistContext);
 }

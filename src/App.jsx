@@ -803,11 +803,11 @@ export default function App() {
   };
   const handleRegistrarEntradaEstoque = (dados) => {
     if (!ensureCanWriteOrRedirect('estoque.create')) return;
-    setDb((prev) => registrarEntradaEstoque(prev, dados, userContext));
+    setDb((prev) => registrarEntradaEstoque(prev, dados, userContext, persistContext));
   };
   const handleRegistrarSaidaEstoque = (dados) => {
     if (!ensureCanWriteOrRedirect('estoque.saida')) return;
-    setDb((prev) => registrarSaidaEstoque(prev, dados, userContext));
+    setDb((prev) => registrarSaidaEstoque(prev, dados, userContext, persistContext));
   };
 
   const onConfirmAction = ({ title, message, tone = 'danger' }) =>

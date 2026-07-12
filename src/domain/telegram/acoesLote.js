@@ -17,18 +17,22 @@ function loteAtivo(lote) {
 }
 
 /**
- * Quantidade e peso médio atuais de um lote. Fonte de verdade: as linhas de
- * `animais` do lote (mesma base do `calcLote`). Se o lote não tiver linhas de
- * animais (modelo puramente agregado no próprio lote), cai para `lote.qtd`/`p_at`.
+ * Quantidade e peso médio atuais de um lote. Peso médio: linhas de `animais`
+ * do lote (mesma base do `calcLote`), com fallback para `lote.p_at`. Quantidade:
+ * segue `lote.qtd` quando definido — mesma fonte canônica de
+ * `services/movimentacoes.js::obterResumoLote` (Seção 8 do sprint de
+ * fechamento). Sem isso, um Ajuste de lotação (que só atualiza `lote.qtd`,
+ * nunca `animais.qtd`) ficava invisível aqui: o bot podia validar/mover uma
+ * quantidade maior que o saldo real usando a soma desatualizada de `animais`.
  */
 function resumoAgregado(db, lote) {
   const animais = (Array.isArray(db?.animais) ? db.animais : []).filter((a) => Number(a.lote_id) === Number(lote.id));
-  if (animais.length > 0) {
-    const qtd = animais.reduce((s, a) => s + toNumber(a.qtd), 0);
-    const peso = qtd ? animais.reduce((s, a) => s + toNumber(a.p_at) * toNumber(a.qtd), 0) / qtd : 0;
-    return { qtd, peso };
-  }
-  return { qtd: toNumber(lote.qtd), peso: toNumber(lote.p_at ?? lote.peso_medio_atual) };
+  const qtdRegistrada = animais.reduce((s, a) => s + toNumber(a.qtd), 0);
+  const peso = qtdRegistrada
+    ? animais.reduce((s, a) => s + toNumber(a.p_at) * toNumber(a.qtd), 0) / qtdRegistrada
+    : toNumber(lote.p_at ?? lote.peso_medio_atual);
+  const qtd = lote?.qtd != null ? toNumber(lote.qtd) : qtdRegistrada;
+  return { qtd, peso };
 }
 
 const erro = (codigo) => ({ ok: false, erro: codigo });

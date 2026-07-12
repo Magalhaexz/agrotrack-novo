@@ -22,6 +22,7 @@ import {
   deleteOperationalRecord,
   updateOperationalRecord,
 } from '../services/operationalPersistence';
+import { matchesRotinaRecurrence } from './calendarioOperacionalLogic.js';
 
 const MONTH_LABELS = ['Janeiro', 'Fevereiro', 'Março', 'Abril', 'Maio', 'Junho', 'Julho', 'Agosto', 'Setembro', 'Outubro', 'Novembro', 'Dezembro'];
 const WEEKDAY_LABELS = ['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sab'];
@@ -733,34 +734,6 @@ function expandRecurringRotinas(rotinas, lotesMap, funcionariosMap) {
 
     return eventos;
   });
-}
-
-function matchesRotinaRecurrence(rotina, date) {
-  const freq = String(rotina?.recorrencia_tipo || '').toLowerCase();
-  const weekday = date.getDay();
-
-  if (freq === 'semanal') {
-    const dias = Array.isArray(rotina?.dias_semana) ? rotina.dias_semana : [weekday];
-    return dias.includes(weekday);
-  }
-
-  if (freq === 'quinzenal') {
-    const inicio = rotina?.data_inicio ? new Date(`${rotina.data_inicio}T00:00:00`) : date;
-    const diff = Math.floor((date - inicio) / 86400000);
-    return diff >= 0 && diff % 14 === 0;
-  }
-
-  if (freq === 'mensal') {
-    const inicio = rotina?.data_inicio ? new Date(`${rotina.data_inicio}T00:00:00`) : date;
-    return date.getDate() === inicio.getDate();
-  }
-
-  if (freq === 'anual') {
-    const inicio = rotina?.data_inicio ? new Date(`${rotina.data_inicio}T00:00:00`) : date;
-    return date.getDate() === inicio.getDate() && date.getMonth() === inicio.getMonth();
-  }
-
-  return false;
 }
 
 function normalizeRotinaEvent(rotina, data, lotesMap, funcionariosMap) {

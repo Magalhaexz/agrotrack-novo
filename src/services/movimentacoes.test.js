@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { registrarSaidaAnimal } from './movimentacoes.js';
+import { registrarSaidaAnimal, registrarSaidaEstoque, registrarEntradaEstoque } from './movimentacoes.js';
 
 // Seção 4 do sprint de fechamento — venda, morte/perda e transferência de
 // saída. O saldo de validação (obterResumoLote) segue lote.qtd quando
@@ -172,4 +172,82 @@ test('registrarSaidaAnimal: lote sem lote.qtd definido (legado) cai para animais
   const db = makeDb({ lotes: [makeLote({ qtd: undefined })], animais: [makeAnimal({ qtd: 50 })] });
   const r = registrarSaidaAnimal(db, { loteId: 1, qtd: 10, pesoMedio: 400, valorTotal: 0, data: hoje, tipoSaida: 'morte' }, {}, { persist: false });
   assert.equal(r.lotes.find((l) => l.id === 1).qtd, 40);
+});
+
+// ── Estoque (auditoria funcional: saída/entrada não persistiam no Supabase,
+// só atualizavam o estado React local — handleRegistrarSaidaEstoque/
+// handleRegistrarEntradaEstoque em App.jsx nunca passavam persistContext) ──
+
+function makeEstoqueDb({ estoque = [] } = {}) {
+  return { estoque, movimentacoes_estoque: [], movimentacoes_financeiras: [] };
+}
+
+function makeItemEstoque(overrides = {}) {
+  return { id: 1, produto: 'Ração', categoria: 'ração', quantidade_atual: 100, valor_unitario: 2, ...overrides };
+}
+
+test('registrarSaidaEstoque: aceita persistContext (4º argumento) sem alterar o resultado do saldo', () => {
+  const db = makeEstoqueDb({ estoque: [makeItemEstoque()] });
+  const r = registrarSaidaEstoque(db, {
+    itemId: 1, quantidade: 10, tipo: 'consumo', data: hoje,
+  }, {}, { persist: false });
+
+  assert.equal(r.estoque.find((i) => i.id === 1).quantidade_atual, 90);
+  assert.equal(r.movimentacoes_estoque.length, 1);
+});
+
+// A coluna real em `movimentacoes_estoque` é `custo_unitario` (não
+// `custo_unit`) — um nome de campo divergente aqui fazia o insert falhar
+// silenciosamente (persistCollectionMutation reporta `persisted: false`,
+// mas o item de estoque em si já tinha sido salvo à parte, então o saldo
+// parecia correto e só o histórico de movimentações sumia no reload).
+test('registrarSaidaEstoque: movimentação usa a coluna real custo_unitario (não custo_unit)', () => {
+  const db = makeEstoqueDb({ estoque: [makeItemEstoque({ valor_unitario: 5 })] });
+  const r = registrarSaidaEstoque(db, {
+    itemId: 1, quantidade: 10, tipo: 'consumo', data: hoje,
+  }, {}, { persist: false });
+
+  const mov = r.movimentacoes_estoque[0];
+  assert.equal(mov.custo_unitario, 5);
+  assert.equal('custo_unit' in mov, false);
+});
+
+test('registrarSaidaEstoque: consumo com lote gera despesa financeira vinculada', () => {
+  const db = makeEstoqueDb({ estoque: [makeItemEstoque()] });
+  const r = registrarSaidaEstoque(db, {
+    itemId: 1, loteId: 7, quantidade: 10, tipo: 'consumo', data: hoje,
+  }, {}, { persist: false });
+
+  assert.equal(r.movimentacoes_financeiras.length, 1);
+  assert.equal(r.movimentacoes_financeiras[0].tipo, 'despesa');
+  assert.equal(r.movimentacoes_financeiras[0].lote_id, 7);
+});
+
+test('registrarSaidaEstoque: impede saldo negativo', () => {
+  const db = makeEstoqueDb({ estoque: [makeItemEstoque({ quantidade_atual: 5 })] });
+  assert.throws(
+    () => registrarSaidaEstoque(db, { itemId: 1, quantidade: 10, tipo: 'consumo', data: hoje }, {}, { persist: false }),
+    /Saldo insuficiente/
+  );
+});
+
+test('registrarEntradaEstoque: aceita persistContext (4º argumento) sem alterar o resultado do saldo', () => {
+  const db = makeEstoqueDb({ estoque: [makeItemEstoque()] });
+  const r = registrarEntradaEstoque(db, {
+    itemId: 1, qtd: 20, custo: 3, data: hoje, fornecedor: 'Fornecedor X',
+  }, {}, { persist: false });
+
+  assert.equal(r.estoque.find((i) => i.id === 1).quantidade_atual, 120);
+  assert.equal(r.movimentacoes_financeiras.length, 1, 'entrada sempre gera despesa de compra');
+});
+
+test('registrarEntradaEstoque: movimentação usa a coluna real custo_unitario (não custo_unit)', () => {
+  const db = makeEstoqueDb({ estoque: [makeItemEstoque()] });
+  const r = registrarEntradaEstoque(db, {
+    itemId: 1, qtd: 20, custo: 3, data: hoje,
+  }, {}, { persist: false });
+
+  const mov = r.movimentacoes_estoque[0];
+  assert.equal(mov.custo_unitario, 3);
+  assert.equal('custo_unit' in mov, false);
 });

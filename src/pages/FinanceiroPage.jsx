@@ -18,6 +18,8 @@ import { useAuth } from '../auth/useAuth';
 import { useToast } from '../hooks/useToast';
 import { createOperationalRecord, updateOperationalRecord } from '../services/operationalPersistence';
 import { formatarMoedaExportacao, montarNomeArquivo } from '../domain/exportacaoRelatorios';
+import { resolverFazendaIdLancamento } from './financeiroLancamentoLogic.js';
+import { useSubmitOnce } from '../hooks/useSubmitOnce.js';
 import { baixarCsv, abrirRelatorioParaImpressao } from '../utils/exportacaoArquivos';
 import '../styles/pagamentos.css';
 
@@ -707,12 +709,12 @@ export default function FinanceiroPage({ db, setDb, navigationIntent = null, faz
         </>
       ) : null}
 
-      {openLanc ? <NovoLancamentoModal db={db} setDb={setDb} onClose={() => setOpenLanc(false)} hasPermission={hasPermission} showToast={showToast} session={session} /> : null}
+      {openLanc ? <NovoLancamentoModal db={db} setDb={setDb} onClose={() => setOpenLanc(false)} hasPermission={hasPermission} showToast={showToast} session={session} fazendaSelecionada={fazendaSelecionada} /> : null}
     </div>
   );
 }
 
-function NovoLancamentoModal({ db, setDb, onClose, hasPermission, showToast, session }) {
+function NovoLancamentoModal({ db, setDb, onClose, hasPermission, showToast, session, fazendaSelecionada = null }) {
   const [form, setForm] = useState({
     tipo: 'despesa',
     categoria: despCats[0],
@@ -725,6 +727,7 @@ function NovoLancamentoModal({ db, setDb, onClose, hasPermission, showToast, ses
     parcelado: false,
     parcelas: 1,
   });
+  const { executar, isSubmitting } = useSubmitOnce();
 
   const categorias = form.tipo === 'despesa' ? despCats : recCats;
 
@@ -735,6 +738,15 @@ function NovoLancamentoModal({ db, setDb, onClose, hasPermission, showToast, ses
     }
     if (!form.valor || !form.data) {
       alert('Valor e data são obrigatórios.');
+      return;
+    }
+
+    const loteEscolhido = form.lote_id
+      ? (Array.isArray(db?.lotes) ? db.lotes : []).find((l) => Number(l.id) === Number(form.lote_id))
+      : null;
+    const fazendaIdLancamento = resolverFazendaIdLancamento({ loteEscolhido, fazendaSelecionada });
+    if (!fazendaIdLancamento) {
+      showToast({ type: 'warning', message: 'Selecione um lote ou uma fazenda específica para lançar sem lote.' });
       return;
     }
 
@@ -752,6 +764,7 @@ function NovoLancamentoModal({ db, setDb, onClose, hasPermission, showToast, ses
         valor: valorParcela,
         data: dataBase.toISOString().slice(0, 10),
         lote_id: form.lote_id ? Number(form.lote_id) : null,
+        fazenda_id: fazendaIdLancamento,
         fornecedor: form.tipo === 'despesa' ? form.pessoa : '',
         comprador: form.tipo === 'receita' ? form.pessoa : '',
         // `movimentacoes_financeiras` não tem coluna `nota_fiscal` — guardamos
@@ -761,27 +774,29 @@ function NovoLancamentoModal({ db, setDb, onClose, hasPermission, showToast, ses
       };
     });
 
-    const persistedRows = await Promise.all(
-      novos.map((item) => createOperationalRecord('movimentacoes_financeiras', item, session))
-    );
+    await executar(async () => {
+      const persistedRows = await Promise.all(
+        novos.map((item) => createOperationalRecord('movimentacoes_financeiras', item, session))
+      );
 
-    if (persistedRows.some((item) => !item.persisted)) {
-      showToast({ type: 'warning', message: 'Não foi possível confirmar o lançamento agora.' });
-      return;
-    }
+      if (persistedRows.some((item) => !item.persisted)) {
+        showToast({ type: 'warning', message: 'Não foi possível confirmar o lançamento agora.' });
+        return;
+      }
 
-    setDb((prev) => ({
-      ...prev,
-      movimentacoes_financeiras: [
-        ...(prev.movimentacoes_financeiras || []),
-        ...persistedRows.map((item, index) => item.data || novos[index]),
-      ],
-    }));
-    onClose();
+      setDb((prev) => ({
+        ...prev,
+        movimentacoes_financeiras: [
+          ...(prev.movimentacoes_financeiras || []),
+          ...persistedRows.map((item, index) => item.data || novos[index]),
+        ],
+      }));
+      onClose();
+    });
   }
 
   return (
-    <Modal open onClose={onClose} title="Novo lançamento financeiro" size="lg" footer={<Button onClick={submit}>Salvar lançamento</Button>}>
+    <Modal open onClose={onClose} title="Novo lançamento financeiro" size="lg" footer={<Button onClick={submit} loading={isSubmitting} loadingLabel="Salvando...">Salvar lançamento</Button>}>
       <div className="form-grid two">
         <label className="ui-input-wrap">
           <span className="ui-input-label">Tipo</span>

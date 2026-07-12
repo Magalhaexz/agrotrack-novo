@@ -17,6 +17,7 @@ import { formatarDataExportacao, montarNomeArquivo } from '../domain/exportacaoR
 import { baixarCsv, abrirRelatorioParaImpressao } from '../utils/exportacaoArquivos';
 import { calcularConsumoDiarioTotalPorProduto, calcularDiasRestantesEstoque } from '../domain/previsaoConsumoEstoque';
 import { isModoConsolidado, construirMapaFazendas } from '../domain/escopoFazenda';
+import { useSubmitOnce } from '../hooks/useSubmitOnce.js';
 
 const CATEGORIAS_ESTOQUE_GERAL = [
   'Medicamento',
@@ -275,6 +276,10 @@ export default function EstoquePage({ db, setDb, onRegistrarSaidaEstoque, naviga
               showToast({ type: 'error', message: mensagemSemPermissao });
               return;
             }
+            if (consolidado) {
+              showToast({ type: 'warning', message: 'Selecione uma fazenda específica para cadastrar um item de estoque.' });
+              return;
+            }
             setItemEmEdicao(null);
             setOpenCadastroItem(true);
           }}>
@@ -344,7 +349,14 @@ export default function EstoquePage({ db, setDb, onRegistrarSaidaEstoque, naviga
             }
             action={
               !showOnlyCrit ? (
-                <Button icon={<Plus size={14} />} onClick={() => { setItemEmEdicao(null); setOpenCadastroItem(true); }}>
+                <Button icon={<Plus size={14} />} onClick={() => {
+                  if (consolidado) {
+                    showToast({ type: 'warning', message: 'Selecione uma fazenda específica para cadastrar um item de estoque.' });
+                    return;
+                  }
+                  setItemEmEdicao(null);
+                  setOpenCadastroItem(true);
+                }}>
                   Novo item
                 </Button>
               ) : null
@@ -478,7 +490,14 @@ export default function EstoquePage({ db, setDb, onRegistrarSaidaEstoque, naviga
         />
       )}
       {openEntrada && (
-        <EntradaModal db={db} setDb={setDb} selectedItem={selectedItem} estoqueMap={estoqueMap} onOpenCadastroItem={() => { setItemEmEdicao(null); setOpenCadastroItem(true); }} onClose={() => { setSelectedItem(null); setOpenEntrada(false); }} hasPermission={hasPermission} showToast={showToast} session={session} />
+        <EntradaModal db={db} setDb={setDb} selectedItem={selectedItem} estoqueMap={estoqueMap} onOpenCadastroItem={() => {
+          if (consolidado) {
+            showToast({ type: 'warning', message: 'Selecione uma fazenda específica para cadastrar um item de estoque.' });
+            return;
+          }
+          setItemEmEdicao(null);
+          setOpenCadastroItem(true);
+        }} onClose={() => { setSelectedItem(null); setOpenEntrada(false); }} hasPermission={hasPermission} showToast={showToast} session={session} />
       )}
       {openSaida && (
         <SaidaModal db={db} setDb={setDb} selectedItem={selectedItem} onRegistrarSaidaEstoque={onRegistrarSaidaEstoque} estoqueMap={estoqueMap} onClose={() => { setSelectedItem(null); setOpenSaida(false); }} hasPermission={hasPermission} showToast={showToast} session={session} />
@@ -490,6 +509,7 @@ export default function EstoquePage({ db, setDb, onRegistrarSaidaEstoque, naviga
 function CadastroItemModal({ setDb, initialData = null, onClose, hasPermission, showToast, session, fazendaSelecionada = null }) {
   const [form, setForm] = useState(() => getCadastroItemInicial(initialData));
   const [erro, setErro] = useState('');
+  const { executar, isSubmitting } = useSubmitOnce();
 
   /* eslint-disable react-hooks/set-state-in-effect */
   useEffect(() => {
@@ -541,34 +561,36 @@ function CadastroItemModal({ setDb, initialData = null, onClose, hasPermission, 
     };
 
     const isEdit = Boolean(initialData?.id);
-    const persisted = isEdit
-      ? await updateOperationalRecord('estoque', Number(initialData.id), payload, session)
-      : await createOperationalRecord('estoque', payload, session);
-    if (!persisted?.persisted) {
-      showToast({ type: 'warning', message: persisted?.error || 'Não foi possível confirmar o salvamento agora.' });
-      return;
-    }
+    await executar(async () => {
+      const persisted = isEdit
+        ? await updateOperationalRecord('estoque', Number(initialData.id), payload, session)
+        : await createOperationalRecord('estoque', payload, session);
+      if (!persisted?.persisted) {
+        showToast({ type: 'warning', message: persisted?.error || 'Não foi possível confirmar o salvamento agora.' });
+        return;
+      }
 
-    setDb((prev) => ({
-      ...prev,
-      estoque: isEdit
-        ? (prev.estoque || []).map((item) => (
-            Number(item.id) === Number(initialData.id)
-              ? { ...item, ...(persisted.data || payload), id: item.id }
-              : item
-          ))
-        : [
-            ...(prev.estoque || []),
-            persisted.data || { id: gerarNovoId(prev.estoque || []), ...payload },
-          ],
-    }));
+      setDb((prev) => ({
+        ...prev,
+        estoque: isEdit
+          ? (prev.estoque || []).map((item) => (
+              Number(item.id) === Number(initialData.id)
+                ? { ...item, ...(persisted.data || payload), id: item.id }
+                : item
+            ))
+          : [
+              ...(prev.estoque || []),
+              persisted.data || { id: gerarNovoId(prev.estoque || []), ...payload },
+            ],
+      }));
 
-    showToast({ type: 'success', message: isEdit ? 'Item atualizado com sucesso.' : 'Item cadastrado com sucesso.' });
-    onClose();
+      showToast({ type: 'success', message: isEdit ? 'Item atualizado com sucesso.' : 'Item cadastrado com sucesso.' });
+      onClose();
+    });
   }
 
   return (
-    <Modal open onClose={onClose} title={initialData ? 'Editar item de estoque' : 'Cadastrar item de estoque'} footer={<Button onClick={submit}>{initialData ? 'Salvar alterações' : 'Salvar item'}</Button>}>
+    <Modal open onClose={onClose} title={initialData ? 'Editar item de estoque' : 'Cadastrar item de estoque'} footer={<Button onClick={submit} loading={isSubmitting} loadingLabel="Salvando...">{initialData ? 'Salvar alterações' : 'Salvar item'}</Button>}>
       <div className="form-grid two">
         <Input label="Nome do item" value={form.produto} onChange={(e) => setForm((p) => ({ ...p, produto: e.target.value }))} />
         <label className="ui-input-wrap">
@@ -601,6 +623,7 @@ function EntradaModal({ db, setDb, selectedItem, estoqueMap, onOpenCadastroItem,
     data: '',
     obs: '',
   });
+  const { executar, isSubmitting } = useSubmitOnce();
 
   const semItens = (db.estoque || []).length === 0;
   const item = estoqueMap.get(Number(form.item_id));
@@ -616,66 +639,68 @@ function EntradaModal({ db, setDb, selectedItem, estoqueMap, onOpenCadastroItem,
       return;
     }
 
-    const itemAtual = (db?.estoque || []).find((entry) => entry.id === Number(form.item_id));
-    const novoSaldo = getCurrentItemStockBalance(itemAtual) + (parseSafeNumber(form.qtd) ?? 0);
-    const estoquePersist = await updateOperationalRecord('estoque', Number(form.item_id), {
-      quantidade_atual: novoSaldo,
-      quantidade: novoSaldo,
-      valor_unitario: Number(form.custo || itemAtual?.valor_unitario || 0),
-      preco_unitario: Number(form.custo || itemAtual?.preco_unitario || 0),
-      data_validade: form.validade || itemAtual?.data_validade || null,
-    }, session);
-    const movPersist = await createOperationalRecord('movimentacoes_estoque', {
-      item_estoque_id: Number(form.item_id),
-      tipo: 'entrada',
-      quantidade: Number(form.qtd),
-      data: form.data,
-      valor_total: total,
-      obs: form.obs,
-      fornecedor: form.fornecedor,
-      numero_nf: form.nf,
-    }, session);
+    await executar(async () => {
+      const itemAtual = (db?.estoque || []).find((entry) => entry.id === Number(form.item_id));
+      const novoSaldo = getCurrentItemStockBalance(itemAtual) + (parseSafeNumber(form.qtd) ?? 0);
+      const estoquePersist = await updateOperationalRecord('estoque', Number(form.item_id), {
+        quantidade_atual: novoSaldo,
+        quantidade: novoSaldo,
+        valor_unitario: Number(form.custo || itemAtual?.valor_unitario || 0),
+        preco_unitario: Number(form.custo || itemAtual?.preco_unitario || 0),
+        data_validade: form.validade || itemAtual?.data_validade || null,
+      }, session);
+      const movPersist = await createOperationalRecord('movimentacoes_estoque', {
+        item_estoque_id: Number(form.item_id),
+        tipo: 'entrada',
+        quantidade: Number(form.qtd),
+        data: form.data,
+        valor_total: total,
+        obs: form.obs,
+        fornecedor: form.fornecedor,
+        numero_nf: form.nf,
+      }, session);
 
-    setDb((prev) => ({
-      ...prev,
-      estoque: prev.estoque.map((i) => (
-        i.id === Number(form.item_id)
-          ? {
-              ...i,
-              ...(estoquePersist.data || {
-                quantidade_atual: getCurrentItemStockBalance(i) + (parseSafeNumber(form.qtd) ?? 0),
-                quantidade: getCurrentItemStockBalance(i) + (parseSafeNumber(form.qtd) ?? 0),
-                valor_unitario: Number(form.custo || i.valor_unitario),
-                preco_unitario: Number(form.custo || i.preco_unitario),
-                data_validade: form.validade || i.data_validade,
-              }),
-            }
-          : i
-      )),
-      movimentacoes_estoque: [
-        ...(prev.movimentacoes_estoque || []),
-        movPersist.data || {
-          id: gerarNovoId(prev.movimentacoes_estoque || []),
-          item_estoque_id: Number(form.item_id),
-          tipo: 'entrada',
-          quantidade: Number(form.qtd),
-          data: form.data,
-          valor_total: total,
-          obs: form.obs,
-          fornecedor: form.fornecedor,
-          numero_nf: form.nf,
-        },
-      ],
-    }));
+      setDb((prev) => ({
+        ...prev,
+        estoque: prev.estoque.map((i) => (
+          i.id === Number(form.item_id)
+            ? {
+                ...i,
+                ...(estoquePersist.data || {
+                  quantidade_atual: getCurrentItemStockBalance(i) + (parseSafeNumber(form.qtd) ?? 0),
+                  quantidade: getCurrentItemStockBalance(i) + (parseSafeNumber(form.qtd) ?? 0),
+                  valor_unitario: Number(form.custo || i.valor_unitario),
+                  preco_unitario: Number(form.custo || i.preco_unitario),
+                  data_validade: form.validade || i.data_validade,
+                }),
+              }
+            : i
+        )),
+        movimentacoes_estoque: [
+          ...(prev.movimentacoes_estoque || []),
+          movPersist.data || {
+            id: gerarNovoId(prev.movimentacoes_estoque || []),
+            item_estoque_id: Number(form.item_id),
+            tipo: 'entrada',
+            quantidade: Number(form.qtd),
+            data: form.data,
+            valor_total: total,
+            obs: form.obs,
+            fornecedor: form.fornecedor,
+            numero_nf: form.nf,
+          },
+        ],
+      }));
 
-    if (!estoquePersist.persisted || !movPersist.persisted) {
-      showToast({ type: 'warning', message: 'Não foi possível confirmar a entrada agora.' });
-    }
-    onClose();
+      if (!estoquePersist.persisted || !movPersist.persisted) {
+        showToast({ type: 'warning', message: 'Não foi possível confirmar a entrada agora.' });
+      }
+      onClose();
+    });
   }
 
   return (
-    <Modal open onClose={onClose} title="Entrada de estoque" footer={!semItens ? <Button onClick={submit}>Confirmar entrada</Button> : null}>
+    <Modal open onClose={onClose} title="Entrada de estoque" footer={!semItens ? <Button onClick={submit} loading={isSubmitting} loadingLabel="Salvando...">Confirmar entrada</Button> : null}>
       {semItens ? (
         <EmptyState
           compact
@@ -721,6 +746,7 @@ function SaidaModal({ db, setDb, selectedItem, onRegistrarSaidaEstoque, estoqueM
     data: '',
     obs: '',
   });
+  const { executar, isSubmitting } = useSubmitOnce();
 
   const item = estoqueMap.get(Number(form.item_id));
   const saldo = getCurrentItemStockBalance(item);
@@ -752,15 +778,17 @@ function SaidaModal({ db, setDb, selectedItem, onRegistrarSaidaEstoque, estoqueM
     }
 
     if (typeof onRegistrarSaidaEstoque === 'function') {
-      onRegistrarSaidaEstoque({
-        itemId: Number(form.item_id),
-        loteId: form.lote_id ? Number(form.lote_id) : '',
-        quantidade: qtd,
-        tipo: form.tipo,
-        data: form.data,
-        obs: form.obs.trim(),
+      await executar(async () => {
+        onRegistrarSaidaEstoque({
+          itemId: Number(form.item_id),
+          loteId: form.lote_id ? Number(form.lote_id) : '',
+          quantidade: qtd,
+          tipo: form.tipo,
+          data: form.data,
+          obs: form.obs.trim(),
+        });
+        onClose();
       });
-      onClose();
       return;
     }
 
@@ -828,7 +856,7 @@ function SaidaModal({ db, setDb, selectedItem, onRegistrarSaidaEstoque, estoqueM
   }
 
   return (
-    <Modal open onClose={onClose} title="Saída / Consumo" footer={<Button variant="danger" onClick={submit}>Confirmar saída</Button>}>
+    <Modal open onClose={onClose} title="Saída / Consumo" footer={<Button variant="danger" onClick={submit} loading={isSubmitting} loadingLabel="Salvando...">Confirmar saída</Button>}>
       <div className="form-grid two">
         <label className="ui-input-wrap">
           <span className="ui-input-label">Item</span>

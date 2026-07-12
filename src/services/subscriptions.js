@@ -26,6 +26,20 @@ const MODULES_BASIC = [
   'relatorioResumoGeral',
   'guiaCriador',
   'suporte',
+  // Auditoria funcional: estas páginas aparecem no menu de todos os planos,
+  // sem nenhum indicador de "recurso premium" na interface ou na tabela de
+  // preços (docs/PRONTIDAO_COMERCIAL_HERDON.md) — omissão do mesmo tipo já
+  // corrigida antes para 'minhaAssinatura' (cliente pagante não conseguia
+  // navegar até uma página que o próprio menu mostra como disponível).
+  'alertas',
+  'suplementacao',
+  'acompanhamentoPeso',
+  'custos',
+  'fluxoCaixa',
+  'custosCompartilhados',
+  'sincronizacao',
+  'importacao',
+  'funcionarios',
 ];
 
 const MODULES_PRO = [
