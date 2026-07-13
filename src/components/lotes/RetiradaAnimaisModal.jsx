@@ -5,7 +5,8 @@ import Modal from '../ui/Modal';
 import { RETIRADA_TIPOS, REDIRECIONAMENTO_TIPOS } from './constants';
 import { useSubmitOnce } from '../../hooks/useSubmitOnce.js';
 
-const today = new Date().toISOString().slice(0, 10);
+import { hojeLocalISO } from '../../domain/dataCivil.js';
+const today = hojeLocalISO();
 
 // Bug 2.2: os botões "Venda parcial"/"Morte/perda"/"Saída do lote" (LoteDetailsPanel)
 // abrem este modal com uma prop `modo`, mas o tipo inicial ficava sempre fixo em

@@ -26,6 +26,7 @@ import { classificarDecisaoVenda, PRECO_ARROBA_PADRAO } from '../domain/decisaoV
 import { exportarCsvCompatExcel, exportarExcelXmlCompat } from '../utils/exportadores';
 import '../styles/relatorios.css';
 
+import { hojeLocalISO } from '../domain/dataCivil.js';
 const REPORT_TYPES = [
   {
     id: 'lote',
@@ -1407,7 +1408,7 @@ function getDateBounds(db) {
   });
 
   if (!candidates.length) {
-    const today = new Date().toISOString().slice(0, 10);
+    const today = hojeLocalISO();
     return { min: today, max: today };
   }
 
@@ -1427,7 +1428,7 @@ function getPresetRange(periodo, bounds) {
     return { start: bounds.min || '', end: bounds.max || '' };
   }
 
-  const end = bounds.max || new Date().toISOString().slice(0, 10);
+  const end = bounds.max || hojeLocalISO();
   const endDate = new Date(`${end}T00:00:00`);
   const startDate = new Date(endDate);
 

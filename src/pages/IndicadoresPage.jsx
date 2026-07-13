@@ -2,13 +2,14 @@ import { useMemo, useState } from 'react';
 import Card from '../components/ui/Card';
 import Input from '../components/ui/Input';
 import PageHeader from '../components/PageHeader';
+import { hojeLocalISO } from '../domain/dataCivil.js';
 import {
   computeIndicadoresEstrategicos,
   resolveIndicadoresPeriod,
 } from '../domain/indicadoresEstrategicos';
 
 function nowDate() {
-  return new Date().toISOString().slice(0, 10);
+  return hojeLocalISO();
 }
 
 function formatCurrency(value) {

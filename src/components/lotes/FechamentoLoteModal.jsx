@@ -5,7 +5,8 @@ import Modal from '../ui/Modal';
 import { useSubmitOnce } from '../../hooks/useSubmitOnce.js';
 import { deveAvisarSaldoPositivoAoFinalizar } from '../../pages/lotesLogic.js';
 
-const today = new Date().toISOString().slice(0, 10);
+import { hojeLocalISO } from '../../domain/dataCivil.js';
+const today = hojeLocalISO();
 
 export default function FechamentoLoteModal({ open, lote, onClose, onSubmit }) {
   const { executar, isSubmitting } = useSubmitOnce();

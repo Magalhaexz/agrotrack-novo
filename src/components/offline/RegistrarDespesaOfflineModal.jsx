@@ -4,7 +4,8 @@ import Input from '../ui/Input';
 import Modal from '../ui/Modal';
 import { CATEGORIAS_DESPESA_OFFLINE, validarDespesaOfflineForm } from '../../domain/offlineCaptureLogic';
 
-const today = new Date().toISOString().slice(0, 10);
+import { hojeLocalISO } from '../../domain/dataCivil.js';
+const today = hojeLocalISO();
 
 function emptyForm() {
   return {

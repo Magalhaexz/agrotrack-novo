@@ -36,10 +36,11 @@ import {
 } from '../domain/calcHelpers.js';
 import '../styles/rebanho.css';
 
+import { hojeLocalISO } from '../domain/dataCivil.js';
 function daysFrom(dateValue) {
   const key = toDateKey(dateValue);
   if (!key) return 0;
-  return Math.max(0, daysBetween(key, new Date().toISOString().slice(0, 10)));
+  return Math.max(0, daysBetween(key, hojeLocalISO()));
 }
 
 function calculateGmd30(pesagens = []) {
@@ -203,7 +204,7 @@ function normalizeStatus(lote) {
   return status;
 }
 
-const todayIso = new Date().toISOString().slice(0, 10);
+const todayIso = hojeLocalISO();
 const EMPTY_LIST = [];
 const LABEL_OR_DASH = '—';
 

@@ -14,6 +14,7 @@ import { getResumoLote } from './resumoLote.js';
 import { avaliarDesempenhoGmd } from './gmdAlerta.js';
 import { deveEntrarNoResultadoLote } from './financeiroStatus.js';
 
+import { hojeLocalISO } from './dataCivil.js';
 export const SEVERIDADE = {
   CRITICO: 'critico',
   ALTO: 'alto',
@@ -58,7 +59,7 @@ const CUSTO_VARIACAO_ALTO = 0.30;
 const CUSTO_VARIACAO_CRITICO = 0.50;
 
 function hojeISO(agora = new Date()) {
-  return toDateKey(agora) || new Date().toISOString().slice(0, 10);
+  return toDateKey(agora) || hojeLocalISO();
 }
 
 function lotesAtivos(db) {

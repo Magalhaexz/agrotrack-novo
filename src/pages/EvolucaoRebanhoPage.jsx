@@ -4,12 +4,13 @@ import Input from '../components/ui/Input';
 import PageHeader from '../components/PageHeader';
 import { computeEvolucaoRebanho } from '../domain/evolucaoRebanho';
 
+import { hojeLocalISO } from '../domain/dataCivil.js';
 function toDateKey(value) {
   return String(value || '').slice(0, 10);
 }
 
 function nowDate() {
-  return new Date().toISOString().slice(0, 10);
+  return hojeLocalISO();
 }
 
 function monthBounds(yyyyMm) {

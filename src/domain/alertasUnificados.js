@@ -37,6 +37,7 @@ import {
 import { getDataVencimento } from './financeiroStatus.js';
 import { PROXIMOS_7_DIAS, CARENCIA_CRITICA_DIAS } from './janelasAlertas.js';
 
+import { hojeLocalISO } from './dataCivil.js';
 export const PRIORIDADE = {
   CRITICO: 'critico',
   ATENCAO: 'atencao',
@@ -68,7 +69,7 @@ const ORIGEM_POR_TIPO_INTELIGENTE = {
 };
 
 function hojeIso() {
-  return new Date().toISOString().slice(0, 10);
+  return hojeLocalISO();
 }
 
 function pluralizar(quantidade, singular, plural) {

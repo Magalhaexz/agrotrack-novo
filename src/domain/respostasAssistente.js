@@ -20,6 +20,7 @@ import { listarSaudeLotes } from './saudeLote.js';
 import { gerarResumoRelatorioLote } from './relatorioLote.js';
 import { formatCurrency } from '../utils/calculations.js';
 
+import { hojeLocalISO } from './dataCivil.js';
 const SEVERIDADE_ORDEM = {
   [SEVERIDADE.CRITICO]: 0,
   [SEVERIDADE.ALTO]: 1,
@@ -275,7 +276,7 @@ function responderLotePrioritario(db, agora) {
 }
 
 function hojeISO(agora) {
-  return toDateKey(agora) || new Date().toISOString().slice(0, 10);
+  return toDateKey(agora) || hojeLocalISO();
 }
 
 /** Maior categoria de despesa nos últimos `dias` — descreve, não altera o alerta de custo. */

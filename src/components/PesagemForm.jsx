@@ -4,6 +4,7 @@ import Button from './ui/Button';
 import ArrobaPreview from './ArrobaPreview';
 import { useSubmitOnce } from '../hooks/useSubmitOnce.js';
 
+import { hojeLocalISO } from '../domain/dataCivil.js';
 function normalizeIdKey(value) {
   if (value === undefined || value === null) return null;
   const text = String(value).trim();
@@ -64,16 +65,6 @@ function getAnimalIndex(animal, fallbackIndex = null) {
   return Number.isFinite(Number(fallbackIndex)) ? Number(fallbackIndex) : null;
 }
 
-// Data local de hoje (sem conversão UTC, que causaria erro de um dia à noite em
-// fusos negativos — bug 3.1). Mesmo padrão de RotinaForm/EntradaEstoqueModal.
-function hojeISO() {
-  const hoje = new Date();
-  const ano = hoje.getFullYear();
-  const mes = String(hoje.getMonth() + 1).padStart(2, '0');
-  const dia = String(hoje.getDate()).padStart(2, '0');
-  return `${ano}-${mes}-${dia}`;
-}
-
 const FORM_VAZIO = {
   tipo: 'lote',
   lote_id: '',
@@ -87,11 +78,11 @@ const FORM_VAZIO = {
 
 function normalizarInitialData(data) {
   // Nova pesagem: já vem com a data de hoje preenchida (3.1), editável.
-  if (!data) return { ...FORM_VAZIO, data: hojeISO() };
+  if (!data) return { ...FORM_VAZIO, data: hojeLocalISO() };
   return {
     tipo: data.tipo || data.origem || 'lote',
     lote_id: data.lote_id ?? '',
-    data: data.data || hojeISO(),
+    data: data.data || hojeLocalISO(),
     peso_medio: data.peso_medio ?? '',
     observacao: data.observacao || '',
     rendimento_carcaca: data.rendimento_carcaca ?? 52,
@@ -472,7 +463,7 @@ export default function PesagemForm({
                 className="ui-input"
                 name="data"
                 type="date"
-                max={new Date().toISOString().slice(0, 10)}
+                max={hojeLocalISO()}
                 value={form.data}
                 onChange={handleChange}
               />

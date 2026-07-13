@@ -8,8 +8,9 @@ import { formatNumber } from '../utils/calculations';
 import { toNumber } from '../domain/calcHelpers.js';
 import { createOperationalRecord, updateOperationalRecord } from '../services/operationalPersistence';
 
+import { hojeLocalISO } from '../domain/dataCivil.js';
 function getTodayIso() {
-  return new Date().toISOString().slice(0, 10);
+  return hojeLocalISO();
 }
 
 function toNumberSafe(value, fallback = 0) {

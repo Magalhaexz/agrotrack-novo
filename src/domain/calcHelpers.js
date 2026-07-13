@@ -1,3 +1,4 @@
+import { hojeLocalISO } from './dataCivil.js';
 const MS_PER_DAY = 24 * 60 * 60 * 1000;
 
 export function toNumber(value) {
@@ -94,7 +95,7 @@ export function isAnimalAtivo(animal) {
 // Retorna dias >= 0 entre dataEntrada e dataReferencia (ou hoje).
 // Retorna 0 se dataEntrada for inválida ou referência for anterior à entrada.
 export function calcularDiasNoLote(dataEntrada, dataReferencia) {
-  const ref = dataReferencia || new Date().toISOString().slice(0, 10);
+  const ref = dataReferencia || hojeLocalISO();
   const dias = daysBetween(dataEntrada, ref);
   return dias > 0 ? dias : 0;
 }

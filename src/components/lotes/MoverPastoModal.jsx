@@ -10,7 +10,8 @@ import {
 } from './movimentacaoPastoLogic';
 import { useSubmitOnce } from '../../hooks/useSubmitOnce.js';
 
-const today = new Date().toISOString().slice(0, 10);
+import { hojeLocalISO } from '../../domain/dataCivil.js';
+const today = hojeLocalISO();
 
 function emptyForm() {
   return {

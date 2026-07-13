@@ -8,6 +8,7 @@ import { useToast } from '../hooks/useToast';
 import { aplicarRateioCustoCompartilhado } from '../services/custosCompartilhados';
 import { formatarMoeda } from '../utils/formatters';
 
+import { hojeLocalISO } from '../domain/dataCivil.js';
 const CRITERIOS = [
   { id: 'cabecas', label: 'Por nº de cabeças' },
   { id: 'peso', label: 'Por peso total do lote' },
@@ -24,7 +25,7 @@ const CATEGORIAS = [
   { id: 'outros', label: 'Outros' },
 ];
 
-const hoje = new Date().toISOString().slice(0, 10);
+const hoje = hojeLocalISO();
 
 function calcularPrevia(db, form) {
   if (!form.valor || Number(form.valor) <= 0) return [];

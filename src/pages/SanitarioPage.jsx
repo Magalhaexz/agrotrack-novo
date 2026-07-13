@@ -20,6 +20,7 @@ import { sincronizarEstoqueSanidade, reverterEstoqueSanidadeExcluido } from '../
 import { formatarDataExportacao, montarNomeArquivo } from '../domain/exportacaoRelatorios';
 import { baixarCsv, abrirRelatorioParaImpressao } from '../utils/exportacaoArquivos';
 
+import { hojeLocalISO } from '../domain/dataCivil.js';
 const AGENDA_SECOES = [
   { chave: 'vencidos', titulo: 'Vencidos', badge: 'badge-r' },
   { chave: 'vencendoHoje', titulo: 'Vencendo hoje', badge: 'badge-a' },
@@ -36,7 +37,7 @@ export default function SanitarioPage({ db, setDb, onConfirmAction, navigationIn
   const abrirManejoPorIntent = navigationIntent?.page === 'sanitario' && navigationIntent?.action === 'novo';
   const [abrirForm, setAbrirForm] = useState(abrirManejoPorIntent);
   const [itemEditando, setItemEditando] = useState(null);
-  const [iatf, setIatf] = useState({ nome: '', fazenda_id: db?.fazendas?.[0]?.id ? String(db.fazendas[0].id) : '', lote_id: db?.lotes?.[0]?.id ? String(db.lotes[0].id) : '', data_inicial: new Date().toISOString().slice(0,10), obs: '', status: 'Planejado', retirada_dias: 8, hormonal_dias: 9, inseminacao_dias: 10, diagnostico_dias: 40, repasse_dias: 55 });
+  const [iatf, setIatf] = useState({ nome: '', fazenda_id: db?.fazendas?.[0]?.id ? String(db.fazendas[0].id) : '', lote_id: db?.lotes?.[0]?.id ? String(db.lotes[0].id) : '', data_inicial: hojeLocalISO(), obs: '', status: 'Planejado', retirada_dias: 8, hormonal_dias: 9, inseminacao_dias: 10, diagnostico_dias: 40, repasse_dias: 55 });
 
   // Memoizar mapas para otimizar lookups
   const lotesMap = useMemo(() => {
@@ -469,14 +470,14 @@ export default function SanitarioPage({ db, setDb, onConfirmAction, navigationIn
     ];
   }, [iatf]);
   const proximaAcaoIatf = useMemo(
-    () => iatfAgenda.find((item) => new Date(`${item.data}T00:00:00`) >= new Date(`${new Date().toISOString().slice(0, 10)}T00:00:00`)) || null,
+    () => iatfAgenda.find((item) => new Date(`${item.data}T00:00:00`) >= new Date(`${hojeLocalISO()}T00:00:00`)) || null,
     [iatfAgenda]
   );
 
   async function salvarIatf() {
     if (!hasPermission('sanitario:editar')) { showToast({ type: 'error', message: mensagemSemPermissao }); return; }
     if (!iatf.nome.trim() || !iatf.data_inicial) { showToast({ type: 'warning', message: 'Informe nome do protocolo e data inicial.' }); return; }
-    const proxima = iatfAgenda.find((item) => new Date(`${item.data}T00:00:00`) >= new Date(new Date().toISOString().slice(0,10)+'T00:00:00')) || iatfAgenda[0];
+    const proxima = iatfAgenda.find((item) => new Date(`${item.data}T00:00:00`) >= new Date(hojeLocalISO()+'T00:00:00')) || iatfAgenda[0];
     const fazendaNome = (db?.fazendas || []).find((f) => String(f.id) === String(iatf.fazenda_id))?.nome || 'Sem fazenda';
     const offsets = `Offset dias: retirada=${Number(iatf.retirada_dias || 0)}, hormonal=${Number(iatf.hormonal_dias || 0)}, inseminação=${Number(iatf.inseminacao_dias || 0)}, diagnóstico=${Number(iatf.diagnostico_dias || 0)}, repasse=${Number(iatf.repasse_dias || 0)}`;
     const agendaSerializada = iatfAgenda.map((evento) => `Dia ${evento.dias} ${evento.label}: ${evento.data}`).join(' | ');

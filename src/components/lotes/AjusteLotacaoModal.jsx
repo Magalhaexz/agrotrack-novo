@@ -4,7 +4,8 @@ import Input from '../ui/Input';
 import Modal from '../ui/Modal';
 import { useSubmitOnce } from '../../hooks/useSubmitOnce.js';
 
-const today = new Date().toISOString().slice(0, 10);
+import { hojeLocalISO } from '../../domain/dataCivil.js';
+const today = hojeLocalISO();
 
 /**
  * Ajuste de lotação: correção ADMINISTRATIVA da contagem de cabeças (não é

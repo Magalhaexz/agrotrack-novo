@@ -2,6 +2,7 @@ import { useMemo, useState } from 'react';
 import Modal from './ui/Modal';
 import Button from './ui/Button';
 
+import { hojeLocalISO } from '../domain/dataCivil.js';
 const EXIT_REASONS = [
   { value: 'morte', label: 'Morte' },
   { value: 'descarte', label: 'Descarte' },
@@ -48,7 +49,7 @@ const MODE_CONFIG = {
 function getInitialForm(mode) {
   if (mode === 'sale') {
     return {
-      data: new Date().toISOString().slice(0, 10),
+      data: hojeLocalISO(),
       valor: '',
       peso: '',
       observacao: '',
@@ -57,7 +58,7 @@ function getInitialForm(mode) {
   }
 
   return {
-    data: new Date().toISOString().slice(0, 10),
+    data: hojeLocalISO(),
     observacao: '',
     motivo: MODE_CONFIG[mode]?.defaultMotive || 'morte',
   };
@@ -128,7 +129,7 @@ export default function AnimalMovementModal({
           <input
             className="ui-input"
             type="date"
-            max={new Date().toISOString().slice(0, 10)}
+            max={hojeLocalISO()}
             value={form.data}
             onChange={(event) => updateField('data', event.target.value)}
           />

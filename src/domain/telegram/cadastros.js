@@ -9,6 +9,7 @@ import { INTENCOES } from './interpretarComandoTelegram.js';
 import { extrairValor, extrairPeso, extrairData, extrairQuantidade, extrairNomeApos, parseNumeroBR } from './extrairEntidades.js';
 import { resolverLotePorNome, normalizarChave } from './resolvedores.js';
 
+import { hojeLocalISO } from '../dataCivil.js';
 const erro = (codigo) => ({ ok: false, erro: codigo });
 
 /** Um número "puro" ("425" ou "1.234,56") — usado quando o slot já pergunta o campo. */
@@ -147,7 +148,7 @@ export function prepararCadastro(intencao, dados, ctx = {}) {
   if (!val.ok) return val;
 
   const db = ctx.db || {};
-  const dataFinal = dados.data || ctx.hoje?.toISOString?.().slice(0, 10) || new Date().toISOString().slice(0, 10);
+  const dataFinal = dados.data || ctx.hoje?.toISOString?.().slice(0, 10) || hojeLocalISO();
 
   // Resolve lote quando informado (opcional na maioria dos cadastros).
   let loteId = null; let loteNome = null;

@@ -24,6 +24,7 @@ import {
 } from '../services/operationalPersistence';
 import { matchesRotinaRecurrence } from './calendarioOperacionalLogic.js';
 
+import { hojeLocalISO } from '../domain/dataCivil.js';
 const MONTH_LABELS = ['Janeiro', 'Fevereiro', 'Março', 'Abril', 'Maio', 'Junho', 'Julho', 'Agosto', 'Setembro', 'Outubro', 'Novembro', 'Dezembro'];
 const WEEKDAY_LABELS = ['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sab'];
 
@@ -40,7 +41,7 @@ const typeMap = {
   operacional: { icon: CalendarDays, color: 'var(--color-text-secondary)', label: 'Operacional' },
 };
 
-const getTodayIso = () => new Date().toISOString().slice(0, 10);
+const getTodayIso = () => hojeLocalISO();
 
 export default function CalendarioOperacionalPage({ db, setDb, session, fazendaSelecionada = null, onConfirmAction }) {
   const { showToast } = useToast();

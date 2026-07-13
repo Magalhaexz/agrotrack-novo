@@ -6,6 +6,7 @@ import '../../styles/decisoes.css';
 import '../../styles/rebanho.css';
 import '../../styles/relatorios.css';
 
+import { hojeLocalISO } from '../../domain/dataCivil.js';
 const GMD_STATUS_LABEL = {
   acima: 'Acima da meta',
   dentro: 'Dentro da meta',
@@ -186,7 +187,7 @@ function toPositiveOrZero(value) {
 }
 
 function toISODate(value) {
-  if (!value) return new Date().toISOString().slice(0, 10);
+  if (!value) return hojeLocalISO();
   if (value instanceof Date) return value.toISOString().slice(0, 10);
   return String(value).slice(0, 10);
 }

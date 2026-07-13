@@ -22,6 +22,7 @@ import {
 } from '../services/telegramConnection';
 import '../styles/configuracoes.css';
 
+import { hojeLocalISO } from '../domain/dataCivil.js';
 /** Mascara o chat_id do Telegram para exibição (Sprint 20) — mantém só os últimos 4 dígitos. */
 function mascararChatId(chatId) {
   const texto = String(chatId || '');
@@ -268,7 +269,7 @@ export default function ConfiguracoesPage({ db, setDb, onConfirmAction, onNaviga
     const url = URL.createObjectURL(blob);
     const anchor = document.createElement('a');
     anchor.href = url;
-    anchor.download = `herdon-backup-${new Date().toISOString().slice(0, 10)}.json`;
+    anchor.download = `herdon-backup-${hojeLocalISO()}.json`;
     anchor.click();
     URL.revokeObjectURL(url);
     showToast({ type: 'success', message: 'Backup exportado com sucesso.' });

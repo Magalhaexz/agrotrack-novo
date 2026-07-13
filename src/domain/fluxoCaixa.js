@@ -1,4 +1,5 @@
 import { toNumber } from './calcHelpers.js';
+import { hojeLocalISO } from './dataCivil.js';
 import {
   deveEntrarNoFluxoCaixa,
   getDataVencimento,
@@ -24,7 +25,7 @@ function round2(value) {
  */
 export function calcularFluxoCaixa(movimentacoes, opcoes = {}) {
   const lista = Array.isArray(movimentacoes) ? movimentacoes : [];
-  const hoje = opcoes.hoje || new Date().toISOString().slice(0, 10);
+  const hoje = opcoes.hoje || hojeLocalISO();
   const loteId = opcoes.loteId != null ? Number(opcoes.loteId) : null;
 
   const filtradas = loteId != null

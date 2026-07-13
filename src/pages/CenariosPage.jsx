@@ -15,6 +15,7 @@ import {
 } from '../services/operationalPersistence';
 import '../styles/simulador.css';
 
+import { hojeLocalISO } from '../domain/dataCivil.js';
 const SIMULADOR_INTRO_CARDS = [
   {
     titulo: 'Simular compra',
@@ -35,7 +36,7 @@ const SIMULADOR_INTRO_CARDS = [
 ];
 
 function nowDate() {
-  return new Date().toISOString().slice(0, 10);
+  return hojeLocalISO();
 }
 
 function toNumber(value) {

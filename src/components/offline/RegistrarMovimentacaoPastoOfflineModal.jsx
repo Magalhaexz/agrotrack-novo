@@ -3,6 +3,7 @@ import Button from '../ui/Button';
 import Input from '../ui/Input';
 import Modal from '../ui/Modal';
 import { filterLotesAtivosPorFazenda } from '../../domain/offlineCaptureLogic';
+import { hojeLocalISO } from '../../domain/dataCivil.js';
 import {
   MOTIVOS_MOVIMENTACAO_PASTO,
   filterPastagensPorFazenda,
@@ -10,7 +11,7 @@ import {
   validarMovimentacaoPastoForm,
 } from '../../components/lotes/movimentacaoPastoLogic';
 
-const today = new Date().toISOString().slice(0, 10);
+const today = hojeLocalISO();
 
 function emptyForm() {
   return {

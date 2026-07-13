@@ -1,3 +1,4 @@
+import { hojeLocalISO } from '../domain/dataCivil.js';
 
 import { formatDate } from './calculations'; // Assuming calculations.js contains formatDate
 
@@ -20,7 +21,7 @@ export function exportarRelatorio(elemento, nomeArquivo = 'relatorio', meta = {}
 
   const conteudo = elemento.innerHTML;
   // Obtém a data atual e formata para BR, usando a função importada
-  const dataGeracao = formatDate(new Date().toISOString().slice(0, 10));
+  const dataGeracao = formatDate(hojeLocalISO());
   const titulo = meta.titulo || 'Relatório Gerencial';
   const fazenda = meta.fazenda || 'Fazenda';
 

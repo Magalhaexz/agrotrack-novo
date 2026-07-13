@@ -39,7 +39,8 @@ import { useAuth } from '../auth/useAuth';
 import { useToast } from '../hooks/useToast';
 import '../styles/dashboard.css';
 
-const getTodayIso = () => new Date().toISOString().slice(0, 10);
+import { hojeLocalISO } from '../domain/dataCivil.js';
+const getTodayIso = () => hojeLocalISO();
 
 const NIVEL_PARA_PRIORIDADE = { critical: 'alta', warning: 'media', info: 'baixa' };
 

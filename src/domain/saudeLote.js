@@ -26,6 +26,7 @@ import {
 } from './alertasInteligentes.js';
 import { LIMIAR_CUSTO_ALTO_PCT, PRECO_ARROBA_PADRAO } from './decisaoVenda.js';
 
+import { hojeLocalISO } from './dataCivil.js';
 export const SAUDE_LOTE_CLASSIFICACAO = {
   SAUDAVEL: 'saudavel',
   ATENCAO: 'atencao',
@@ -55,7 +56,7 @@ const PONTOS_ESTOQUE = { [SEVERIDADE.CRITICO]: -10, [SEVERIDADE.ALTO]: -7, [SEVE
 const PONTOS_CUSTO_ALTO = -15;
 
 function hojeISO(agora = new Date()) {
-  return toDateKey(agora) || new Date().toISOString().slice(0, 10);
+  return toDateKey(agora) || hojeLocalISO();
 }
 
 function pluralizar(quantidade, singular, plural) {

@@ -16,6 +16,7 @@ import {
 } from '../utils/importParser';
 import { createOperationalRecord } from '../services/operationalPersistence';
 
+import { hojeLocalISO } from '../domain/dataCivil.js';
 // ── Constantes ───────────────────────────────────────────────────────────────
 
 const ABA_LABELS = {
@@ -301,7 +302,7 @@ export default function ImportacaoPage({ db, setDb, session: sessionProp, onConf
       const fazendaId = fazendaIdPorNome.get(norm(row.codigo_fazenda));
       const qtd = Number(String(row.quantidade_cabecas).replace(',', '.')) || 0;
       const pIni = parsePositiveNumber(row.peso_inicial_kg) || 0;
-      const dataEntrada = parseDate(row.data_entrada) || new Date().toISOString().slice(0, 10);
+      const dataEntrada = parseDate(row.data_entrada) || hojeLocalISO();
       try {
         const res = await createOperationalRecord('lotes', {
           id: gerarNovoId(),

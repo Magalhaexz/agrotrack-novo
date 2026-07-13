@@ -11,7 +11,7 @@ import ExportActions from '../components/ExportActions';
 import { getResumoLote } from '../domain/resumoLote';
 import { isModoConsolidado, construirMapaFazendas } from '../domain/escopoFazenda';
 import { listarContasFinanceiras } from '../domain/hojeNaFazenda';
-import { isMovimentacaoPaga, isMovimentacaoCancelada, getDataVencimento } from '../domain/financeiroStatus';
+import { isMovimentacaoPaga, isMovimentacaoCancelada, getDataVencimento, deveEntrarNoResultadoLote } from '../domain/financeiroStatus';
 import { formatCurrency, formatDate, formatNumber } from '../utils/calculations';
 import { gerarNovoId } from '../utils/id';
 import { useAuth } from '../auth/useAuth';
@@ -19,15 +19,17 @@ import { useToast } from '../hooks/useToast';
 import { createOperationalRecord, updateOperationalRecord } from '../services/operationalPersistence';
 import { formatarMoedaExportacao, montarNomeArquivo } from '../domain/exportacaoRelatorios';
 import { resolverFazendaIdLancamento } from './financeiroLancamentoLogic.js';
+import { computeDRE } from './financeiroDreLogic.js';
 import { useSubmitOnce } from '../hooks/useSubmitOnce.js';
 import { baixarCsv, abrirRelatorioParaImpressao } from '../utils/exportacaoArquivos';
 import '../styles/pagamentos.css';
 
+import { hojeLocalISO } from '../domain/dataCivil.js';
 const tabs = ['dre', 'lote', 'lanc', 'pag'];
 const despCats = ['Compra Animal', 'Racao', 'Suplemento', 'Medicamento', 'Vacina', 'Frete', 'Funcionario', 'Arrendamento', 'Manutencao', 'Outro'];
 const recCats = ['Venda Animal', 'Venda Produto', 'Outro'];
 const metodosPagamento = ['Dinheiro', 'Pix', 'Cartão', 'Boleto', 'Transferência', 'Cheque', 'Outro'];
-const getTodayIso = () => new Date().toISOString().slice(0, 10);
+const getTodayIso = () => hojeLocalISO();
 const TAB_LABELS = {
   dre: 'DRE',
   lote: 'Por Lote',
@@ -100,7 +102,7 @@ export default function FinanceiroPage({ db, setDb, navigationIntent = null, faz
       const resumo = getResumoLote(db, lote.id);
       const movs = movFinMapByLote.get(lote.id) || [];
       const deducoes = movs
-        .filter((mov) => mov.tipo === 'despesa' && ['Frete', 'Comissao'].includes(mov.categoria))
+        .filter((mov) => mov.tipo === 'despesa' && ['Frete', 'Comissao'].includes(mov.categoria) && deveEntrarNoResultadoLote(mov))
         .reduce((sum, mov) => sum + Number(mov.valor || 0), 0);
       const receitaLiquida = resumo.receitaTotal - deducoes;
       const custoTotal = resumo.custoTotal;
@@ -856,41 +858,6 @@ function NovoLancamentoModal({ db, setDb, onClose, hasPermission, showToast, ses
   );
 }
 
-function computeDRE(db, lotesRows) {
-  const movimentacoes = Array.isArray(db?.movimentacoes_financeiras) ? db.movimentacoes_financeiras : [];
-  const receitaLotes = lotesRows.reduce((sum, row) => sum + row.receitaTotal, 0);
-  const despesaLotes = lotesRows.reduce((sum, row) => sum + row.custoTotal, 0);
-  const despesasGerais = movimentacoes.filter((item) => item.tipo === 'despesa' && !item.lote_id).reduce((sum, item) => sum + Number(item.valor || 0), 0);
-  const receitasGerais = movimentacoes.filter((item) => item.tipo === 'receita' && !item.lote_id).reduce((sum, item) => sum + Number(item.valor || 0), 0);
-
-  const mensalMap = {};
-  movimentacoes.forEach((item) => {
-    const mes = String(item.data || '').slice(0, 7);
-    if (!mes) {
-      return;
-    }
-    if (!mensalMap[mes]) {
-      mensalMap[mes] = { mes, receita: 0, despesa: 0 };
-    }
-    mensalMap[mes][item.tipo === 'receita' ? 'receita' : 'despesa'] += Number(item.valor || 0);
-  });
-
-  const despesaPorCategoria = {};
-  movimentacoes
-    .filter((item) => item.tipo === 'despesa')
-    .forEach((item) => {
-      const categoria = item.categoria || 'Outro';
-      despesaPorCategoria[categoria] = (despesaPorCategoria[categoria] || 0) + Number(item.valor || 0);
-    });
-
-  return {
-    receita: receitaLotes + receitasGerais,
-    despesa: despesaLotes + despesasGerais,
-    resultado: receitaLotes + receitasGerais - despesaLotes - despesasGerais,
-    mensal: Object.values(mensalMap).sort((a, b) => a.mes.localeCompare(b.mes)),
-    despesaPorCategoria,
-  };
-}
 
 function buildFinanceTimeline(db, loteId) {
   const timeline = (db.movimentacoes_financeiras || [])

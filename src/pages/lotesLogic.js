@@ -1,4 +1,5 @@
-﻿import { calculateDailyConsumptionKg, toNumber } from '../domain/calcHelpers.js';
+import { hojeLocalISO } from '../domain/dataCivil.js';
+import { calculateDailyConsumptionKg, toNumber } from '../domain/calcHelpers.js';
 
 export function filterLotesByActiveFarm(lotes = [], activeFarmId = null) {
   if (!activeFarmId) return [];
@@ -151,7 +152,7 @@ export function buildGrupoAnimaisAutoPatch(lote) {
     qtd,
     p_ini: pesoInicial,
     p_at: pesoAtual,
-    data_referencia: lote?.entrada || new Date().toISOString().slice(0, 10),
+    data_referencia: lote?.entrada || hojeLocalISO(),
     status: 'ativo',
     rendimento_carcaca: toNumber(lote?.rendimento_carcaca) || 52,
     observacao: 'Criado automaticamente a partir do cadastro do lote.',
@@ -174,7 +175,7 @@ export function buildPesagemInicialPatch(lote) {
     lote_id: lote?.id ?? null,
     tipo: 'lote',
     origem: 'lote',
-    data: lote?.entrada || new Date().toISOString().slice(0, 10),
+    data: lote?.entrada || hojeLocalISO(),
     peso_medio: pesoInicial,
     observacao: 'Peso de entrada do lote (registrado automaticamente no cadastro).',
   };
@@ -198,7 +199,7 @@ export function buildAjusteLotacaoPatch({ lote, novaQtd, motivo, data }) {
   if (qtdNova === qtdAtual) return { ok: false, erro: 'SEM_ALTERACAO' };
 
   const delta = qtdNova - qtdAtual;
-  const dataAjuste = data || new Date().toISOString().slice(0, 10);
+  const dataAjuste = data || hojeLocalISO();
 
   return {
     ok: true,

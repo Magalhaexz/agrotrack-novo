@@ -7,6 +7,7 @@ import { computeEvolucaoRebanho } from './evolucaoRebanho.js';
 import { calcularRendimentoCarcaca } from './indicadores.js';
 import { safeDivide, toDateKey, toNonNegativeNumber, toNumber } from './calcHelpers.js';
 
+import { hojeLocalISO } from './dataCivil.js';
 function isDateInPeriod(value, start, end) {
   const date = toDateKey(value);
   const safeStart = toDateKey(start);
@@ -245,7 +246,7 @@ export function resolveIndicadoresPeriod({ tipoPeriodo, mesRef, anoRef, customIn
     const a = toDateKey(customInicio);
     const b = toDateKey(customFim);
     if (!a || !b) {
-      const today = new Date().toISOString().slice(0, 10);
+      const today = hojeLocalISO();
       return { start: today, end: today };
     }
     return a <= b ? { start: a, end: b } : { start: b, end: a };

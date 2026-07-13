@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import Modal from './ui/Modal';
 import Button from './ui/Button';
 
+import { hojeLocalISO } from '../domain/dataCivil.js';
 const TIPOS_MANEJO = [
   { value: 'vacina', label: 'Vacina' },
   { value: 'vermifugo', label: 'Vermífugo' },
@@ -231,7 +232,7 @@ export default function SanitarioForm({
               className="ui-input"
               name="data_aplic"
               type="date"
-              max={new Date().toISOString().slice(0, 10)}
+              max={hojeLocalISO()}
               value={form.data_aplic}
               onChange={handleChange}
             />

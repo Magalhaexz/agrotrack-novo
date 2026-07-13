@@ -21,6 +21,7 @@ import { formatarDataExportacao, montarNomeArquivo } from '../domain/exportacaoR
 import { baixarCsv, abrirRelatorioParaImpressao } from '../utils/exportacaoArquivos';
 import '../styles/alertas.css';
 
+import { hojeLocalISO } from '../domain/dataCivil.js';
 const ORIGEM_LABEL = {
   financeiro: 'Financeiro',
   estoque: 'Estoque',
@@ -493,7 +494,7 @@ export default function AlertasPage({
                         type="date"
                         className="ui-input"
                         value={dataAdiamento}
-                        min={new Date().toISOString().slice(0, 10)}
+                        min={hojeLocalISO()}
                         onChange={(e) => setDataAdiamento(e.target.value)}
                       />
                       <button type="button" className="alertas-card-abrir" onClick={() => confirmarAdiamento(alerta)}>Confirmar</button>

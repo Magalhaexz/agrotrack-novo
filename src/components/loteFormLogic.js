@@ -6,6 +6,7 @@ import {
   toDateKey,
   toNumber,
 } from '../domain/calcHelpers.js';
+import { hojeLocalISO } from '../domain/dataCivil.js';
 
 const FORM_VAZIO = {
   nome: '',
@@ -15,7 +16,7 @@ const FORM_VAZIO = {
   raca: '',
   tipo: 'engorda',
   sistema: 'confinamento',
-  entrada: new Date().toISOString().slice(0, 10),
+  entrada: hojeLocalISO(),
   qtd: '',
   p_ini: '',
   peso_alvo: '',
@@ -126,7 +127,7 @@ export function normalizarInitialData(data, pastagens = [], fazendaAtiva = null)
     raca: data.raca ?? data.raca_animal ?? data.gen ?? '',
     tipo: data.tipo || 'engorda',
     sistema: data.sistema || 'confinamento',
-    entrada: data.entrada || new Date().toISOString().slice(0, 10),
+    entrada: data.entrada || hojeLocalISO(),
     qtd: data.qtd ?? '',
     p_ini: data.p_ini ?? data.p_at ?? '',
     peso_alvo: data.peso_alvo ?? '',

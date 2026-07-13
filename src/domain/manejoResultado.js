@@ -1,6 +1,7 @@
 import { toNumber, safeDivide, daysBetween } from './calcHelpers.js';
 import { montarDadosDecisaoVenda } from './decisaoVenda.js';
 
+import { hojeLocalISO } from './dataCivil.js';
 export const LIMIAR_SANIDADE_EM_DIA_DIAS = 60;
 export const LIMIAR_SANIDADE_ATENCAO_DIAS = 120;
 export const PERIODO_OCORRENCIAS_RECENTES_DIAS = 90;
@@ -46,7 +47,7 @@ function arr(value) {
 }
 
 function hojeIso() {
-  return new Date().toISOString().slice(0, 10);
+  return hojeLocalISO();
 }
 
 /**

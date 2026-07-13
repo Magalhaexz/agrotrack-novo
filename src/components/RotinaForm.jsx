@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import Modal from './ui/Modal';
 import Button from './ui/Button';
 
+import { hojeLocalISO } from '../domain/dataCivil.js';
 const SETORES = ['Lotes', 'Estoque', 'Pesagens', 'Sanitário', 'Custos', 'Fazenda', 'Geral'];
 const RECORRENCIA_TIPOS = [
   { value: 'diaria', label: 'Diária' },
@@ -254,7 +255,7 @@ export default function RotinaForm({
                 className="ui-input"
                 name="data"
                 type="date"
-                max={new Date().toISOString().slice(0, 10)}
+                max={hojeLocalISO()}
                 value={form.data}
                 onChange={handleChange}
               />
@@ -293,7 +294,7 @@ export default function RotinaForm({
                   className="ui-input"
                   name="data_inicio"
                   type="date"
-                  max={new Date().toISOString().slice(0, 10)}
+                  max={hojeLocalISO()}
                   value={form.data_inicio}
                   onChange={handleChange}
                 />

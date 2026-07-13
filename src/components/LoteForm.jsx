@@ -3,6 +3,7 @@ import Modal from './ui/Modal';
 import Button from './ui/Button';
 import Input from './ui/Input';
 import { useSubmitOnce } from '../hooks/useSubmitOnce.js';
+import { hojeLocalISO } from '../domain/dataCivil.js';
 import {
   addDaysToDate,
   calculateDailyConsumptionKg,
@@ -30,7 +31,7 @@ const FORM_VAZIO = {
   sexo: '',
   tipo: 'engorda',
   sistema: 'confinamento',
-  entrada: new Date().toISOString().slice(0, 10),
+  entrada: hojeLocalISO(),
   qtd: '',
   p_ini: '',
   peso_alvo: '',
@@ -144,7 +145,7 @@ function normalizarInitialData(data, pastagens = [], fazendaAtiva = null) {
     sexo: data.sexo ?? '',
     tipo: data.tipo || 'engorda',
     sistema: data.sistema || 'confinamento',
-    entrada: data.entrada || new Date().toISOString().slice(0, 10),
+    entrada: data.entrada || hojeLocalISO(),
     qtd: data.qtd ?? '',
     p_ini: data.p_ini ?? data.p_at ?? '',
     peso_alvo: data.peso_alvo ?? '',
@@ -400,7 +401,7 @@ export default function LoteForm({ initialData, fazendas = [], pastagens = [], e
                 className="ui-input"
                 name="entrada"
                 type="date"
-                max={new Date().toISOString().slice(0, 10)}
+                max={hojeLocalISO()}
                 value={form.entrada}
                 onChange={handleChange}
               />

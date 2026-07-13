@@ -50,6 +50,7 @@ import './styles/ui.css';
 import './styles/layout.css';
 
 
+import { hojeLocalISO } from './domain/dataCivil.js';
 const DashboardPage = lazy(() => import('./pages/DashboardPage'));
 const AlertasPage = lazy(() => import('./pages/AlertasPage'));
 const FazendasPage = lazy(() => import('./pages/FazendasPage'));
@@ -104,7 +105,7 @@ const publicPageMap = {
   suporte: SuportePage,
 };
 
-const TODAY_BOOT_ISO = new Date().toISOString().slice(0, 10);
+const TODAY_BOOT_ISO = hojeLocalISO();
 const MENSAGEM_SEM_PERMISSAO = 'Você não tem permissão para executar esta ação.';
 const ALERTAS_RESOLVIDOS_STORAGE_KEY = 'herdon-alertas-resolvidos';
 const ALERTAS_ADIADOS_STORAGE_KEY = 'herdon-alertas-adiados';

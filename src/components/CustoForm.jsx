@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import Modal from './ui/Modal';
 import Button from './ui/Button';
 
+import { hojeLocalISO } from '../domain/dataCivil.js';
 const CATEGORIAS = [
   'alimentação', 'sanitário', 'mão de obra',
   'combustível', 'manutenção', 'administrativo', 'outros',
@@ -108,7 +109,7 @@ export default function CustoForm({ initialData, lotes = [], onSave, onCancel })
               className="ui-input"
               name="data"
               type="date"
-              max={new Date().toISOString().slice(0, 10)}
+              max={hojeLocalISO()}
               value={form.data}
               onChange={handleChange}
             />

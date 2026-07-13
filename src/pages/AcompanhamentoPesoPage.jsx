@@ -9,6 +9,7 @@ import { calcularDias } from '../utils/calculations';
 import { gerarNovoId } from '../utils/id';
 import { toDateKey } from '../domain/calcHelpers.js';
 
+import { hojeLocalISO } from '../domain/dataCivil.js';
 function toNumber(value, fallback = 0) {
   const n = Number(value);
   return Number.isFinite(n) ? n : fallback;
@@ -16,7 +17,7 @@ function toNumber(value, fallback = 0) {
 
 function normalizeDate(value) {
   const text = String(value || '').trim();
-  if (!text) return new Date().toISOString().slice(0, 10);
+  if (!text) return hojeLocalISO();
   return text.slice(0, 10);
 }
 
@@ -96,7 +97,7 @@ export default function AcompanhamentoPesoPage({ db, setDb }) {
   const [abaAtiva, setAbaAtiva] = useState('pesagem_lote');
   const [fazendaSelecionada, setFazendaSelecionada] = useState('');
   const [loteSelecionado, setLoteSelecionado] = useState('');
-  const [dataPesagem, setDataPesagem] = useState(() => new Date().toISOString().slice(0, 10));
+  const [dataPesagem, setDataPesagem] = useState(() => hojeLocalISO());
   const [draftPesos, setDraftPesos] = useState({});
   const [draftObs, setDraftObs] = useState({});
   const [resumoFinal, setResumoFinal] = useState(null);

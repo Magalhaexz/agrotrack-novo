@@ -5,13 +5,14 @@ import { calcularOcupacaoPastos, listarLotesSemPasto } from './ocupacaoPastos.js
 import { montarDadosDecisaoVenda, classificarDecisaoVenda, STATUS_DECISAO } from './decisaoVenda.js';
 import { montarDadosManejoResultado, STATUS_SANIDADE, STATUS_SUPLEMENTACAO } from './manejoResultado.js';
 
+import { hojeLocalISO } from './dataCivil.js';
 export { listarLotesSemPasto };
 
 const PESAGEM_LIMITE_DIAS = 30;
 const FINANCEIRO_PROXIMO_DIAS = 3;
 
 function hojeIso() {
-  return new Date().toISOString().slice(0, 10);
+  return hojeLocalISO();
 }
 
 function lotesAtivosDe(db) {

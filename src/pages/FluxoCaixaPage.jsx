@@ -7,8 +7,9 @@ import { calcularFluxoCaixa } from '../domain/fluxoCaixa';
 import { normalizarStatusMovimentacao, getDataCompetencia, getDataVencimento } from '../domain/financeiroStatus';
 import { formatarMoeda, formatarData } from '../utils/formatters';
 
+import { hojeLocalISO } from '../domain/dataCivil.js';
 function getTodayIso() {
-  return new Date().toISOString().slice(0, 10);
+  return hojeLocalISO();
 }
 
 const STATUS_LABELS = {

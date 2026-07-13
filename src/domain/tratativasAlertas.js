@@ -1,3 +1,4 @@
+import { hojeLocalISO } from './dataCivil.js';
 // Tratativa operacional de alertas (Sprint 16) — puro, sem I/O. A tratativa é
 // uma camada SOBRE o alerta já gerado por `gerarAlertasUnificados`
 // (alertasUnificados.js) — nunca substitui a regra de origem, nunca apaga o
@@ -21,7 +22,7 @@ export function validarStatusTratativa(status) {
 function hojeISO(hoje) {
   if (hoje instanceof Date) return hoje.toISOString().slice(0, 10);
   if (typeof hoje === 'string' && hoje) return hoje.slice(0, 10);
-  return new Date().toISOString().slice(0, 10);
+  return hojeLocalISO();
 }
 
 /**

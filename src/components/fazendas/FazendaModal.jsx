@@ -2,6 +2,7 @@
 import Modal from '../ui/Modal';
 import Button from '../ui/Button';
 
+import { hojeLocalISO } from '../../domain/dataCivil.js';
 const ESTADOS = [
   'AC', 'AL', 'AM', 'AP', 'BA', 'CE', 'DF', 'ES', 'GO', 'MA',
   'MG', 'MS', 'MT', 'PA', 'PB', 'PE', 'PI', 'PR', 'RJ', 'RN',
@@ -46,7 +47,7 @@ function normalizarPayload(form, initialData) {
     telefone: text(form.telefone),
     observacoes: text(form.observacoes),
     status: form.status || 'ativa',
-    data_cadastro: initialData?.data_cadastro || new Date().toISOString().slice(0, 10),
+    data_cadastro: initialData?.data_cadastro || hojeLocalISO(),
   };
 }
 

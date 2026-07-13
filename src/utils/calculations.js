@@ -10,6 +10,7 @@ import {
 import { calcularCustoLote } from '../domain/calculos.js';
 import { calcularArrobasProduzidas } from '../domain/indicadores.js';
 
+import { hojeLocalISO } from '../domain/dataCivil.js';
 /**
  * Formata um número para exibição com um número específico de casas decimais, usando o locale pt-BR.
  * Retorna '-' para valores indefinidos, nulos ou não numéricos.
@@ -63,7 +64,7 @@ export const formatDate = (value) => {
 export const daysDiff = (dateStr) => {
   const target = toDateKey(dateStr);
   if (!target) return 999;
-  const today = new Date().toISOString().slice(0, 10);
+  const today = hojeLocalISO();
   return daysBetween(today, target);
 };
 
@@ -100,7 +101,7 @@ export function pesoMedioAtualDoLote(db, loteId, fallback = 0) {
   return doLote.length > 0 ? doLote[0].peso : fallback;
 }
 
-export const calcLote = (db, loteId, referenceDate = new Date().toISOString().slice(0, 10)) => {
+export const calcLote = (db, loteId, referenceDate = hojeLocalISO()) => {
   // Garante que as coleções são arrays para evitar erros
   const lotes = Array.isArray(db?.lotes) ? db.lotes : [];
   const animais = Array.isArray(db?.animais) ? db.animais : [];

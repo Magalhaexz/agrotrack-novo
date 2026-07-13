@@ -6,6 +6,7 @@ import { calcularOcupacaoPastos, listarLotesSemPasto } from './ocupacaoPastos.js
 import { buildAlerts } from '../utils/alerts.js';
 import { classificarDecisaoVenda, compararVenderOuManter, montarDadosDecisaoVenda, STATUS_DECISAO } from './decisaoVenda.js';
 import { gerarSinaisComplementaresVenda, montarDadosManejoResultado } from './manejoResultado.js';
+import { deveEntrarNoResultadoLote } from './financeiroStatus.js';
 
 function arr(value) {
   return Array.isArray(value) ? value : [];
@@ -180,7 +181,7 @@ export function buildRelatorioFinanceiro(db, { fazendaId, loteId, dataInicio, da
 
   const custosPorCategoria = new Map();
   movimentacoes
-    .filter((m) => m?.tipo === 'despesa')
+    .filter((m) => m?.tipo === 'despesa' && deveEntrarNoResultadoLote(m))
     .forEach((m) => {
       const categoria = m.categoria || 'Sem categoria';
       custosPorCategoria.set(categoria, toNumber(custosPorCategoria.get(categoria)) + toNumber(m.valor));
