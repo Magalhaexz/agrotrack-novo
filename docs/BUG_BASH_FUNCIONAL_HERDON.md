@@ -45,6 +45,12 @@ Ao interagir via automação de navegador, cliques disparados via `dispatchEvent
 
 **Prioridade:** P0 (era o achado residual mais grave). **Status:** ✅ Corrigido.
 
+## Pastagens
+
+Testado em navegador autenticado: cadastro de pasto (área, capacidade UA/ha, cálculo de "Diagnóstico de capacidade" correto), "Trocar lote de pasto" a partir do card do lote, vínculo refletido no header do lote e na aba "Pasto".
+
+**BB-05 — texto do histórico de movimentação de pasto errado logo após a ação.** Ao trocar de pasto, a mensagem no histórico aparecia como "...foi vinculado ao pasto **um novo pasto**." em vez do nome real do pasto, até a página ser recarregada (depois do refresh, o texto corrigia sozinho). Causa: `handleMoverPasto` em `src/pages/LotesPage.jsx` prependia `resultado.data` (retorno cru do INSERT, sem o relacionamento `pastagem_destino` embutido) direto no estado local `historicoPastos`; `formatHistoricoMensagem` caía no fallback `'um novo pasto'`. Corrigido enriquecendo o registro com `pastagensMap` (que o componente já tinha em memória) antes de atualizar o estado — texto correto imediatamente, sem precisar de refresh. Reproduzido e corrigido com dados reais (troca QA-Pasto Um → QA-Pasto Dois), confirmado texto completo "...foi movido do pasto QA-Pasto Um para o pasto QA-Pasto Dois." **Prioridade P2** (texto incorreto, sem perda de dado — o registro em si sempre esteve correto no banco). **Status:** ✅ Corrigido.
+
 ## Cobertura real desta rodada
 
 ```

@@ -499,7 +499,15 @@ export default function LotesPage({ db, setDb, onRegistrarSaidaAnimal, session, 
         Number(l.id) === Number(loteId) ? { ...l, pastagem_id: pastagemDestinoId } : l
       )),
     }));
-    setHistoricoPastos((prev) => [resultado.data, ...prev]);
+    // resultado.data e o retorno cru do insert (sem join) — sem isso,
+    // formatHistoricoMensagem cai no fallback "um novo pasto"/"um pasto"
+    // até o proximo carregarHistoricoPastos (ex.: apos refresh).
+    const historicoEnriquecido = {
+      ...resultado.data,
+      pastagem_origem: selectedLote.pastagem_id ? pastagensMap.get(String(selectedLote.pastagem_id)) || null : null,
+      pastagem_destino: pastagensMap.get(String(pastagemDestinoId)) || null,
+    };
+    setHistoricoPastos((prev) => [historicoEnriquecido, ...prev]);
     showToast({ type: 'success', message: 'Movimentação de pasto registrada com sucesso.' });
     setOpenMoverPasto(false);
   }
