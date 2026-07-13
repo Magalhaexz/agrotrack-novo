@@ -34,3 +34,30 @@ Ao interagir via automação de navegador, cliques disparados via `dispatchEvent
 | BB-01 | Financeiro (e potencialmente qualquer tela sem tratamento especial em `buildOperationalCreatePayload`) | Conta nova (sem nenhum lançamento ainda) tenta salvar a primeira receita/despesa em "Registrar movimentação" | Lançamento salva e aparece na DRE | Salvamento falha silenciosamente — sem toast, sem fechar modal, sem persistir. Console mostra `[HERDON_SAVE_ERROR]` com `postgresCode: 23505` (duplicate key) | Reproduzido 2x com conta QA nova (perfil="admin", conta sem lançamentos prévios); `select` no banco confirmou zero linhas após o clique; chamada direta a `createOperationalRecord` sem o campo `id` funcionou; `buildOperationalCreatePayload` em `src/services/operationalPersistence.js` não removia `id` no caminho padrão (usado por `movimentacoes_financeiras` e toda tabela sem branch especial), diferente de `fazendas`/`lotes`/`pesagens`/`animais`/`estoque` que já removiam | **P0** (dado não persiste, sem qualquer feedback de erro ao usuário) | ✅ Corrigido |
 | BB-02 | Estoque | Cadastrar item novo em "Estoque geral" com categoria explícita "Medicamento" e nome contendo a palavra "Sal" (ex.: "Sal Mineral" — produto real e comum em fazenda) | Item aparece na lista de "Estoque geral" | Item salva corretamente no banco (confirmado via SQL) mas não aparece em nenhuma lista após criar nem após recarregar a página — some para o usuário, parece que o cadastro falhou | `itemEhNutricao()` em `src/pages/EstoquePage.jsx` reclassificava o item como nutrição só por `produto.includes('sal')`, ignorando a `categoria` explícita escolhida no formulário; item ficava oculto na aba padrão "Estoque geral" (só aparecia em "Todos os itens"). `metadata.modulo === 'nutricao'` (sinal oficial usado por `SuplementacaoPage.jsx`) nem era considerado | **P0** (dado parece perdido para o usuário, mesmo estando salvo) | ✅ Corrigido |
 | BB-03 | Backend/RLS (afeta toda tabela com policy legada `_own`) | Testado direto via API (bypassando a UI, que já esconde os botões corretamente): usuário convidado com perfil `visualizador` chama `createOperationalRecord('lotes', {...}, session)` | Escrita bloqueada pelo banco, igual ao gate aplicado na sprint anterior | Escrita **bem-sucedida** — a migration anterior (`20260713193754`, sprint passado) só gateou as policies `_same_account`; as policies legadas `_own` (`owner_user_id = auth.uid()`) usam texto de `qual`/`with_check` diferente e não foram tocadas. Qualquer usuário autenticado conseguia inserir um registro com `owner_user_id = seu próprio auth.uid()`, contornando o gate de perfil inteiro — reproduzido com uma segunda conta real (`qa-bugbash-teammate@example.com`) convidada como visualizador da conta QA | **P0** (bypass completo do gate de autorização por perfil aplicado na sprint anterior) | ✅ Corrigido (`supabase/migrations/20260713204723_rls_role_gate_own_policies_visualizador.sql`) — reconfirmado bloqueado após o fix, e reconfirmado que o proprietário real continua escrevendo normalmente |
+
+## Achado residual não corrigido (documentado, não improvisado)
+
+**Injeção de registro órfão referenciando fazenda de outra conta.** Ao testar BB-03, descobri que qualquer usuário autenticado (mesmo de uma conta completamente não relacionada, sem convite) consegue inserir uma linha com `owner_user_id = seu próprio id` e um `faz_id`/`lote_id` de **qualquer outra conta**, sem que exista validação de que essa chave estrangeira pertence à mesma conta. A policy `_own` gateada por perfil (BB-03) impede que um `visualizador` faça isso, mas não impede um `admin` de uma conta totalmente estranha (ele é admin da própria conta vazia). O registro fica invisível para o dono real da fazenda (nenhuma policy de SELECT o alcança), então não é vazamento de leitura — é sujeira/possível abuso de FK sem dono real. Corrigir direito exige um trigger de validação de propriedade de FK (checar que `faz_id`/`lote_id` referenciado pertence à mesma conta do `owner_user_id` da linha) — mudança estrutural maior, não improvisada aqui. Proponho sprint dedicado.
+
+## Cobertura real desta rodada
+
+```
+Módulos com reprodução real em navegador autenticado: Autenticação/cadastro, Fazendas (CRUD),
+  Lotes (cadastro + as 7 ações visíveis no card), Pesagens (nova pesagem, GMD),
+  Financeiro (receita/despesa/cancelamento/DRE), Estoque (novo item, filtro geral/nutrição),
+  Permissões (RLS: visualizador bloqueado, proprietário liberado), Multi-fazenda (isolamento
+  confirmado na Central de Alertas)
+Módulos NÃO testados nesta rodada: Pastagens, Sanidade, Calendário/Tarefas, Suplementação,
+  Central de Alertas (fluxo de resolver/adiar), Assinatura/plano, Telegram, Equipe/convite via UI
+  (só via SQL), relatórios/exportação, todos os modais restantes, viewports mobile (320/375/390/
+  430/768px), rota-por-rota (refresh/voltar/avançar em cada uma), botão voltar do navegador
+Bugs encontrados: 3 (todos P0)
+Bugs corrigidos: 3 de 3
+P0 abertos: 0 (dos encontrados) — 1 achado residual (FK sem validação de dono) documentado, não corrigido
+P1 abertos: 0 (dos encontrados)
+Cobertura funcional: parcial — não é possível declarar o app "pronto"; esta rodada não é
+  equivalente ao bug bash completo de 30+ etapas descrito no prompt original, dado o volume de
+  investigação que os 3 bugs P0 exigiram
+```
+
+Não declaro o HERDON pronto para piloto/produção — a varredura completa (todas as rotas, modais, formulários, os 4 perfis, 5 larguras mobile) descrita no escopo original não foi concluída nesta rodada. O que foi encontrado e corrigido são 3 bugs reais e severos; o que falta é largura de cobertura, não correção pendente conhecida.
