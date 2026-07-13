@@ -18,6 +18,7 @@ import { baixarCsv, abrirRelatorioParaImpressao } from '../utils/exportacaoArqui
 import { calcularConsumoDiarioTotalPorProduto, calcularDiasRestantesEstoque } from '../domain/previsaoConsumoEstoque';
 import { isModoConsolidado, construirMapaFazendas } from '../domain/escopoFazenda';
 import { useSubmitOnce } from '../hooks/useSubmitOnce.js';
+import { itemEhNutricao } from './estoqueLogic.js';
 
 const CATEGORIAS_ESTOQUE_GERAL = [
   'Medicamento',
@@ -102,25 +103,6 @@ function getCadastroItemInicial(data) {
   };
 }
 
-function itemEhNutricao(item) {
-  const categoria = String(item?.categoria || item?.tipo || '').toLowerCase();
-  const nome = String(item?.produto || '').toLowerCase();
-  return (
-    categoria.includes('suplement')
-    || categoria.includes('dieta')
-    || categoria.includes('aliment')
-    || categoria.includes('proteinado')
-    || categoria.includes('sal')
-    || categoria.includes('núcleo')
-    || categoria.includes('nucleo')
-    || nome.includes('suplement')
-    || nome.includes('dieta')
-    || nome.includes('sal')
-    || nome.includes('núcleo')
-    || nome.includes('nucleo')
-    || nome.includes('proteinado')
-  );
-}
 
 export default function EstoquePage({ db, setDb, onRegistrarSaidaEstoque, navigationIntent = null, fazendaSelecionada = null }) {
   const { showToast } = useToast();
