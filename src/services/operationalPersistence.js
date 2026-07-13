@@ -824,7 +824,7 @@ function buildAlertSnoozedPayload(record, userId) {
   return payload;
 }
 
-function buildOperationalCreatePayload(table, record, userId) {
+export function buildOperationalCreatePayload(table, record, userId) {
   const normalizedTable = String(table || '').toLowerCase();
   if (normalizedTable === 'alertas_resolvidos') {
     return buildAlertResolvedPayload(record, userId);
@@ -1110,7 +1110,18 @@ function buildOperationalCreatePayload(table, record, userId) {
     }
     return Object.fromEntries(Object.entries(payload).filter(([, value]) => value !== undefined));
   }
+  // Toda tabela tratada acima explicitamente remove `id` do payload de
+  // criação (bigint gerado pelo Postgres via sequence) antes de inserir —
+  // exceto `configuracoes`, que faz upsert e mantém `id` quando presente.
+  // Esse caminho padrão (usado por movimentacoes_financeiras, custos,
+  // sanitario, tarefas, suplementacao, pastagens, funcionarios, usuarios,
+  // rotinas, cenarios e outras tabelas sem tratamento especial) esquecia
+  // essa remoção: o `id` local gerado por gerarNovoId() a partir da lista em
+  // memória do cliente (que começa vazia numa conta nova) colidia com a
+  // sequence real do banco e o INSERT falhava com 23505 (duplicate key) —
+  // silenciosamente, sem toast, porque o erro nunca chegava ao usuário.
   const safe = sanitizeRecord(record);
+  delete safe.id;
   if (tableSupportsOwnerScope(normalizedTable)) {
     return {
       ...safe,
