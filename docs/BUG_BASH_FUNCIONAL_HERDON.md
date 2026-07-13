@@ -51,6 +51,18 @@ Testado em navegador autenticado: cadastro de pasto (área, capacidade UA/ha, c�
 
 **BB-05 — texto do histórico de movimentação de pasto errado logo após a ação.** Ao trocar de pasto, a mensagem no histórico aparecia como "...foi vinculado ao pasto **um novo pasto**." em vez do nome real do pasto, até a página ser recarregada (depois do refresh, o texto corrigia sozinho). Causa: `handleMoverPasto` em `src/pages/LotesPage.jsx` prependia `resultado.data` (retorno cru do INSERT, sem o relacionamento `pastagem_destino` embutido) direto no estado local `historicoPastos`; `formatHistoricoMensagem` caía no fallback `'um novo pasto'`. Corrigido enriquecendo o registro com `pastagensMap` (que o componente já tinha em memória) antes de atualizar o estado — texto correto imediatamente, sem precisar de refresh. Reproduzido e corrigido com dados reais (troca QA-Pasto Um → QA-Pasto Dois), confirmado texto completo "...foi movido do pasto QA-Pasto Um para o pasto QA-Pasto Dois." **Prioridade P2** (texto incorreto, sem perda de dado — o registro em si sempre esteve correto no banco). **Status:** ✅ Corrigido.
 
+## Auditoria de erros silenciosos / submissão duplicada
+
+Grep dirigido por `catch` vazio: nenhum encontrado. Grep por `onSave?.(`/`onSave(` sem `await` (o padrão que causaria fechar/resetar o formulário antes da persistência real, ou permitir duplo clique) encontrou **6 formulários sem a trava `useSubmitOnce`** já usada em `PesagemForm.jsx`/`NovoLancamentoModal` (Financeiro)/`LoteForm.jsx`: `CustoForm.jsx`, `AnimalForm.jsx`, `funcionarios/FuncionarioModal.jsx`, `fazendas/FazendaModal.jsx`, `SanitarioForm.jsx`, `RotinaForm.jsx`, `TarefasPage.jsx` (`TaskForm`).
+
+**BB-06 — Custos, Animais, Funcionários, Fazendas, Sanidade, Rotinas e Tarefas sem proteção contra duplo clique/duplo envio.** Sem `useSubmitOnce`, um duplo clique em "Salvar" nesses 7 formulários dispara `createOperationalRecord`/`updateOperationalRecord` duas vezes antes do primeiro terminar — o mesmo padrão de "ação duplicada" (P0 na classificação deste sprint) já corrigido antes em Pesagens/Lotes/Financeiro. `createOperationalRecord` não lança exceção (retorna `{persisted:false, error}`), então o risco real não é erro não tratado — é o registro duplicado em si.
+
+**Correção:** aplicado o mesmo padrão já usado nos demais formulários (`const { executar, isSubmitting } = useSubmitOnce()`, `try { await executar(() => onSave?.(...)) } catch { setErro(...) }`, botão com `loading={isSubmitting}`/`disabled={isSubmitting}`) nos 7 arquivos.
+
+**Validação:** lint limpo, 1178/1178 testes, build ok. **Não foi possível reverificar em navegador** — a ferramenta de browser ficou temporariamente indisponível (erro do classificador de segurança) no fim desta sessão. A mudança segue exatamente o mesmo padrão mecânico já verificado ao vivo em `PesagemForm`/`NovoLancamentoModal` mais cedo nesta mesma sessão de bug bash, mas os 7 formulários específicos listados aqui não foram reabertos no navegador depois da alteração.
+
+**Prioridade:** P1 (risco de duplicidade, não confirmado por reprodução em navegador desta vez — diferente de BB-01 a BB-05, que foram todos reproduzidos e reconfirmados ao vivo). **Status:** ✅ Corrigido no código, validado por lint/test/build; **validação visual pendente** (ver pendências).
+
 ## Cobertura real desta rodada
 
 ```

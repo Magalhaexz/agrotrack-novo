@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import Modal from './ui/Modal';
 import Button from './ui/Button';
+import { useSubmitOnce } from '../hooks/useSubmitOnce.js';
 
 import { hojeLocalISO } from '../domain/dataCivil.js';
 const CATEGORIAS = [
@@ -38,6 +39,7 @@ function validarForm(form) {
 export default function CustoForm({ initialData, lotes = [], onSave, onCancel }) {
   const [form, setForm] = useState(() => normalizarInitialData(initialData));
   const [erro, setErro] = useState('');
+  const { executar, isSubmitting } = useSubmitOnce();
 
   /* eslint-disable react-hooks/set-state-in-effect */
   useEffect(() => {
@@ -51,7 +53,7 @@ export default function CustoForm({ initialData, lotes = [], onSave, onCancel })
     setForm((prev) => ({ ...prev, [name]: value }));
   }
 
-  function handleSubmit(e) {
+  async function handleSubmit(e) {
     e.preventDefault();
     const erroValidacao = validarForm(form);
 
@@ -61,21 +63,25 @@ export default function CustoForm({ initialData, lotes = [], onSave, onCancel })
     }
 
     setErro('');
-    onSave?.({
-      lote_id: form.lote_id ? Number(form.lote_id) : null,
-      cat: form.cat,
-      desc: form.desc.trim(),
-      data: form.data,
-      val: Number(form.val),
-    });
+    try {
+      await executar(() => onSave?.({
+        lote_id: form.lote_id ? Number(form.lote_id) : null,
+        cat: form.cat,
+        desc: form.desc.trim(),
+        data: form.data,
+        val: Number(form.val),
+      }));
+    } catch (error) {
+      setErro(error?.message || 'Não foi possível salvar agora. Tente novamente.');
+    }
   }
 
   const titulo = initialData ? 'Editar custo' : 'Novo custo';
 
   const footer = (
     <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8 }}>
-      <Button variant="ghost" onClick={onCancel}>Cancelar</Button>
-      <Button onClick={handleSubmit}>Salvar custo</Button>
+      <Button variant="ghost" onClick={onCancel} disabled={isSubmitting}>Cancelar</Button>
+      <Button onClick={handleSubmit} loading={isSubmitting} loadingLabel="Salvando...">Salvar custo</Button>
     </div>
   );
 

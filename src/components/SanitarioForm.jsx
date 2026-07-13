@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import Modal from './ui/Modal';
 import Button from './ui/Button';
+import { useSubmitOnce } from '../hooks/useSubmitOnce.js';
 
 import { hojeLocalISO } from '../domain/dataCivil.js';
 const TIPOS_MANEJO = [
@@ -90,6 +91,7 @@ export default function SanitarioForm({
   const [form, setForm] = useState(() => sharedFromInitial(initialData));
   const [procedimentos, setProcedimentos] = useState(() => procedimentosFromInitial(initialData));
   const [erro, setErro] = useState('');
+  const { executar, isSubmitting } = useSubmitOnce();
 
   // Produtos do estoque relevantes para manejo sanitário. Se nada casar com as
   // palavras sanitárias mas houver estoque, mostra todos (não trava o produtor).
@@ -155,7 +157,7 @@ export default function SanitarioForm({
     setProcedimentos((prev) => (prev.length <= 1 ? prev : prev.filter((_, idx) => idx !== index)));
   }
 
-  function handleSubmit(e) {
+  async function handleSubmit(e) {
     e.preventDefault();
     const erroValidacao = validarForm(form, procedimentos);
     if (erroValidacao) {
@@ -166,27 +168,31 @@ export default function SanitarioForm({
     const metadataBase = initialData?.metadata && typeof initialData.metadata === 'object'
       ? initialData.metadata
       : {};
-    onSave?.({
-      lote_id: Number(form.lote_id),
-      data_aplic: form.data_aplic,
-      proxima: form.proxima || null,
-      alerta_dias_antes: Number(form.alerta_dias_antes || 0),
-      data_fim_carencia: form.data_fim_carencia || null,
-      qtd: Number(form.qtd || 0),
-      obs: form.obs.trim(),
-      funcionario_responsavel_id: form.funcionario_responsavel_id
-        ? Number(form.funcionario_responsavel_id)
-        : null,
-      metadataBase,
-      procedimentos: procedimentos.map((proc) => ({
-        tipo: proc.tipo,
-        item_estoque_id: proc.item_estoque_id ? Number(proc.item_estoque_id) : null,
-        quantidade_utilizada: proc.item_estoque_id && Number(proc.quantidade_utilizada) > 0
-          ? Number(proc.quantidade_utilizada)
+    try {
+      await executar(() => onSave?.({
+        lote_id: Number(form.lote_id),
+        data_aplic: form.data_aplic,
+        proxima: form.proxima || null,
+        alerta_dias_antes: Number(form.alerta_dias_antes || 0),
+        data_fim_carencia: form.data_fim_carencia || null,
+        qtd: Number(form.qtd || 0),
+        obs: form.obs.trim(),
+        funcionario_responsavel_id: form.funcionario_responsavel_id
+          ? Number(form.funcionario_responsavel_id)
           : null,
-        desc: String(proc.desc || '').trim(),
-      })),
-    });
+        metadataBase,
+        procedimentos: procedimentos.map((proc) => ({
+          tipo: proc.tipo,
+          item_estoque_id: proc.item_estoque_id ? Number(proc.item_estoque_id) : null,
+          quantidade_utilizada: proc.item_estoque_id && Number(proc.quantidade_utilizada) > 0
+            ? Number(proc.quantidade_utilizada)
+            : null,
+          desc: String(proc.desc || '').trim(),
+        })),
+      }));
+    } catch (error) {
+      setErro(error?.message || 'Não foi possível salvar agora. Tente novamente.');
+    }
   }
 
   const isEdit = Boolean(initialData);
@@ -194,8 +200,8 @@ export default function SanitarioForm({
 
   const footer = (
     <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8 }}>
-      <Button variant="ghost" onClick={onCancel}>Cancelar</Button>
-      <Button onClick={handleSubmit}>Salvar manejo</Button>
+      <Button variant="ghost" onClick={onCancel} disabled={isSubmitting}>Cancelar</Button>
+      <Button onClick={handleSubmit} loading={isSubmitting} loadingLabel="Salvando...">Salvar manejo</Button>
     </div>
   );
 

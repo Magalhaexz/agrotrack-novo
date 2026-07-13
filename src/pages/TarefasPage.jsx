@@ -6,6 +6,7 @@ import Button from '../components/ui/Button';
 import Modal from '../components/ui/Modal';
 import Input from '../components/ui/Input'; // Importar o componente Input
 import { useToast } from '../hooks/useToast'; // Assumindo que você tem um hook de toast
+import { useSubmitOnce } from '../hooks/useSubmitOnce.js';
 import { useAuth } from '../auth/useAuth';
 import {
   createOperationalRecord,
@@ -362,6 +363,7 @@ function TaskForm({ open, initialData, onSave, onCancel, funcionariosMap, lotesM
   const { showToast } = useToast();
   const [form, setForm] = useState(initialData || EMPTY_TASK);
   const [errors, setErrors] = useState({});
+  const { executar, isSubmitting } = useSubmitOnce();
 
   /* eslint-disable react-hooks/set-state-in-effect */
   useEffect(() => {
@@ -378,21 +380,25 @@ function TaskForm({ open, initialData, onSave, onCancel, funcionariosMap, lotesM
     return Object.keys(newErrors).length === 0;
   }, [form]);
 
-  const handleSubmit = useCallback((e) => {
+  const handleSubmit = useCallback(async (e) => {
     e.preventDefault();
-    if (validate()) {
-      onSave(form);
-    } else {
+    if (!validate()) {
       showToast({ type: 'error', message: 'Por favor, preencha todos os campos obrigatórios.' });
+      return;
     }
-  }, [form, onSave, validate, showToast]);
+    try {
+      await executar(() => onSave(form));
+    } catch (error) {
+      showToast({ type: 'error', message: error?.message || 'Não foi possível salvar agora. Tente novamente.' });
+    }
+  }, [form, onSave, validate, showToast, executar]);
 
   const funcionarios = useMemo(() => Array.from(funcionariosMap.values()), [funcionariosMap]);
   const lotes = useMemo(() => Array.from(lotesMap.values()), [lotesMap]);
   const fazendas = useMemo(() => Array.from(fazendasMap.values()), [fazendasMap]);
 
   return (
-    <Modal open={open} onClose={onCancel} title={initialData ? 'Editar Tarefa' : 'Nova Tarefa'} footer={<Button onClick={handleSubmit}>Salvar Tarefa</Button>}>
+    <Modal open={open} onClose={onCancel} title={initialData ? 'Editar Tarefa' : 'Nova Tarefa'} footer={<Button onClick={handleSubmit} loading={isSubmitting} loadingLabel="Salvando...">Salvar Tarefa</Button>}>
       <form onSubmit={handleSubmit} className="task-form-grid">
         <Input label="Título *" value={form.titulo} error={errors.titulo} onChange={(e) => setForm((prev) => ({ ...prev, titulo: e.target.value }))} />
         <Input label="Descrição" value={form.descricao} onChange={(e) => setForm((prev) => ({ ...prev, descricao: e.target.value }))} />

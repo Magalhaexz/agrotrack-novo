@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import Modal from './ui/Modal';
 import Button from './ui/Button';
+import { useSubmitOnce } from '../hooks/useSubmitOnce.js';
 
 import { hojeLocalISO } from '../domain/dataCivil.js';
 const SETORES = ['Lotes', 'Estoque', 'Pesagens', 'Sanitário', 'Custos', 'Fazenda', 'Geral'];
@@ -100,6 +101,7 @@ export default function RotinaForm({
 }) {
   const [form, setForm] = useState(() => normalizarInitialData(initialData));
   const [erro, setErro] = useState('');
+  const { executar, isSubmitting } = useSubmitOnce();
 
   /* eslint-disable react-hooks/set-state-in-effect */
   useEffect(() => {
@@ -128,7 +130,7 @@ export default function RotinaForm({
     });
   }
 
-  function handleSubmit(e) {
+  async function handleSubmit(e) {
     e.preventDefault();
     const erroValidacao = validarForm(form);
 
@@ -146,30 +148,34 @@ export default function RotinaForm({
       obs: form.obs.trim(),
     };
 
-    if (form.recorrente) {
-      onSave?.({
-        ...baseData,
-        recorrente: true,
-        recorrencia_tipo: form.recorrencia_tipo,
-        dias_semana: form.recorrencia_tipo === 'semanal' ? form.dias_semana : [],
-        data_inicio: form.data_inicio,
-        data_fim: form.data_fim || null, // Usar null para data_fim opcional
-        data: null, // Tarefas recorrentes não têm 'data' avulsa
-        status: 'pendente', // Status inicial para recorrentes
-        concluido_datas: initialData?.concluido_datas || [],
-      });
-    } else {
-      onSave?.({
-        ...baseData,
-        recorrente: false,
-        data: form.data,
-        status: form.status,
-        recorrencia_tipo: null,
-        dias_semana: [],
-        data_inicio: null,
-        data_fim: null,
-        concluido_datas: [],
-      });
+    try {
+      if (form.recorrente) {
+        await executar(() => onSave?.({
+          ...baseData,
+          recorrente: true,
+          recorrencia_tipo: form.recorrencia_tipo,
+          dias_semana: form.recorrencia_tipo === 'semanal' ? form.dias_semana : [],
+          data_inicio: form.data_inicio,
+          data_fim: form.data_fim || null, // Usar null para data_fim opcional
+          data: null, // Tarefas recorrentes não têm 'data' avulsa
+          status: 'pendente', // Status inicial para recorrentes
+          concluido_datas: initialData?.concluido_datas || [],
+        }));
+      } else {
+        await executar(() => onSave?.({
+          ...baseData,
+          recorrente: false,
+          data: form.data,
+          status: form.status,
+          recorrencia_tipo: null,
+          dias_semana: [],
+          data_inicio: null,
+          data_fim: null,
+          concluido_datas: [],
+        }));
+      }
+    } catch (error) {
+      setErro(error?.message || 'Não foi possível salvar agora. Tente novamente.');
     }
   }
 
@@ -177,8 +183,8 @@ export default function RotinaForm({
 
   const footer = (
     <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8 }}>
-      <Button variant="ghost" onClick={onCancel}>Cancelar</Button>
-      <Button onClick={handleSubmit}>Salvar tarefa</Button>
+      <Button variant="ghost" onClick={onCancel} disabled={isSubmitting}>Cancelar</Button>
+      <Button onClick={handleSubmit} loading={isSubmitting} loadingLabel="Salvando...">Salvar tarefa</Button>
     </div>
   );
 

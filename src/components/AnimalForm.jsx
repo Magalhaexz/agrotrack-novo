@@ -3,6 +3,7 @@ import ArrobaPreview from './ArrobaPreview';
 import Button from './ui/Button';
 import Modal from './ui/Modal';
 import { parseNumeroEntrada } from '../utils/formatters';
+import { useSubmitOnce } from '../hooks/useSubmitOnce.js';
 
 const FORM_VAZIO = {
   tipo_registro: 'grupo',
@@ -82,6 +83,7 @@ function getFilteredLotes(lotes = [], fazendaId = '') {
 export default function AnimalForm({ initialData, lotes = [], fazendas = [], onSave, onCancel }) {
   const [form, setForm] = useState(() => normalizarInitialData(initialData));
   const [erro, setErro] = useState('');
+  const { executar, isSubmitting } = useSubmitOnce();
   const lotesVisiveis = useMemo(() => getFilteredLotes(lotes, form.fazenda_id), [lotes, form.fazenda_id]);
 
   /* eslint-disable react-hooks/set-state-in-effect */
@@ -120,7 +122,7 @@ export default function AnimalForm({ initialData, lotes = [], fazendas = [], onS
     });
   }
 
-  function handleSubmit(event) {
+  async function handleSubmit(event) {
     event.preventDefault();
     const erroValidacao = validarForm(form);
     if (erroValidacao) {
@@ -142,38 +144,42 @@ export default function AnimalForm({ initialData, lotes = [], fazendas = [], onS
     const rendimentoCarcaca = obterNumero(form, 'rendimento_carcaca');
     const precoArroba = obterNumero(form, 'preco_arroba');
 
-    onSave?.({
-      tipo_registro: form.tipo_registro,
-      fazenda_id: fazendaId,
-      lote_id: loteId,
-      data_referencia: dataReferencia,
-      data_nascimento: dataNascimento,
-      identificacao,
-      nome: identificacao,
-      categoria: form.categoria.trim(),
-      raca: form.raca.trim(),
-      sexo: form.sexo || '',
-      origem: form.origem.trim(),
-      qtd,
-      p_ini: pIni,
-      p_at: pAt,
-      dias,
-      consumo,
-      status: form.status || 'ativo',
-      observacao: form.observacao.trim(),
-      rendimento_carcaca: rendimentoCarcaca,
-      preco_arroba: form.preco_arroba === '' ? null : precoArroba,
-      metadata: {
+    try {
+      await executar(() => onSave?.({
+        tipo_registro: form.tipo_registro,
         fazenda_id: fazendaId,
-        data_nascimento: dataNascimento,
-        categoria: form.categoria.trim() || null,
-        raca: form.raca.trim() || null,
-        sexo: form.sexo || null,
-        origem: form.origem.trim() || null,
-        identificacao,
+        lote_id: loteId,
         data_referencia: dataReferencia,
-      },
-    });
+        data_nascimento: dataNascimento,
+        identificacao,
+        nome: identificacao,
+        categoria: form.categoria.trim(),
+        raca: form.raca.trim(),
+        sexo: form.sexo || '',
+        origem: form.origem.trim(),
+        qtd,
+        p_ini: pIni,
+        p_at: pAt,
+        dias,
+        consumo,
+        status: form.status || 'ativo',
+        observacao: form.observacao.trim(),
+        rendimento_carcaca: rendimentoCarcaca,
+        preco_arroba: form.preco_arroba === '' ? null : precoArroba,
+        metadata: {
+          fazenda_id: fazendaId,
+          data_nascimento: dataNascimento,
+          categoria: form.categoria.trim() || null,
+          raca: form.raca.trim() || null,
+          sexo: form.sexo || null,
+          origem: form.origem.trim() || null,
+          identificacao,
+          data_referencia: dataReferencia,
+        },
+      }));
+    } catch (error) {
+      setErro(error?.message || 'Não foi possível salvar agora. Tente novamente.');
+    }
   }
 
   const titulo = initialData?.id ? 'Editar animal' : 'Novo cadastro de animal';
@@ -186,8 +192,8 @@ export default function AnimalForm({ initialData, lotes = [], fazendas = [], onS
 
   const footer = (
     <div className="modal-footer action-row" style={{ width: '100%' }}>
-      <Button variant="ghost" onClick={onCancel}>Cancelar</Button>
-      <Button onClick={handleSubmit}>Salvar</Button>
+      <Button variant="ghost" onClick={onCancel} disabled={isSubmitting}>Cancelar</Button>
+      <Button onClick={handleSubmit} loading={isSubmitting} loadingLabel="Salvando...">Salvar</Button>
     </div>
   );
 

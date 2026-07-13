@@ -1,6 +1,7 @@
 ﻿import { useEffect, useState } from 'react';
 import Modal from '../ui/Modal';
 import Button from '../ui/Button';
+import { useSubmitOnce } from '../../hooks/useSubmitOnce.js';
 
 import { hojeLocalISO } from '../../domain/dataCivil.js';
 const ESTADOS = [
@@ -54,6 +55,7 @@ function normalizarPayload(form, initialData) {
 export default function FazendaModal({ open, initialData, onSave, onCancel }) {
   const [form, setForm] = useState(() => normalizarInitialData(initialData));
   const [erro, setErro] = useState('');
+  const { executar, isSubmitting } = useSubmitOnce();
 
   /* eslint-disable react-hooks/set-state-in-effect */
   useEffect(() => {
@@ -71,7 +73,7 @@ export default function FazendaModal({ open, initialData, onSave, onCancel }) {
     setForm((prev) => ({ ...prev, [name]: value }));
   }
 
-  function handleSubmit(e) {
+  async function handleSubmit(e) {
     e.preventDefault();
 
     if (!String(form.nome ?? '').trim()) {
@@ -80,13 +82,17 @@ export default function FazendaModal({ open, initialData, onSave, onCancel }) {
     }
 
     setErro('');
-    onSave?.(normalizarPayload(form, initialData));
+    try {
+      await executar(() => onSave?.(normalizarPayload(form, initialData)));
+    } catch (error) {
+      setErro(error?.message || 'Não foi possível salvar agora. Tente novamente.');
+    }
   }
 
   const footer = (
     <div className="form-actions action-row">
-      <Button variant="ghost" onClick={onCancel}>Cancelar</Button>
-      <Button onClick={handleSubmit}>Salvar fazenda</Button>
+      <Button variant="ghost" onClick={onCancel} disabled={isSubmitting}>Cancelar</Button>
+      <Button onClick={handleSubmit} loading={isSubmitting} loadingLabel="Salvando...">Salvar fazenda</Button>
     </div>
   );
 
