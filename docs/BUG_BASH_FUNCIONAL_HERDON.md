@@ -63,25 +63,32 @@ Grep dirigido por `catch` vazio: nenhum encontrado. Grep por `onSave?.(`/`onSave
 
 **Prioridade:** P1 (risco de duplicidade, não confirmado por reprodução em navegador desta vez — diferente de BB-01 a BB-05, que foram todos reproduzidos e reconfirmados ao vivo). **Status:** ✅ Corrigido no código, validado por lint/test/build; **validação visual pendente** (ver pendências).
 
-## Cobertura real desta rodada
+## Cobertura real — sprint "fechamento funcional" (esta rodada)
 
 ```
-Módulos com reprodução real em navegador autenticado: Autenticação/cadastro, Fazendas (CRUD),
-  Lotes (cadastro + as 7 ações visíveis no card), Pesagens (nova pesagem, GMD),
-  Financeiro (receita/despesa/cancelamento/DRE), Estoque (novo item, filtro geral/nutrição),
-  Permissões (RLS: visualizador bloqueado, proprietário liberado), Multi-fazenda (isolamento
-  confirmado na Central de Alertas)
-Módulos NÃO testados nesta rodada: Pastagens, Sanidade, Calendário/Tarefas, Suplementação,
-  Central de Alertas (fluxo de resolver/adiar), Assinatura/plano, Telegram, Equipe/convite via UI
-  (só via SQL), relatórios/exportação, todos os modais restantes, viewports mobile (320/375/390/
-  430/768px), rota-por-rota (refresh/voltar/avançar em cada uma), botão voltar do navegador
-Bugs encontrados: 3 (todos P0)
-Bugs corrigidos: 3 de 3
-P0 abertos: 0 (dos encontrados) — 1 achado residual (FK sem validação de dono) documentado, não corrigido
-P1 abertos: 0 (dos encontrados)
-Cobertura funcional: parcial — não é possível declarar o app "pronto"; esta rodada não é
-  equivalente ao bug bash completo de 30+ etapas descrito no prompt original, dado o volume de
-  investigação que os 3 bugs P0 exigiram
+Pastagens: testado em navegador (cadastro, capacidade, trocar lote de pasto) — 1/1 fluxo principal
+Sanidade: NÃO testado nesta rodada
+Calendário: NÃO testado nesta rodada
+Suplementação: NÃO testado nesta rodada (investigado por código na rodada anterior, não neste sprint)
+Assinatura: NÃO testado nesta rodada
+Telegram: NÃO testado nesta rodada
+Rotas: NÃO testado sistematicamente (só as rotas já visitadas incidentalmente ao testar Lotes/
+  Pesagens/Financeiro/Estoque/Pastagens)
+Mobile: 0/5 viewports testados
+Integridade entre contas/fazenda: corrigido e testado com 2 contas reais (BB-04)
+
+Bugs encontrados nesta rodada: 3 (BB-04 P0, BB-05 P2, BB-06 P1)
+Bugs corrigidos: 3 de 3 no código
+Confirmados ao vivo em navegador após o fix: BB-04 e BB-05 (2 de 3)
+BB-06 (7 formulários) corrigido no código e validado por lint/test/build, mas não reaberto no
+  navegador — a ferramenta de browser ficou indisponível (erro transitório do classificador de
+  segurança) no fim desta sessão
+P0 abertos: 0 dos encontrados nesta rodada. O achado P0 explicitamente pedido no início deste
+  sprint (integridade entre contas/fazendas) foi corrigido e confirmado.
+P1 abertos: 0 corrigidos no código; 1 (BB-06) sem confirmação visual pós-fix
+Cobertura funcional total: parcial — Pastagens e a integridade cross-conta foram fechadas;
+  Sanidade, Calendário, Suplementação, Assinatura, Telegram, rotas sistemáticas e mobile
+  permanecem no mesmo estado de "não testado nesta rodada" que estavam antes deste sprint
 ```
 
-Não declaro o HERDON pronto para piloto/produção — a varredura completa (todas as rotas, modais, formulários, os 4 perfis, 5 larguras mobile) descrita no escopo original não foi concluída nesta rodada. O que foi encontrado e corrigido são 3 bugs reais e severos; o que falta é largura de cobertura, não correção pendente conhecida.
+Não declaro o HERDON pronto para piloto/produção. O pedido mais crítico deste sprint — fechar o risco de integridade entre contas e fazendas — foi corrigido e confirmado com dados reais. O restante do escopo (Sanidade, Calendário, Suplementação, Assinatura, Telegram, rotas, mobile) segue pendente de teste; não foi possível cobrir nesta única rodada dado o tempo que a investigação de cada bug real exige quando feita com reprodução e correção (não apenas leitura de código).
