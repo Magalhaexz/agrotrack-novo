@@ -21,6 +21,7 @@ import { formatarDataExportacao, montarNomeArquivo } from '../domain/exportacaoR
 import { baixarCsv, abrirRelatorioParaImpressao } from '../utils/exportacaoArquivos';
 
 import { hojeLocalISO } from '../domain/dataCivil.js';
+import { daysBetween } from '../domain/calcHelpers.js';
 const AGENDA_SECOES = [
   { chave: 'vencidos', titulo: 'Vencidos', badge: 'badge-r' },
   { chave: 'vencendoHoje', titulo: 'Vencendo hoje', badge: 'badge-a' },
@@ -837,13 +838,7 @@ function normalizarTipo(tipo) {
 function obterStatus(dataProxima, alertaDiasAntes = 0) {
   if (!dataProxima) return 'sem-data';
 
-  const hoje = new Date();
-  const proxima = new Date(dataProxima);
-
-  hoje.setHours(0, 0, 0, 0);
-  proxima.setHours(0, 0, 0, 0);
-
-  const diffDias = Math.round((proxima.getTime() - hoje.getTime()) / (1000 * 60 * 60 * 24));
+  const diffDias = daysBetween(hojeLocalISO(), dataProxima);
 
   if (diffDias < 0) return 'vencido';
   if (diffDias <= Number(alertaDiasAntes || 0)) return 'proximo';

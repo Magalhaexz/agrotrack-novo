@@ -45,7 +45,7 @@ export function safeDivide(value, divisor, fallback = 0) {
 export function toDateKey(value) {
   if (!value) return '';
   if (value instanceof Date) {
-    return Number.isNaN(value.getTime()) ? '' : value.toISOString().slice(0, 10);
+    return Number.isNaN(value.getTime()) ? '' : hojeLocalISO(value);
   }
 
   const raw = String(value).trim();
@@ -57,7 +57,7 @@ export function toDateKey(value) {
   }
 
   const parsed = new Date(raw);
-  return Number.isNaN(parsed.getTime()) ? '' : parsed.toISOString().slice(0, 10);
+  return Number.isNaN(parsed.getTime()) ? '' : hojeLocalISO(parsed);
 }
 
 export function daysBetween(start, end) {
