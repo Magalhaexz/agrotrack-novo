@@ -288,8 +288,22 @@ export default function SuplementacaoConsumoModal({ db, setDb, session, activeFa
     }
 
     const currentSelectionBase = isEdit ? normalizeConsumptionSelection(db, {}, initialData) : null;
-    const restoredQty = isEdit && currentSelectionBase?.produto?.id != null && Number(currentSelectionBase.produto.id) === Number(preview.selectedProduct?.id)
-      ? toNumberSafe(initialData?.qtd_total ?? initialData?.quantidade_total ?? initialData?.quantidade, 0)
+    const oldProduto = currentSelectionBase?.produto || null;
+    const oldQty = isEdit ? toNumberSafe(initialData?.qtd_total ?? initialData?.quantidade_total ?? initialData?.quantidade, 0) : 0;
+    const produtoTrocou = Boolean(isEdit && oldProduto && preview.selectedProduct && Number(oldProduto.id) !== Number(preview.selectedProduct.id));
+
+    // Se o produto vinculado mudou na edição, devolve a quantidade antiga ao
+    // produto original antes de baixar a quantidade nova do produto atual -
+    // sem isso o produto antigo ficava com saldo artificialmente baixo para
+    // sempre (a baixa nunca era revertida).
+    let saldoRestauradoAntigo = null;
+    if (produtoTrocou) {
+      saldoRestauradoAntigo = toNumberSafe(oldProduto.quantidade_atual, 0) + oldQty;
+      await updateOperationalRecord('estoque', Number(oldProduto.id), { quantidade_atual: saldoRestauradoAntigo, quantidade: saldoRestauradoAntigo }, session);
+    }
+
+    const restoredQty = isEdit && !produtoTrocou && oldProduto?.id != null && Number(oldProduto.id) === Number(preview.selectedProduct?.id)
+      ? oldQty
       : 0;
     const novoSaldoEstoque = preview.selectedProduct
       ? toNumberSafe(preview.selectedProduct.quantidade_atual, 0) + restoredQty - quantidadeConsumida
@@ -321,13 +335,15 @@ export default function SuplementacaoConsumoModal({ db, setDb, session, activeFa
 
     setDb((prev) => {
       const consumoFinal = consumoPersist.data || { id: consumoIdReal ?? gerarNovoId(prev.consumo_suplementacao || []), ...payloadBase };
-      const estoqueAtualizado = preview.selectedProduct
-        ? (prev.estoque || []).map((item) => (
-            Number(item.id) === Number(preview.selectedProduct.id)
-              ? { ...item, quantidade_atual: novoSaldoEstoque, quantidade: novoSaldoEstoque }
-              : item
-          ))
-        : (prev.estoque || []);
+      const estoqueAtualizado = (prev.estoque || []).map((item) => {
+        if (preview.selectedProduct && Number(item.id) === Number(preview.selectedProduct.id)) {
+          return { ...item, quantidade_atual: novoSaldoEstoque, quantidade: novoSaldoEstoque };
+        }
+        if (produtoTrocou && oldProduto && Number(item.id) === Number(oldProduto.id)) {
+          return { ...item, quantidade_atual: saldoRestauradoAntigo, quantidade: saldoRestauradoAntigo };
+        }
+        return item;
+      });
       const movFinanceiroFinal = movFinanceiroPersist?.data || { id: movimentoExistente?.id ?? gerarNovoId(prev.movimentacoes_financeiras || []), ...movimentoFinanceiroBase };
       const movimentacoesFinanceirasAtualizadas = movimentoExistente
         ? (prev.movimentacoes_financeiras || []).map((mov) => (Number(mov.id) === Number(movimentoExistente.id) ? movFinanceiroFinal : mov))

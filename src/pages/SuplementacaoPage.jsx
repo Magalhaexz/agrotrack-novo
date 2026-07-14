@@ -9,7 +9,7 @@ import { useToast } from '../hooks/useToast';
 import { useAuth } from '../auth/useAuth';
 import { gerarNovoId } from '../utils/id';
 import { formatNumber } from '../utils/calculations';
-import { createOperationalRecord, updateOperationalRecord } from '../services/operationalPersistence';
+import { createOperationalRecord, updateOperationalRecord, deleteOperationalRecord } from '../services/operationalPersistence';
 import { calcularConsumoDiarioTotalPorProduto, calcularDiasRestantesEstoque } from '../domain/previsaoConsumoEstoque';
 
 function getActiveFarmId(fazendaSelecionada) {
@@ -85,7 +85,7 @@ function getDietaEditData(dieta) {
   };
 }
 
-export default function SuplementacaoPage({ db, setDb, session, fazendaSelecionada = null }) {
+export default function SuplementacaoPage({ db, setDb, session, fazendaSelecionada = null, onConfirmAction }) {
   const { showToast } = useToast();
   const { hasPermission } = useAuth();
   const activeFarmId = useMemo(() => getActiveFarmId(fazendaSelecionada), [fazendaSelecionada]);
@@ -147,6 +147,64 @@ export default function SuplementacaoPage({ db, setDb, session, fazendaSeleciona
       }, 0),
     };
   }), [lotesAtivos, dietas, db.animais, consumo, produtos]);
+
+  // Estorna um consumo de suplementação: devolve a quantidade ao estoque e
+  // remove a movimentação financeira vinculada (mesmo padrão já usado para
+  // excluir manejo sanitário em SanitarioPage.jsx). Antes desta função não
+  // havia nenhuma forma de cancelar um consumo registrado por engano.
+  async function excluirConsumo(registro) {
+    if (!hasPermission('estoque:editar')) {
+      showToast({ type: 'error', message: 'Você não tem permissão para excluir consumos.' });
+      return;
+    }
+    const confirmado = typeof onConfirmAction === 'function'
+      ? await onConfirmAction({
+          title: 'Excluir consumo de suplementação',
+          message: 'Deseja excluir este consumo? A quantidade será devolvida ao estoque.',
+          tone: 'danger',
+        })
+      : window.confirm('Deseja excluir este consumo? A quantidade será devolvida ao estoque.');
+    if (!confirmado) return;
+
+    const qtdConsumida = Number(registro.qtd_total || registro.quantidade_total || registro.quantidade || 0);
+    const produto = registro.item_estoque_id
+      ? (db.estoque || []).find((item) => Number(item.id) === Number(registro.item_estoque_id))
+      : null;
+    const movimento = (db.movimentacoes_financeiras || []).find(
+      (mov) => String(mov?.origem_tipo || '') === 'consumo_suplementacao' && Number(mov?.origem_id) === Number(registro.id)
+    );
+
+    const consumoPersist = await deleteOperationalRecord('consumo_suplementacao', registro.id, session);
+    if (!consumoPersist?.persisted) {
+      showToast({ type: 'warning', message: consumoPersist?.error || 'Não foi possível excluir o consumo agora.' });
+      return;
+    }
+
+    let novoSaldoEstoque = null;
+    if (produto && qtdConsumida > 0) {
+      novoSaldoEstoque = Number(produto.quantidade_atual || 0) + qtdConsumida;
+      await updateOperationalRecord('estoque', Number(produto.id), { quantidade_atual: novoSaldoEstoque, quantidade: novoSaldoEstoque }, session);
+    }
+
+    if (movimento) {
+      await deleteOperationalRecord('movimentacoes_financeiras', movimento.id, session);
+    }
+
+    setDb((prev) => ({
+      ...prev,
+      consumo_suplementacao: (prev.consumo_suplementacao || []).filter((item) => Number(item.id) !== Number(registro.id)),
+      estoque: produto
+        ? (prev.estoque || []).map((item) => (
+            Number(item.id) === Number(produto.id) ? { ...item, quantidade_atual: novoSaldoEstoque, quantidade: novoSaldoEstoque } : item
+          ))
+        : (prev.estoque || []),
+      movimentacoes_financeiras: movimento
+        ? (prev.movimentacoes_financeiras || []).filter((mov) => Number(mov.id) !== Number(movimento.id))
+        : (prev.movimentacoes_financeiras || []),
+    }));
+
+    showToast({ type: 'success', message: 'Consumo excluído e estoque estornado.' });
+  }
 
   return (
     <div className="page suplementacao-page">
@@ -402,6 +460,14 @@ export default function SuplementacaoPage({ db, setDb, session, fazendaSeleciona
                         disabled={!hasPermission('estoque:editar')}
                       >
                         Editar
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        onClick={() => excluirConsumo(registro)}
+                        disabled={!hasPermission('estoque:editar')}
+                      >
+                        Excluir
                       </Button>
                     </td>
                   </tr>
