@@ -20,10 +20,10 @@ function lotesAtivosDe(db) {
 }
 
 export function listarLotesSemPesagemRecente(db = {}, limiteDias = PESAGEM_LIMITE_DIAS) {
-  const hoje = new Date();
+  const hoje = hojeIso();
   return lotesAtivosDe(db).filter((lote) => {
     if (!lote.ultima_pesagem) return true;
-    const dias = (hoje - new Date(lote.ultima_pesagem)) / (1000 * 60 * 60 * 24);
+    const dias = daysBetween(lote.ultima_pesagem, hoje);
     return dias > limiteDias;
   });
 }

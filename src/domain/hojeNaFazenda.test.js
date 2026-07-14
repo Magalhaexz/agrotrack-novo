@@ -65,6 +65,18 @@ test('listarLotesSemPesagemRecente ignora lotes inativos', () => {
   assert.deepEqual(listarLotesSemPesagemRecente(db), []);
 });
 
+// Regressão BB-13: a função usava `(new Date() - new Date(ultima_pesagem)) /
+// msPorDia` (aritmética de instante, não de dia civil), sujeito ao mesmo
+// desalinhamento UTC/local dos outros bugs de data desta rodada perto do
+// limite de 30 dias. Pesagem feita exatamente hoje não pode contar como "há
+// 1 dia" por causa de horas fracionárias.
+test('listarLotesSemPesagemRecente não sinaliza lote pesado hoje', () => {
+  const db = {
+    lotes: [{ id: 1, status: 'ativo', ultima_pesagem: hojeLocalISO() }],
+  };
+  assert.deepEqual(listarLotesSemPesagemRecente(db), []);
+});
+
 test('construirHojeNaFazenda gera prioridade no plural para lotes sem pesagem', () => {
   const db = {
     lotes: [

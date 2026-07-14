@@ -7,6 +7,7 @@ function isoRelativo(dias) {
   return hojeLocalISO(new Date(Date.now() + dias * 864e5));
 }
 
+const HOJE = isoRelativo(0);
 const ONTEM = isoRelativo(-1);
 const HA_50_DIAS = isoRelativo(-50);
 const HA_35_DIAS = isoRelativo(-35);
@@ -290,5 +291,71 @@ describe('buildAlerts', () => {
     assert.ok(alerta);
     assert.equal(alerta.nivel, 'warning');
     assert.ok(alerta.mensagem.includes('Lote A'));
+  });
+
+  // --- Regressão BB-12: dia 0 ("vencendo hoje") não pode virar "vencido" ---
+  // Bug original: parseISODate()+zerarHora() misturava um instante ancorado
+  // em UTC com zeragem de hora local, empurrando qualquer data civil um dia
+  // para trás — um item vencendo hoje sempre caía em "vencido".
+
+  it('manejo sanitário com próxima aplicação hoje gera aviso, não "vencido"', () => {
+    const db = {
+      sanitario: [{ id: 1, tipo: 'vacina', desc: 'Aftosa', proxima: HOJE, alerta_dias_antes: 5, lote_id: 1 }],
+      lotes: [{ id: 1, nome: 'Lote A', status: 'ativo' }],
+    };
+    const alerta = buildAlerts(db).find((a) => a.tipo === 'sanitario');
+    assert.ok(alerta, 'Deve gerar alerta sanitário para o dia de hoje');
+    assert.equal(alerta.nivel, 'warning');
+    assert.equal(alerta.titulo, 'Manejo sanitário próximo');
+  });
+
+  it('despesa com vencimento hoje gera aviso, não "vencido"', () => {
+    const db = {
+      movimentacoes_financeiras: [
+        { id: 200, tipo: 'despesa', status: 'previsto', descricao: 'Ração', valor: 1000, data_vencimento: HOJE },
+      ],
+    };
+    const alertFin = buildAlerts(db).find((a) => a.tipo === 'financeiro');
+    assert.ok(alertFin);
+    assert.equal(alertFin.nivel, 'warning');
+    assert.equal(alertFin.titulo, 'Pagamento próximo do vencimento');
+  });
+
+  it('tarefa avulsa (rotina) com vencimento hoje gera "pendente hoje", não "atrasada"', () => {
+    const db = {
+      rotinas: [{ id: 1, tarefa: 'Vacinar', recorrente: false, data: HOJE, status: 'pendente' }],
+    };
+    const alerta = buildAlerts(db).find((a) => a.tipo === 'rotina');
+    assert.ok(alerta, 'Deve gerar alerta de rotina para o dia de hoje');
+    assert.equal(alerta.nivel, 'warning');
+    assert.equal(alerta.titulo, 'Tarefa pendente hoje');
+  });
+
+  it('rotina recorrente diária vale para hoje', () => {
+    const db = {
+      rotinas: [{ id: 2, tarefa: 'Checar cocho', recorrente: true, recorrencia_tipo: 'diaria', data_inicio: HA_2_DIAS }],
+    };
+    const alerta = buildAlerts(db).find((a) => a.tipo === 'rotina');
+    assert.ok(alerta, 'Recorrência diária iniciada no passado deve valer hoje');
+    assert.equal(alerta.titulo, 'Rotina recorrente pendente hoje');
+  });
+
+  it('saída de lote hoje gera "próxima", não "vencida"', () => {
+    const db = {
+      lotes: [{ id: 30, nome: 'Lote Saída Hoje', status: 'ativo', saida: HOJE }],
+    };
+    const alertLote = buildAlerts(db).find((a) => a.tipo === 'lote');
+    assert.ok(alertLote);
+    assert.equal(alertLote.nivel, 'warning');
+    assert.equal(alertLote.titulo, 'Saída de lote próxima');
+  });
+
+  it('lote pesado hoje não entra em "pesagem pendente"', () => {
+    const db = {
+      lotes: [{ id: 40, nome: 'Lote Pesado Hoje', status: 'ativo' }],
+      pesagens: [{ id: 1, lote_id: 40, data: HOJE }],
+    };
+    const alertasPesagem = buildAlerts(db).filter((a) => a.tipo === 'pesagem');
+    assert.equal(alertasPesagem.length, 0);
   });
 });

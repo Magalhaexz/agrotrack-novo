@@ -1,4 +1,5 @@
 import { daysBetween, toDateKey, toNumber } from '../domain/calcHelpers.js';
+import { hojeLocalISO } from '../domain/dataCivil.js';
 import { normalizarStatusMovimentacao, getDataVencimento } from '../domain/financeiroStatus.js';
 import { calcularOcupacaoPastos, listarLotesSemPasto } from '../domain/ocupacaoPastos.js';
 
@@ -13,31 +14,14 @@ const PESAGEM_CRITICAL_DIAS = 45;
 const LOTE_SAIDA_ALERT_DIAS = 7;
 const FINANCEIRO_VENCIMENTO_WARN_DIAS = 3;
 
-function parseISODate(valor) {
+// Só para ordenação (data_sort) — um número consistente por data civil, não
+// usado para diferença de dias (isso é sempre daysBetween/toDateKey, que já
+// tratam corretamente o dia civil em America/Sao_Paulo).
+function dataOrdenavel(valor) {
   const dateKey = toDateKey(valor);
-  if (!dateKey) return zerarHora(new Date());
+  if (!dateKey) return 0;
   const [ano, mes, dia] = dateKey.split('-').map(Number);
-  return new Date(Date.UTC(ano, (mes || 1) - 1, dia || 1));
-}
-
-function zerarHora(data) {
-  const d = new Date(data);
-  d.setHours(0, 0, 0, 0);
-  return d;
-}
-
-function diferencaEmDias(dataA, dataB) {
-  return daysBetween(
-    zerarHora(dataB).toISOString().slice(0, 10),
-    zerarHora(dataA).toISOString().slice(0, 10)
-  );
-}
-
-function formatarDataISO(data) {
-  const ano = data.getFullYear();
-  const mes = String(data.getMonth() + 1).padStart(2, '0');
-  const dia = String(data.getDate()).padStart(2, '0');
-  return `${ano}-${mes}-${dia}`;
+  return Date.UTC(ano, (mes || 1) - 1, dia || 1);
 }
 
 function formatarDataBR(valor) {
@@ -72,21 +56,19 @@ function normalizarTipoSanitario(tipo) {
   return mapa[tipo] || tipo || 'Manejo';
 }
 
-function recorrenciaValeNaData(item, dataReferencia) {
+function recorrenciaValeNaData(item, hojeStr) {
   if (!item.recorrente) return false;
   if (!item.data_inicio) return false;
 
-  const inicio = zerarHora(parseISODate(item.data_inicio));
-  const fim = item.data_fim ? zerarHora(parseISODate(item.data_fim)) : null;
-  const hoje = zerarHora(dataReferencia);
-
-  if (hoje.getTime() < inicio.getTime()) return false;
-  if (fim && hoje.getTime() > fim.getTime()) return false;
+  if (daysBetween(hojeStr, item.data_inicio) > 0) return false;
+  if (item.data_fim && daysBetween(hojeStr, item.data_fim) < 0) return false;
 
   if (item.recorrencia_tipo === 'diaria') return true;
 
   if (item.recorrencia_tipo === 'semanal') {
-    const diaHoje = hoje.getDay();
+    // T00:00:00 sem offset força horário local, evitando o shift de um dia
+    // que "YYYY-MM-DD" puro sofre ao ser parseado como UTC pelo spec do JS.
+    const diaHoje = new Date(`${hojeStr}T00:00:00`).getDay();
     return Array.isArray(item.dias_semana) && item.dias_semana.includes(diaHoje);
   }
 
@@ -111,8 +93,7 @@ export function buildAlerts(db = {}) {
   const lotesMap = new Map(lotes.map((item) => [toNumber(item.id), item]));
   const funcionariosMap = new Map(funcionarios.map((item) => [toNumber(item.id), item]));
 
-  const hoje = zerarHora(new Date());
-  const hojeStr = formatarDataISO(hoje);
+  const hojeStr = hojeLocalISO();
 
   const alerts = [];
 
@@ -152,8 +133,7 @@ export function buildAlerts(db = {}) {
     }
 
     if (item.data_validade) {
-      const dataValidade = parseISODate(item.data_validade);
-      const diffDias = diferencaEmDias(dataValidade, hoje);
+      const diffDias = daysBetween(hojeStr, item.data_validade);
       const alertaDiasAntes = toNumber(item.alerta_dias_antes);
 
       if (diffDias < 0) {
@@ -167,7 +147,7 @@ export function buildAlerts(db = {}) {
           titulo: 'Produto vencido no estoque',
           mensagem: `${produto} venceu em ${formatarDataBR(item.data_validade)}.`,
           pagina: 'estoque',
-          data_sort: dataValidade.getTime(),
+          data_sort: dataOrdenavel(item.data_validade),
         });
       } else if (diffDias <= alertaDiasAntes) {
         const chave = `estoque-validade-${item.id}-${item.data_validade}`;
@@ -180,7 +160,7 @@ export function buildAlerts(db = {}) {
           titulo: 'Validade próxima no estoque',
           mensagem: `${produto} vence em ${formatarDataBR(item.data_validade)}.`,
           pagina: 'estoque',
-          data_sort: dataValidade.getTime(),
+          data_sort: dataOrdenavel(item.data_validade),
         });
       }
     }
@@ -190,8 +170,7 @@ export function buildAlerts(db = {}) {
   sanitario.forEach((item) => {
     if (!item.proxima) return;
 
-    const dataProxima = parseISODate(item.proxima);
-    const diffDias = diferencaEmDias(dataProxima, hoje);
+    const diffDias = daysBetween(hojeStr, item.proxima);
     const alertaDiasAntes = toNumber(item.alerta_dias_antes);
     const loteNome = lotesMap.get(toNumber(item.lote_id))?.nome || 'Lote sem identificação';
     const funcionarioNome = funcionariosMap.get(toNumber(item.funcionario_responsavel_id))?.nome || 'Sem responsável';
@@ -209,7 +188,7 @@ export function buildAlerts(db = {}) {
         titulo: 'Manejo sanitário vencido',
         mensagem: `${tipo}: ${descricao} no ${loteNome} venceu em ${formatarDataBR(item.proxima)}. Responsável: ${funcionarioNome}.`,
         pagina: 'sanitario',
-        data_sort: dataProxima.getTime(),
+        data_sort: dataOrdenavel(item.proxima),
       });
     } else if (diffDias <= alertaDiasAntes) {
       const chave = `sanitario-proximo-${item.id}-${item.proxima}`;
@@ -222,7 +201,7 @@ export function buildAlerts(db = {}) {
         titulo: 'Manejo sanitário próximo',
         mensagem: `${tipo}: ${descricao} no ${loteNome} está previsto para ${formatarDataBR(item.proxima)}. Responsável: ${funcionarioNome}.`,
         pagina: 'sanitario',
-        data_sort: dataProxima.getTime(),
+        data_sort: dataOrdenavel(item.proxima),
       });
     }
   });
@@ -239,9 +218,9 @@ export function buildAlerts(db = {}) {
     if (!item.recorrente) {
       if (!item.data || item.status === 'concluido') return;
 
-      const dataTarefa = parseISODate(item.data);
+      const diffDias = daysBetween(hojeStr, item.data);
 
-      if (dataTarefa.getTime() < hoje.getTime()) {
+      if (diffDias < 0) {
         const chave = `rotina-atrasada-${item.id}-${item.data}`;
         alerts.push({
           id: chave,
@@ -252,9 +231,9 @@ export function buildAlerts(db = {}) {
           titulo: 'Tarefa atrasada',
           mensagem: `${item.tarefa} está atrasada desde ${formatarDataBR(item.data)}${loteNome ? ` • ${loteNome}` : ''} • ${funcionarioNome}.`,
           pagina: 'rotina',
-          data_sort: dataTarefa.getTime(),
+          data_sort: dataOrdenavel(item.data),
         });
-      } else if (dataTarefa.getTime() === hoje.getTime()) {
+      } else if (diffDias === 0) {
         const chave = `rotina-hoje-${item.id}-${item.data}`;
         alerts.push({
           id: chave,
@@ -265,13 +244,13 @@ export function buildAlerts(db = {}) {
           titulo: 'Tarefa pendente hoje',
           mensagem: `${item.tarefa} precisa ser executada hoje${loteNome ? ` • ${loteNome}` : ''} • ${funcionarioNome}.`,
           pagina: 'rotina',
-          data_sort: dataTarefa.getTime(),
+          data_sort: dataOrdenavel(item.data),
         });
       }
       return;
     }
 
-    if (!recorrenciaValeNaData(item, hoje)) return;
+    if (!recorrenciaValeNaData(item, hojeStr)) return;
 
     const concluidas = Array.isArray(item.concluido_datas) ? item.concluido_datas : [];
     if (concluidas.includes(hojeStr)) return;
@@ -286,7 +265,7 @@ export function buildAlerts(db = {}) {
       titulo: 'Rotina recorrente pendente hoje',
       mensagem: `${item.tarefa} está prevista para hoje${loteNome ? ` • ${loteNome}` : ''} • ${funcionarioNome}.`,
       pagina: 'rotina',
-      data_sort: hoje.getTime(),
+      data_sort: dataOrdenavel(hojeStr),
     });
   });
 
@@ -323,7 +302,7 @@ export function buildAlerts(db = {}) {
       return;
     }
 
-    const diasSemPesar = diferencaEmDias(hoje, parseISODate(ultima.data));
+    const diasSemPesar = daysBetween(ultima.data, hojeStr);
 
     if (diasSemPesar >= PESAGEM_CRITICAL_DIAS) {
       const chave = `pesagem-atrasada-${l.id}`;
@@ -336,7 +315,7 @@ export function buildAlerts(db = {}) {
         titulo: 'Pesagem muito atrasada',
         mensagem: `${l.nome} não é pesado há ${diasSemPesar} dias (última: ${formatarDataBR(ultima.data)}).`,
         pagina: 'pesagens',
-        data_sort: parseISODate(ultima.data).getTime(),
+        data_sort: dataOrdenavel(ultima.data),
       });
     } else if (diasSemPesar >= PESAGEM_WARN_DIAS) {
       const chave = `pesagem-pendente-${l.id}`;
@@ -349,15 +328,14 @@ export function buildAlerts(db = {}) {
         titulo: 'Pesagem pendente',
         mensagem: `${l.nome} não é pesado há ${diasSemPesar} dias (última: ${formatarDataBR(ultima.data)}).`,
         pagina: 'pesagens',
-        data_sort: parseISODate(ultima.data).getTime(),
+        data_sort: dataOrdenavel(ultima.data),
       });
     }
   });
 
   // --- Alertas de Saída de Lote ---
   lotes.filter((l) => l.status === 'ativo' && l.saida).forEach((l) => {
-    const dataSaida = parseISODate(l.saida);
-    const diasAteSaida = diferencaEmDias(dataSaida, hoje);
+    const diasAteSaida = daysBetween(hojeStr, l.saida);
 
     if (diasAteSaida < 0) {
       const chave = `lote-saida-vencida-${l.id}`;
@@ -370,7 +348,7 @@ export function buildAlerts(db = {}) {
         titulo: 'Saída de lote vencida',
         mensagem: `${l.nome} tinha saída prevista para ${formatarDataBR(l.saida)} e ainda está ativo.`,
         pagina: 'lotes',
-        data_sort: dataSaida.getTime(),
+        data_sort: dataOrdenavel(l.saida),
       });
     } else if (diasAteSaida <= LOTE_SAIDA_ALERT_DIAS) {
       const chave = `lote-saida-proxima-${l.id}`;
@@ -383,7 +361,7 @@ export function buildAlerts(db = {}) {
         titulo: 'Saída de lote próxima',
         mensagem: `${l.nome} tem saída prevista para ${formatarDataBR(l.saida)} (em ${diasAteSaida} dia${diasAteSaida !== 1 ? 's' : ''}).`,
         pagina: 'lotes',
-        data_sort: dataSaida.getTime(),
+        data_sort: dataOrdenavel(l.saida),
       });
     }
   });
@@ -398,8 +376,7 @@ export function buildAlerts(db = {}) {
     const dataVenc = getDataVencimento(mov);
     if (!dataVenc) return;
 
-    const dataVencDate = parseISODate(dataVenc);
-    const diasAteVenc = diferencaEmDias(dataVencDate, hoje);
+    const diasAteVenc = daysBetween(hojeStr, dataVenc);
     const descricao = mov.descricao || mov.categoria || 'Despesa';
     const valor = mov.valor ? ` (${formatarMoedaSimples(mov.valor)})` : '';
 
@@ -414,7 +391,7 @@ export function buildAlerts(db = {}) {
         titulo: 'Pagamento vencido',
         mensagem: `${descricao}${valor} venceu em ${formatarDataBR(dataVenc)}.`,
         pagina: 'financeiro',
-        data_sort: dataVencDate.getTime(),
+        data_sort: dataOrdenavel(dataVenc),
       });
     } else if (diasAteVenc <= FINANCEIRO_VENCIMENTO_WARN_DIAS) {
       const chave = `financeiro-proximo-${mov.id}`;
@@ -427,7 +404,7 @@ export function buildAlerts(db = {}) {
         titulo: 'Pagamento próximo do vencimento',
         mensagem: `${descricao}${valor} vence em ${formatarDataBR(dataVenc)} (em ${diasAteVenc} dia${diasAteVenc !== 1 ? 's' : ''}).`,
         pagina: 'financeiro',
-        data_sort: dataVencDate.getTime(),
+        data_sort: dataOrdenavel(dataVenc),
       });
     }
   });
