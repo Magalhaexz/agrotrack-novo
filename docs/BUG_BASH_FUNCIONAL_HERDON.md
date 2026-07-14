@@ -778,3 +778,111 @@ Rotas: mapeamento página↔rota 100% (45/45) confirmado por código. Mecânica 
 
 P0 abertos: 0
 P1 abertos: 0
+
+## Rodada 11 — Mobile (320/375/390/430/768px)
+
+### Nota de metodologia: falso positivo por animação congelada
+
+O tirador de screenshot (`computer` `screenshot`) ficou indisponível a
+sessão inteira (timeout); verificação feita por inspeção de DOM/estilo
+computado (`read_page`, `get_page_text`, `javascript_tool`). Isso expôs
+um artefato específico deste ambiente automatizado: a transição CSS do
+drawer da Sidebar (`.sidebar { transition: transform 0.2s ease }`) ficou
+presa com uma Web Animation em `localTime: 0`/`progress: 0` (provável
+throttling de `requestAnimationFrame` numa aba não pintada ativamente),
+fazendo o `transform` computado parecer travado em `translateX(0)`
+mesmo depois de o React remover a classe `mobile-open` — inclusive
+resistindo a `!important` inline, o que confirma que era uma Web
+Animation ativa vencendo a cascata, não uma regra CSS. Forçar a
+animação a concluir (`el.getAnimations().forEach(a => a.finish())`)
+revelou o valor real (`translateX(-285.6px)`, ~-105% de 272px — fora da
+tela), provando que o app estava correto. **Nenhum bug real aqui** —
+registrado para não ser reaberto por engano; toda checagem de
+visibilidade por `transform` a partir daqui usa `.finish()` antes de
+medir.
+
+### Validado ao vivo
+
+| Fluxo | Largura(s) | Resultado |
+| ----- | ---------- | --------- |
+| "Abrir menu" (hamburguer, `AppHeader`) abre o drawer da Sidebar | 320, 375 | `<aside>` ganha `mobile-open`, `transform` vira `translateX(0)`, ocupa 272px à esquerda |
+| Selecionar item de navegação dentro do drawer aberto | 320, 375 | Navega (`/sanitario`, `/suplementacao`) **e** fecha o drawer (classe `mobile-open` removida, `transform` sai da tela após concluir a transição) |
+| Overflow horizontal | 320, 375, 390, 430, 768 | Nenhum em Dashboard, Central de Alertas, Calendário Operacional, Suplementação, Planos e Assinatura — `scrollWidth === innerWidth` em todos os casos testados |
+| Modal de formulário ("Registrar consumo", Suplementação) | 375 | Abre com margem de 8px de cada lado (359px de 375px), sem estourar a viewport; nenhum dos 10 campos/botões internos ultrapassa a borda da tela; fecha corretamente pelo botão "Fechar" |
+| Seletor de fazenda | 375 | A instância do cabeçalho (`.farm-selector-wrap`) fica **`display:none !important`** abaixo de 900px (regra deliberada, não bug) — o equivalente mobile é um botão separado ("Abrir controles do cabeçalho", ícone `MoreHorizontal`) que abre um painel (`#mobile-header-panel`, portal) com a mesma lista de fazendas. Testado clicar em "QA-Fazenda Dois": painel fecha, contagem do badge de alertas muda de 11 para 5, confirmando a troca de fazenda real, não só visual |
+| Botão voltar do navegador | 768 | Volta para `/dashboard` corretamente, conteúdo carrega |
+
+### Achado de layout no breakpoint 768px (P3, não corrigido)
+
+A Sidebar usa `max-width: 767px` para o modo drawer (`app.css`), mas o
+cabeçalho usa `max-width: 900px` para o modo mobile (hamburguer visível,
+seletor de fazenda do cabeçalho escondido). Em 768px — uma das 5
+larguras exigidas pelo sprint — isso cria uma faixa onde a Sidebar já
+renderiza como painel fixo permanente de desktop (`transform: none`,
+sempre visível, 272px) **e** o hamburguer do cabeçalho continua visível
+e clicável, mesmo sem função (a Sidebar já não tem mais a regra
+`translateX` fora da tela nessa largura, então abrir/fechar não move
+nada). Confirmado sem impacto funcional: `main` tem `margin-left: 260px`
+corretamente calculado, sem sobreposição visual, sem scroll bloqueado
+de forma anômala (`body { overflow: hidden }` é o padrão do app-shell,
+não um efeito colateral do clique). Puramente cosmético — um botão sem
+efeito visível numa faixa estreita de largura — não corrigido por ser
+P3 e por não haver tempo disponível para mais uma rodada de ajuste de
+breakpoint nesta sprint.
+
+### Não testado nesta rodada
+
+Gesto real de "voltar" (swipe), teclado virtual real (ambos exigem um
+dispositivo físico ou emulação que este harness de navegador não
+oferece); FAB — nenhum elemento com classe `fab`/`floating` foi
+encontrado nas páginas testadas, então o item do checklist não se
+aplica a este app (não há um componente de ação flutuante no design
+atual); as 45 rotas individualmente em cada largura (testada a amostra
+de páginas do checklist do sprint: Dashboard, Central de Alertas,
+Calendário Operacional, Suplementação, Planos e Assinatura).
+
+### Cobertura atualizada
+
+```
+Mobile: 5/5 larguras exigidas testadas (320, 375, 390, 430, 768) — overflow horizontal, abrir/
+  fechar do drawer com navegação real, modal de formulário com checagem de campo a campo, seletor
+  de fazenda mobile (mecanismo correto, diferente do cabeçalho desktop) com troca de fazenda
+  real confirmada, botão voltar. 1 achado P3 (hamburguer redundante em 768px, sem efeito
+  funcional), não corrigido. Gesto de voltar e teclado virtual não testáveis neste ambiente.
+```
+
+P0 abertos: 0
+P1 abertos: 0
+
+## Encerramento do sprint
+
+### Critério de encerramento (item 10)
+
+```
+P0 abertos: 0 (BB-01, BB-02, BB-03, BB-04, BB-09, BB-17 — todos corrigidos e reconfirmados ao vivo)
+P1 abertos: 0 (BB-06, BB-07, BB-08, BB-10, BB-11, BB-12, BB-14, BB-15, BB-16, BB-18 — todos
+  corrigidos; BB-06 corrigido por padrão mecânico já validado, não reaberto em navegador depois
+  do fix)
+P2 (não bloqueiam piloto): BB-05, BB-13 — corrigidos
+P3 (cosmético, não bloqueia piloto, não corrigido): URL não reseta em rota inválida (Rodada 10);
+  hamburguer redundante em 768px (Rodada 11)
+Todos os 10 módulos do sprint têm cobertura registrada (ver seções "Cobertura atualizada" de
+  cada rodada) — nenhum módulo tem cobertura 0%, nenhuma cobertura é reivindicada como 100%
+  onde não foi de fato exaustiva (pagamento real via Asaas, mensagem real via Telegram, gesto
+  touch e teclado virtual mobile continuam fora do alcance desta sessão e estão listados como
+  pendência real, não omitidos)
+```
+
+### Pendências reais (não bloqueiam o critério de encerramento, registradas para transparência)
+
+- **Telegram:** nenhuma mensagem real foi enviada/recebida nesta sessão (sem cliente Telegram
+  nem `vercel dev` configurado localmente); cobertura é auditoria de código + suíte de testes
+  já existente, não interação ao vivo.
+- **Assinatura:** trial/expirado/upgrade/downgrade/cancelamento não testados (Asaas em sandbox);
+  papel operador não testado ao vivo especificamente para o gate de Assinatura (evidência só de
+  código, idêntica à de gerente/visualizador que foram testados ao vivo).
+- **Mobile:** gesto de voltar (swipe) e teclado virtual real não testáveis neste harness de
+  navegador (requerem dispositivo físico ou emulação não disponível).
+- **P3 cosméticos, não corrigidos:** URL não reseta em rota inválida (Rodada 10); hamburguer do
+  cabeçalho continua visível e sem efeito em 768px, faixa entre os breakpoints 767px (Sidebar) e
+  900px (cabeçalho) (Rodada 11).
