@@ -509,13 +509,13 @@ async function runWithConcurrency(items, limit, worker) {
   return results;
 }
 
-async function loadOperationalSnapshotRequest(userId, shouldApply, generationId) {
+async function loadOperationalSnapshotRequest(ownerUserId, shouldApply, generationId) {
   const bootStart = nowMs();
   if (import.meta.env.DEV) {
     console.debug('[HERDON_DATA_BOOT]', {
       stage: 'snapshot_start',
       generationId,
-      hasUserId: Boolean(userId),
+      hasUserId: Boolean(ownerUserId),
       tables: OPERACIONAL_TABLES.length,
       concurrencyLimit: HYDRATION_CONCURRENCY_LIMIT,
     });
@@ -525,7 +525,7 @@ async function loadOperationalSnapshotRequest(userId, shouldApply, generationId)
   const entries = await runWithConcurrency(
     OPERACIONAL_TABLES,
     HYDRATION_CONCURRENCY_LIMIT,
-    (table) => fetchOperationalTableWithCircuit(table, userId, shouldApply, circuitState)
+    (table) => fetchOperationalTableWithCircuit(table, ownerUserId, shouldApply, circuitState)
   );
 
   if (import.meta.env.DEV) {
@@ -544,8 +544,12 @@ async function loadOperationalSnapshotRequest(userId, shouldApply, generationId)
   };
 }
 
-async function loadOperationalSnapshot(userId, shouldApply, generationId) {
-  if (!userId) {
+// `userId` (sessão logada) só chaveia dedup/cooldown locais nesta função.
+// `ownerUserId` (conta ativa, pode ser diferente de `userId` para um membro
+// convidado de Equipe) é o que efetivamente filtra os dados buscados —
+// ver fetchOperationalTableWithCircuit.
+async function loadOperationalSnapshot(userId, ownerUserId, shouldApply, generationId) {
+  if (!userId || !ownerUserId) {
     return {};
   }
 
@@ -572,7 +576,7 @@ async function loadOperationalSnapshot(userId, shouldApply, generationId) {
     return existing;
   }
 
-  const request = loadOperationalSnapshotRequest(userId, shouldApply, generationId)
+  const request = loadOperationalSnapshotRequest(ownerUserId, shouldApply, generationId)
     .then((snapshot) => {
       if (snapshot?.circuitOpen) {
         failedHydrationAt.set(userId, Date.now());
@@ -597,6 +601,12 @@ async function loadOperationalSnapshot(userId, shouldApply, generationId) {
 
 export function useOperationalData(session, options = {}) {
   const hydrationEnabled = options?.enabled !== false;
+  // Conta cujos dados devem ser buscados. Para o dono da conta é o próprio
+  // id de sessão; para um membro convidado de Equipe (gerente/operador/
+  // visualizador), o chamador (App.jsx) passa o owner_user_id resolvido do
+  // profile — sem isso, o filtro de busca usava o id do membro convidado,
+  // que nunca é dono de nenhuma linha, e a conta inteira aparecia vazia.
+  const ownerUserId = options?.ownerUserId || session?.user?.id || null;
   const [db, setDbState] = useState(() => createOperationalFallbackDb());
   const [dataReady, setDataReady] = useState(true);
   const [dataSource, setDataSource] = useState('signed_out');
@@ -748,7 +758,7 @@ export function useOperationalData(session, options = {}) {
 
       try {
         const snapshotResult = await withTimeout(
-          loadOperationalSnapshot(userId, shouldApply, generationId),
+          loadOperationalSnapshot(userId, ownerUserId, shouldApply, generationId),
           MANUAL_SYNC_TIMEOUT_MS,
           'snapshot_timeout'
         );
@@ -858,7 +868,7 @@ export function useOperationalData(session, options = {}) {
         hasUserId: Boolean(userId),
       });
     };
-  }, [hydrationEnabled, manualSyncNonce, session]);
+  }, [hydrationEnabled, manualSyncNonce, session, ownerUserId]);
 
   return {
     db,

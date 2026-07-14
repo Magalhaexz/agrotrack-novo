@@ -269,6 +269,10 @@ export default function App() {
     syncNow,
   } = useOperationalData(session, {
     enabled: Boolean(session?.user?.id) && !loadingAuth,
+    // Sem isso, um membro convidado de Equipe (gerente/operador/visualizador)
+    // buscava dados filtrados pelo próprio id de sessão em vez do dono da
+    // conta — nunca dono de nenhuma linha, a conta inteira aparecia vazia.
+    ownerUserId: user?.owner_user_id || null,
   });
   const accountSubscriptionState = useAccountSubscription(session, {
     enabled: Boolean(session?.user?.id) && !loadingAuth,
