@@ -66,6 +66,8 @@ export const permissoesPorPerfil = {
     'comparativo:ver',
     'configuracoes:ver',
     'configuracoes:editar',
+    'suplementacao:ver',
+    'suplementacao:editar',
     'pastagens:ver',
     'pastagens:editar',
     'pastagens:excluir',
