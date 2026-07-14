@@ -14,6 +14,8 @@ import {
   deleteOperationalRecord,
   updateOperationalRecord,
 } from '../services/operationalPersistence';
+import { daysBetween } from '../domain/calcHelpers.js';
+import { hojeLocalISO } from '../domain/dataCivil.js';
 
 export default function RotinaPage({ db, setDb, onConfirmAction }) {
   const { showToast } = useToast(); // Usar o hook de toast
@@ -37,8 +39,7 @@ export default function RotinaPage({ db, setDb, onConfirmAction }) {
 
   const rotinas = useMemo(() => (Array.isArray(db?.rotinas) ? db.rotinas : []), [db]);
 
-  const hoje = useMemo(() => zerarHora(new Date()), []);
-  const hojeStr = useMemo(() => formatarDataISO(hoje), [hoje]);
+  const hojeStr = useMemo(() => hojeLocalISO(), []);
 
   const dadosBase = useMemo(() => {
     return rotinas.map((item) => {
@@ -59,7 +60,7 @@ export default function RotinaPage({ db, setDb, onConfirmAction }) {
 
   const tarefasHojeRecorrentes = useMemo(() => {
     return tarefasRecorrentes
-      .filter((item) => recorrenciaValeHoje(item, hoje))
+      .filter((item) => recorrenciaValeHoje(item, hojeStr))
       .map((item) => ({
         ...item,
         id_virtual: `rec-${item.id}-${hojeStr}`, // ID único para instância recorrente
@@ -70,15 +71,14 @@ export default function RotinaPage({ db, setDb, onConfirmAction }) {
           ? 'concluido'
           : 'pendente',
       }));
-  }, [tarefasRecorrentes, hoje, hojeStr]);
+  }, [tarefasRecorrentes, hojeStr]);
 
   const tarefasHojeAvulsas = useMemo(() => {
     return tarefasAvulsas.filter((item) => {
       if (!item.data) return false;
-      const dataItem = zerarHora(new Date(item.data));
-      return dataItem.getTime() === hoje.getTime();
+      return daysBetween(hojeStr, item.data) === 0;
     });
-  }, [tarefasAvulsas, hoje]);
+  }, [tarefasAvulsas, hojeStr]);
 
   const tarefasHoje = useMemo(() => {
     return [...tarefasHojeAvulsas, ...tarefasHojeRecorrentes].sort((a, b) =>
@@ -89,18 +89,16 @@ export default function RotinaPage({ db, setDb, onConfirmAction }) {
   const tarefasAtrasadas = useMemo(() => {
     return tarefasAvulsas.filter((item) => {
       if (!item.data || item.status === 'concluido') return false;
-      const dataItem = zerarHora(new Date(item.data));
-      return dataItem.getTime() < hoje.getTime();
+      return daysBetween(hojeStr, item.data) < 0;
     });
-  }, [tarefasAvulsas, hoje]);
+  }, [tarefasAvulsas, hojeStr]);
 
   const proximasTarefas = useMemo(() => {
     return tarefasAvulsas.filter((item) => {
       if (!item.data || item.status === 'concluido') return false;
-      const dataItem = zerarHora(new Date(item.data));
-      return dataItem.getTime() > hoje.getTime();
+      return daysBetween(hojeStr, item.data) > 0;
     });
-  }, [tarefasAvulsas, hoje]);
+  }, [tarefasAvulsas, hojeStr]);
 
   const resumo = useMemo(() => {
     const concluidasHoje = tarefasHoje.filter((item) => item.status === 'concluido').length;
@@ -241,10 +239,10 @@ export default function RotinaPage({ db, setDb, onConfirmAction }) {
       />
 
       <div className="summary-cards">
-        <Card title="Total de Rotinas" value={resumo.total} />
-        <Card title="Pendentes Hoje" value={resumo.pendentesHoje} />
-        <Card title="Atrasadas" value={resumo.atrasadas} />
-        <Card title="Concluídas Hoje" value={resumo.concluidasHoje} />
+        <Card title="Total de Rotinas"><strong>{resumo.total}</strong></Card>
+        <Card title="Pendentes Hoje"><strong>{resumo.pendentesHoje}</strong></Card>
+        <Card title="Atrasadas"><strong>{resumo.atrasadas}</strong></Card>
+        <Card title="Concluídas Hoje"><strong>{resumo.concluidasHoje}</strong></Card>
       </div>
 
       <section className="todo-section">
@@ -393,54 +391,31 @@ function TodoList({ items, vazioTitulo, vazioTexto, destaque, onToggleStatus, on
 /**
  * Verifica se uma tarefa recorrente é válida para a data de hoje.
  * @param {object} item - O objeto da tarefa.
- * @param {Date} hoje - A data de hoje (com hora zerada).
+ * @param {string} hojeStr - A data civil de hoje, formato YYYY-MM-DD.
  * @returns {boolean} True se a recorrência é válida para hoje, false caso contrário.
  */
-function recorrenciaValeHoje(item, hoje) {
+function recorrenciaValeHoje(item, hojeStr) {
   if (!item.recorrente) return false;
   if (!item.data_inicio) return false;
 
-  const inicio = zerarHora(new Date(item.data_inicio));
-  const fim = item.data_fim ? zerarHora(new Date(item.data_fim)) : null;
-
-  if (hoje.getTime() < inicio.getTime()) return false;
-  if (fim && hoje.getTime() > fim.getTime()) return false;
+  if (daysBetween(hojeStr, item.data_inicio) > 0) return false;
+  if (item.data_fim && daysBetween(hojeStr, item.data_fim) < 0) return false;
 
   if (item.recorrencia_tipo === 'diaria') return true;
 
   if (item.recorrencia_tipo === 'semanal') {
-    const diaHoje = hoje.getDay(); // 0 para Domingo, 1 para Segunda, etc.
+    // T00:00:00 sem offset força o parser a interpretar em horário local,
+    // evitando o shift de um dia que "YYYY-MM-DD" puro sofre (parseado como
+    // UTC pelo spec do JS, um problema à parte do civil-date do daysBetween).
+    const diaHoje = new Date(`${hojeStr}T00:00:00`).getDay(); // 0 para Domingo, 1 para Segunda, etc.
     // item.dias_semana deve ser um array de números [0, 1, 2, ...]
     return Array.isArray(item.dias_semana) && item.dias_semana.includes(diaHoje);
   }
 
-  // Adicionar lógica para recorrência mensal, anual, etc. se necessário
-  // if (item.recorrencia_tipo === 'mensal') { ... }
+  // Recorrência mensal/anual não existe nesta tela ainda — RotinaForm.jsx só
+  // oferece "diaria"/"semanal" como opção, não é um bug, é escopo não construído.
 
   return false;
-}
-
-/**
- * Zera a hora de um objeto Date para facilitar comparações de data.
- * @param {Date|string} data - A data a ser zerada.
- * @returns {Date} Um novo objeto Date com a hora zerada.
- */
-function zerarHora(data) {
-  const d = new Date(data);
-  d.setHours(0, 0, 0, 0);
-  return d;
-}
-
-/**
- * Formata um objeto Date para uma string ISO (YYYY-MM-DD).
- * @param {Date} data - O objeto Date a ser formatado.
- * @returns {string} A data formatada.
- */
-function formatarDataISO(data) {
-  const ano = data.getFullYear();
-  const mes = String(data.getMonth() + 1).padStart(2, '0');
-  const dia = String(data.getDate()).padStart(2, '0');
-  return `${ano}-${mes}-${dia}`;
 }
 
 /**
