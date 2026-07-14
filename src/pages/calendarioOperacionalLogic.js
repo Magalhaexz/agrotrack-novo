@@ -38,3 +38,36 @@ export function matchesRotinaRecurrence(rotina, date) {
 
   return false;
 }
+
+// Recorrência de `eventos_operacionais` (campo "Novo evento" do Calendário).
+// Entidade separada de `rotinas` — sem `dias_semana` (semanal repete no
+// mesmo dia da semana de `data_inicio`) e sem `data_fim` (a janela de
+// expansão é limitada externamente, igual a `expandRecurringRotinas`).
+export function matchesEventoRecurrence(evento, date) {
+  const freq = String(evento?.metadata?.recorrencia || 'nenhuma').toLowerCase();
+  if (freq === 'nenhuma' || !freq) return false;
+
+  const dataInicioStr = String(evento?.data_inicio || evento?.data || '').slice(0, 10);
+  if (!dataInicioStr) return false;
+  const inicio = new Date(`${dataInicioStr}T00:00:00`);
+  if (date < inicio) return false;
+
+  if (freq === 'semanal') {
+    return date.getDay() === inicio.getDay();
+  }
+
+  if (freq === 'quinzenal') {
+    const diff = Math.floor((date - inicio) / 86400000);
+    return diff % 14 === 0;
+  }
+
+  if (freq === 'mensal') {
+    return date.getDate() === inicio.getDate();
+  }
+
+  if (freq === 'anual') {
+    return date.getDate() === inicio.getDate() && date.getMonth() === inicio.getMonth();
+  }
+
+  return false;
+}

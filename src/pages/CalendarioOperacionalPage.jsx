@@ -22,7 +22,7 @@ import {
   deleteOperationalRecord,
   updateOperationalRecord,
 } from '../services/operationalPersistence';
-import { matchesRotinaRecurrence } from './calendarioOperacionalLogic.js';
+import { matchesRotinaRecurrence, matchesEventoRecurrence } from './calendarioOperacionalLogic.js';
 
 import { hojeLocalISO } from '../domain/dataCivil.js';
 const MONTH_LABELS = ['Janeiro', 'Fevereiro', 'Março', 'Abril', 'Maio', 'Junho', 'Julho', 'Agosto', 'Setembro', 'Outubro', 'Novembro', 'Dezembro'];
@@ -620,7 +620,7 @@ function NovoEventoModal({ db, setDb, session, fazendaSelecionada, eventoEditand
 }
 
 function buildCalendarEvents(db, lotesMap, funcionariosMap) {
-  const operacionais = (db?.eventos_operacionais || []).map((event) => normalizeOperationalEvent(event, lotesMap, funcionariosMap));
+  const operacionais = expandRecurringEventos(db?.eventos_operacionais || [], lotesMap, funcionariosMap);
   const sanitarios = (db?.sanitario || []).map((event) => normalizeSanitaryEvent(event, lotesMap, funcionariosMap));
   const pesagens = (db?.pesagens || []).map((event) => normalizePesagemEvent(event, lotesMap));
   const rotinas = expandRecurringRotinas(db?.rotinas || [], lotesMap, funcionariosMap);
@@ -633,22 +633,54 @@ function buildCalendarEvents(db, lotesMap, funcionariosMap) {
     .sort((a, b) => a.data.localeCompare(b.data));
 }
 
-function normalizeOperationalEvent(event, lotesMap, funcionariosMap) {
+function normalizeOperationalEvent(event, lotesMap, funcionariosMap, dataOcorrencia = null) {
   const lote = event?.lote_id ? lotesMap.get(Number(event.lote_id)) : null;
   const funcionarioId = event?.funcionario_id ?? event?.funcionario_responsavel_id;
   const responsavel = funcionarioId ? funcionariosMap.get(Number(funcionarioId)) : null;
+  // Coluna real é data_inicio; mantém 'data' como alias para registros antigos.
+  const data = dataOcorrencia || String(event.data_inicio || event.data || '').slice(0, 10);
 
   return {
-    id: event.id,
+    id: dataOcorrencia ? `${event.id}-${dataOcorrencia}` : event.id,
     source: 'operacional',
     type: event.tipo || 'operacional',
-    // Coluna real é data_inicio; mantém 'data' como alias para registros antigos.
-    data: String(event.data_inicio || event.data || '').slice(0, 10),
+    data,
     title: event.titulo || 'Evento operacional',
     description: [event.status || 'programado', lote?.nome || null].filter(Boolean).join(' · '),
     metaLine: responsavel?.nome || event.responsavel || 'Sem responsável',
+    // Editar/Excluir agem sobre o registro base — igual às instâncias
+    // virtuais de rotina recorrente (RotinaPage), não existe edição por
+    // ocorrência individual.
     raw: event,
   };
+}
+
+// Janela de expansão: mesmos limites de `expandRecurringRotinas` (2 meses
+// atrás a 13 meses à frente), para não gerar ocorrências sem fim.
+function expandRecurringEventos(eventos, lotesMap, funcionariosMap) {
+  const today = new Date();
+  const start = new Date(today.getFullYear(), today.getMonth() - 2, 1);
+  const end = new Date(today.getFullYear(), today.getMonth() + 13, 0);
+
+  return eventos.flatMap((evento) => {
+    const freq = String(evento?.metadata?.recorrencia || 'nenhuma').toLowerCase();
+    if (freq === 'nenhuma' || !freq) {
+      return [normalizeOperationalEvent(evento, lotesMap, funcionariosMap)];
+    }
+
+    const dataInicioStr = String(evento?.data_inicio || evento?.data || '').slice(0, 10);
+    const inicio = dataInicioStr ? new Date(`${dataInicioStr}T00:00:00`) : start;
+    const from = inicio > start ? inicio : start;
+    const eventosGerados = [];
+
+    for (let cursor = new Date(from); cursor <= end; cursor.setDate(cursor.getDate() + 1)) {
+      if (matchesEventoRecurrence(evento, cursor)) {
+        eventosGerados.push(normalizeOperationalEvent(evento, lotesMap, funcionariosMap, cursor.toISOString().slice(0, 10)));
+      }
+    }
+
+    return eventosGerados;
+  });
 }
 
 function normalizeSanitaryEvent(event, lotesMap, funcionariosMap) {
