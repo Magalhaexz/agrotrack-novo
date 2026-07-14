@@ -454,3 +454,75 @@ Calendário: recorrência de eventos operacionais corrigida e testada (mensal/an
 
 P0 abertos: 0
 P1 abertos: 0 (BB-14 corrigido e confirmado ao vivo)
+
+## Rodada 7 — Suplementação de ponta a ponta
+
+### Arquitetura confirmada (planejado × estimado × realizado)
+
+Testado com dados reais: "Dietas" (planejamento por lote) é local-only,
+avisado explicitamente na UI ("Dietas ficam salvas apenas neste
+dispositivo... não sincronizam com a nuvem") — não é bug, é limitação
+conhecida e disclosed. A cobertura/duração estimada na aba "Produtos
+nutricionais" (`calcularConsumoDiarioTotalPorProduto`/
+`calcularDiasRestantesEstoque`) é cálculo puro de exibição, nunca grava
+nada — planejamento e estimativa corretamente não tocam estoque. Só
+"Registrar consumo diário" (realizado) baixa estoque de verdade — igual
+ao que o item 4 do sprint pedia para validar.
+
+### BB-15 — Não existia forma de excluir/estornar um consumo registrado (P1)
+
+**Reprodução:** aba "Histórico" de Suplementação só tinha botão
+"Editar" em cada linha — nenhum "Excluir". Um consumo lançado por engano
+não podia ser removido, só editado para outros valores (o que ainda deixa
+o registro existindo, só com dados diferentes).
+
+**Correção:** adicionado botão "Excluir" (`excluirConsumo` em
+`SuplementacaoPage.jsx`), mesmo padrão de confirmação/estorno já usado
+em Sanidade: confirma via `onConfirmAction` (modal custom da aplicação,
+com fallback `window.confirm`), devolve a quantidade ao produto de
+estoque vinculado, remove a `movimentacoes_financeiras` linkada
+(`origem_tipo = 'consumo_suplementacao'`) e remove o registro de consumo.
+
+**Validação ao vivo:** produto com 250 kg → consumo de 30 kg → 220 kg;
+excluído → estoque volta a 250 kg, badge de alertas do cabeçalho cai de
+11 para 10 (a despesa financeira vinculada some junto), tudo confirmado
+com reload completo.
+
+### BB-16 — Editar um consumo trocando o produto vinculado vazava estoque (P1)
+
+**Reprodução:** registrar consumo de 30 kg do Produto A (baixa 250→220).
+Editar o mesmo registro e trocar o produto vinculado para o Produto B.
+Esperado: A volta a 250 (devolvido), B desconta 30. Obtido (antes do
+fix): A ficava travado em 220 para sempre (nunca devolvido) e B também
+descontava 30 — a mesma quantidade "sumia" do produto errado.
+
+**Causa:** `SuplementacaoConsumoModal.jsx` só devolvia a quantidade
+anterior (`restoredQty`) quando o produto editado era **o mesmo** do
+registro original (`Number(oldProduto.id) === Number(novoProduto.id)`).
+Se o produto mudava, o `restoredQty` virava `0` e o produto antigo nunca
+recebia a devolução — só o novo produto era descontado.
+
+**Correção:** quando o produto muda na edição (`produtoTrocou`), o
+produto **antigo** recebe a devolução total (`quantidade_atual + qtd
+anterior`) antes de aplicar a baixa no produto novo — duas chamadas de
+`updateOperationalRecord('estoque', ...)`, uma para cada produto, mais
+o `setDb` local refletindo os dois.
+
+**Validação ao vivo:** Produto A (Ração) em 220 kg após consumo de 30 kg
+→ editado o mesmo registro trocando para Produto B (Sal Proteinado, 200
+kg) → salvo → A volta a 250 kg, B cai para 170 kg. Confirmado com
+reload completo.
+
+### Cobertura atualizada
+
+```
+Suplementação: planejamento/estimativa/realizado testados de ponta a ponta (cadastro de
+  produto → consumo → baixa de estoque → custo financeiro → exclusão com estorno →
+  edição trocando produto). BB-15 e BB-16 corrigidos e confirmados ao vivo. NÃO testado:
+  fluxo por "Dieta" (a própria UI avisa "recurso em preparação, registre pelo produto"),
+  modo "quantidade por cabeça"/"percentual do peso vivo" (só "manual total" testado),
+  saldo negativo (código já existente, não reproduzido ao vivo nesta rodada)
+```
+
+P0 abertos: 0
+P1 abertos: 0 (BB-15, BB-16 corrigidos e confirmados ao vivo)
