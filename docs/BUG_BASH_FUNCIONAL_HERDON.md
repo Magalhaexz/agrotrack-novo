@@ -376,3 +376,81 @@ Rotinas da Equipe: bloqueio de Funcionário obrigatório resolvido (campo agora 
 
 P0 abertos: 0
 P1 abertos: 0
+
+## Rodada 6 — Calendário Operacional completo
+
+### BB-14 — Recorrência de "Novo evento" era decorativa: nada a expandia (P1)
+
+**Reprodução:** criado um evento em "Novo evento" com Recorrência =
+"Mensal" em 14/07/2026. Esperado: aparecer também em 14/08, 14/09 etc.
+Obtido: aparecia **só** em 14/07 — nenhuma ocorrência em nenhum mês
+seguinte, sem qualquer erro ou aviso.
+
+**Causa:** `buildCalendarEvents()` em `CalendarioOperacionalPage.jsx`
+mapeava `db.eventos_operacionais` 1-para-1 (`normalizeOperationalEvent`),
+ignorando por completo `event.metadata.recorrencia` — o campo é salvo no
+banco, mas nada no calendário (nem em nenhum outro arquivo do projeto,
+confirmado por grep) o lê para gerar ocorrências repetidas. O motor que
+já existe (`matchesRotinaRecurrence`, usado só para `db.rotinas`) já
+suporta `diaria/semanal/quinzenal/mensal/anual` corretamente — só nunca
+foi conectado a `eventos_operacionais`.
+
+**Correção:** nova função `matchesEventoRecurrence()` em
+`calendarioOperacionalLogic.js` (mesmo arquivo puro/testável do motor de
+rotinas), com semântica adaptada à entidade `eventos_operacionais` (sem
+`dias_semana`: "semanal" repete no mesmo dia da semana da data de
+início; sem `data_fim`: a janela de expansão é limitada externamente,
+igual ao padrão já usado para rotinas — 2 meses atrás a 13 meses à
+frente). Nova `expandRecurringEventos()` em
+`CalendarioOperacionalPage.jsx` gera as ocorrências virtuais; Editar/
+Excluir continuam operando sobre o registro base (mesma semântica já
+usada nas instâncias virtuais de rotina recorrente — não existe edição
+por ocorrência individual, é uma decisão de escopo consciente, não um
+bug).
+
+**Validação ao vivo:** evento mensal criado em 14/07 — antes do fix,
+navegando para Agosto não aparecia em nenhum dia; depois do fix, aparece
+corretamente em 14/08, com "Editar"/"Excluir" funcionando ao clicar no
+dia.
+
+**Testes de regressão** em `calendarioOperacionalLogic.test.js`: sem
+recorrência não repete; semanal repete no dia da semana certo; quinzenal
+a cada 14 dias; mensal repete no mesmo dia do mês **inclusive virada de
+ano** (nov→dez→jan); mensal com início dia 31 **não ocorre em meses sem
+dia 31** (fevereiro incluído, checado todos os 28 dias); anual repete no
+mesmo dia/mês; anual iniciado em 29/02 só ocorre em anos bissextos
+(checado que fevereiro de um ano não-bissexto não bate em nenhum dia);
+não aparece antes da data de início.
+
+### Escopo do Calendário confirmado
+
+- **Recorrência mensal/anual "existe"** tanto para `eventos_operacionais`
+  (agora, via BB-14) quanto para `rotinas` (o motor `matchesRotinaRecurrence`
+  já suportava, só nunca exposto na UI — ver Rodada 3/BB-10: `RotinaForm.jsx`
+  só oferece diária/semanal ao usuário). Não estendi o formulário de
+  Rotinas para mensal/anual nesta rodada — é uma mudança de formulário/UX,
+  não um bug, e o pedido específico desta rodada era o Calendário.
+- Navegação mensal/anual (botões Anterior/Próximo/Hoje, toggle Mensal/Anual)
+  testada visualmente sem erro em julho→agosto.
+- Conclusão/reabertura/reagendamento de rotinas a partir do calendário:
+  **não existe** — o calendário é somente leitura para eventos de rotina
+  (`event.raw` só é populado para `source === 'operacional'`; rotinas e
+  sanitário não têm Editar/Excluir no card). Ações de conclusão continuam
+  precisando ser feitas em Rotinas da Equipe/Sanidade diretamente. Não é
+  bug (nunca existiu), mas é uma limitação real do "fluxo único" que a
+  seção pedia testar.
+- **NÃO testado nesta rodada:** duplicidade ao criar dois eventos na
+  mesma data/mesmo título, refresh no meio da edição, botão voltar do
+  navegador.
+
+### Cobertura atualizada
+
+```
+Calendário: recorrência de eventos operacionais corrigida e testada (mensal/anual, incluindo
+  dia 31 e virada de ano, via testes unitários + 1 caso ao vivo). Navegação mensal/anual sem
+  erro visual. NÃO testado: duplicidade de cadastro, refresh, botão voltar, conclusão/
+  reagendamento a partir do calendário (não existe — confirmado como limitação, não bug)
+```
+
+P0 abertos: 0
+P1 abertos: 0 (BB-14 corrigido e confirmado ao vivo)
