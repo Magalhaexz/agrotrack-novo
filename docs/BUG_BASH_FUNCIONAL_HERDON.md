@@ -725,3 +725,56 @@ Telegram: auditoria de código completa (sem o bug do BB-17, permissão reaprove
 
 P0 abertos: 0
 P1 abertos: 0
+
+## Rodada 10 — Todas as rotas
+
+### Mapeamento (código)
+
+Diff programático entre `pageMap`+`publicPageMap` (App.jsx, 41+4 = 45
+páginas) e `pageRouteMap` (routes.js, 45 rotas): **correspondência
+exata nos dois sentidos** — nenhuma página sem rota, nenhuma rota sem
+página. Confirma que o fix da Sprint 20 (pageRouteMap tinha só 6/39)
+se manteve — nenhuma regressão nas páginas adicionadas desde então.
+
+### Validado ao vivo
+
+| Fluxo | Resultado |
+| ----- | --------- |
+| URL direta (`/sanitario`, sem passar pelo menu) | Carrega a página correta, sessão preservada |
+| Refresh na mesma URL | Permanece na mesma página (`/sanitario` → título "Sanitário / Manejo" depois do reload) |
+| Navegar (Sanidade → Tarefas via menu) | URL atualiza para `/tarefas` |
+| Botão voltar do navegador | Volta para `/sanitario` **dentro do app** — não sai do HERDON (bug histórico confirmado corrigido) |
+| Botão avançar do navegador | Retorna para `/tarefas` corretamente |
+| Rota inexistente (`/esta-rota-nao-existe`) | Conteúdo cai para o Dashboard (Painel Geral), sem tela branca, sem erro |
+| Troca de fazenda em `/suplementacao` | Permanece em `/suplementacao`, "Fazenda ativa" atualiza para a nova fazenda — não bounce para o Dashboard |
+
+### Achado P3 (cosmético, não corrigido)
+
+Em rota inexistente, o **conteúdo** cai corretamente para o Dashboard,
+mas a **URL na barra do navegador continua mostrando a rota inválida**
+(`getPageFromPathname` não chama `history.replaceState` no fallback).
+Sem impacto funcional (um refresh nessa URL continua caindo no
+Dashboard, nunca quebra) — só um descompasso cosmético entre URL e
+conteúdo exibido. Não corrigido nesta rodada por ser P3 e o tempo já
+investido nas rodadas anteriores.
+
+### Não testado nesta rodada
+
+Cada uma das 45 rotas individualmente (testados ~6 como amostra
+representativa da mecânica genérica de roteamento, não checklist
+página a página); sessão expirada durante navegação direta; logout e
+retorno pelo login; comportamento mobile do botão voltar (gesto, não
+testado — ver Rodada 11).
+
+### Cobertura atualizada
+
+```
+Rotas: mapeamento página↔rota 100% (45/45) confirmado por código. Mecânica de navegação
+  (URL direta, refresh, voltar, avançar, rota inválida, troca de fazenda) validada ao vivo
+  numa amostra de 6 rotas — mecanismo genérico, não específico por página, então a amostra
+  cobre a lógica compartilhada por todas as 45. 1 achado P3 cosmético (URL não corrige em
+  rota inválida), não corrigido.
+```
+
+P0 abertos: 0
+P1 abertos: 0
