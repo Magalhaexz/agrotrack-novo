@@ -223,3 +223,85 @@ P1 abertos: 0 dos corrigidos (BB-07, BB-08, BB-10, BB-11 corrigidos e confirmado
   Central de Alertas for testada. Achado de produto NÃO resolvido (não é código): campo
   Funcionário obrigatório em Rotinas sem caminho de UI para cadastro numa conta nova.
 ```
+
+## Rodada 4 — Central de Alertas (utils/alerts.js, hojeNaFazenda.js)
+
+### Nota importante: drift de relógio real durante a sessão
+
+No meio desta rodada, o relógio real da máquina avançou de 13/07/2026 para
+**14/07/2026** (a sessão já durava várias horas). Isso inicialmente pareceu
+um bug novo — "QA-Bug-Bash tarefa vence hoje" (criada com vencimento
+13/07) passou a aparecer como atrasada no Dashboard e na Central de
+Alertas. **Não é bug**: a tarefa foi criada "para hoje" quando hoje era
+13/07; um dia real se passou, então ela está genuinamente vencida agora.
+Registrado aqui para não ser confundido com regressão numa futura sessão,
+e porque o restante das validações desta rodada usa "hoje" real (14/07),
+não a data desta rodada anterior.
+
+### BB-12 — `utils/alerts.js` misturava datas âncoradas em UTC com zeragem de hora local (P1)
+
+**Causa:** `parseISODate()` convertia a data civil corretamente (via
+`toDateKey`, já corrigido no BB-07) para um instante `Date.UTC(...)` — mas
+a função `zerarHora()`, chamada em cima desse resultado em quase toda
+função do arquivo (`diferencaEmDias`, `recorrenciaValeNaData`), fazia
+`new Date(instanteUTC)` seguido de `.setHours(0,0,0,0)` (hora **local**).
+Meia-noite UTC de um dia civil corresponde a 21h do dia anterior em
+America/Sao_Paulo; zerar a hora localmente nesse instante empurra a data
+para o dia anterior — um shift de um dia, **sistemático, não só à noite**
+(diferente do BB-07/BB-08, que só apareciam numa janela de horário). Isso
+afetava praticamente todo o arquivo: validade de estoque, manejo
+sanitário, tarefas avulsas (rotinas), pesagem, saída de lote e vencimento
+financeiro — qualquer item "vencendo hoje" aparecia como "vencido".
+
+**Correção:** reescrito para o padrão canônico já estabelecido nesta
+sessão — `hojeLocalISO()` para "hoje" e `daysBetween(hojeStr, dataString)`
+para toda diferença de dias, sem nenhum objeto `Date` intermediário na
+lógica de comparação. `parseISODate`/`zerarHora`/`diferencaEmDias`/
+`formatarDataISO` foram removidas (mortas após a reescrita); mantida só
+uma função `dataOrdenavel()` para o campo `data_sort` (usado apenas para
+ordenar a lista final, não para nenhuma comparação de vencimento).
+
+**Validação ao vivo:** criado um manejo sanitário real com "próxima dose"
+= hoje (14/07/2026). Antes do fix este teria caído em "vencido"; depois
+do fix, tanto a Central de Alertas (`gerarAlertasUnificados`, que já
+usava `toDateKey` corrigido) quanto o badge de notificações do cabeçalho
+(`buildAlerts`, o arquivo corrigido aqui) contaram o item corretamente —
+badge foi de 8 para 9 alertas pendentes, Central de Alertas mostrou
+"Vence Hoje · 14/07/2026 · vacina do QA-Lote Confinamento vence hoje".
+
+**Testes de regressão adicionados** em `alerts.test.js`: manejo sanitário
+hoje → aviso (não vencido); despesa vencendo hoje → aviso; rotina avulsa
+hoje → "pendente hoje" (não atrasada); rotina recorrente diária → vale
+hoje; saída de lote hoje → "próxima" (não vencida); lote pesado hoje →
+não entra em "pesagem pendente". Todos usam `hojeLocalISO()` real (dia 0
+relativo), não uma data fixa, para travar exatamente o limite que
+quebrava antes.
+
+### BB-13 — `hojeNaFazenda.js`: dias sem pesagem calculado por aritmética de instante (P2)
+
+**Causa:** `listarLotesSemPesagemRecente()` calculava
+`(new Date() - new Date(ultima_pesagem)) / msPorDia` — aritmética de
+milissegundos entre dois instantes, não contagem de dias civis. Diferente
+dos outros achados desta sessão, o impacto prático é pequeno (limiar de
+30 dias, o erro máximo é de algumas horas), mas é a mesma classe de bug
+pedida na auditoria e o arquivo já tinha `hojeIso()`/`daysBetween`
+disponíveis e não os usava nesta função.
+
+**Correção:** reescrito para `daysBetween(lote.ultima_pesagem, hojeIso())`.
+
+**Teste de regressão:** lote pesado exatamente hoje não pode aparecer em
+"sem pesagem recente" (antes, dependendo do horário, um resto de hora
+podia empurrar o resultado para "1 dia sem pesar").
+
+### Cobertura atualizada
+
+```
+Central de Alertas: corrigida e validada ao vivo (BB-12) — Dashboard ("Prioridades de hoje" /
+  "Alertas importantes"), página Central de Alertas (gerarAlertasUnificados) e badge do
+  cabeçalho (buildAlerts) comparados entre si e conferidos consistentes para o mesmo evento
+  criado nesta rodada. NÃO testado: mudança de mês/ano (só validado no "hoje" real da sessão),
+  Telegram e relatório diário ainda não comparados (ver pendências)
+```
+
+P0 abertos: 0
+P1 abertos: 0 (BB-12 corrigido e confirmado ao vivo). BB-13 é P2 (baixo impacto prático).
