@@ -6,14 +6,13 @@ import {
   classificarScore,
   listarSaudeLotes,
 } from './saudeLote.js';
+import { hojeLocalISO } from './dataCivil.js';
 
 // GMD e peso alvo dependem de getResumoLote/calcLote, que usam a data REAL do
 // sistema (não recebem `agora` injetado) — mesmo padrão já usado em
 // alertasInteligentes.test.js/hojeNaFazenda.test.js.
 function diasAtras(dias) {
-  const data = new Date();
-  data.setDate(data.getDate() - dias);
-  return data.toISOString().slice(0, 10);
+  return hojeLocalISO(new Date(Date.now() - dias * 864e5));
 }
 
 // Pesagem/tarefa/sanidade/estoque/custo/mortalidade recebem `agora` explícito.

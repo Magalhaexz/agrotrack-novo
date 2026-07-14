@@ -2,13 +2,12 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { gerarResumoRelatorioLote } from './relatorioLote.js';
 import { gerarResumoLoteTexto } from './whatsappResumo.js';
+import { hojeLocalISO } from './dataCivil.js';
 
 // GMD/peso alvo dependem de getResumoLote/calcLote (data REAL do sistema) —
 // mesmo padrão de saudeLote.test.js/alertasInteligentes.test.js.
 function diasAtras(dias) {
-  const data = new Date();
-  data.setDate(data.getDate() - dias);
-  return data.toISOString().slice(0, 10);
+  return hojeLocalISO(new Date(Date.now() - dias * 864e5));
 }
 
 const AGORA = new Date('2026-07-02T12:00:00Z');

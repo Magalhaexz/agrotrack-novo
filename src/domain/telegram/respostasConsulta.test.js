@@ -10,11 +10,12 @@ import {
   formatarPesagens,
   formatarResumo,
 } from './respostasConsulta.js';
+import { hojeLocalISO } from '../dataCivil.js';
 
-const hojeIso = new Date().toISOString().slice(0, 10);
-const ontem = new Date(Date.now() - 864e5).toISOString().slice(0, 10);
-const amanha = new Date(Date.now() + 864e5).toISOString().slice(0, 10);
-const anoPassado = new Date(Date.now() - 400 * 864e5).toISOString().slice(0, 10);
+const hojeIso = hojeLocalISO();
+const ontem = hojeLocalISO(new Date(Date.now() - 864e5));
+const amanha = hojeLocalISO(new Date(Date.now() + 864e5));
+const anoPassado = hojeLocalISO(new Date(Date.now() - 400 * 864e5));
 
 function db() {
   return {

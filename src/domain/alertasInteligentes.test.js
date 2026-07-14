@@ -10,15 +10,14 @@ import {
   detectarCustoAcimaDoPrevisto,
   gerarAlertasPriorizados,
 } from './alertasInteligentes.js';
+import { hojeLocalISO } from './dataCivil.js';
 
 // GMD e peso alvo passam por getResumoLote/calcLote, que usam a data REAL do
 // sistema como referência (não recebem `agora` injetado) — por isso essas
 // datas são relativas a `new Date()`, igual ao padrão já usado em
 // hojeNaFazenda.test.js.
 function diasAtras(dias) {
-  const data = new Date();
-  data.setDate(data.getDate() - dias);
-  return data.toISOString().slice(0, 10);
+  return hojeLocalISO(new Date(Date.now() - dias * 864e5));
 }
 
 // Estoque/tarefas/sanidade/custo recebem `agora` explícito — usamos uma data

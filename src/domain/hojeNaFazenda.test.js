@@ -11,11 +11,10 @@ import {
   listarLotesSemPasto,
   listarLotesSemPesagemRecente,
 } from './hojeNaFazenda.js';
+import { hojeLocalISO } from './dataCivil.js';
 
 function diasAtras(dias) {
-  const data = new Date();
-  data.setDate(data.getDate() - dias);
-  return data.toISOString().slice(0, 10);
+  return hojeLocalISO(new Date(Date.now() - dias * 864e5));
 }
 
 // ─── conta vazia ────────────────────────────────────────────────────────────

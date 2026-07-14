@@ -1,6 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { gerarAlertasUnificados } from './alertasUnificados.js';
+import { hojeLocalISO } from './dataCivil.js';
 
 const AGORA = new Date('2026-07-10T12:00:00Z');
 
@@ -210,9 +211,7 @@ test('gerarAlertasUnificados alerta financeiro vencido traz dataReferencia e lot
   // não a opção `agora` — por isso este teste usa uma data relativa ao
   // "agora" real do momento em que os testes rodam, não à data fixa AGORA
   // usada no restante deste arquivo.
-  const ontem = new Date();
-  ontem.setDate(ontem.getDate() - 3);
-  const dataVencimento = ontem.toISOString().slice(0, 10);
+  const dataVencimento = hojeLocalISO(new Date(Date.now() - 3 * 864e5));
 
   const db = {
     lotes: [{ id: 9, nome: 'Lote Frete' }],

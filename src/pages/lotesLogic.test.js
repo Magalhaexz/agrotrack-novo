@@ -1,6 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { buildGrupoAnimaisAutoPatch, buildPesagemInicialPatch, buildAjusteLotacaoPatch, deveAvisarSaldoPositivoAoFinalizar, loteEstaBloqueado } from './lotesLogic.js';
+import { hojeLocalISO } from '../domain/dataCivil.js';
 
 // Sprint 37.1: editar um lote (ex.: cabeças) não atualizava o grupo
 // correspondente em `animais` criado automaticamente no cadastro (Sprint 35),
@@ -57,7 +58,7 @@ test('buildPesagemInicialPatch retorna null sem peso de entrada informado', () =
 
 test('buildPesagemInicialPatch cai para a data de hoje quando o lote não tem entrada', () => {
   const patch = buildPesagemInicialPatch({ id: 21, p_ini: 300 });
-  assert.equal(patch.data, new Date().toISOString().slice(0, 10));
+  assert.equal(patch.data, hojeLocalISO());
 });
 
 // Ajuste de lotação: correção administrativa da contagem, distinta de venda/

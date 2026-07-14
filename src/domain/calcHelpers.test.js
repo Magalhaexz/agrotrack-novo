@@ -1,6 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { calcularDiasNoLote, daysBetween } from './calcHelpers.js';
+import { hojeLocalISO } from './dataCivil.js';
 
 // --- calcularDiasNoLote (F-03) ---
 
@@ -25,7 +26,7 @@ test('calcularDiasNoLote retorna 0 quando referência é anterior à entrada', (
 
 test('calcularDiasNoLote usa data atual quando dataReferencia não fornecida', () => {
   const past = '2000-01-01';
-  const today = new Date().toISOString().slice(0, 10);
+  const today = hojeLocalISO();
   assert.equal(calcularDiasNoLote(past), daysBetween(past, today));
 });
 

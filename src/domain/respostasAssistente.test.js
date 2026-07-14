@@ -5,13 +5,12 @@ import {
   listarPerguntasAssistente,
   avaliarProntidaoAssistente,
 } from './respostasAssistente.js';
+import { hojeLocalISO } from './dataCivil.js';
 
 // GMD depende de getResumoLote/calcLote, que usa a data REAL do sistema (não
 // recebe `agora` injetado) — mesmo padrão de saudeLote.test.js/relatorioLote.test.js.
 function diasAtras(dias) {
-  const data = new Date();
-  data.setDate(data.getDate() - dias);
-  return data.toISOString().slice(0, 10);
+  return hojeLocalISO(new Date(Date.now() - dias * 864e5));
 }
 
 // Demais funções (sanidade, tarefas, estoque, custo) recebem `agora` explícito.

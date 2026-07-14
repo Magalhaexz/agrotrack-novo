@@ -1,11 +1,10 @@
 import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
 import { buildAlerts } from './alerts.js';
+import { hojeLocalISO } from '../domain/dataCivil.js';
 
 function isoRelativo(dias) {
-  const d = new Date();
-  d.setDate(d.getDate() + dias);
-  return d.toISOString().slice(0, 10);
+  return hojeLocalISO(new Date(Date.now() + dias * 864e5));
 }
 
 const ONTEM = isoRelativo(-1);
