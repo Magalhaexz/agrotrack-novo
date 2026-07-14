@@ -1122,6 +1122,16 @@ export function buildOperationalCreatePayload(table, record, userId) {
   // silenciosamente, sem toast, porque o erro nunca chegava ao usuário.
   const safe = sanitizeRecord(record);
   delete safe.id;
+  // Campos `*_id` (lote_id, fazenda_id, responsavel_id...) são bigint no
+  // banco. Formulários deixam esses selects opcionais em '' quando "Não
+  // definido"/"Sem lote" é escolhido, e Postgres rejeita '' para bigint com
+  // 22P02 — bloqueando o cadastro inteiro mesmo quando o campo é opcional.
+  // cloud_id é a única exceção nesse padrão (é uuid, não bigint).
+  Object.keys(safe).forEach((key) => {
+    if (key !== 'cloud_id' && key.endsWith('_id') && safe[key] === '') {
+      safe[key] = null;
+    }
+  });
   if (tableSupportsOwnerScope(normalizedTable)) {
     return {
       ...safe,

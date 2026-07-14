@@ -8,6 +8,8 @@ import Input from '../components/ui/Input'; // Importar o componente Input
 import { useToast } from '../hooks/useToast'; // Assumindo que você tem um hook de toast
 import { useSubmitOnce } from '../hooks/useSubmitOnce.js';
 import { useAuth } from '../auth/useAuth';
+import { daysBetween } from '../domain/calcHelpers.js';
+import { hojeLocalISO } from '../domain/dataCivil.js';
 import {
   createOperationalRecord,
   deleteOperationalRecord,
@@ -529,11 +531,7 @@ function formatDate(dateStr) {
  */
 function isOverdue(dateStr) {
   if (!dateStr) return false;
-  const today = new Date();
-  today.setHours(0, 0, 0, 0);
-  const due = new Date(dateStr);
-  due.setHours(0, 0, 0, 0);
-  return due < today;
+  return daysBetween(hojeLocalISO(), dateStr) < 0;
 }
 
 function resolveBucket(task) {
@@ -561,19 +559,11 @@ function parseSnoozeOption(option, fallbackDate) {
  */
 function isInPeriodo(dateStr, periodo) {
   if (!dateStr) return false;
-  const date = new Date(dateStr);
-  const now = new Date();
-  now.setHours(0, 0, 0, 0);
-  date.setHours(0, 0, 0, 0);
+  const diffDias = daysBetween(hojeLocalISO(), dateStr);
 
-  if (periodo === 'hoje') return date.getTime() === now.getTime();
-  if (periodo === 'semana') {
-    const limit = new Date(now);
-    limit.setDate(now.getDate() + 7);
-    limit.setHours(0, 0, 0, 0); // Ensure limit is also at start of day
-    return date >= now && date <= limit;
-  }
-  if (periodo === 'atrasadas') return date < now;
+  if (periodo === 'hoje') return diffDias === 0;
+  if (periodo === 'semana') return diffDias >= 0 && diffDias <= 7;
+  if (periodo === 'atrasadas') return diffDias < 0;
   return true;
 }
 
