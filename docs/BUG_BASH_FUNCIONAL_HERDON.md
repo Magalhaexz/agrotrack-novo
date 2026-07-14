@@ -526,3 +526,119 @@ Suplementação: planejamento/estimativa/realizado testados de ponta a ponta (ca
 
 P0 abertos: 0
 P1 abertos: 0 (BB-15, BB-16 corrigidos e confirmados ao vivo)
+
+## Rodada 8 — Assinatura e planos por perfil
+
+### Metodologia
+
+Testado com duas contas reais logadas de fato (não simulação): a conta QA
+proprietária e `qa-bugbash-teammate@example.com`, já convidada como membro
+da equipe em rodada anterior. Senha de ambas redefinida via SQL
+(`crypt()`/`gen_salt('bf')` em `auth.users`) **com autorização explícita do
+usuário para cada conta**, dado que a ação foi barrada uma vez pelo
+classificador de permissões (categoria "Secret Store Writes") até a
+autorização ser concedida. Troca de papel do membro da equipe feita pela
+própria tela "Equipe" da aplicação (dropdown + modal de confirmação), não
+por SQL — uma tentativa de alterar `profiles.perfil` direto via SQL foi
+também barrada pelo classificador (mudança de RBAC fora do fluxo do app) e
+abandonada em favor do fluxo real da UI.
+
+### BB-17 — Membro convidado de Equipe via qualquer papel via não via nenhum dado da conta (P0)
+
+**Reprodução:** logar como `qa-bugbash-teammate@example.com` (visualizador
+confirmado na tela Equipe da conta QA, `owner_user_id` correto no banco).
+Esperado: ver os dados da conta QA em modo leitura. Obtido: Dashboard
+mostra "Nenhuma fazenda cadastrada", 0 fazendas/pastos/lotes/cabeças — a
+conta inteira aparece vazia, como se fosse uma conta nova, para um usuário
+que a própria aplicação lista como membro ativo dela.
+
+**Investigação:** confirmado que RLS estava correta (`fazendas_select_same_account`
+usa `app_is_same_account(owner_user_id)`, que resolve corretamente via
+`profiles.owner_user_id`) e que o registro em `profiles` também estava
+correto (`owner_user_id` do teammate aponta para o id da conta QA). A
+causa estava no cliente: `useOperationalData.js` monta a query de cada
+tabela operacional com `query.eq('owner_user_id', userId)`, onde `userId`
+era **sempre `session.user.id`** — o id de login do próprio usuário, não o
+dono da conta ativa. Para o dono da conta os dois valores coincidem (por
+isso o bug nunca apareceu nos testes anteriores, todos como proprietário);
+para qualquer membro convidado (gerente, operador ou visualizador) os
+valores divergem, e o filtro client-side restringe a busca a linhas com
+`owner_user_id = id do próprio convidado` — que não existem. O RLS
+permitiria ver os dados; o filtro do cliente os escondia antes da resposta
+chegar à tela. **Isso quebrava a funcionalidade de Equipe por inteiro**:
+nenhum membro convidado, de nenhum papel, via qualquer dado da conta que
+foi convidado a acessar.
+
+**Correção:** `useOperationalData(session, options)` agora recebe
+`options.ownerUserId` (resolvido em `App.jsx` a partir de
+`user.owner_user_id`, já calculado por `AuthContext`/`mapProfileRowToUser`
+mas nunca repassado a este hook) e usa esse valor — não mais
+`session.user.id` — no filtro de cada tabela. O id de sessão continua
+sendo usado só para as chaves de cache local/dedup (`localStorage`,
+`inFlightSnapshots`), que devem mesmo ficar por usuário logado, não por
+conta.
+
+**Validação ao vivo:** antes do fix, teammate via 0 fazendas/pastos/
+lotes/cabeças. Depois do fix, reload completo e o mesmo login mostra
+"QA-Fazenda Um", 2 fazendas, 2 pastos, 1 lote, 50 cabeças, todos os
+alertas — os mesmos dados que o proprietário vê. Confirmado também com o
+papel trocado para gerente (dados continuam visíveis).
+
+**Sem teste de regressão automatizado:** `useOperationalData.js` é um hook
+React com estado, timers e cache em módulo (não uma função pura) — nenhum
+outro hook deste projeto tem teste automatizado (o runner é `node:test`
+sobre funções puras, sem React Testing Library configurada). Introduzir
+esse tipo de teste só para este hook seria montar uma infraestrutura nova
+no meio de um bug fix, não escrever um teste de regressão proporcional.
+Optei por validar com o padrão mais forte disponível — login real como
+dois usuários diferentes, três papéis, antes/depois do fix, com reload
+completo — em vez de forçar um teste automatizado de baixo valor.
+
+### BB-18 — Papel "Gerente" não tinha nenhuma permissão de Suplementação (P1)
+
+**Reprodução:** logado como teammate com papel gerente, o menu "Campo e
+Rebanho" não mostra "Nutrição e Suplementação" — item ausente, não
+apenas bloqueado.
+
+**Causa:** `permissoesPorPerfil[GERENTE]` em `src/auth/perfis.js` não
+tinha `suplementacao:ver`/`suplementacao:editar`, enquanto **operador e
+visualizador — os dois papéis de privilégio menor — tinham ambos**
+(visualizador só o `:ver`). Gerente, descrito na própria tela Equipe como
+quem "gerencia a operação", ficava sem acesso a um módulo operacional que
+um operador comum tinha — inversão da hierarquia de privilégio esperada.
+
+**Correção:** adicionado `suplementacao:ver`/`suplementacao:editar` à
+lista de permissões de gerente (mesmo nível de operador).
+
+**Validação ao vivo:** com o teammate como gerente, antes do fix "Nutrição
+e Suplementação" ausente do menu; depois do fix (mesma sessão, sem
+recarregar login), o item aparece corretamente entre "Pastos" e
+"Sanidade".
+
+### Confirmado sem bug: gate de rota de Assinatura por perfil
+
+`MinhaAssinaturaPage.jsx` não tem nenhuma checagem de permissão própria no
+componente — mas a rota (`RotaProtegida`) exige `assinatura:gerenciar`,
+presente só no perfil proprietário (`['*']`); gerente/operador/
+visualizador explicitamente não têm essa chave (comentário no próprio
+`perfis.js`, Sprint 6). Confirmado ao vivo: com o teammate como
+visualizador e depois como gerente, o item "Planos e Assinatura" **não
+aparece** no menu "Gestão" em nenhum dos dois papéis (só Fazendas/
+Sincronização/Perfil para visualizador; +Importação/Configurações para
+gerente) — sem tela branca, sem erro, o item simplesmente não é oferecido.
+Operador não testado ao vivo nesta rodada (mesmo trecho de código exclui
+os três papéis de forma idêntica, evidência de código suficiente dado o
+tempo já investido nesta rodada).
+
+### Cobertura atualizada
+
+```
+Assinatura: gate de rota confirmado correto por perfil (proprietário único a ver "Planos e
+  Assinatura"). BB-17 (P0, visibilidade de dados para qualquer membro convidado) e BB-18 (P1,
+  gerente sem Suplementação) corrigidos e confirmados ao vivo com troca de papel real via UI.
+  NÃO testado: trial/plano expirado/upgrade/downgrade/cancelamento (Asaas em sandbox, não
+  testado o fluxo de pagamento completo nesta rodada), operador ao vivo (evidência só de código)
+```
+
+P0 abertos: 0 (BB-17 corrigido e confirmado ao vivo)
+P1 abertos: 0 (BB-18 corrigido e confirmado ao vivo)
