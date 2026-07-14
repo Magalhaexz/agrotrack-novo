@@ -305,3 +305,74 @@ Central de Alertas: corrigida e validada ao vivo (BB-12) — Dashboard ("Priorid
 
 P0 abertos: 0
 P1 abertos: 0 (BB-12 corrigido e confirmado ao vivo). BB-13 é P2 (baixo impacto prático).
+
+## Rodada 5 — Bloqueio de Funcionário em Rotinas (BM-25)
+
+### Mapeamento antes de alterar (pedido explícito antes de qualquer fix)
+
+- **Por que `FuncionariosPage` foi tirada do menu:** commit `2f3ca29`
+  ("chore(nav): reorganize sidebar groups"), sem justificativa na mensagem
+  do commit. A decisão já estava sinalizada antes disso, na Sprint 13
+  (`docs/FASE0_NAVEGACAO_SIDEBAR_HERDON.md`): "'Equipe' existe como duas
+  páginas diferentes... reorganizar sem decidir qual sobrevive só move a
+  confusão de lugar." Documentada como pendência **BM-25** em
+  `docs/HERDON_BACKLOG_MESTRE.md`, reafirmada na Sprint 18
+  (`docs/SPRINT18_NAVEGACAO_UX_PAGINAS_ORFAS.md`): "Mantida oculta (sem
+  mudança)... decisão de produto necessária (aposentar ou migrar dados) —
+  não é uma remoção segura de código morto." Ou seja: **já era um achado
+  conhecido e deliberadamente adiado por 3+ sprints**, não uma descoberta
+  nova desta sessão.
+- **Qual entidade substituiu Funcionário:** nenhuma. `EquipePage.jsx`
+  ("Equipe e Acessos") gerencia contas de usuário com login (papéis
+  proprietário/gerente/operador/visualizador via `profiles`/convites) —
+  um conceito totalmente diferente de "funcionário" (registro de
+  colaborador de campo: nome, CPF, cargo, salário, admissão). As duas
+  tabelas nunca foram cruzadas em nenhum lugar do código.
+- **Se Equipe deveria alimentar o select:** não, sem uma decisão de
+  produto para fundir as duas entidades — misturar "conta com login" e
+  "colaborador de campo" silenciosamente seria uma mudança de modelo de
+  dados, não um bug fix.
+- **Se o campo deveria continuar obrigatório:** não. `rotinas.funcionario_id`
+  **não tem `NOT NULL`** no schema (`docs/supabase-production-schema.sql`)
+  — a obrigatoriedade era só uma validação de frontend em
+  `RotinaForm.jsx`. Nenhuma razão de integridade de dados para mantê-la.
+- **Se registros antigos dependem de `funcionario_id`:** `utils/alerts.js`,
+  `DashboardPage.jsx`, `CalendarioOperacionalPage.jsx` e `SanitarioPage.jsx`
+  também leem `funcionarios`, mas todos já tratam ausência com fallback
+  (`|| 'Sem responsável'`/`'—'`) — nenhum outro campo obrigatório dependia
+  disso além do `RotinaForm.jsx`.
+
+### Solução escolhida: Opção C — tornar o campo opcional
+
+Não escolhi a Opção A (reabrir `FuncionariosPage` no menu) nem a Opção B
+(migrar para Equipe) porque ambas são exatamente a decisão de produto que
+já foi adiada deliberadamente 3 vezes ("aposentar ou migrar dados" —
+BM-25) — não é uma chamada que corrija sozinho no meio de um bug bash.
+A Opção C resolve o bloqueio real (conta nova não consegue usar Rotinas
+de jeito nenhum) sem tocar nessa decisão pendente, é segura no banco (sem
+`NOT NULL` para relaxar) e não descarta nenhum dado.
+
+**Correção:** `RotinaForm.jsx` — removida a validação
+`if (!form.funcionario_id) return 'Selecione o funcionário.'`; o payload
+agora envia `null` quando não selecionado (mesmo padrão já usado para
+`lote_id`); rótulo do campo e opção vazia trocados para "Funcionário
+(opcional)" / "Sem responsável", consistente com o padrão já usado em
+`TarefasPage.jsx`.
+
+**Validação ao vivo:** criada uma rotina avulsa sem selecionar
+funcionário — salvou, apareceu em "Tarefas para hoje" mostrando "—" no
+lugar do nome (fallback já existente), sobreviveu a reload completo.
+
+**BM-25 continua em aberto** — esta correção só remove o bloqueio
+funcional; a duplicação Funcionário × Equipe segue sendo uma decisão de
+produto pendente, agora sem urgência (não bloqueia mais nenhuma tela).
+
+### Cobertura atualizada
+
+```
+Rotinas da Equipe: bloqueio de Funcionário obrigatório resolvido (campo agora opcional) —
+  conta nova consegue usar o módulo do zero, sem depender de seed manual via SQL
+```
+
+P0 abertos: 0
+P1 abertos: 0
