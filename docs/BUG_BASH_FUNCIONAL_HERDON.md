@@ -642,3 +642,86 @@ Assinatura: gate de rota confirmado correto por perfil (proprietário único a v
 
 P0 abertos: 0 (BB-17 corrigido e confirmado ao vivo)
 P1 abertos: 0 (BB-18 corrigido e confirmado ao vivo)
+
+## Rodada 9 — Telegram (regressão por código, sem envio real de mensagem)
+
+### Limitação da ferramenta, registrada explicitamente
+
+Esta sessão não tem acesso a um cliente Telegram real, e `npm run dev`
+só sobe o Vite (frontend) — as funções serverless em `api/*.js`
+(`telegram-webhook.js`, `_telegramBot.js`) não ficam expostas por um
+servidor local (não há `vercel dev` configurado neste projeto), então
+não foi possível enviar uma mensagem real ao bot e conferir a resposta
+na tela, como as rodadas anteriores fizeram para todo o resto. Em vez
+de pular a seção, fiz uma auditoria de código dirigida às mesmas
+perguntas do item 6 do sprint, apoiada na suíte de testes já existente
+(`api/_telegramBot.test.js`, `api/_telegramConnections.test.js`,
+`src/domain/telegram/*.test.js` — todos já passam, confirmados na
+rodada de `npm test` desta sessão).
+
+### Verificado por código: sem o mesmo bug do BB-17
+
+Dado que BB-17 (Rodada 8) era sobre o app confundir "usuário logado"
+com "dono da conta", conferi especificamente se o Telegram tem o mesmo
+problema — não tem. `api/telegram-gerar-codigo.js` já resolve o dono da
+conta explicitamente antes de gravar a conexão:
+```
+const ownerUserId = await resolveOwnerUserId(client, user.id);
+```
+onde `resolveOwnerUserId` busca `profiles.owner_user_id` (mesmo padrão
+da correção do BB-17, só que já existia aqui). `api/_herdonDb.js`
+(`montarDbDaConta`) recebe esse `owner_user_id` já resolvido como
+parâmetro explícito, nunca deriva de sessão — o comentário do próprio
+arquivo já dizia "nunca lê outra conta". `api/_telegramBot.js` usa
+`conexao.owner_user_id` (o valor gravado na conexão, resolvido no
+momento do pareamento) em toda leitura/escrita — 13 ocorrências
+conferidas, nenhuma usa o id do usuário conectado para filtrar dados
+da conta.
+
+### Verificado por código: permissão por perfil não é uma segunda fonte de verdade
+
+`src/domain/telegram/permissoesTelegram.js` reusa `perfilTemPermissao`
+de `auth/perfis.js` — a mesma matriz corrigida no BB-18 desta sessão —
+em vez de duplicar a lógica de permissão para o bot. Intenções
+mutáveis (transferir animais, renomear lote, registrar pesagem,
+cadastrar despesa/receita, registrar entrada de estoque) são todas
+mapeadas para a permissão de escrita equivalente do app; visualizador
+nunca tem `*:editar`/`*:movimentar`, então fica automaticamente
+bloqueado sem lógica própria a manter sincronizada.
+
+### Verificado por código: mesma fonte de dados que o app
+
+`montarDbDaConta` lê as mesmas 11 tabelas
+(`fazendas, lotes, animais, pesagens, movimentacoes_financeiras,
+estoque, movimentacoes_estoque, tarefas, sanitario, pastagens,
+alertas_tratativas`) e alimenta as mesmas funções puras de domínio que
+o app usa no navegador (`gerarAlertasUnificados`,
+`gerarRelatorioDiarioTelegram` sobre o mesmo array de alertas
+unificados) — não há um segundo cálculo de saldo/peso/status para o
+bot que possa divergir do app por definição de arquitetura, não por
+teste caso a caso.
+
+### Não verificado nesta rodada (requer envio real de mensagem)
+
+Conexão/desconexão via `/start CODIGO` real, multi-fazenda por texto de
+comando, confirmação/cancelamento de um cadastro em etapas,
+comparação lado a lado do texto de resposta do bot com a tela do app
+para o mesmo lote real, erro de operação (ex.: saldo insuficiente) via
+comando de texto. A suíte de testes já existente cobre esses cenários
+de forma automatizada (relatório diário, respostas de prioridades/
+pagamentos/estoque/tarefas/lotes, transferência usando `lote.qtd`
+canônico), mas isso é diferente de mandar a mensagem e ver a resposta
+real, que é o que a Rodada 9 não conseguiu fazer.
+
+### Cobertura atualizada
+
+```
+Telegram: auditoria de código completa (sem o bug do BB-17, permissão reaproveita a matriz do
+  app, mesma fonte de dados por arquitetura) + suíte de testes já existente confirmada passando.
+  NÃO testado: envio real de mensagem/resposta do bot (sem cliente Telegram nem servidor local
+  das funções serverless nesta sessão) — nenhum bug novo encontrado, mas cobertura ao vivo real
+  continua pendente
+```
+
+P0 abertos: 0
+P1 abertos: 0
