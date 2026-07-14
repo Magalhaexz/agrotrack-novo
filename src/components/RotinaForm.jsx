@@ -78,7 +78,6 @@ function normalizarInitialData(data) {
 }
 
 function validarForm(form) {
-  if (!form.funcionario_id) return 'Selecione o funcionário.';
   if (!form.tarefa.trim()) return 'Informe a tarefa.';
 
   if (form.recorrente) {
@@ -141,7 +140,7 @@ export default function RotinaForm({
 
     setErro('');
     const baseData = {
-      funcionario_id: Number(form.funcionario_id),
+      funcionario_id: form.funcionario_id ? Number(form.funcionario_id) : null, // Sem funcionário cadastrado ainda bloqueava toda a tela (BM-25)
       lote_id: form.lote_id ? Number(form.lote_id) : null, // Usar null para "Sem lote"
       tarefa: form.tarefa.trim(),
       setor: form.setor,
@@ -221,9 +220,9 @@ export default function RotinaForm({
         {/* Funcionário e Setor */}
         <div className="grid-2">
           <label className="ui-input-wrap">
-            <span className="ui-input-label">Funcionário</span>
+            <span className="ui-input-label">Funcionário (opcional)</span>
             <select className="ui-input" name="funcionario_id" value={form.funcionario_id} onChange={handleChange}>
-              <option value="">Selecione</option>
+              <option value="">Sem responsável</option>
               {funcionarios.map((f) => (
                 <option key={f.id} value={f.id}>
                   {f.nome} — {f.funcao}
