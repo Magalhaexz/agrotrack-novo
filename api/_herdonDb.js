@@ -22,6 +22,9 @@ export const TABELAS_NECESSARIAS = [
   // Sprint 16: tratativa da Central de Alertas — sem isso, o bot mostraria
   // alertas já resolvidos/ignorados/adiados como se ainda fossem prioridade.
   'alertas_tratativas',
+  // Assistente IA (Sprint): resolução de responsável por nome ao cadastrar
+  // tarefa por linguagem natural.
+  'funcionarios',
 ];
 
 export async function montarDbDaConta(client, ownerUserId) {

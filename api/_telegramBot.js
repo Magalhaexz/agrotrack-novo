@@ -24,6 +24,8 @@ import {
   proximoCampoFaltante, mesclarDados, conversaExpirada,
   calcularExpiraEm as calcularExpiraConversa, STATUS_CONVERSA,
 } from '../src/domain/telegram/conversas.js';
+import { obterFerramenta } from '../src/domain/telegram/telegramToolsRegistry.js';
+import { perfilTemPermissao } from '../src/auth/perfis.js';
 
 // Intenções que o novo bot atende; as demais (DESCONHECIDO) caem no fluxo
 // legado (Sprint 8), preservando o comportamento atual.
@@ -93,12 +95,12 @@ function ajuda() {
 }
 
 /** Lista numerada de candidatos para desambiguação. */
-function listaNumerada(itens, campo = 'nome') {
+export function listaNumerada(itens, campo = 'nome') {
   return itens.map((it, idx) => `${idx + 1}. ${it[campo]}`).join('\n');
 }
 
 /** Nome da fazenda ativa (selecionada ou única) para os títulos. */
-function nomeFazendaAtiva(dbConta, fazendaId) {
+export function nomeFazendaAtiva(dbConta, fazendaId) {
   const fazendas = Array.isArray(dbConta?.fazendas) ? dbConta.fazendas : [];
   if (fazendaId != null) {
     const f = fazendas.find((x) => Number(x.id) === Number(fazendaId));
@@ -107,12 +109,12 @@ function nomeFazendaAtiva(dbConta, fazendaId) {
   return fazendas.length === 1 ? fazendas[0].nome : null;
 }
 
-async function carregarPerfil(client, userId) {
+export async function carregarPerfil(client, userId) {
   const { data } = await client.from('profiles').select('perfil').eq('id', userId).maybeSingle();
   return data?.perfil || 'visualizador';
 }
 
-async function registrarAuditoria(client, conexao, dados) {
+export async function registrarAuditoria(client, conexao, dados) {
   try {
     await client.from('telegram_bot_auditoria').insert({
       owner_user_id: conexao.owner_user_id,
@@ -275,7 +277,7 @@ async function selecionarFazenda(client, conexao, fazendas, nome, textoOriginal)
 }
 
 // ── Preparar ação → operação pendente (Parte 15) ─────────────────────────────
-async function salvarOperacaoPendente(client, conexao, tipo, payload, agora) {
+export async function salvarOperacaoPendente(client, conexao, tipo, payload, agora) {
   // Cancela qualquer pendência anterior do mesmo chat antes de criar a nova.
   await client.from('telegram_operacoes_pendentes')
     .update({ status: STATUS.CANCELADA })
@@ -450,7 +452,34 @@ async function executarCadastro(client, conexao, op) {
   return `${plano.resumo[0].replace('Confirme', 'Registrado').replace(':', '.')}`;
 }
 
-async function aplicarWrites(client, conexao, writes) {
+// ── Execução de uma ferramenta do Assistente IA já confirmada ───────────────
+// Único ponto de saída das 4 ferramentas novas desta sprint E das duas ações
+// críticas existentes (transferir/renomear) quando chamadas pela IA — a
+// versão determinística delas continua usando `executarTransferencia`/
+// `executarRenomear` acima, intocadas. Mesmo padrão das demais execuções:
+// recarrega o db fresco (idempotente contra saldo desatualizado) e revalida
+// a permissão no momento da confirmação, não só na proposta.
+export async function executarFerramentaIA(client, conexao, op) {
+  const { tool: nomeFerramenta, params } = op.payload || {};
+  const ferramenta = obterFerramenta(nomeFerramenta);
+  if (!ferramenta) throw new Error('FERRAMENTA_DESCONHECIDA');
+
+  const perfil = await carregarPerfil(client, conexao.user_id);
+  if (!perfilTemPermissao(perfil, ferramenta.requiredPermission)) throw new Error('SEM_PERMISSAO');
+
+  const dbConta = await montarDbDaConta(client, conexao.owner_user_id);
+  const db = filtrarDbPorFazenda(dbConta, op.fazenda_id);
+  const plano = ferramenta.execute(db, params, { fazendaId: op.fazenda_id ?? null });
+  if (!plano.ok) throw new Error(plano.erro || 'FALHA');
+
+  await aplicarWrites(client, conexao, plano.writes);
+  await registrarAuditoria(client, conexao, {
+    acao: nomeFerramenta, intencao: nomeFerramenta, sucesso: true, dados_posteriores: params,
+  });
+  return ferramenta.formatResult(plano, { confirmado: true });
+}
+
+export async function aplicarWrites(client, conexao, writes) {
   for (const w of writes) {
     if (w.tipo === 'insert') {
       await client.from(w.tabela).insert({ owner_user_id: conexao.owner_user_id, ...w.registro });
@@ -504,6 +533,7 @@ async function confirmar(client, conexao, chatId, agora) {
     if (op.tipo_operacao === 'transferir_animais') texto = await executarTransferencia(client, conexao, op);
     else if (op.tipo_operacao === 'renomear_lote') texto = await executarRenomear(client, conexao, op);
     else if (op.tipo_operacao === 'cadastro') texto = await executarCadastro(client, conexao, op);
+    else if (op.tipo_operacao === 'ia_tool') texto = await executarFerramentaIA(client, conexao, op);
     else throw new Error('TIPO_DESCONHECIDO');
     await client.from('telegram_operacoes_pendentes').update({ status: STATUS.EXECUTADA, executado_em: new Date().toISOString() }).eq('id', op.id);
     return texto;
