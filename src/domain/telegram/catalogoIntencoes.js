@@ -37,6 +37,11 @@ export const CATALOGO_INTENCOES = {
   [INTENCOES.CADASTRAR_MANEJO]: { tipo: 'cadastro', exemplos: ['vacinei o lote Recria hoje'] },
   [INTENCOES.CADASTRAR_PLANEJAMENTO_SUPLEMENTACAO]: { tipo: 'cadastro', exemplos: ['planeje 2 kg por cabeça de ração para o lote Recria'] },
   [INTENCOES.REGISTRAR_CONSUMO_SUPLEMENTACAO]: { tipo: 'cadastro', exemplos: ['registre consumo de 80 kg de sal no lote Recria'] },
+  // Sprint Paridade 1 — Fazendas/Lotes/Pesagens/Pastagens:
+  [INTENCOES.CADASTRAR_FAZENDA]: { tipo: 'cadastro', exemplos: ['cadastre uma fazenda chamada Boa Esperança'] },
+  [INTENCOES.RENOMEAR_FAZENDA]: { tipo: 'cadastro', exemplos: ['altere o nome da Fazenda Um para Fazenda São João'] },
+  [INTENCOES.LISTAR_PASTOS]: { tipo: 'consulta', exemplos: ['quais pastos estão vazios?', '/pastos'] },
+  [INTENCOES.CONSULTAR_RESULTADO_LOTE]: { tipo: 'consulta', exemplos: ['qual o resultado do lote Recria?'] },
   [INTENCOES.CONFIRMAR]: { tipo: 'sistema', exemplos: ['/confirmar', 'confirmo'] },
   [INTENCOES.CANCELAR]: { tipo: 'sistema', exemplos: ['/cancelar', 'cancelar'] },
   [INTENCOES.AMBIGUO]: { tipo: 'sistema', exemplos: ['trocar lote 1 para lote 2'] },

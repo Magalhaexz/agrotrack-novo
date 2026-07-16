@@ -9,6 +9,7 @@ import {
   listarLotesSemPesagemRecente,
   construirHojeNaFazenda,
 } from '../hojeNaFazenda.js';
+import { calcularOcupacaoPastos } from '../ocupacaoPastos.js';
 import { toNumber } from '../calcHelpers.js';
 
 const NAO_INFORMADO = 'não informado';
@@ -208,6 +209,38 @@ export function formatarPesagens(db) {
     semPesagem.slice(0, 8).forEach((l) => linhas.push(`• ${l.nome}`));
   }
   return linhas.join('\n').trim();
+}
+
+// ── pastos ──────────────────────────────────────────────────────────────────
+export function formatarPastagens(db, { fazendaNome = null } = {}) {
+  const pastos = calcularOcupacaoPastos(db);
+  const titulo = fazendaNome ? `🌱 Pastos — ${fazendaNome}` : '🌱 Pastos';
+  if (pastos.length === 0) return `${titulo}\n\nNenhum pasto cadastrado.`;
+
+  const emoji = { vazio: '⚪', sem_dados: '⚪', ok: '🟢', atencao: '🟡', acima_capacidade: '🔴' };
+  const linhas = [titulo, ''];
+  pastos.forEach((p) => {
+    const area = p.areaHa ? `${p.areaHa} ha` : null;
+    const lotes = p.quantidadeLotes > 0 ? `${p.quantidadeLotes} lote(s), ${p.cabecasEstimadas} cabeças` : 'vazio';
+    linhas.push(`${emoji[p.status] || '⚪'} ${p.nome} — ${lotes}${area ? ` — ${area}` : ''} (${p.statusLabel})`);
+  });
+  return linhas.join('\n');
+}
+
+// ── resultado do lote ────────────────────────────────────────────────────────
+export function formatarResultadoLote(db, lote) {
+  if (!lote) return 'Lote não encontrado.';
+  const r = getResumoLote(db, lote.id);
+  return [
+    `📈 Resultado — ${lote.nome}`,
+    '',
+    `Custo total: ${toNumber(r.custoTotal) > 0 ? `R$ ${toNumber(r.custoTotal).toFixed(2)}` : NAO_INFORMADO}`,
+    `Receita total: ${toNumber(r.receitaTotal) > 0 ? `R$ ${toNumber(r.receitaTotal).toFixed(2)}` : NAO_INFORMADO}`,
+    `Lucro total: R$ ${toNumber(r.lucroTotal).toFixed(2)}`,
+    `Margem: ${r.margemPct != null ? `${toNumber(r.margemPct).toFixed(1)}%` : NAO_INFORMADO}`,
+    `Custo por @: ${toNumber(r.custoPorArroba) > 0 ? `R$ ${toNumber(r.custoPorArroba).toFixed(2)}` : NAO_INFORMADO}`,
+    `Lucro por cabeça: R$ ${toNumber(r.lucroPorCabeca).toFixed(2)}`,
+  ].join('\n');
 }
 
 // ── /resumo ─────────────────────────────────────────────────────────────────

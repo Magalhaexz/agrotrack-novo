@@ -239,3 +239,33 @@ test('prepararCadastro registrar_consumo_suplementacao baixa estoque e vincula f
   const estoqueUpdate = r.writes.find((w) => w.tabela === 'estoque');
   assert.equal(estoqueUpdate.patch.quantidade_atual, 4);
 });
+
+// ── Sprint Paridade 1: Fazendas/Lotes/Pesagens/Pastagens ────────────────────
+const dbComFazendas = () => ({ ...db(), fazendas: [{ id: 1, nome: 'Fazenda Um' }, { id: 2, nome: 'Fazenda Dois' }] });
+const ctxComFazendas = () => ({ db: dbComFazendas(), hoje: HOJE, fazendaId: 1 });
+
+test('prepararCadastro cadastrar_fazenda insere fazenda nova', () => {
+  const r = prepararCadastro(INTENCOES.CADASTRAR_FAZENDA, { nome_fazenda: 'Boa Esperança' }, ctxComFazendas());
+  assert.equal(r.ok, true);
+  assert.equal(r.tipo, 'cadastro_fazenda');
+  assert.equal(r.writes[0].tabela, 'fazendas');
+  assert.equal(r.writes[0].registro.nome, 'Boa Esperança');
+});
+
+test('cadastrar_fazenda rejeita nome vazio e duplicado', () => {
+  assert.equal(prepararCadastro(INTENCOES.CADASTRAR_FAZENDA, { nome_fazenda: '' }, ctxComFazendas()).erro, 'NOME_VAZIO');
+  assert.equal(prepararCadastro(INTENCOES.CADASTRAR_FAZENDA, { nome_fazenda: 'Fazenda Um' }, ctxComFazendas()).erro, 'NOME_DUPLICADO');
+});
+
+test('prepararCadastro renomear_fazenda resolve por nome e atualiza', () => {
+  const r = prepararCadastro(INTENCOES.RENOMEAR_FAZENDA, { fazenda_atual: 'Um', novo_nome: 'Fazenda São João' }, ctxComFazendas());
+  assert.equal(r.ok, true);
+  assert.equal(r.tipo, 'renomear_fazenda');
+  assert.equal(r.writes[0].match.id, 1);
+  assert.equal(r.writes[0].patch.nome, 'Fazenda São João');
+});
+
+test('renomear_fazenda exige fazenda e novo nome', () => {
+  assert.equal(prepararCadastro(INTENCOES.RENOMEAR_FAZENDA, { fazenda_atual: '', novo_nome: 'X' }, ctxComFazendas()).erro, 'FAZENDA_VAZIA');
+  assert.equal(prepararCadastro(INTENCOES.RENOMEAR_FAZENDA, { fazenda_atual: 'Um', novo_nome: '' }, ctxComFazendas()).erro, 'NOME_VAZIO');
+});

@@ -40,6 +40,11 @@ const PERMISSAO_POR_INTENCAO = {
   [INTENCOES.CADASTRAR_MANEJO]: 'sanitario:editar',
   [INTENCOES.CADASTRAR_PLANEJAMENTO_SUPLEMENTACAO]: 'suplementacao:editar',
   [INTENCOES.REGISTRAR_CONSUMO_SUPLEMENTACAO]: 'suplementacao:editar',
+  // Sprint Paridade 1 — Fazendas/Lotes/Pesagens/Pastagens:
+  [INTENCOES.CADASTRAR_FAZENDA]: 'fazendas:editar',
+  [INTENCOES.RENOMEAR_FAZENDA]: 'fazendas:editar',
+  [INTENCOES.LISTAR_PASTOS]: 'pastagens:ver',
+  [INTENCOES.CONSULTAR_RESULTADO_LOTE]: 'lotes:ver',
 };
 
 // Cadastros que abrem conversa em etapas (slot-filling) quando falta dado.
@@ -52,6 +57,7 @@ const INTENCOES_CADASTRO = new Set([
   INTENCOES.REGISTRAR_VENDA, INTENCOES.REGISTRAR_MORTE, INTENCOES.FINALIZAR_LOTE,
   INTENCOES.CADASTRAR_MANEJO, INTENCOES.CADASTRAR_PLANEJAMENTO_SUPLEMENTACAO,
   INTENCOES.REGISTRAR_CONSUMO_SUPLEMENTACAO,
+  INTENCOES.CADASTRAR_FAZENDA, INTENCOES.RENOMEAR_FAZENDA,
 ]);
 
 export function intencaoEhCadastro(intencao) {

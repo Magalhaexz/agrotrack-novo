@@ -312,3 +312,50 @@ test('consumo de suplementação não colide com baixa de estoque genérica (tes
 test('registrar morte não colide com dar baixa de estoque genérico', () => {
   assert.equal(i('dar baixa em 50 kg de sal').intencao, INTENCOES.DAR_BAIXA_ESTOQUE);
 });
+
+// ── Sprint Paridade 1: Fazendas/Lotes/Pesagens/Pastagens ────────────────────
+test('cadastrar fazenda: cadastrar/criar + "fazenda"', () => {
+  for (const txt of ['Cadastre uma fazenda chamada Boa Esperança.', 'Crie a fazenda Santa Rita.']) {
+    const r = i(txt);
+    assert.equal(r.intencao, INTENCOES.CADASTRAR_FAZENDA, txt);
+    assert.equal(r.requerConfirmacao, true, txt);
+  }
+});
+
+test('renomear fazenda: altere/renomear (nunca "mudar/trocar", que já são seleção)', () => {
+  for (const txt of ['Altere o nome da Fazenda Um para Fazenda São João.', 'Renomeie a fazenda Santa Rita para Fazenda Nova.']) {
+    const r = i(txt);
+    assert.equal(r.intencao, INTENCOES.RENOMEAR_FAZENDA, txt);
+    assert.equal(r.requerConfirmacao, true, txt);
+  }
+});
+
+test('renomear fazenda não colide com trocar/selecionar fazenda', () => {
+  assert.equal(i('Trocar para a Fazenda Dois.').intencao, INTENCOES.SELECIONAR_FAZENDA);
+  assert.equal(i('Mudar para a fazenda Dois.').intencao, INTENCOES.SELECIONAR_FAZENDA);
+});
+
+test('listar pastos: consulta', () => {
+  for (const txt of ['Quais pastos estão vazios?', '/pastos', 'listar pastos', 'meus pastos']) {
+    assert.equal(i(txt).intencao, INTENCOES.LISTAR_PASTOS, txt);
+  }
+  assert.equal(i('/pastos').requerConfirmacao, false);
+});
+
+test('listar pastos não colide com cadastrar/trocar pasto', () => {
+  assert.equal(i('Cadastre o Pasto Norte com 18 hectares.').intencao, INTENCOES.CADASTRAR_PASTO);
+  assert.equal(i('Mova o lote Recria para o pasto Norte.').intencao, INTENCOES.TROCAR_LOTE_PASTO);
+});
+
+test('consultar resultado do lote: resultado/margem/lucro + nome', () => {
+  const r = i('Qual o resultado do lote Recria?');
+  assert.equal(r.intencao, INTENCOES.CONSULTAR_RESULTADO_LOTE);
+  assert.equal(r.parametros.nome, 'Recria');
+  assert.equal(i('margem do lote Engorda 02').intencao, INTENCOES.CONSULTAR_RESULTADO_LOTE);
+  assert.equal(i('lucro do lote Engorda 02').intencao, INTENCOES.CONSULTAR_RESULTADO_LOTE);
+});
+
+test('resultado do lote não colide com ver_lote', () => {
+  assert.equal(i('/lote Recria').intencao, INTENCOES.VER_LOTE);
+  assert.equal(i('ver lote Recria').intencao, INTENCOES.VER_LOTE);
+});

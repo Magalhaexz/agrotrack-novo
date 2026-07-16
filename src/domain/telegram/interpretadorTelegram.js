@@ -36,6 +36,8 @@ const VOCABULARIO_BASE = [
   // Sprint de expansão do bot operacional — novos cadastros/ações:
   'venda', 'morte', 'finalizar', 'vacina', 'vermifugo', 'suplementacao',
   'planejar', 'consumo',
+  // Sprint Paridade 1 — Fazendas/Lotes/Pesagens/Pastagens:
+  'pastos', 'resultado',
 ];
 const DICIONARIO_TOLERANCIA = [...new Set([...palavrasConhecidas(), ...VOCABULARIO_BASE])];
 

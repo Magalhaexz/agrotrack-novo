@@ -43,6 +43,11 @@ export const INTENCOES = {
   CADASTRAR_MANEJO: 'CADASTRAR_MANEJO',
   CADASTRAR_PLANEJAMENTO_SUPLEMENTACAO: 'CADASTRAR_PLANEJAMENTO_SUPLEMENTACAO',
   REGISTRAR_CONSUMO_SUPLEMENTACAO: 'REGISTRAR_CONSUMO_SUPLEMENTACAO',
+  // Sprint Paridade 1 — Fazendas/Lotes/Pesagens/Pastagens:
+  CADASTRAR_FAZENDA: 'CADASTRAR_FAZENDA',
+  RENOMEAR_FAZENDA: 'RENOMEAR_FAZENDA',
+  LISTAR_PASTOS: 'LISTAR_PASTOS',
+  CONSULTAR_RESULTADO_LOTE: 'CONSULTAR_RESULTADO_LOTE',
   CONFIRMAR: 'CONFIRMAR',
   CANCELAR: 'CANCELAR',
   AMBIGUO: 'AMBIGUO',
@@ -128,6 +133,22 @@ const RE_CAD_MANEJO = /^\/?(?:vacin\w+|vermifug\w+)\b|\bmanejo\s+sanit[áa]rio\b
 // (ração/sal/suplemento/trato/proteinado) é o sinal que desambigua.
 const RE_PLANEJ_SUPL = /^\/?planej\w+\b|^\/?cadastr\w+\s+.*\balimenta[çc][ãa]o\b/i;
 const RE_CONSUMO_SUPL = /^\/?registr\w+\s+(?:o\s+)?consumo\b.*\b(?:sal|ra[çc][ãa]o|suplement\w*|trato|proteinado)\b|^\/?us(?:ei|ou|amos|ar)\b.*\b(?:sal|ra[çc][ãa]o|suplement\w*|trato|proteinado)\b|\bbaixa\s+da\s+alimenta[çc][ãa]o\b/i;
+
+// --- Sprint Paridade 1: Fazendas/Lotes/Pesagens/Pastagens ---
+// Cadastrar fazenda: verbo de criação + "fazenda", checado ANTES de
+// RE_SELECIONAR_FAZENDA na cascata (seção 3) não é necessário — os verbos
+// não colidem ("cadastrar/criar/crie" vs. "usar/selecionar/trocar/mudar").
+const RE_CAD_FAZENDA = /^\/?(?:cadastr\w+|criar?|crie)\s+(?:uma\s+|a\s+)?fazenda\b/i;
+// Renomear fazenda: verbos próprios ("altere"/"renomear"), nunca
+// "mudar"/"trocar" (esses já são o gatilho de SELECIONAR_FAZENDA).
+const RE_RENOMEAR_FAZENDA = /^\/?(?:renome\w+|altere|alterar)\s+(?:o\s+nome\s+d[ae]\s+|a\s+)?fazenda\b/i;
+// Listar pastos: consulta, mesmo padrão de RE_LISTAR_LOTES.
+const RE_LISTAR_PASTOS = /^\/?(?:pastos?|ver\s+pastos?|listar\s+pastos?|mostrar\s+pastos?|meus\s+pastos?|quais\s+(?:s[ãa]o\s+)?(?:os\s+)?(?:meus\s+)?pastos?)\b|\bpastos\b/i;
+// Resultado do lote: checado antes de VER_LOTE não é necessário (RE_VER_LOTE
+// exige que "lote" apareça logo após um prefixo de consulta específico no
+// início da frase — "resultado do lote X" nunca bate nela), mas mantido
+// antes por clareza de leitura da cascata.
+const RE_RESULTADO_LOTE = /\b(?:resultado|margem|lucro)\s+d[eo]\s+lote\s+(.+?)$/i;
 
 // --- Fazenda ---
 const RE_SELECIONAR_FAZENDA = /^\/?(?:usar|selecionar|ativar|trocar\s+para|mudar\s+para|trocar|mudar|escolher)\s+(?:a\s+|de\s+|para\s+a\s+)?fazenda\s+(.+?)$/i;
@@ -238,6 +259,8 @@ export function interpretarComandoTelegram(texto) {
   //     manejo/suplementação — checados ANTES dos cadastros genéricos de
   //     estoque (a palavra de produto/verbo específico é o sinal que
   //     desambigua "usei 3 sacos de ração" de uma baixa de estoque genérica).
+  if (RE_CAD_FAZENDA.test(t)) return intent(INTENCOES.CADASTRAR_FAZENDA, {}, true);
+  if (RE_RENOMEAR_FAZENDA.test(t)) return intent(INTENCOES.RENOMEAR_FAZENDA, {}, true);
   if (RE_CAD_LOTE.test(t)) return intent(INTENCOES.CADASTRAR_LOTE, {}, true);
   if (RE_CAD_PASTO.test(t)) return intent(INTENCOES.CADASTRAR_PASTO, {}, true);
   if (RE_REG_VENDA.test(t)) return intent(INTENCOES.REGISTRAR_VENDA, {}, true);
@@ -276,10 +299,16 @@ export function interpretarComandoTelegram(texto) {
   if (RE_PESAGENS.test(t)) return intent(INTENCOES.VER_PESAGENS);
   if (RE_RESUMO.test(t)) return intent(INTENCOES.RESUMO);
 
-  // 10. Lotes: ver um lote específico antes de listar todos.
+  // 10. Lotes: resultado (checado antes de VER_LOTE), depois ver um lote
+  //     específico antes de listar todos.
+  m = t.match(RE_RESULTADO_LOTE);
+  if (m) return intent(INTENCOES.CONSULTAR_RESULTADO_LOTE, { nome: limparNome(m[1]) });
   m = t.match(RE_VER_LOTE);
   if (m) return intent(INTENCOES.VER_LOTE, { nome: limparNome(m[1]) });
   if (RE_LISTAR_LOTES.test(t)) return intent(INTENCOES.LISTAR_LOTES);
+
+  // 10b. Pastos (consulta).
+  if (RE_LISTAR_PASTOS.test(t)) return intent(INTENCOES.LISTAR_PASTOS);
 
   // 11. Ajuda / start.
   if (RE_AJUDA.test(t)) return intent(INTENCOES.AJUDA);

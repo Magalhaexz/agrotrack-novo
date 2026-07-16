@@ -14,6 +14,7 @@ import { prepararSaidaEstoque } from './acoesEstoque.js';
 import { prepararTrocaLotePasto } from './acoesPasto.js';
 import { prepararCadastroLote } from './cadastroLote.js';
 import { prepararCadastroPasto } from './cadastroPasto.js';
+import { prepararCadastroFazenda, prepararRenomearFazenda } from './cadastroFazenda.js';
 import { prepararVendaAnimais, prepararMorteAnimais, prepararFinalizarLote } from './acoesLote.js';
 import { prepararCadastroManejo } from './cadastroManejo.js';
 import { prepararPlanejamentoSuplementacao, prepararConsumoSuplementacao } from './suplementacao.js';
@@ -256,6 +257,31 @@ export const CATALOGO_CADASTROS = {
       return { ok: true };
     },
   },
+  // ── Sprint Paridade 1: Fazendas/Lotes/Pesagens/Pastagens ──────────────────
+  [INTENCOES.CADASTRAR_FAZENDA]: {
+    tipo: 'cadastro',
+    slots: [
+      { nome: 'nome_fazenda', tipo: 'texto', pergunta: 'Qual o nome da fazenda?' },
+      { nome: 'cidade', tipo: 'opcional_texto', pergunta: 'Em qual cidade? (ou "não")', obrigatorio: false, perguntar: true },
+      { nome: 'estado', tipo: 'opcional_texto', pergunta: 'Qual o estado (UF)? (ou "não")', obrigatorio: false, perguntar: true },
+    ],
+    validar(dados) {
+      if (!String(dados.nome_fazenda || '').trim()) return erro('NOME_VAZIO');
+      return { ok: true };
+    },
+  },
+  [INTENCOES.RENOMEAR_FAZENDA]: {
+    tipo: 'cadastro',
+    slots: [
+      { nome: 'fazenda_atual', tipo: 'texto', pergunta: 'Qual fazenda você quer renomear?' },
+      { nome: 'novo_nome', tipo: 'texto', pergunta: 'Qual o novo nome?' },
+    ],
+    validar(dados) {
+      if (!String(dados.fazenda_atual || '').trim()) return erro('FAZENDA_VAZIA');
+      if (!String(dados.novo_nome || '').trim()) return erro('NOME_VAZIO');
+      return { ok: true };
+    },
+  },
 };
 
 export function slotsDoCadastro(intencao) {
@@ -282,6 +308,7 @@ export function extrairDadosIniciais(intencao, texto, ctx = {}) {
     // Sprint de expansão do bot operacional — novos cadastros/ações:
     else if (slot.nome === 'nome_lote') v = extrairNomeApos(texto, ['lote']);
     else if (slot.nome === 'nome_pasto') v = extrairNomeApos(texto, ['pasto']);
+    else if (slot.nome === 'nome_fazenda') v = extrairNomeFazenda(texto);
     else if (slot.nome === 'produto') v = extrairItemEstoque(texto);
     else if (slot.nome === 'tipo') v = extrairTipoManejo(texto);
     else if (slot.tipo === 'valor') v = extrairValor(texto);
@@ -346,6 +373,14 @@ function extrairNomeProduto(texto) {
     if (candidato) return candidato;
   }
   return null;
+}
+
+/** Nome de fazenda nova: reaproveita extrairNomeApos (mesma proteção contra
+ * capturar stopword), só remove um "chamada" opcional antes do nome. */
+function extrairNomeFazenda(texto) {
+  const bruto = extrairNomeApos(texto, ['fazenda']);
+  if (!bruto) return null;
+  return bruto.replace(/^chamada\s+/i, '').trim() || null;
 }
 
 /** Tipo de manejo sanitário: detecta o verbo/substantivo já usado na mensagem
@@ -471,6 +506,15 @@ export function prepararCadastro(intencao, dados, ctx = {}) {
     case INTENCOES.REGISTRAR_CONSUMO_SUPLEMENTACAO: {
       const plano = prepararConsumoSuplementacao(db, dados, { fazendaId: ctx.fazendaId ?? null });
       return plano.ok ? { ...plano, tipo: 'consumo_suplementacao' } : plano;
+    }
+    // ── Sprint Paridade 1: Fazendas/Lotes/Pesagens/Pastagens ────────────────
+    case INTENCOES.CADASTRAR_FAZENDA: {
+      const plano = prepararCadastroFazenda(db, { ...dados, nome: dados.nome_fazenda });
+      return plano.ok ? { ...plano, tipo: 'cadastro_fazenda' } : plano;
+    }
+    case INTENCOES.RENOMEAR_FAZENDA: {
+      const plano = prepararRenomearFazenda(db, { fazendaAtual: dados.fazenda_atual, novoNome: dados.novo_nome });
+      return plano.ok ? { ...plano, tipo: 'renomear_fazenda' } : plano;
     }
     default:
       return erro('CADASTRO_DESCONHECIDO');

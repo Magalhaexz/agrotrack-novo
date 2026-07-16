@@ -9,6 +9,8 @@ import {
   formatarManejos,
   formatarPesagens,
   formatarResumo,
+  formatarPastagens,
+  formatarResultadoLote,
 } from './respostasConsulta.js';
 import { hojeLocalISO } from '../dataCivil.js';
 
@@ -124,4 +126,29 @@ test('vazios não inventam dados', () => {
   assert.match(formatarEstoque({ estoque: [] }), /Nenhum item/);
   assert.match(formatarFinanceiro({ movimentacoes_financeiras: [] }), /Nenhuma movimenta/);
   assert.match(formatarManejos({ sanitario: [] }), /Nenhum manejo/);
+});
+
+test('pastagens: lista ocupação por pasto', () => {
+  const dbComPastos = {
+    ...db(),
+    pastagens: [{ id: 1, nome: 'Pasto Norte', faz_id: 1, area_ha: 20, capacidade_suporte_ua_ha: 2 }],
+  };
+  const txt = formatarPastagens(dbComPastos, { fazendaNome: 'Santa Clara' });
+  assert.match(txt, /Pasto Norte/);
+  assert.match(txt, /20 ha/);
+});
+
+test('pastagens: vazio não inventa dados', () => {
+  assert.match(formatarPastagens({ pastagens: [] }), /Nenhum pasto cadastrado/);
+});
+
+test('resultado do lote: mostra custo/lucro/margem', () => {
+  const txt = formatarResultadoLote(db(), { id: 11, nome: 'Engorda 02' });
+  assert.match(txt, /Resultado — Engorda 02/);
+  assert.match(txt, /Lucro total/);
+  assert.match(txt, /Custo por @/);
+});
+
+test('resultado do lote: inexistente não quebra', () => {
+  assert.match(formatarResultadoLote(db(), null), /não encontrado/);
 });

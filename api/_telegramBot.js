@@ -15,6 +15,7 @@ import { resolverFazendaPorNome, resolverLotePorNome } from '../src/domain/teleg
 import {
   formatarFazendas, formatarLotes, formatarLote, formatarEstoque,
   formatarFinanceiro, formatarManejos, formatarPesagens, formatarResumo,
+  formatarPastagens, formatarResultadoLote,
 } from '../src/domain/telegram/respostasConsulta.js';
 import { prepararTransferenciaAnimais, prepararRenomearLote } from '../src/domain/telegram/acoesLote.js';
 import { calcularExpiraEm, podeConfirmar, STATUS } from '../src/domain/telegram/operacoesPendentes.js';
@@ -46,6 +47,9 @@ const INTENCOES_ATENDIDAS = new Set([
   INTENCOES.REGISTRAR_VENDA, INTENCOES.REGISTRAR_MORTE, INTENCOES.FINALIZAR_LOTE,
   INTENCOES.CADASTRAR_MANEJO, INTENCOES.CADASTRAR_PLANEJAMENTO_SUPLEMENTACAO,
   INTENCOES.REGISTRAR_CONSUMO_SUPLEMENTACAO,
+  // Sprint Paridade 1 — Fazendas/Lotes/Pesagens/Pastagens:
+  INTENCOES.CADASTRAR_FAZENDA, INTENCOES.RENOMEAR_FAZENDA,
+  INTENCOES.LISTAR_PASTOS, INTENCOES.CONSULTAR_RESULTADO_LOTE,
 ]);
 
 // Intenções que exigem uma fazenda definida (recorte). Fazendas e ajuda não.
@@ -61,6 +65,7 @@ const INTENCOES_ESCOPADAS = new Set([
   INTENCOES.REGISTRAR_VENDA, INTENCOES.REGISTRAR_MORTE, INTENCOES.FINALIZAR_LOTE,
   INTENCOES.CADASTRAR_MANEJO, INTENCOES.CADASTRAR_PLANEJAMENTO_SUPLEMENTACAO,
   INTENCOES.REGISTRAR_CONSUMO_SUPLEMENTACAO,
+  INTENCOES.LISTAR_PASTOS, INTENCOES.CONSULTAR_RESULTADO_LOTE,
 ]);
 
 const MSG = {
@@ -102,6 +107,8 @@ const MSG = {
   TIPO_VAZIO: 'Informe o tipo de manejo.',
   PRODUTO_VAZIO: 'Informe o produto.',
   SALDO_INSUFICIENTE: 'Estoque insuficiente para essa quantidade.',
+  FAZENDA_AMBIGUA: 'Há mais de uma fazenda com esse nome. Seja mais específico.',
+  FAZENDA_VAZIA: 'Informe qual fazenda.',
 };
 
 function ajuda() {
@@ -282,6 +289,14 @@ async function processarComandoBotInterno({ client, conexao, texto, chatId, agor
       return { texto: formatarPesagens(db) };
     case INTENCOES.RESUMO:
       return { texto: formatarResumo(db, { fazendaNome }) };
+    case INTENCOES.LISTAR_PASTOS:
+      return { texto: formatarPastagens(db, { fazendaNome }) };
+    case INTENCOES.CONSULTAR_RESULTADO_LOTE: {
+      const r = resolverLotePorNome(db.lotes, intent.parametros.nome);
+      if (r.status === 'ambiguo') return { texto: `Há mais de um lote com esse nome:\n\n${listaNumerada(r.candidatos)}` };
+      if (r.status !== 'ok') return { texto: MSG.LOTE_NAO_ENCONTRADO };
+      return { texto: formatarResultadoLote(db, r.lote) };
+    }
     case INTENCOES.TRANSFERIR_ANIMAIS_ENTRE_LOTES:
       return { texto: await prepararConfirmacaoTransferencia(client, conexao, db, intent, texto, agora) };
     case INTENCOES.RENOMEAR_LOTE:
