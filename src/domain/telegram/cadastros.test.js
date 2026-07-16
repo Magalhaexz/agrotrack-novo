@@ -269,3 +269,73 @@ test('renomear_fazenda exige fazenda e novo nome', () => {
   assert.equal(prepararCadastro(INTENCOES.RENOMEAR_FAZENDA, { fazenda_atual: '', novo_nome: 'X' }, ctxComFazendas()).erro, 'FAZENDA_VAZIA');
   assert.equal(prepararCadastro(INTENCOES.RENOMEAR_FAZENDA, { fazenda_atual: 'Um', novo_nome: '' }, ctxComFazendas()).erro, 'NOME_VAZIO');
 });
+
+const dbComPesagens = () => ({
+  ...db(),
+  pesagens: [
+    { id: 100, lote_id: 10, data: '2026-07-01', peso_medio: 300 },
+    { id: 101, lote_id: 10, data: '2026-07-08', peso_medio: 320 },
+  ],
+});
+const ctxComPesagens = () => ({ db: dbComPesagens(), hoje: HOJE, fazendaId: 1 });
+
+test('prepararCadastro editar_pesagem corrige a pesagem mais recente do lote', () => {
+  const r = prepararCadastro(INTENCOES.EDITAR_PESAGEM, { lote: 'Recria 01', peso: 405 }, ctxComPesagens());
+  assert.equal(r.ok, true);
+  assert.equal(r.tipo, 'editar_pesagem');
+  const upd = r.writes.find((w) => w.tabela === 'pesagens');
+  assert.equal(upd.match.id, 101);
+  assert.equal(upd.patch.peso_medio, 405);
+});
+
+test('editar_pesagem rejeita peso inválido e lote sem pesagem', () => {
+  assert.equal(prepararCadastro(INTENCOES.EDITAR_PESAGEM, { lote: 'Recria 01', peso: 0 }, ctxComPesagens()).erro, 'PESO_INVALIDO');
+  assert.equal(prepararCadastro(INTENCOES.EDITAR_PESAGEM, { lote: 'Recria 01', peso: 400 }, ctx()).erro, 'PESAGEM_NAO_ENCONTRADA');
+});
+
+test('prepararCadastro excluir_pesagem remove a pesagem mais recente e recalcula o lote', () => {
+  const r = prepararCadastro(INTENCOES.EXCLUIR_PESAGEM, { lote: 'Recria 01' }, ctxComPesagens());
+  assert.equal(r.ok, true);
+  assert.equal(r.tipo, 'excluir_pesagem');
+  const del = r.writes.find((w) => w.tabela === 'pesagens');
+  assert.equal(del.tipo, 'delete');
+  assert.equal(del.match.id, 101);
+  const loteUpdate = r.writes.find((w) => w.tabela === 'lotes');
+  assert.equal(loteUpdate.patch.p_at, 300);
+});
+
+test('prepararCadastro ajustar_lotacao resolve o lote pelo nome', () => {
+  const r = prepararCadastro(INTENCOES.AJUSTAR_LOTACAO, { lote: 'Recria 01', quantidade: 5, motivo: 'Recontagem' }, ctxComRebanho());
+  assert.equal(r.ok, true);
+  assert.equal(r.tipo, 'ajuste_lotacao');
+  const loteUpdate = r.writes.find((w) => w.tabela === 'lotes');
+  assert.equal(loteUpdate.patch.qtd, 5);
+});
+
+test('ajustar_lotacao exige motivo e lote encontrado', () => {
+  assert.equal(prepararCadastro(INTENCOES.AJUSTAR_LOTACAO, { lote: 'Recria 01', quantidade: 5, motivo: '' }, ctxComRebanho()).erro, 'MOTIVO_VAZIO');
+  assert.equal(prepararCadastro(INTENCOES.AJUSTAR_LOTACAO, { lote: 'Inexistente', quantidade: 5, motivo: 'X' }, ctxComRebanho()).erro, 'LOTE_NAO_ENCONTRADO');
+});
+
+test('prepararCadastro editar_lote altera campos do lote resolvido', () => {
+  const r = prepararCadastro(INTENCOES.EDITAR_LOTE, { lote: 'Recria 01', sexo: 'machos' }, ctxComRebanho());
+  assert.equal(r.ok, true);
+  assert.equal(r.tipo, 'editar_lote');
+  assert.equal(r.writes[0].patch.sexo, 'macho');
+});
+
+test('prepararCadastro editar_pasto resolve o pasto pelo nome', () => {
+  const r = prepararCadastro(INTENCOES.EDITAR_PASTO, { pasto: 'Capim Norte', area: 12 }, ctxComRebanho());
+  assert.equal(r.ok, true);
+  assert.equal(r.tipo, 'editar_pasto');
+  assert.equal(r.writes[0].patch.area_ha, 12);
+});
+
+test('prepararCadastro retirar_lote_pasto limpa o vínculo sem alterar quantidade', () => {
+  const r = prepararCadastro(INTENCOES.RETIRAR_LOTE_PASTO, { lote: 'Recria 01' }, ctxComRebanho());
+  assert.equal(r.ok, true);
+  assert.equal(r.tipo, 'retirar_lote_pasto');
+  const loteUpdate = r.writes.find((w) => w.tabela === 'lotes');
+  assert.equal(loteUpdate.patch.pastagem_id, null);
+  assert.equal('qtd' in loteUpdate.patch, false);
+});

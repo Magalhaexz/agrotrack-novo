@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { prepararTrocaLotePasto } from './acoesPasto.js';
+import { prepararTrocaLotePasto, prepararRetirarLotePasto } from './acoesPasto.js';
 
 const db = {
   lotes: [
@@ -63,4 +63,23 @@ test('quantidade de cabeças opcional, mas se informada deve ser positiva', () =
   assert.equal(prepararTrocaLotePasto(db, { lote: 'Recria', pasto: 'Capim Norte', quantidade_cabecas: 0 }).erro, 'QUANTIDADE_INVALIDA');
   const ok = prepararTrocaLotePasto(db, { lote: 'Recria', pasto: 'Capim Norte', quantidade_cabecas: 15 });
   assert.equal(ok.writes[0].registro.quantidade_cabecas, 15);
+});
+
+// ── Retirar lote do pasto ────────────────────────────────────────────────────
+test('retira lote do pasto sem vincular a um novo, nunca altera qtd', () => {
+  const r = prepararRetirarLotePasto(db, { lote: 'Recria' });
+  assert.equal(r.ok, true);
+  const hist = r.writes.find((w) => w.tabela === 'lote_pastagens_historico');
+  assert.equal(hist.registro.pastagem_origem_id, 'pasto-a');
+  assert.equal(hist.registro.pastagem_destino_id, null);
+  const upd = r.writes.find((w) => w.tabela === 'lotes');
+  assert.equal(upd.patch.pastagem_id, null);
+  assert.equal('qtd' in upd.patch, false);
+});
+
+test('retirar rejeita lote sem pasto, bloqueado ou inexistente', () => {
+  const dbSemPasto = { ...db, lotes: [...db.lotes, { id: 4, nome: 'Sem Pasto', status: 'ativo', faz_id: 100, pastagem_id: null }] };
+  assert.equal(prepararRetirarLotePasto(dbSemPasto, { lote: 'Sem Pasto' }).erro, 'LOTE_SEM_PASTO');
+  assert.equal(prepararRetirarLotePasto(db, { lote: 'Confinamento' }).erro, 'LOTE_BLOQUEADO');
+  assert.equal(prepararRetirarLotePasto(db, { lote: 'Inexistente' }).erro, 'LOTE_NAO_ENCONTRADO');
 });

@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import {
   prepararTransferenciaAnimais, prepararRenomearLote,
   prepararVendaAnimais, prepararMorteAnimais, prepararFinalizarLote,
+  prepararAjusteLotacao, prepararEdicaoLote,
 } from './acoesLote.js';
 
 function db() {
@@ -172,4 +173,46 @@ test('finalizar lote exige motivo e rejeita lote já finalizado/inexistente', ()
   assert.equal(prepararFinalizarLote(db(), { loteId: 10, motivo: '  ' }).erro, 'MOTIVO_VAZIO');
   assert.equal(prepararFinalizarLote(db(), { loteId: 12, motivo: 'X' }).erro, 'LOTE_JA_FINALIZADO');
   assert.equal(prepararFinalizarLote(db(), { loteId: 99, motivo: 'X' }).erro, 'LOTE_NAO_ENCONTRADO');
+});
+
+// ── Ajuste de lotação (reaproveita buildAjusteLotacaoPatch de lotesLogic.js) ─
+test('ajuste de lotação válido gera update de qtd e movimentação tipo ajuste', () => {
+  const r = prepararAjusteLotacao(db(), { loteId: 10, quantidade: 70, motivo: 'Contagem física' });
+  assert.equal(r.ok, true);
+  const loteUpdate = r.writes.find((w) => w.tabela === 'lotes');
+  assert.equal(loteUpdate.patch.qtd, 70);
+  const mov = r.writes.find((w) => w.tabela === 'movimentacoes_animais');
+  assert.equal(mov.registro.tipo, 'ajuste');
+  assert.equal(mov.registro.qtd, -12);
+});
+
+test('ajuste de lotação rejeita quantidade igual, negativa e lote bloqueado/inexistente', () => {
+  assert.equal(prepararAjusteLotacao(db(), { loteId: 10, quantidade: 82, motivo: 'X' }).erro, 'SEM_ALTERACAO');
+  assert.equal(prepararAjusteLotacao(db(), { loteId: 10, quantidade: -1, motivo: 'X' }).erro, 'QUANTIDADE_INVALIDA');
+  assert.equal(prepararAjusteLotacao(db(), { loteId: 12, quantidade: 5, motivo: 'X' }).erro, 'LOTE_BLOQUEADO');
+  assert.equal(prepararAjusteLotacao(db(), { loteId: 99, quantidade: 5, motivo: 'X' }).erro, 'LOTE_NAO_ENCONTRADO');
+});
+
+test('ajuste de lotação exige motivo (validado por buildAjusteLotacaoPatch)', () => {
+  assert.equal(prepararAjusteLotacao(db(), { loteId: 10, quantidade: 70, motivo: '' }).erro, 'MOTIVO_VAZIO');
+});
+
+// ── Edição básica do lote (sexo/raça/observação) ────────────────────────────
+test('edição de lote altera só os campos informados', () => {
+  const r = prepararEdicaoLote(db(), { loteId: 10, sexo: 'femeas' });
+  assert.equal(r.ok, true);
+  assert.deepEqual(r.writes[0].patch, { sexo: 'femea' });
+});
+
+test('edição de lote aceita múltiplos campos de uma vez', () => {
+  const r = prepararEdicaoLote(db(), { loteId: 10, raca: 'Nelore', observacao: 'Grupo homogêneo' });
+  assert.equal(r.writes[0].patch.raca, 'Nelore');
+  assert.equal(r.writes[0].patch.obs, 'Grupo homogêneo');
+});
+
+test('edição de lote rejeita sexo inválido, nenhum campo, lote bloqueado/inexistente', () => {
+  assert.equal(prepararEdicaoLote(db(), { loteId: 10, sexo: 'invalido' }).erro, 'SEXO_INVALIDO');
+  assert.equal(prepararEdicaoLote(db(), { loteId: 10 }).erro, 'NENHUM_CAMPO_INFORMADO');
+  assert.equal(prepararEdicaoLote(db(), { loteId: 12, raca: 'X' }).erro, 'LOTE_BLOQUEADO');
+  assert.equal(prepararEdicaoLote(db(), { loteId: 99, raca: 'X' }).erro, 'LOTE_NAO_ENCONTRADO');
 });

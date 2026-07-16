@@ -359,3 +359,51 @@ test('resultado do lote não colide com ver_lote', () => {
   assert.equal(i('/lote Recria').intencao, INTENCOES.VER_LOTE);
   assert.equal(i('ver lote Recria').intencao, INTENCOES.VER_LOTE);
 });
+
+test('editar pesagem: corrija/edite + pesagem', () => {
+  for (const txt of ['Corrija a pesagem do lote Recria para 405 kg.', 'Edite a pesagem do lote Engorda.']) {
+    const r = i(txt);
+    assert.equal(r.intencao, INTENCOES.EDITAR_PESAGEM, txt);
+    assert.equal(r.requerConfirmacao, true, txt);
+  }
+});
+
+test('excluir pesagem: excluir/cancelar + (última) pesagem', () => {
+  for (const txt of ['Excluir a última pesagem do lote Recria.', 'Cancele a pesagem do lote Engorda.']) {
+    const r = i(txt);
+    assert.equal(r.intencao, INTENCOES.EXCLUIR_PESAGEM, txt);
+    assert.equal(r.requerConfirmacao, true, txt);
+  }
+});
+
+test('editar/excluir pesagem não colidem com registrar pesagem', () => {
+  assert.equal(i('registre pesagem de 425 kg no lote Engorda 02').intencao, INTENCOES.REGISTRAR_PESAGEM);
+  assert.equal(i('o lote Engorda pesou 470 quilos').intencao, INTENCOES.REGISTRAR_PESAGEM);
+});
+
+test('ajustar lotação: verbo próprio "ajuste/ajustar" + lote', () => {
+  const r = i('Ajuste o lote Recria para 28 cabeças.');
+  assert.equal(r.intencao, INTENCOES.AJUSTAR_LOTACAO);
+  assert.equal(r.requerConfirmacao, true);
+});
+
+test('editar lote: sinalizado pelo campo citado (sexo/raça/observação)', () => {
+  for (const txt of ['Altere o sexo do lote Recria para fêmeas.', 'Edite a raça do lote Engorda.', 'Altere a observação do lote Recria.']) {
+    const r = i(txt);
+    assert.equal(r.intencao, INTENCOES.EDITAR_LOTE, txt);
+    assert.equal(r.requerConfirmacao, true, txt);
+  }
+});
+
+test('editar pasto: verbo + "pasto", distinto de cadastrar pasto', () => {
+  const r = i('Edite o pasto Norte, área 25 hectares.');
+  assert.equal(r.intencao, INTENCOES.EDITAR_PASTO);
+  assert.equal(i('Cadastre o Pasto Norte com 18 hectares.').intencao, INTENCOES.CADASTRAR_PASTO);
+});
+
+test('retirar lote do pasto: precisa de "lote" e "pasto" juntos, não colide com baixa de estoque', () => {
+  const r = i('Retire o lote Recria do pasto atual.');
+  assert.equal(r.intencao, INTENCOES.RETIRAR_LOTE_PASTO);
+  assert.equal(r.requerConfirmacao, true);
+  assert.equal(i('retirar 10 sacos de racao').intencao, INTENCOES.DAR_BAIXA_ESTOQUE);
+});
