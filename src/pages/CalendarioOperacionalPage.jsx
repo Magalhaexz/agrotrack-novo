@@ -17,6 +17,7 @@ import Input from '../components/ui/Input';
 import Modal from '../components/ui/Modal';
 import { formatDate } from '../utils/calculations';
 import { useToast } from '../hooks/useToast';
+import { useAuth } from '../auth/useAuth';
 import {
   createOperationalRecord,
   deleteOperationalRecord,
@@ -43,8 +44,11 @@ const typeMap = {
 
 const getTodayIso = () => hojeLocalISO();
 
+const MENSAGEM_SEM_PERMISSAO = 'Você não tem permissão para executar esta ação.';
+
 export default function CalendarioOperacionalPage({ db, setDb, session, fazendaSelecionada = null, onConfirmAction }) {
   const { showToast } = useToast();
+  const { hasPermission } = useAuth();
   const hoje = getTodayIso();
   const [selectedDate, setSelectedDate] = useState(hoje);
   const [viewMode, setViewMode] = useState('mensal');
@@ -53,11 +57,19 @@ export default function CalendarioOperacionalPage({ db, setDb, session, fazendaS
   const [eventoEditando, setEventoEditando] = useState(null);
 
   function abrirNovoEvento() {
+    if (!hasPermission('sanitario:editar')) {
+      showToast({ type: 'error', message: MENSAGEM_SEM_PERMISSAO });
+      return;
+    }
     setEventoEditando(null);
     setOpenModal(true);
   }
 
   function abrirEdicaoEvento(eventoRaw) {
+    if (!hasPermission('sanitario:editar')) {
+      showToast({ type: 'error', message: MENSAGEM_SEM_PERMISSAO });
+      return;
+    }
     setEventoEditando(eventoRaw);
     setOpenModal(true);
   }
@@ -68,6 +80,10 @@ export default function CalendarioOperacionalPage({ db, setDb, session, fazendaS
   }
 
   async function excluirEvento(eventoRaw) {
+    if (!hasPermission('sanitario:excluir')) {
+      showToast({ type: 'error', message: MENSAGEM_SEM_PERMISSAO });
+      return;
+    }
     if (!eventoRaw?.id) return;
     const confirmado = typeof onConfirmAction === 'function'
       ? await onConfirmAction({

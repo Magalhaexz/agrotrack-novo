@@ -13,7 +13,8 @@ import { gerarResumoRelatorioLote } from '../domain/relatorioLote';
 import { gerarResumoLoteTexto } from '../domain/whatsappResumo';
 import { calcLote } from '../utils/calculations';
 import { gerarNovoId } from '../utils/id';
-import { createOperationalRecord, deleteOperationalRecord, updateOperationalRecord } from '../services/operationalPersistence';
+import { createOperationalRecord, updateOperationalRecord } from '../services/operationalPersistence';
+import { excluirEEstornarConsumoSuplementacao } from '../services/consumoSuplementacao';
 import LoteCard from '../components/lotes/LoteCard';
 import LoteDetailsPanel from '../components/lotes/LoteDetailsPanel';
 import LotesFilters from '../components/lotes/LotesFilters';
@@ -388,36 +389,30 @@ export default function LotesPage({ db, setDb, onRegistrarSaidaAnimal, session, 
       return;
     }
 
-    const confirmado = window.confirm('Deseja excluir este consumo do histórico?');
+    const confirmado = window.confirm('Deseja excluir este consumo? A quantidade será devolvida ao estoque.');
     if (!confirmado) return;
 
-    const consumoId = Number(item.id);
-    const linkedFinanceiro = movFinanceiros.find(
-      (mov) => String(mov?.origem_tipo || '') === 'consumo_suplementacao' && Number(mov?.origem_id) === consumoId
-    );
-
-    const consumoPersist = await deleteOperationalRecord('consumo_suplementacao', consumoId, session);
-    const financePersist = linkedFinanceiro?.id
-      ? await deleteOperationalRecord('movimentacoes_financeiras', linkedFinanceiro.id, session)
-      : { persisted: true };
-
-    if (!consumoPersist?.persisted || !financePersist?.persisted) {
-      showToast({ type: 'warning', message: consumoPersist?.error || financePersist?.error || 'Não foi possível confirmar a exclusão agora.' });
+    const resultado = await excluirEEstornarConsumoSuplementacao(db, session, item);
+    if (!resultado.ok) {
+      showToast({ type: 'warning', message: resultado.error || 'Não foi possível confirmar a exclusão agora.' });
       return;
     }
 
     setDb((prev) => ({
       ...prev,
-      consumo_suplementacao: (prev.consumo_suplementacao || []).filter((registro) => Number(registro.id) !== consumoId),
-      movimentacoes_financeiras: (prev.movimentacoes_financeiras || []).filter((mov) => {
-        if (Number(mov?.id) === Number(linkedFinanceiro?.id)) return false;
-        return !(
-          String(mov?.origem_tipo || '') === 'consumo_suplementacao'
-          && Number(mov?.origem_id) === consumoId
-        );
-      }),
+      consumo_suplementacao: (prev.consumo_suplementacao || []).filter((registro) => Number(registro.id) !== resultado.consumoId),
+      estoque: resultado.produtoId
+        ? (prev.estoque || []).map((entry) => (
+            Number(entry.id) === Number(resultado.produtoId)
+              ? { ...entry, quantidade_atual: resultado.novoSaldoEstoque, quantidade: resultado.novoSaldoEstoque }
+              : entry
+          ))
+        : (prev.estoque || []),
+      movimentacoes_financeiras: (prev.movimentacoes_financeiras || []).filter((mov) => (
+        Number(mov?.id) !== Number(resultado.financeiroIdExcluido)
+      )),
     }));
-    showToast({ type: 'success', message: 'Consumo excluído com sucesso.' });
+    showToast({ type: 'success', message: 'Consumo excluído e estoque estornado.' });
   }
 
   function handleRetirada(payload) {

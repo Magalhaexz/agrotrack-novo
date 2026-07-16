@@ -17,9 +17,11 @@ import {
 import { daysBetween } from '../domain/calcHelpers.js';
 import { hojeLocalISO } from '../domain/dataCivil.js';
 
+const MENSAGEM_SEM_PERMISSAO = 'Você não tem permissão para executar esta ação.';
+
 export default function RotinaPage({ db, setDb, onConfirmAction }) {
   const { showToast } = useToast(); // Usar o hook de toast
-  const { session } = useAuth();
+  const { session, hasPermission } = useAuth();
 
   const [abrirForm, setAbrirForm] = useState(false);
   const [itemEditando, setItemEditando] = useState(null);
@@ -125,6 +127,10 @@ export default function RotinaPage({ db, setDb, onConfirmAction }) {
   }, [rotinas]);
 
   const excluirItem = useCallback(async (item) => {
+    if (!hasPermission('sanitario:excluir')) {
+      showToast({ type: 'error', message: MENSAGEM_SEM_PERMISSAO });
+      return;
+    }
     const id = item._instanciaRecorrente ? item.id_base : item.id;
 
     const confirmado = typeof onConfirmAction === 'function'
@@ -147,9 +153,13 @@ export default function RotinaPage({ db, setDb, onConfirmAction }) {
       rotinas: prev.rotinas.filter((r) => r.id !== id),
     }));
     showToast({ type: 'success', message: 'Tarefa excluída com sucesso!' });
-  }, [onConfirmAction, session, setDb, showToast]);
+  }, [hasPermission, onConfirmAction, session, setDb, showToast]);
 
   const salvarItem = useCallback(async (dados) => {
+    if (!hasPermission('sanitario:editar')) {
+      showToast({ type: 'error', message: MENSAGEM_SEM_PERMISSAO });
+      return;
+    }
     if (itemEditando) {
       const persisted = await updateOperationalRecord('rotinas', itemEditando.id, dados, session);
       if (!persisted.persisted) {
@@ -185,9 +195,13 @@ export default function RotinaPage({ db, setDb, onConfirmAction }) {
 
     setAbrirForm(false);
     setItemEditando(null);
-  }, [itemEditando, session, setDb, showToast]);
+  }, [hasPermission, itemEditando, session, setDb, showToast]);
 
   const concluirOuReabrir = useCallback(async (item, concluir) => {
+    if (!hasPermission('sanitario:editar')) {
+      showToast({ type: 'error', message: MENSAGEM_SEM_PERMISSAO });
+      return;
+    }
     if (item._instanciaRecorrente) {
       const rotinaBase = rotinas.find((r) => r.id === item.id_base);
       if (!rotinaBase) return;
@@ -228,7 +242,7 @@ export default function RotinaPage({ db, setDb, onConfirmAction }) {
       }));
       showToast({ type: 'success', message: `Tarefa ${concluir ? 'concluída' : 'reaberta'} com sucesso!` });
     }
-  }, [rotinas, session, setDb, showToast]);
+  }, [hasPermission, rotinas, session, setDb, showToast]);
 
   return (
     <div className="page rotina-page">

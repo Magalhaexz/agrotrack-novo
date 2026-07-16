@@ -9,7 +9,8 @@ import { useToast } from '../hooks/useToast';
 import { useAuth } from '../auth/useAuth';
 import { gerarNovoId } from '../utils/id';
 import { formatNumber } from '../utils/calculations';
-import { createOperationalRecord, updateOperationalRecord, deleteOperationalRecord } from '../services/operationalPersistence';
+import { createOperationalRecord, updateOperationalRecord } from '../services/operationalPersistence';
+import { excluirEEstornarConsumoSuplementacao } from '../services/consumoSuplementacao';
 import { calcularConsumoDiarioTotalPorProduto, calcularDiasRestantesEstoque } from '../domain/previsaoConsumoEstoque';
 
 function getActiveFarmId(fazendaSelecionada) {
@@ -150,8 +151,10 @@ export default function SuplementacaoPage({ db, setDb, session, fazendaSeleciona
 
   // Estorna um consumo de suplementação: devolve a quantidade ao estoque e
   // remove a movimentação financeira vinculada (mesmo padrão já usado para
-  // excluir manejo sanitário em SanitarioPage.jsx). Antes desta função não
-  // havia nenhuma forma de cancelar um consumo registrado por engano.
+  // excluir manejo sanitário em SanitarioPage.jsx). A regra em si vive em
+  // `services/consumoSuplementacao.js` — única implementação, reaproveitada
+  // também por `LotesPage.jsx` (antes desta correção, a versão do Lote não
+  // devolvia o estoque; ver `domain/consumoSuplementacao.js`).
   async function excluirConsumo(registro) {
     if (!hasPermission('estoque:editar')) {
       showToast({ type: 'error', message: 'Você não tem permissão para excluir consumos.' });
@@ -166,41 +169,25 @@ export default function SuplementacaoPage({ db, setDb, session, fazendaSeleciona
       : window.confirm('Deseja excluir este consumo? A quantidade será devolvida ao estoque.');
     if (!confirmado) return;
 
-    const qtdConsumida = Number(registro.qtd_total || registro.quantidade_total || registro.quantidade || 0);
-    const produto = registro.item_estoque_id
-      ? (db.estoque || []).find((item) => Number(item.id) === Number(registro.item_estoque_id))
-      : null;
-    const movimento = (db.movimentacoes_financeiras || []).find(
-      (mov) => String(mov?.origem_tipo || '') === 'consumo_suplementacao' && Number(mov?.origem_id) === Number(registro.id)
-    );
-
-    const consumoPersist = await deleteOperationalRecord('consumo_suplementacao', registro.id, session);
-    if (!consumoPersist?.persisted) {
-      showToast({ type: 'warning', message: consumoPersist?.error || 'Não foi possível excluir o consumo agora.' });
+    const resultado = await excluirEEstornarConsumoSuplementacao(db, session, registro);
+    if (!resultado.ok) {
+      showToast({ type: 'warning', message: resultado.error || 'Não foi possível excluir o consumo agora.' });
       return;
-    }
-
-    let novoSaldoEstoque = null;
-    if (produto && qtdConsumida > 0) {
-      novoSaldoEstoque = Number(produto.quantidade_atual || 0) + qtdConsumida;
-      await updateOperationalRecord('estoque', Number(produto.id), { quantidade_atual: novoSaldoEstoque, quantidade: novoSaldoEstoque }, session);
-    }
-
-    if (movimento) {
-      await deleteOperationalRecord('movimentacoes_financeiras', movimento.id, session);
     }
 
     setDb((prev) => ({
       ...prev,
-      consumo_suplementacao: (prev.consumo_suplementacao || []).filter((item) => Number(item.id) !== Number(registro.id)),
-      estoque: produto
+      consumo_suplementacao: (prev.consumo_suplementacao || []).filter((item) => Number(item.id) !== resultado.consumoId),
+      estoque: resultado.produtoId
         ? (prev.estoque || []).map((item) => (
-            Number(item.id) === Number(produto.id) ? { ...item, quantidade_atual: novoSaldoEstoque, quantidade: novoSaldoEstoque } : item
+            Number(item.id) === Number(resultado.produtoId)
+              ? { ...item, quantidade_atual: resultado.novoSaldoEstoque, quantidade: resultado.novoSaldoEstoque }
+              : item
           ))
         : (prev.estoque || []),
-      movimentacoes_financeiras: movimento
-        ? (prev.movimentacoes_financeiras || []).filter((mov) => Number(mov.id) !== Number(movimento.id))
-        : (prev.movimentacoes_financeiras || []),
+      movimentacoes_financeiras: (prev.movimentacoes_financeiras || []).filter((mov) => (
+        Number(mov?.id) !== Number(resultado.financeiroIdExcluido)
+      )),
     }));
 
     showToast({ type: 'success', message: 'Consumo excluído e estoque estornado.' });
