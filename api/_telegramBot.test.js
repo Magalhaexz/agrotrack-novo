@@ -32,7 +32,130 @@ function makeClient(tables) {
     maybeSingle() { return Promise.resolve(this._run(true)); }
     then(res, rej) { return Promise.resolve(this._run(false)).then(res, rej); }
   }
-  return { from: (t) => new Q(t) };
+
+  // Fake das RPCs transacionais (Sprint Paridade 1, bloco 4). Espelha a
+  // lógica do SQL real (supabase/migrations/20260716120000_...sql) sobre as
+  // mesmas tabelas em memória — não é um Postgres real, mas cobre a mesma
+  // orquestração (uma única chamada, tudo aplicado de uma vez) que os testes
+  // de bot precisam verificar sem depender de um banco.
+  function nextId(tabela) {
+    const arr = tables[tabela] || (tables[tabela] = []);
+    return `${tabela}_${arr.length + 1}`;
+  }
+  const rpcImpl = {
+    registrar_saida_lote(p) {
+      const lote = tables.lotes.find((l) => String(l.id) === String(p.p_lote_id));
+      if (!lote) return { error: 'LOTE_NAO_ENCONTRADO' };
+      if (p.p_qtd > lote.qtd) return { error: 'ANIMAIS_INSUFICIENTES' };
+      const movId = nextId('movimentacoes_animais');
+      tables.movimentacoes_animais.push({
+        id: movId, owner_user_id: p.p_owner_user_id, lote_id: p.p_lote_id,
+        destino_lote_id: p.p_tipo === 'transferencia_saida' ? p.p_destino_lote_id : null,
+        tipo: p.p_tipo, qtd: p.p_qtd, peso_medio: p.p_peso_medio, valor_total: p.p_valor_total,
+        custo_por_cabeca: p.p_custo_por_cabeca, data: p.p_data,
+        comprador_fornecedor: p.p_comprador_fornecedor, obs: p.p_obs,
+      });
+      lote.qtd -= p.p_qtd;
+      let finId = null;
+      if ((p.p_tipo === 'venda' || p.p_tipo === 'abate') && (p.p_valor_total || 0) > 0) {
+        finId = nextId('movimentacoes_financeiras');
+        tables.movimentacoes_financeiras.push({
+          id: finId, owner_user_id: p.p_owner_user_id, lote_id: p.p_lote_id, tipo: 'receita',
+          categoria: p.p_tipo === 'abate' ? 'abate_animal' : 'venda_animal', valor: p.p_valor_total,
+          data: p.p_data, status: 'realizado', descricao: p.p_obs, origem_id: movId,
+        });
+      }
+      if (p.p_tipo === 'transferencia_saida') {
+        const destino = tables.lotes.find((l) => String(l.id) === String(p.p_destino_lote_id));
+        destino.qtd += p.p_qtd;
+        if (p.p_peso_destino_final != null) destino.p_at = p.p_peso_destino_final;
+      }
+      return { data: [{ movimentacao_id: movId, financeiro_id: finId }] };
+    },
+    ajustar_lotacao_lote(p) {
+      const lote = tables.lotes.find((l) => String(l.id) === String(p.p_lote_id));
+      if (!lote) return { error: 'LOTE_NAO_ENCONTRADO' };
+      const delta = p.p_nova_qtd - lote.qtd;
+      const movId = nextId('movimentacoes_animais');
+      tables.movimentacoes_animais.push({ id: movId, owner_user_id: p.p_owner_user_id, lote_id: p.p_lote_id, tipo: 'ajuste', qtd: delta, data: p.p_data, obs: p.p_motivo });
+      lote.qtd = p.p_nova_qtd;
+      return { data: [{ movimentacao_id: movId }] };
+    },
+    finalizar_lote(p) {
+      const lote = tables.lotes.find((l) => String(l.id) === String(p.p_lote_id));
+      if (!lote) return { error: 'LOTE_NAO_ENCONTRADO' };
+      lote.status = p.p_status;
+      lote.data_encerramento = p.p_data_encerramento;
+      lote.data_venda = p.p_status === 'vendido' ? (p.p_data_venda || p.p_data_encerramento) : null;
+      if (p.p_motivo) lote.obs = p.p_motivo;
+      return { data: null };
+    },
+    mover_lote_para_pasto_bot(p) {
+      const lote = tables.lotes.find((l) => String(l.id) === String(p.p_lote_id));
+      if (!lote) return { error: 'LOTE_NAO_ENCONTRADO' };
+      const historico = tables.lote_pastagens_historico || (tables.lote_pastagens_historico = []);
+      historico.push({
+        id: nextId('lote_pastagens_historico'), owner_user_id: p.p_owner_user_id, lote_id: p.p_lote_id,
+        faz_id: lote.faz_id, pastagem_origem_id: lote.pastagem_id ?? null,
+        pastagem_destino_id: p.p_pastagem_destino_id, data_movimentacao: p.p_data,
+        quantidade_cabecas: p.p_quantidade_cabecas, motivo: p.p_motivo, observacoes: p.p_observacoes,
+      });
+      lote.pastagem_id = p.p_pastagem_destino_id;
+      return { data: null };
+    },
+    editar_ultima_pesagem_lote(p) {
+      const pesagem = tables.pesagens.find((x) => String(x.id) === String(p.p_pesagem_id));
+      if (!pesagem) return { error: 'PESAGEM_NAO_ENCONTRADA' };
+      pesagem.peso_medio = p.p_novo_peso;
+      if (p.p_nova_data) pesagem.data = p.p_nova_data;
+      const doLote = tables.pesagens.filter((x) => x.lote_id === pesagem.lote_id).sort((a, b) => String(b.data).localeCompare(String(a.data)));
+      const lote = tables.lotes.find((l) => l.id === pesagem.lote_id);
+      if (lote && doLote[0]) { lote.p_at = doLote[0].peso_medio; lote.ultima_pesagem = doLote[0].data; }
+      return { data: null };
+    },
+    excluir_ultima_pesagem_lote(p) {
+      const idx = tables.pesagens.findIndex((x) => String(x.id) === String(p.p_pesagem_id));
+      if (idx === -1) return { error: 'PESAGEM_NAO_ENCONTRADA' };
+      const [removida] = tables.pesagens.splice(idx, 1);
+      const lote = tables.lotes.find((l) => l.id === removida.lote_id);
+      const restantes = tables.pesagens.filter((x) => x.lote_id === removida.lote_id).sort((a, b) => String(b.data).localeCompare(String(a.data)));
+      if (lote) {
+        if (restantes[0]) { lote.p_at = restantes[0].peso_medio; lote.ultima_pesagem = restantes[0].data; } else { lote.ultima_pesagem = null; }
+      }
+      return { data: null };
+    },
+    criar_lote_completo(p) {
+      const loteId = nextId('lotes');
+      tables.lotes.push({
+        id: loteId, owner_user_id: p.p_owner_user_id, nome: p.p_nome, faz_id: p.p_faz_id,
+        pastagem_id: p.p_pastagem_id ?? null, entrada: p.p_data_entrada, status: 'ativo',
+        raca: p.p_raca || '', sexo: p.p_sexo, qtd: p.p_qtd, p_ini: p.p_peso_inicial || 0, p_at: p.p_peso_inicial || 0,
+        rendimento_carcaca: p.p_rendimento_carcaca ?? 52, obs: p.p_observacao || null,
+      });
+      if (p.p_qtd > 0) {
+        tables.animais.push({ id: nextId('animais'), owner_user_id: p.p_owner_user_id, fazenda_id: p.p_faz_id, lote_id: loteId, identificacao: p.p_nome, tipo_registro: 'grupo', qtd: p.p_qtd, p_at: p.p_peso_inicial || 0 });
+      }
+      if ((p.p_peso_inicial || 0) > 0) {
+        tables.pesagens.push({ id: nextId('pesagens'), owner_user_id: p.p_owner_user_id, lote_id: loteId, data: p.p_data_entrada, peso_medio: p.p_peso_inicial, tipo: 'lote', origem: 'telegram' });
+      }
+      if (p.p_pastagem_id) {
+        const historico = tables.lote_pastagens_historico || (tables.lote_pastagens_historico = []);
+        historico.push({ id: nextId('lote_pastagens_historico'), owner_user_id: p.p_owner_user_id, lote_id: loteId, faz_id: p.p_faz_id, pastagem_destino_id: p.p_pastagem_id });
+      }
+      return { data: loteId };
+    },
+  };
+
+  return {
+    from: (t) => new Q(t),
+    rpc: (nome, params) => {
+      const impl = rpcImpl[nome];
+      if (!impl) return Promise.resolve({ data: null, error: { message: `RPC desconhecida no fake: ${nome}` } });
+      const resultado = impl(params);
+      if (resultado.error) return Promise.resolve({ data: null, error: { message: resultado.error } });
+      return Promise.resolve({ data: resultado.data ?? null, error: null });
+    },
+  };
 }
 
 function baseTables(perfil = 'operador') {
@@ -302,4 +425,220 @@ test('correção de digitação preserva o nome próprio do lote (não corrompe 
   assert.match(r.texto, /Entendi "pesajen" como "pesagem"/);
   assert.match(r.texto, /Confirme a pesagem/);
   assert.match(r.texto, /Recria 01/);
+});
+
+// ── Confirmação editável (Sprint Paridade 1, bloco 4) ────────────────────────
+test('confirmação editável: corrige o pasto de um lote pendente sem perder os outros campos', async () => {
+  const tables = baseTables('operador');
+  tables.pastagens = [
+    { id: 'pasto-a', nome: 'Capim Sul', faz_id: 1, owner_user_id: 'o1' },
+    { id: 'pasto-b', nome: 'Capim Norte', faz_id: 1, owner_user_id: 'o1' },
+  ];
+  const client = makeClient(tables);
+  const c = conexao();
+  const chatId = '123';
+
+  let r = await processarComandoBot({ client, conexao: c, texto: 'cadastre um lote', chatId });
+  assert.match(r.texto, /nome do lote/i);
+  r = await processarComandoBot({ client, conexao: c, texto: 'Recria 03', chatId });
+  assert.match(r.texto, /quantas cabe/i);
+  r = await processarComandoBot({ client, conexao: c, texto: '20', chatId });
+  assert.match(r.texto, /sexo/i);
+  r = await processarComandoBot({ client, conexao: c, texto: 'machos', chatId });
+  assert.match(r.texto, /peso/i);
+  r = await processarComandoBot({ client, conexao: c, texto: 'não', chatId });
+  assert.match(r.texto, /pasto/i);
+  r = await processarComandoBot({ client, conexao: c, texto: 'Capim Sul', chatId });
+  assert.match(r.texto, /Confirme o novo lote/);
+  assert.match(r.texto, /Capim Sul/);
+
+  const edit = await processarComandoBot({ client, conexao: c, texto: 'troque o pasto para Capim Norte', chatId });
+  assert.match(edit.texto, /Pasto alterado/i);
+  assert.match(edit.texto, /Capim Norte/);
+  assert.doesNotMatch(edit.texto, /Capim Sul/);
+  assert.match(edit.texto, /Recria 03/); // outros campos preservados
+  assert.match(edit.texto, /20 cabeças/);
+
+  const conf = await processarComandoBot({ client, conexao: c, texto: '/confirmar', chatId });
+  assert.match(conf.texto, /Registrado/i);
+  const loteCriado = tables.lotes.find((l) => l.nome === 'Recria 03');
+  assert.equal(loteCriado.pastagem_id, 'pasto-b');
+  // action_id estável: UPDATE na mesma linha, nunca criou uma segunda pendência.
+  assert.equal(tables.telegram_operacoes_pendentes.length, 1);
+});
+
+test('confirmação editável: revalidação falhando não altera a pendência (pasto novo não existe)', async () => {
+  const tables = baseTables('operador');
+  tables.pastagens = [{ id: 'pasto-a', nome: 'Capim Sul', faz_id: 1, owner_user_id: 'o1' }];
+  const client = makeClient(tables);
+  const c = conexao();
+  const chatId = '123';
+  await processarComandoBot({ client, conexao: c, texto: 'cadastre um lote', chatId });
+  await processarComandoBot({ client, conexao: c, texto: 'Recria 04', chatId });
+  await processarComandoBot({ client, conexao: c, texto: '15', chatId });
+  await processarComandoBot({ client, conexao: c, texto: 'femeas', chatId });
+  await processarComandoBot({ client, conexao: c, texto: 'não', chatId });
+  const antes = await processarComandoBot({ client, conexao: c, texto: 'não', chatId }); // pasto: não informado
+  assert.match(antes.texto, /Confirme o novo lote/);
+
+  const edit = await processarComandoBot({ client, conexao: c, texto: 'troque o pasto para Pasto Inexistente', chatId });
+  assert.match(edit.texto, /não encontrei/i);
+
+  const conf = await processarComandoBot({ client, conexao: c, texto: '/confirmar', chatId });
+  assert.match(conf.texto, /Registrado/i);
+  const lote = tables.lotes.find((l) => l.nome === 'Recria 04');
+  assert.equal(lote.pastagem_id, null);
+});
+
+test('confirmação editável: idempotência — editar depois de já confirmado não encontra pendência', async () => {
+  const tables = baseTables('operador');
+  tables.pastagens = [
+    { id: 'pasto-a', nome: 'Capim Sul', faz_id: 1, owner_user_id: 'o1' },
+    { id: 'pasto-b', nome: 'Capim Norte', faz_id: 1, owner_user_id: 'o1' },
+  ];
+  const client = makeClient(tables);
+  const c = conexao();
+  const chatId = '123';
+  await processarComandoBot({ client, conexao: c, texto: 'cadastre um lote', chatId });
+  await processarComandoBot({ client, conexao: c, texto: 'Recria 05', chatId });
+  await processarComandoBot({ client, conexao: c, texto: '10', chatId });
+  await processarComandoBot({ client, conexao: c, texto: 'misto', chatId });
+  await processarComandoBot({ client, conexao: c, texto: 'não', chatId });
+  await processarComandoBot({ client, conexao: c, texto: 'Capim Sul', chatId });
+  await processarComandoBot({ client, conexao: c, texto: '/confirmar', chatId });
+
+  const executada = tables.telegram_operacoes_pendentes.find((o) => o.status === 'executada');
+  const payloadAntes = JSON.stringify(executada.payload);
+
+  // Sem pendência 'cadastro' ativa (já executada) — a frase de edição não tem
+  // mais nada a interceptar; pode até disparar OUTRA intenção normal (não é o
+  // que estamos testando aqui), mas nunca deve reabrir/alterar a pendência
+  // antiga já executada nem o lote que ela já criou.
+  await processarComandoBot({ client, conexao: c, texto: 'troque o pasto para Capim Norte', chatId });
+
+  const aindaExecutada = tables.telegram_operacoes_pendentes.find((o) => o.id === executada.id);
+  assert.equal(aindaExecutada.status, 'executada');
+  assert.equal(JSON.stringify(aindaExecutada.payload), payloadAntes);
+  const lote = tables.lotes.find((l) => l.nome === 'Recria 05');
+  assert.equal(lote.pastagem_id, 'pasto-a');
+});
+
+// ── RPCs transacionais (Sprint Paridade 1, bloco 4) — fim a fim via o bot ───
+test('venda: confirma e lança financeiro (via registrar_saida_lote)', async () => {
+  const tables = baseTables('operador');
+  const client = makeClient(tables);
+  const c = conexao();
+  const p1 = await processarComandoBot({ client, conexao: c, texto: 'vendi 10 animais do lote Recria 01 por 25000', chatId: '123' });
+  assert.match(p1.texto, /valor da venda/i);
+  const p2 = await processarComandoBot({ client, conexao: c, texto: '25000', chatId: '123' });
+  assert.match(p2.texto, /Confirme a venda/);
+  const r = await processarComandoBot({ client, conexao: c, texto: '/confirmar', chatId: '123' });
+  assert.match(r.texto, /Registrado/i);
+  assert.equal(tables.lotes.find((l) => l.id === 10).qtd, 72);
+  assert.equal(tables.movimentacoes_animais[0].tipo, 'venda');
+  assert.equal(tables.movimentacoes_financeiras.length, 1);
+  assert.equal(tables.movimentacoes_financeiras[0].valor, 25000);
+});
+
+test('morte: confirma, decrementa qtd e nunca lança financeiro (via registrar_saida_lote)', async () => {
+  const tables = baseTables('operador');
+  const client = makeClient(tables);
+  const c = conexao();
+  const p1 = await processarComandoBot({ client, conexao: c, texto: 'registrar morte de 2 animais do lote Recria 01', chatId: '123' });
+  assert.match(p1.texto, /motivo/i);
+  const p2 = await processarComandoBot({ client, conexao: c, texto: 'Doença respiratória', chatId: '123' });
+  assert.match(p2.texto, /Confirme a baixa por morte/);
+  const r = await processarComandoBot({ client, conexao: c, texto: '/confirmar', chatId: '123' });
+  assert.match(r.texto, /Registrado/i);
+  assert.equal(tables.lotes.find((l) => l.id === 10).qtd, 80);
+  assert.equal(tables.movimentacoes_animais[0].tipo, 'morte');
+  assert.equal(tables.movimentacoes_financeiras.length, 0);
+});
+
+test('ajuste de lotação: confirma e atualiza qtd (via ajustar_lotacao_lote)', async () => {
+  const tables = baseTables('operador');
+  const client = makeClient(tables);
+  const c = conexao();
+  const p1 = await processarComandoBot({ client, conexao: c, texto: 'ajustar o lote Recria 01 para 70 cabeças', chatId: '123' });
+  assert.match(p1.texto, /motivo/i);
+  const p2 = await processarComandoBot({ client, conexao: c, texto: 'Recontagem física', chatId: '123' });
+  assert.match(p2.texto, /Confirme o ajuste de lota/);
+  const r = await processarComandoBot({ client, conexao: c, texto: '/confirmar', chatId: '123' });
+  assert.match(r.texto, /Registrado/i);
+  assert.equal(tables.lotes.find((l) => l.id === 10).qtd, 70);
+  assert.equal(tables.movimentacoes_animais[0].tipo, 'ajuste');
+});
+
+test('finalizar lote: confirma e encerra o status (via finalizar_lote)', async () => {
+  const tables = baseTables('operador');
+  const client = makeClient(tables);
+  const c = conexao();
+  const p1 = await processarComandoBot({ client, conexao: c, texto: 'finalizar o lote Recria 01', chatId: '123' });
+  assert.match(p1.texto, /motivo/i);
+  const p2 = await processarComandoBot({ client, conexao: c, texto: 'Ciclo encerrado', chatId: '123' });
+  assert.match(p2.texto, /Confirme a finaliza/);
+  const r = await processarComandoBot({ client, conexao: c, texto: '/confirmar', chatId: '123' });
+  assert.match(r.texto, /Registrado/i);
+  assert.equal(tables.lotes.find((l) => l.id === 10).status, 'encerrado');
+});
+
+test('editar pesagem: confirma e chama editar_ultima_pesagem_lote', async () => {
+  const tables = baseTables('operador');
+  tables.pesagens = [{ id: 1, lote_id: 10, data: '2026-07-01', peso_medio: 300, tipo: 'lote', owner_user_id: 'o1' }];
+  const client = makeClient(tables);
+  const c = conexao();
+  const p1 = await processarComandoBot({ client, conexao: c, texto: 'corrija a pesagem do lote Recria 01', chatId: '123' });
+  assert.match(p1.texto, /peso/i);
+  const p2 = await processarComandoBot({ client, conexao: c, texto: '405', chatId: '123' });
+  assert.match(p2.texto, /Confirme a corre/);
+  const r = await processarComandoBot({ client, conexao: c, texto: '/confirmar', chatId: '123' });
+  assert.match(r.texto, /Registrado/i);
+  assert.equal(tables.pesagens[0].peso_medio, 405);
+  assert.equal(tables.lotes.find((l) => l.id === 10).p_at, 405);
+});
+
+test('excluir pesagem: confirma e chama excluir_ultima_pesagem_lote', async () => {
+  const tables = baseTables('operador');
+  tables.pesagens = [
+    { id: 1, lote_id: 10, data: '2026-07-01', peso_medio: 300, tipo: 'lote', owner_user_id: 'o1' },
+    { id: 2, lote_id: 10, data: '2026-07-10', peso_medio: 320, tipo: 'lote', owner_user_id: 'o1' },
+  ];
+  const client = makeClient(tables);
+  const c = conexao();
+  const p1 = await processarComandoBot({ client, conexao: c, texto: 'excluir a pesagem do lote Recria 01', chatId: '123' });
+  assert.match(p1.texto, /Confirme a exclus/);
+  const r = await processarComandoBot({ client, conexao: c, texto: '/confirmar', chatId: '123' });
+  assert.match(r.texto, /Registrado/i);
+  assert.equal(tables.pesagens.length, 1);
+  assert.equal(tables.pesagens[0].id, 1);
+  assert.equal(tables.lotes.find((l) => l.id === 10).p_at, 300);
+  assert.equal(tables.lotes.find((l) => l.id === 10).ultima_pesagem, '2026-07-01');
+});
+
+test('cadastro completo de lote: confirma e cria o grupo em animais + pesagem inicial (via criar_lote_completo)', async () => {
+  const tables = baseTables('operador');
+  const client = makeClient(tables);
+  const c = conexao();
+  const animaisAntes = tables.animais.length;
+  const p1 = await processarComandoBot({ client, conexao: c, texto: 'cadastre um lote', chatId: '123' });
+  assert.match(p1.texto, /nome do lote/i);
+  await processarComandoBot({ client, conexao: c, texto: 'Recria 06', chatId: '123' });
+  await processarComandoBot({ client, conexao: c, texto: '25', chatId: '123' });
+  await processarComandoBot({ client, conexao: c, texto: 'machos', chatId: '123' });
+  await processarComandoBot({ client, conexao: c, texto: '350', chatId: '123' });
+  const confirmacao = await processarComandoBot({ client, conexao: c, texto: 'não', chatId: '123' });
+  assert.match(confirmacao.texto, /Confirme o novo lote/);
+  const r = await processarComandoBot({ client, conexao: c, texto: '/confirmar', chatId: '123' });
+  assert.match(r.texto, /Registrado/i);
+
+  const loteCriado = tables.lotes.find((l) => l.nome === 'Recria 06');
+  assert.ok(loteCriado);
+  assert.equal(loteCriado.qtd, 25);
+  // Side-effects que o insert avulso antigo nunca replicava:
+  assert.equal(tables.animais.length, animaisAntes + 1);
+  const grupo = tables.animais.find((a) => a.lote_id === loteCriado.id);
+  assert.equal(grupo.tipo_registro, 'grupo');
+  assert.equal(grupo.qtd, 25);
+  const pesagemInicial = tables.pesagens.find((p) => p.lote_id === loteCriado.id);
+  assert.equal(pesagemInicial.peso_medio, 350);
 });

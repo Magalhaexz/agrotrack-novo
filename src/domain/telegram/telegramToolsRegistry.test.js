@@ -67,16 +67,15 @@ const dbLote = {
   animais: [],
 };
 
-test('transferir_animais_entre_lotes resolve nomes e monta writes genéricos aplicáveis por aplicarWrites', () => {
+test('transferir_animais_entre_lotes resolve nomes e prepara RPC transacional (registrar_saida_lote)', () => {
   const tool = obterFerramenta('transferir_animais_entre_lotes');
   const r = tool.execute(dbLote, { loteOrigem: 'Recria', loteDestino: 'Engorda', quantidade: 5 });
   assert.equal(r.ok, true);
-  assert.equal(r.writes.length, 3);
-  assert.equal(r.writes[0].tabela, 'movimentacoes_animais');
-  assert.equal(r.writes[1].tabela, 'lotes');
-  assert.equal(r.writes[1].match.id, 1);
-  assert.equal(r.writes[1].patch.qtd, 35);
-  assert.equal(r.writes[2].patch.qtd, 15);
+  assert.equal(r.rpc.nome, 'registrar_saida_lote');
+  assert.equal(r.rpc.params.p_tipo, 'transferencia_saida');
+  assert.equal(r.rpc.params.p_lote_id, 1);
+  assert.equal(r.rpc.params.p_destino_lote_id, 2);
+  assert.equal(r.rpc.params.p_qtd, 5);
 });
 
 test('transferir_animais_entre_lotes propaga erro de lote não encontrado', () => {

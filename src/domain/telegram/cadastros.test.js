@@ -138,13 +138,13 @@ test('dar_baixa_estoque impede saldo negativo', () => {
   assert.equal(prepararCadastro(INTENCOES.DAR_BAIXA_ESTOQUE, { item: 'sal', quantidade: 999 }, ctx()).erro, 'SALDO_INSUFICIENTE');
 });
 
-test('prepararCadastro trocar_lote_pasto move o lote sem alterar quantidade', () => {
+test('prepararCadastro trocar_lote_pasto prepara RPC transacional sem tocar quantidade', () => {
   const r = prepararCadastro(INTENCOES.TROCAR_LOTE_PASTO, { lote: 'Recria', pasto: 'Capim Norte' }, ctx());
   assert.equal(r.ok, true);
   assert.equal(r.tipo, 'troca_pasto');
-  const updLote = r.writes.find((w) => w.tabela === 'lotes');
-  assert.equal(updLote.patch.pastagem_id, 'pasto-b');
-  assert.equal('qtd' in updLote.patch, false);
+  assert.equal(r.rpc.nome, 'mover_lote_para_pasto_bot');
+  assert.equal(r.rpc.params.p_pastagem_destino_id, 'pasto-b');
+  assert.equal('p_qtd' in r.rpc.params, false);
 });
 
 test('trocar_lote_pasto de pasto de outra fazenda é rejeitado', () => {
@@ -161,14 +161,15 @@ const dbComRebanho = () => ({
 });
 const ctxComRebanho = () => ({ db: dbComRebanho(), hoje: HOJE, fazendaId: 1 });
 
-test('prepararCadastro cadastrar_lote insere lote novo na fazenda do contexto', () => {
+test('prepararCadastro cadastrar_lote prepara RPC transacional (criar_lote_completo) na fazenda do contexto', () => {
   const r = prepararCadastro(INTENCOES.CADASTRAR_LOTE, { nome_lote: 'Nova Recria', quantidade: 20, sexo: 'macho' }, ctxComRebanho());
   assert.equal(r.ok, true);
   assert.equal(r.tipo, 'cadastro_lote');
-  assert.equal(r.writes[0].tabela, 'lotes');
-  assert.equal(r.writes[0].registro.nome, 'Nova Recria');
-  assert.equal(r.writes[0].registro.faz_id, 1);
-  assert.equal(r.writes[0].registro.qtd, 20);
+  assert.equal(r.rpc.nome, 'criar_lote_completo');
+  assert.equal(r.rpc.params.p_nome, 'Nova Recria');
+  assert.equal(r.rpc.params.p_faz_id, 1);
+  assert.equal(r.rpc.params.p_qtd, 20);
+  assert.equal(r.rpc.params.p_sexo, 'macho');
 });
 
 test('prepararCadastro cadastrar_pasto insere pasto novo na fazenda do contexto', () => {
@@ -180,32 +181,35 @@ test('prepararCadastro cadastrar_pasto insere pasto novo na fazenda do contexto'
   assert.equal(r.writes[0].registro.faz_id, 1);
 });
 
-test('prepararCadastro registrar_venda resolve o lote pelo nome e gera receita', () => {
+test('prepararCadastro registrar_venda resolve o lote pelo nome e prepara RPC transacional', () => {
   const r = prepararCadastro(INTENCOES.REGISTRAR_VENDA, { lote: 'Recria 01', quantidade: 10, valor: 25000 }, ctxComRebanho());
   assert.equal(r.ok, true);
   assert.equal(r.tipo, 'venda');
-  const loteUpdate = r.writes.find((w) => w.tabela === 'lotes');
-  assert.equal(loteUpdate.patch.qtd, 20);
-  const financeiro = r.writes.find((w) => w.tabela === 'movimentacoes_financeiras');
-  assert.equal(financeiro.registro.valor, 25000);
+  assert.equal(r.rpc.nome, 'registrar_saida_lote');
+  assert.equal(r.rpc.params.p_tipo, 'venda');
+  assert.equal(r.rpc.params.p_qtd, 10);
+  assert.equal(r.rpc.params.p_valor_total, 25000);
 });
 
 test('registrar_venda lote inexistente', () => {
   assert.equal(prepararCadastro(INTENCOES.REGISTRAR_VENDA, { lote: 'Inexistente', quantidade: 5 }, ctxComRebanho()).erro, 'LOTE_NAO_ENCONTRADO');
 });
 
-test('prepararCadastro registrar_morte nunca gera lançamento financeiro', () => {
+test('prepararCadastro registrar_morte nunca gera lançamento financeiro (p_valor_total=0)', () => {
   const r = prepararCadastro(INTENCOES.REGISTRAR_MORTE, { lote: 'Recria 01', quantidade: 2, motivo: 'Doença' }, ctxComRebanho());
   assert.equal(r.ok, true);
   assert.equal(r.tipo, 'morte');
-  assert.equal(r.writes.some((w) => w.tabela === 'movimentacoes_financeiras'), false);
+  assert.equal(r.rpc.nome, 'registrar_saida_lote');
+  assert.equal(r.rpc.params.p_tipo, 'morte');
+  assert.equal(r.rpc.params.p_valor_total, 0);
 });
 
-test('prepararCadastro finalizar_lote atualiza só o status do lote', () => {
+test('prepararCadastro finalizar_lote prepara RPC transacional com status encerrado', () => {
   const r = prepararCadastro(INTENCOES.FINALIZAR_LOTE, { lote: 'Recria 01', motivo: 'Ciclo encerrado' }, ctxComRebanho());
   assert.equal(r.ok, true);
   assert.equal(r.tipo, 'finalizar_lote');
-  assert.equal(r.writes[0].patch.status, 'encerrado');
+  assert.equal(r.rpc.nome, 'finalizar_lote');
+  assert.equal(r.rpc.params.p_status, 'encerrado');
 });
 
 test('prepararCadastro cadastrar_manejo insere em sanitario', () => {
@@ -279,13 +283,13 @@ const dbComPesagens = () => ({
 });
 const ctxComPesagens = () => ({ db: dbComPesagens(), hoje: HOJE, fazendaId: 1 });
 
-test('prepararCadastro editar_pesagem corrige a pesagem mais recente do lote', () => {
+test('prepararCadastro editar_pesagem prepara RPC transacional para a pesagem mais recente', () => {
   const r = prepararCadastro(INTENCOES.EDITAR_PESAGEM, { lote: 'Recria 01', peso: 405 }, ctxComPesagens());
   assert.equal(r.ok, true);
   assert.equal(r.tipo, 'editar_pesagem');
-  const upd = r.writes.find((w) => w.tabela === 'pesagens');
-  assert.equal(upd.match.id, 101);
-  assert.equal(upd.patch.peso_medio, 405);
+  assert.equal(r.rpc.nome, 'editar_ultima_pesagem_lote');
+  assert.equal(r.rpc.params.p_pesagem_id, 101);
+  assert.equal(r.rpc.params.p_novo_peso, 405);
 });
 
 test('editar_pesagem rejeita peso inválido e lote sem pesagem', () => {
@@ -293,23 +297,20 @@ test('editar_pesagem rejeita peso inválido e lote sem pesagem', () => {
   assert.equal(prepararCadastro(INTENCOES.EDITAR_PESAGEM, { lote: 'Recria 01', peso: 400 }, ctx()).erro, 'PESAGEM_NAO_ENCONTRADA');
 });
 
-test('prepararCadastro excluir_pesagem remove a pesagem mais recente e recalcula o lote', () => {
+test('prepararCadastro excluir_pesagem prepara RPC transacional para a pesagem mais recente', () => {
   const r = prepararCadastro(INTENCOES.EXCLUIR_PESAGEM, { lote: 'Recria 01' }, ctxComPesagens());
   assert.equal(r.ok, true);
   assert.equal(r.tipo, 'excluir_pesagem');
-  const del = r.writes.find((w) => w.tabela === 'pesagens');
-  assert.equal(del.tipo, 'delete');
-  assert.equal(del.match.id, 101);
-  const loteUpdate = r.writes.find((w) => w.tabela === 'lotes');
-  assert.equal(loteUpdate.patch.p_at, 300);
+  assert.equal(r.rpc.nome, 'excluir_ultima_pesagem_lote');
+  assert.equal(r.rpc.params.p_pesagem_id, 101);
 });
 
-test('prepararCadastro ajustar_lotacao resolve o lote pelo nome', () => {
+test('prepararCadastro ajustar_lotacao resolve o lote pelo nome e prepara RPC transacional', () => {
   const r = prepararCadastro(INTENCOES.AJUSTAR_LOTACAO, { lote: 'Recria 01', quantidade: 5, motivo: 'Recontagem' }, ctxComRebanho());
   assert.equal(r.ok, true);
   assert.equal(r.tipo, 'ajuste_lotacao');
-  const loteUpdate = r.writes.find((w) => w.tabela === 'lotes');
-  assert.equal(loteUpdate.patch.qtd, 5);
+  assert.equal(r.rpc.nome, 'ajustar_lotacao_lote');
+  assert.equal(r.rpc.params.p_nova_qtd, 5);
 });
 
 test('ajustar_lotacao exige motivo e lote encontrado', () => {
@@ -331,11 +332,11 @@ test('prepararCadastro editar_pasto resolve o pasto pelo nome', () => {
   assert.equal(r.writes[0].patch.area_ha, 12);
 });
 
-test('prepararCadastro retirar_lote_pasto limpa o vínculo sem alterar quantidade', () => {
+test('prepararCadastro retirar_lote_pasto prepara RPC transacional com destino nulo, sem alterar quantidade', () => {
   const r = prepararCadastro(INTENCOES.RETIRAR_LOTE_PASTO, { lote: 'Recria 01' }, ctxComRebanho());
   assert.equal(r.ok, true);
   assert.equal(r.tipo, 'retirar_lote_pasto');
-  const loteUpdate = r.writes.find((w) => w.tabela === 'lotes');
-  assert.equal(loteUpdate.patch.pastagem_id, null);
-  assert.equal('qtd' in loteUpdate.patch, false);
+  assert.equal(r.rpc.nome, 'mover_lote_para_pasto_bot');
+  assert.equal(r.rpc.params.p_pastagem_destino_id, null);
+  assert.equal('p_qtd' in r.rpc.params, false);
 });

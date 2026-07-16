@@ -20,23 +20,23 @@ function db() {
   };
 }
 
-test('transferência válida atualiza os dois lotes e cria movimentação', () => {
+test('transferência válida atualiza os dois lotes e cria movimentação (via RPC transacional)', () => {
   const r = prepararTransferenciaAnimais(db(), { loteOrigemId: 10, loteDestinoId: 11, quantidade: 15 });
   assert.equal(r.ok, true);
   assert.equal(r.resumo.origemQtdFinal, 67);
   assert.equal(r.resumo.destinoQtdFinal, 79);
-  assert.equal(r.writes.movimentacaoAnimal.tipo, 'transferencia_saida');
-  assert.equal(r.writes.movimentacaoAnimal.lote_id, 10);
-  assert.equal(r.writes.movimentacaoAnimal.destino_lote_id, 11);
-  assert.equal(r.writes.loteOrigem.qtd, 67);
-  assert.equal(r.writes.loteDestino.qtd, 79);
+  assert.equal(r.rpc.nome, 'registrar_saida_lote');
+  assert.equal(r.rpc.params.p_tipo, 'transferencia_saida');
+  assert.equal(r.rpc.params.p_lote_id, 10);
+  assert.equal(r.rpc.params.p_destino_lote_id, 11);
+  assert.equal(r.rpc.params.p_qtd, 15);
 });
 
 test('peso médio do destino é ponderado', () => {
   const r = prepararTransferenciaAnimais(db(), { loteOrigemId: 10, loteDestinoId: 11, quantidade: 10 });
   // (64*478 + 10*312) / 74
   const esperado = (64 * 478 + 10 * 312) / 74;
-  assert.ok(Math.abs(r.writes.loteDestino.p_at - esperado) < 1e-6);
+  assert.ok(Math.abs(r.rpc.params.p_peso_destino_final - esperado) < 1e-6);
 });
 
 test('rejeita quantidade maior que o disponível', () => {
@@ -111,27 +111,24 @@ test('renomear lote inexistente', () => {
 });
 
 // ── Venda ────────────────────────────────────────────────────────────────────
-test('venda válida atualiza qtd e gera receita quando valor > 0', () => {
+test('venda válida atualiza qtd e gera receita quando valor > 0 (via RPC transacional)', () => {
   const r = prepararVendaAnimais(db(), { loteId: 10, quantidade: 10, valor: 25000, data: '2026-07-15' });
   assert.equal(r.ok, true);
   assert.ok(r.resumo.some((l) => l === 'Quantidade atual: 82 cabeças'));
   assert.ok(r.resumo.some((l) => /Quantidade vendida: 10/.test(l)));
   assert.ok(r.resumo.some((l) => /Quantidade restante: 72/.test(l)));
-  const movAnimal = r.writes.find((w) => w.tabela === 'movimentacoes_animais');
-  assert.equal(movAnimal.registro.tipo, 'venda');
-  assert.equal(movAnimal.registro.qtd, 10);
-  const loteUpdate = r.writes.find((w) => w.tabela === 'lotes');
-  assert.equal(loteUpdate.patch.qtd, 72);
-  const financeiro = r.writes.find((w) => w.tabela === 'movimentacoes_financeiras');
-  assert.equal(financeiro.registro.tipo, 'receita');
-  assert.equal(financeiro.registro.categoria, 'venda_animal');
-  assert.equal(financeiro.registro.valor, 25000);
+  assert.equal(r.rpc.nome, 'registrar_saida_lote');
+  assert.equal(r.rpc.params.p_tipo, 'venda');
+  assert.equal(r.rpc.params.p_lote_id, 10);
+  assert.equal(r.rpc.params.p_qtd, 10);
+  assert.equal(r.rpc.params.p_valor_total, 25000);
+  assert.equal(r.rpc.params.p_data, '2026-07-15');
 });
 
-test('venda sem valor não gera lançamento financeiro', () => {
+test('venda sem valor manda p_valor_total=0 (a RPC decide não lançar financeiro)', () => {
   const r = prepararVendaAnimais(db(), { loteId: 10, quantidade: 5 });
   assert.equal(r.ok, true);
-  assert.equal(r.writes.some((w) => w.tabela === 'movimentacoes_financeiras'), false);
+  assert.equal(r.rpc.params.p_valor_total, 0);
 });
 
 test('venda rejeita quantidade acima do disponível, inválida e lote bloqueado/inexistente', () => {
@@ -142,16 +139,14 @@ test('venda rejeita quantidade acima do disponível, inválida e lote bloqueado/
 });
 
 // ── Morte / perda ────────────────────────────────────────────────────────────
-test('morte válida atualiza qtd e nunca gera receita', () => {
+test('morte válida atualiza qtd e nunca gera receita (via RPC transacional)', () => {
   const r = prepararMorteAnimais(db(), { loteId: 10, quantidade: 2, motivo: 'Doença respiratória' });
   assert.equal(r.ok, true);
-  const movAnimal = r.writes.find((w) => w.tabela === 'movimentacoes_animais');
-  assert.equal(movAnimal.registro.tipo, 'morte');
-  assert.equal(movAnimal.registro.valor_total, 0);
-  assert.equal(movAnimal.registro.obs, 'Doença respiratória');
-  assert.equal(r.writes.some((w) => w.tabela === 'movimentacoes_financeiras'), false);
-  const loteUpdate = r.writes.find((w) => w.tabela === 'lotes');
-  assert.equal(loteUpdate.patch.qtd, 80);
+  assert.equal(r.rpc.nome, 'registrar_saida_lote');
+  assert.equal(r.rpc.params.p_tipo, 'morte');
+  assert.equal(r.rpc.params.p_valor_total, 0);
+  assert.equal(r.rpc.params.p_obs, 'Doença respiratória');
+  assert.equal(r.rpc.params.p_qtd, 2);
 });
 
 test('morte rejeita quantidade acima do disponível', () => {
@@ -159,14 +154,13 @@ test('morte rejeita quantidade acima do disponível', () => {
 });
 
 // ── Finalizar lote ───────────────────────────────────────────────────────────
-test('finalizar lote válido preserva histórico e só atualiza status', () => {
+test('finalizar lote válido preserva histórico e só atualiza status (via RPC transacional)', () => {
   const r = prepararFinalizarLote(db(), { loteId: 10, motivo: 'Ciclo encerrado', data: '2026-07-15' });
   assert.equal(r.ok, true);
-  assert.equal(r.writes.length, 1);
-  assert.equal(r.writes[0].tabela, 'lotes');
-  assert.equal(r.writes[0].patch.status, 'encerrado');
-  assert.equal(r.writes[0].patch.motivo_encerramento, 'Ciclo encerrado');
-  assert.equal(r.writes[0].patch.data_encerramento, '2026-07-15');
+  assert.equal(r.rpc.nome, 'finalizar_lote');
+  assert.equal(r.rpc.params.p_status, 'encerrado');
+  assert.equal(r.rpc.params.p_motivo, 'Ciclo encerrado');
+  assert.equal(r.rpc.params.p_data_encerramento, '2026-07-15');
 });
 
 test('finalizar lote exige motivo e rejeita lote já finalizado/inexistente', () => {
@@ -176,14 +170,13 @@ test('finalizar lote exige motivo e rejeita lote já finalizado/inexistente', ()
 });
 
 // ── Ajuste de lotação (reaproveita buildAjusteLotacaoPatch de lotesLogic.js) ─
-test('ajuste de lotação válido gera update de qtd e movimentação tipo ajuste', () => {
+test('ajuste de lotação válido gera update de qtd e movimentação tipo ajuste (via RPC transacional)', () => {
   const r = prepararAjusteLotacao(db(), { loteId: 10, quantidade: 70, motivo: 'Contagem física' });
   assert.equal(r.ok, true);
-  const loteUpdate = r.writes.find((w) => w.tabela === 'lotes');
-  assert.equal(loteUpdate.patch.qtd, 70);
-  const mov = r.writes.find((w) => w.tabela === 'movimentacoes_animais');
-  assert.equal(mov.registro.tipo, 'ajuste');
-  assert.equal(mov.registro.qtd, -12);
+  assert.equal(r.rpc.nome, 'ajustar_lotacao_lote');
+  assert.equal(r.rpc.params.p_lote_id, 10);
+  assert.equal(r.rpc.params.p_nova_qtd, 70);
+  assert.equal(r.rpc.params.p_motivo, 'Contagem física');
 });
 
 test('ajuste de lotação rejeita quantidade igual, negativa e lote bloqueado/inexistente', () => {
