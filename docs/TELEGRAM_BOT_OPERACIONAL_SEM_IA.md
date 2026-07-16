@@ -593,16 +593,47 @@ operações. `api/_telegramBot.js` ganhou `aplicarRpc` (uma chamada
 quando o plano tem `.rpc`.
 
 **Decisão de escopo**: o app web (`services/movimentacoes.js`) não foi
-migrado para as RPCs nesta rodada — só o bot. **Achado à parte**: dois
-fluxos do app (`peso_medio_atual`, `motivo_encerramento`) escrevem colunas
-de `lotes` que não existem no schema real — não replicado pelas RPCs
-novas, investigação sinalizada separadamente.
+migrado para as RPCs nesta rodada — só o bot.
 
-**Pendência real**: a migration foi criada e revisada, mas **não aplicada
-em produção** nesta sessão (decisão do usuário) — o código que chama
-`client.rpc(...)` só funciona depois que ela for aplicada. Ação de escrita
-de alertas, edição completa de lote, fazenda consolidada/exclusão, exclusão
-de pasto, pesagem batch, matriz de idempotência/permissão/multi-fazenda
-dedicada, validação autenticada no app e validação real no Telegram
-continuam em aberto — ver `docs/TELEGRAM_PARIDADE_COMPLETA_APP.md`, seção
-"Sprint Paridade 1 — bloco 4".
+**Correção**: o "achado à parte" registrado aqui originalmente (colunas
+`peso_medio_atual`/`motivo_encerramento` inexistentes) estava errado —
+baseava-se num dump de schema desatualizado. As duas colunas existem de
+verdade no banco real; as RPCs já foram escritas para gravar nelas.
+
+## 19. Ativação: migration aplicada, vulnerabilidade corrigida, smoke tests
+
+Continuação a partir de `19736b8`. A migration foi revisada contra o
+schema real (`information_schema`, não o dump), corrigida (2 bugs de
+coluna) e **aplicada em produção** — único ambiente disponível
+(`list_branches` não mostra homologação separada).
+
+**Vulnerabilidade crítica encontrada e corrigida na mesma sessão**: depois
+de aplicar, `anon` (sem login) tinha `EXECUTE` nas 8 funções — Supabase
+concede `EXECUTE` por padrão a `anon`/`authenticated`/`service_role` via
+`ALTER DEFAULT PRIVILEGES`, um grant que `REVOKE ALL FROM PUBLIC` não
+remove. Como `app_assert_owner_write` só validava quando
+`auth.role()='authenticated'`, um chamador `anon` caía no ramo "confia no
+parâmetro" — escrita cross-conta completa, sem autenticação nenhuma.
+Corrigido imediatamente: `REVOKE EXECUTE ... FROM anon` nas 8 funções +
+`app_assert_owner_write` reescrita para negar explicitamente qualquer
+papel que não seja `service_role`/`authenticated` validado (migration de
+avanço `20260716181018_hardening_rpcs_transacionais_revoke_anon.sql`).
+Confirmado via `get_advisors` que `anon` não aparece mais como executor de
+nenhuma das 8 funções.
+
+**Smoke tests diretos** contra dados QA reais (`Fazenda QA Sprint 34`),
+numa transação com `ROLLBACK` (nada persistiu): 17 casos cobrindo as 8
+RPCs (caminho feliz + erros de valor + cross-conta + permissão) — 16
+corretos de primeira, 1 falso-negativo de teste (query de verificação sem
+filtro `origem_tipo`) identificado e corrigido. Matriz completa em
+`docs/TELEGRAM_PARIDADE_COMPLETA_APP.md`, seção "Sprint Paridade 1 —
+bloco 4 (ativação)".
+
+**Validação autenticada no app**: não se aplica — confirmado por grep que
+nenhum código de `src/services/`/`src/pages/` chama as 8 RPCs (só o bot).
+**Validação real no Telegram**: sem acesso nesta sessão, não validado.
+
+**Pendências reais**: ação de escrita de alertas, edição completa de
+lote, fazenda consolidada/exclusão, exclusão de pasto, pesagem batch,
+matriz de idempotência/permissão/multi-fazenda dedicada (cobertura
+representativa feita, não exaustiva), validação real no Telegram.

@@ -593,16 +593,14 @@ consolidada/exclusão, exclusão de pasto seguem para o próximo bloco).
   reduz o raio de alcance da mudança a um código já em produção e testado,
   deixando a migração do app como um fast-follow depois que as RPCs
   estiverem provadas via o bot.
-- **Achado adicional, fora do escopo de correção desta rodada**: dois
-  fluxos do app escrevem em colunas de `lotes` que não existem em nenhuma
-  migration nem no dump `docs/supabase-production-schema.sql` —
-  `peso_medio_atual` (6 arquivos, incluindo `PesagensPage.jsx`) e
-  `motivo_encerramento` (`LotesPage.jsx::handleFechamento`). As RPCs novas
-  desta rodada **não replicam esse bug** (só escrevem colunas reais: `p_at`/
-  `ultima_pesagem` para pesagem, `obs` para o motivo de encerramento) — mas
-  o próprio app continua enviando esses campos extras ao Supabase, o que
-  pode estar falhando silenciosamente. Investigação e fix ficam para uma
-  sessão dedicada (tarefa sinalizada separadamente).
+- **Achado inicial CORRIGIDO na ativação (ver abaixo)**: esta seção
+  originalmente registrava `lotes.peso_medio_atual` e
+  `lotes.motivo_encerramento` como colunas inexistentes. Isso estava
+  **errado** — baseava-se no dump estático `docs/supabase-production-schema.sql`,
+  desatualizado. Consultando `information_schema` no banco real, as duas
+  colunas existem de fato (`peso_medio_atual`, `peso_atual` e `motivo_encerramento`,
+  todas `text`/`numeric` nullable). As RPCs foram corrigidas antes da
+  aplicação para gravar nelas — ver seção de ativação abaixo.
 - **Não implementado nesta rodada** (ficam para o próximo bloco): ação de
   escrita de alertas no bot (resolver/ignorar/adiar/em análise), edição de
   peso inicial/data de entrada/origem/pasto do lote, visão consolidada/
@@ -611,13 +609,86 @@ consolidada/exclusão, exclusão de pasto seguem para o próximo bloco).
   de idempotência/permissão/multi-fazenda para as 8 operações
   transacionais (reaproveitam o mesmo mecanismo genérico já testado —
   `operacoesPendentes.test.js` — mesma decisão já tomada nos blocos
-  anteriores), validação autenticada no app e validação real no Telegram.
-- **Migration não aplicada em produção nesta sessão** — só o arquivo SQL
-  foi criado e revisado (lint/testes/build passam sem depender do banco
-  real, já que a suíte de testes usa um client Supabase fake). O código do
-  bot que chama `client.rpc('registrar_saida_lote', ...)` etc. só funciona
-  **depois** que a migration for aplicada no Supabase de produção — pendência
-  real, decisão do usuário nesta sessão.
+  anteriores), validação autenticada no app (não se aplica — a UI web não
+  chama essas RPCs, ver abaixo) e validação real no Telegram (sem acesso).
+
+## Sprint Paridade 1 — bloco 4 (ativação): migration aplicada e validada
+
+Continuação a partir de `19736b8`. Migration
+`supabase/migrations/20260716180853_rpcs_transacionais_lote_pesagem.sql`
+(renomeada do timestamp local `20260716120000` para o timestamp que o
+Supabase atribuiu ao aplicar — mesmo padrão de reconciliação já documentado
+em sprints anteriores) **aplicada em produção** (único ambiente disponível —
+`list_branches` não mostra homologação separada), via `mcp__supabase__apply_migration`.
+
+**Dois bugs reais corrigidos antes de aplicar**, achados ao conferir contra
+`information_schema` em vez do dump estático:
+1. `lotes.motivo_encerramento` existe de verdade — `finalizar_lote` foi
+   corrigida para gravar nela (não em `obs`, como a versão original fazia).
+2. `lotes.peso_atual`/`peso_medio_atual` existem de verdade, junto com
+   `p_at` — `editar_ultima_pesagem_lote`/`excluir_ultima_pesagem_lote`
+   passaram a sincronizar as três colunas, igual ao que `PesagensPage.jsx`
+   já fazia em JS.
+
+**Vulnerabilidade crítica encontrada e corrigida na hora**: depois de
+aplicar a migration original, `anon` (chamador sem login nenhum) tinha
+`EXECUTE` nas 8 funções — `REVOKE ALL ... FROM PUBLIC` não remove o
+`EXECUTE` que o Supabase concede por padrão a `anon`/`authenticated`/
+`service_role` via `ALTER DEFAULT PRIVILEGES` do schema `public` (é um
+GRANT separado por role, não uma herança de `PUBLIC`). Como
+`app_assert_owner_write` só validava a conta quando
+`auth.role() = 'authenticated'`, um chamador `anon` caía no ramo "confia
+no parâmetro" (pensado só para o service-role do bot) e podia informar
+QUALQUER `p_owner_user_id` — escrita cross-conta completa, sem
+autenticação. Corrigido imediatamente (`REVOKE EXECUTE ... FROM anon` nas
+8 funções + `app_assert_owner_write` reescrita para negar explicitamente
+qualquer papel que não seja `service_role` ou `authenticated` validado, em
+vez do padrão anterior "só nega quando é authenticated e falha a
+checagem"). Migration de avanço:
+`supabase/migrations/20260716181018_hardening_rpcs_transacionais_revoke_anon.sql`.
+Confirmado via `get_advisors(security)`: nenhuma das 8 funções aparece mais
+como executável por `anon`.
+
+**Smoke tests diretos contra a conta QA real** (`Fazenda QA Sprint 34`,
+`owner_user_id=971ee284-…`), em uma transação com `ROLLBACK` no final (nada
+persistiu):
+
+| RPC | Válida | Erro de valor | Outra conta | Permissão | Observação |
+|---|---|---|---|---|---|
+| `registrar_saida_lote` (venda) | ✅ qtd -3, financeiro criado | ✅ qtd negativa e qtd>saldo rejeitadas | — | — | |
+| `registrar_saida_lote` (morte) | ✅ qtd -1, **sem** financeiro | — | — | — | confirmado 2x (1 falso-negativo de teste, causado por uma query de verificação sem filtro `origem_tipo`, corrigido e re-testado isoladamente) |
+| `registrar_saida_lote` (transferência) | ✅ origem -2 / destino +2, peso do destino reponderado | — | — | — | |
+| `ajustar_lotacao_lote` | ✅ qtd atualizada | ✅ "sem alteração" rejeitada | — | — | |
+| `finalizar_lote` | ✅ status+motivo_encerramento gravados | ✅ dupla finalização bloqueada | — | — | |
+| `mover_lote_para_pasto_bot` (troca) | ✅ histórico criado, pastagem_id atualizado | — | — | — | |
+| `mover_lote_para_pasto_bot` (retirada) | ✅ pastagem_id → null | — | — | — | |
+| `mover_lote_para_pasto_bot` | — | ✅ pasto de outra fazenda rejeitado | — | — | |
+| `editar_ultima_pesagem_lote` | ✅ peso + `p_at`/`peso_atual`/`peso_medio_atual` sincronizados | — | — | — | |
+| `excluir_ultima_pesagem_lote` | ✅ cai para a pesagem restante corretamente | — | — | — | |
+| `criar_lote_completo` | ✅ lote + grupo em `animais` + pesagem inicial + pasto, tudo junto | — | — | — | |
+| (todas, via `ajustar_lotacao_lote`) | — | — | ✅ lote de outra conta → 42501 | ✅ `authenticated` sem perfil válido → 42501 | |
+| (todas) | — | — | — | ✅ `anon` sem `EXECUTE` (permission denied no Postgres, antes de entrar na função) | verificado via `get_advisors` após o revoke |
+
+17 casos exercitados, 16 confirmados corretos de primeira, 1 falso-negativo
+de teste identificado e corrigido (não era bug da RPC). Cobertura
+representativa (caminho feliz + 1-2 erros mais relevantes por RPC), não a
+matriz exaustiva de todas as combinações — mesma decisão de escopo já usada
+para idempotência/multi-fazenda nos blocos anteriores.
+
+**Validação autenticada no app**: não se aplica a este bloco —
+confirmado por grep que `src/services/` e `src/pages/` não chamam nenhuma
+das 8 RPCs (decisão de escopo do bloco anterior: só o bot foi religado a
+elas). Não há caminho de UI para clicar e exercitar essas funções
+especificamente; a validação real disponível é a direta contra o banco
+(acima), que é mais forte para provar a lógica transacional em si do que
+um clique de UI seria.
+
+**Validação real no Telegram**: continua sem acesso a bot ao vivo nesta
+sessão — não validado, não declarado como validado.
+
+**P0/P1 deste bloco: 0** (a vulnerabilidade de `anon` foi encontrada e
+corrigida na mesma sessão, antes de qualquer exposição real fora deste
+processo de ativação).
 
 ## Custo de IA
 
