@@ -29,6 +29,7 @@ import AssistenteHerdon from '../components/assistente/AssistenteHerdon';
 import { getResumoLote } from '../domain/resumoLote';
 import { construirHojeNaFazenda } from '../domain/hojeNaFazenda';
 import { gerarAlertasUnificados, PRIORIDADE } from '../domain/alertasUnificados';
+import { aplicarTratativasAosAlertas } from '../domain/tratativasAlertas';
 import { construirChecklistPrimeirosPassos } from '../domain/guiaCriador';
 import { getNavLabel } from '../navigation/navConfig';
 import { formatCurrency, formatDate, formatNumber } from '../utils/calculations';
@@ -293,9 +294,23 @@ export default function DashboardPage({
   // `alertasInteligentes.js` + `hojeNaFazenda.js` internamente e já devolve
   // {prioridade, origem, titulo, pageId} padronizados. Substitui a composição
   // ad-hoc que vivia aqui desde o Sprint 4.
-  const alertasUnificados = useMemo(
+  //
+  // Sprint Paridade 1 (bloco 2 — unificação do motor de alertas): aplica a
+  // mesma tratativa (`alertas_tratativas`) que a Central e o Telegram já
+  // respeitam, para que "Prioridades de hoje" nunca mostre um alerta já
+  // resolvido/ignorado/adiado em outro canal. Só leitura aqui — resolver/
+  // ignorar/adiar continuam existindo apenas na Central (`AlertasPage.jsx`).
+  const alertasUnificadosBrutos = useMemo(
     () => gerarAlertasUnificados({ ...db, pastagens: pastagensFazendaAtiva }),
     [db, pastagensFazendaAtiva]
+  );
+  const alertasTratativas = useMemo(
+    () => (Array.isArray(db?.alertas_tratativas) ? db.alertas_tratativas : []),
+    [db]
+  );
+  const alertasUnificados = useMemo(
+    () => aplicarTratativasAosAlertas(alertasUnificadosBrutos, alertasTratativas, new Date()).filter((a) => a.visivel),
+    [alertasUnificadosBrutos, alertasTratativas]
   );
 
   const gruposPrioridades = useMemo(() => {
@@ -787,11 +802,12 @@ export default function DashboardPage({
             <div className="card-header dashboard-tab-header">
               <h3>Todos os alertas</h3>
               <div style={{ display: 'flex', gap: 8 }}>
-                {/* Sprint 16: este painel usa o motor legado (utils/alerts.js) com
-                    resolver/adiar simples; a Central (alertasUnificados.js +
-                    tratativasAlertas.js) tem também "em análise"/"ignorar" e
-                    histórico consultável — atalho aqui em vez de duplicar essa
-                    tratativa dentro do Dashboard. */}
+                {/* Sprint Paridade 1 (bloco 2): este painel já usa a mesma fonte
+                    canônica da Central (alertasUnificados.js + tratativasAlertas.js,
+                    via App.jsx::adaptarAlertaParaPainelLegado) — resolver/adiar aqui
+                    grava na mesma tabela alertas_tratativas. A Central continua
+                    tendo também "em análise"/"ignorar" e histórico consultável,
+                    que não foram duplicados aqui — atalho abaixo em vez disso. */}
                 <button className="btn-secondary btn-sm" onClick={() => onNavigate?.('alertas')} type="button">
                   Ver Central de Alertas
                 </button>

@@ -1,6 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { gerarAlertasUnificados } from './alertasUnificados.js';
+import { gerarAlertasUnificados, adaptarAlertaParaPainelLegado, PRIORIDADE } from './alertasUnificados.js';
+import { aplicarTratativasAosAlertas, STATUS_TRATATIVA } from './tratativasAlertas.js';
 import { hojeLocalISO } from './dataCivil.js';
 
 const AGORA = new Date('2026-07-10T12:00:00Z');
@@ -269,4 +270,74 @@ test('gerarAlertasUnificados não duplica alertas (ids únicos) mesmo com vário
   const alertas = gerarAlertasUnificados(db, { agora: AGORA });
   const ids = alertas.map((alerta) => alerta.id);
   assert.equal(new Set(ids).size, ids.length, 'não deveria haver ids duplicados');
+});
+
+// ── adaptarAlertaParaPainelLegado (unificação do motor de alertas) ──────────
+test('adaptarAlertaParaPainelLegado traduz para a forma que AppHeader/DashboardPage esperam', () => {
+  const alerta = { id: 'abc-123', origem: 'estoque', prioridade: PRIORIDADE.CRITICO, titulo: 'Estoque crítico', descricao: 'Sal mineral acabando', pageId: 'estoque' };
+  const legado = adaptarAlertaParaPainelLegado(alerta);
+  assert.equal(legado.id, 'abc-123');
+  assert.equal(legado.ackKey, 'abc-123');
+  assert.equal(legado.nivel, 'critical');
+  assert.equal(legado.titulo, 'Estoque crítico');
+  assert.equal(legado.mensagem, 'Sal mineral acabando');
+  assert.equal(legado.pagina, 'estoque');
+  assert.equal(legado.route, 'estoque');
+});
+
+test('adaptarAlertaParaPainelLegado mapeia todas as prioridades para um nivel conhecido', () => {
+  assert.equal(adaptarAlertaParaPainelLegado({ id: 1, prioridade: PRIORIDADE.CRITICO }).nivel, 'critical');
+  assert.equal(adaptarAlertaParaPainelLegado({ id: 1, prioridade: PRIORIDADE.ATENCAO }).nivel, 'warning');
+  assert.equal(adaptarAlertaParaPainelLegado({ id: 1, prioridade: PRIORIDADE.DECISAO }).nivel, 'warning');
+  assert.equal(adaptarAlertaParaPainelLegado({ id: 1, prioridade: PRIORIDADE.INFORMATIVO }).nivel, 'info');
+  assert.equal(adaptarAlertaParaPainelLegado({ id: 1, prioridade: 'inexistente' }).nivel, 'info');
+});
+
+test('adaptarAlertaParaPainelLegado não quebra com alerta vazio/nulo', () => {
+  const legado = adaptarAlertaParaPainelLegado({});
+  assert.equal(legado.id, null);
+  assert.equal(legado.titulo, 'Alerta do sistema');
+  assert.equal(legado.mensagem, '');
+});
+
+// ── Equivalência entre canais (Sprint Paridade 1, bloco 2 — unificação) ─────
+// Dashboard (via App.jsx::adaptarAlertaParaPainelLegado), Central
+// (AlertasPage.jsx via centralAlertas.js) e Telegram (api/_telegramBot.js)
+// agora processam o MESMO db pela MESMA cadeia
+// (gerarAlertasUnificados → aplicarTratativasAosAlertas → filter visivel) —
+// só a apresentação final diverge. Estes testes garantem que o conjunto de
+// alertas ATIVOS (ids) é idêntico entre o caminho "cru" (Central/Telegram) e
+// o caminho adaptado (Dashboard/header), para a mesma conta/fazenda/data.
+function dbComAlertas() {
+  return {
+    estoque: [{ id: 1, produto: 'Sal', quantidade_atual: 2, quantidade_minima: 10 }],
+    lotes: [{ id: 1, nome: 'Lote A', status: 'ativo', saida: '2026-07-01' }],
+    sanitario: [{ id: 1, tipo: 'vacina', lote_id: 1, proxima: '2026-07-01' }],
+  };
+}
+
+test('equivalência: mesmo db + mesma tratativa produz o mesmo conjunto de ids ativos nos dois caminhos', () => {
+  const db = dbComAlertas();
+  const brutos = gerarAlertasUnificados(db, { agora: AGORA });
+  const tratativas = [];
+
+  const caminhoCentralOuTelegram = aplicarTratativasAosAlertas(brutos, tratativas, AGORA).filter((a) => a.visivel).map((a) => a.id);
+  const caminhoDashboard = aplicarTratativasAosAlertas(brutos, tratativas, AGORA).filter((a) => a.visivel).map(adaptarAlertaParaPainelLegado).map((a) => a.id);
+
+  assert.deepEqual(new Set(caminhoDashboard), new Set(caminhoCentralOuTelegram));
+  assert.ok(caminhoCentralOuTelegram.length > 0, 'deveria haver ao menos um alerta ativo neste cenário');
+});
+
+test('equivalência: resolver um alerta o remove dos dois caminhos igualmente', () => {
+  const db = dbComAlertas();
+  const brutos = gerarAlertasUnificados(db, { agora: AGORA });
+  const alvo = brutos[0];
+  const tratativas = [{ alerta_id: alvo.id, status: STATUS_TRATATIVA.RESOLVIDO }];
+
+  const caminhoCentralOuTelegram = aplicarTratativasAosAlertas(brutos, tratativas, AGORA).filter((a) => a.visivel).map((a) => a.id);
+  const caminhoDashboard = aplicarTratativasAosAlertas(brutos, tratativas, AGORA).filter((a) => a.visivel).map(adaptarAlertaParaPainelLegado).map((a) => a.id);
+
+  assert.equal(caminhoCentralOuTelegram.includes(alvo.id), false);
+  assert.equal(caminhoDashboard.includes(alvo.id), false);
+  assert.equal(caminhoCentralOuTelegram.length, caminhoDashboard.length);
 });

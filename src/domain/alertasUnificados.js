@@ -638,3 +638,33 @@ export function gerarAlertasUnificados(db = {}, opcoes = {}) {
     return String(a.id).localeCompare(String(b.id));
   });
 }
+
+// Unificação do motor de alertas (Sprint Paridade 1, bloco 2): o painel
+// legado do header/Dashboard (`AppHeader.jsx`, aba "Todos os alertas" de
+// `DashboardPage.jsx`) foi escrito contra a forma de `utils/alerts.js`
+// (`nivel`/`mensagem`/`pagina`, chave `ackKey` heurística). Em vez de
+// reescrever esses dois componentes — que já têm fallback defensivo para
+// várias formas de alerta —, este adaptador traduz um alerta já visível do
+// motor único (`gerarAlertasUnificados` + `aplicarTratativasAosAlertas`)
+// para essa mesma forma, preservando o `id` estável do motor único como
+// `ackKey`/`id` (a chave que a tratativa em `alertas_tratativas` usa).
+const NIVEL_POR_PRIORIDADE = {
+  [PRIORIDADE.CRITICO]: 'critical',
+  [PRIORIDADE.ATENCAO]: 'warning',
+  [PRIORIDADE.DECISAO]: 'warning',
+  [PRIORIDADE.INFORMATIVO]: 'info',
+};
+
+export function adaptarAlertaParaPainelLegado(alerta) {
+  return {
+    id: alerta?.id ?? null,
+    ackKey: alerta?.id ?? null,
+    tipo: alerta?.origem || 'geral',
+    tipoLabel: alerta?.origem || 'Geral',
+    nivel: NIVEL_POR_PRIORIDADE[alerta?.prioridade] || 'info',
+    titulo: alerta?.titulo || 'Alerta do sistema',
+    mensagem: alerta?.descricao || '',
+    pagina: alerta?.pageId ?? null,
+    route: alerta?.pageId ?? null,
+  };
+}

@@ -30,7 +30,6 @@ import {
   registrarSaidaEstoque,
 } from './services/movimentacoes';
 import {
-  createOperationalRecord,
   getPendingSyncQueueSnapshot,
   processPendingSyncQueue,
 } from './services/operationalPersistence';
@@ -44,13 +43,13 @@ import { configureWriteAccess } from './services/writeGuard';
 import { useAccountSubscription } from './hooks/useAccountSubscription';
 import { useTeamUsage } from './hooks/useTeamUsage';
 import { obterResumoUso } from './domain/planos';
-import { buildAlerts } from './utils/alerts';
+import { gerarAlertasUnificados, adaptarAlertaParaPainelLegado } from './domain/alertasUnificados.js';
+import { aplicarTratativasAosAlertas, STATUS_TRATATIVA } from './domain/tratativasAlertas.js';
+import { salvarTratativaAlerta } from './services/tratativasAlertas.js';
 import './styles/app.css';
 import './styles/ui.css';
 import './styles/layout.css';
 
-
-import { hojeLocalISO } from './domain/dataCivil.js';
 const DashboardPage = lazy(() => import('./pages/DashboardPage'));
 const AlertasPage = lazy(() => import('./pages/AlertasPage'));
 const FazendasPage = lazy(() => import('./pages/FazendasPage'));
@@ -105,75 +104,18 @@ const publicPageMap = {
   suporte: SuportePage,
 };
 
-const TODAY_BOOT_ISO = hojeLocalISO();
 const MENSAGEM_SEM_PERMISSAO = 'Você não tem permissão para executar esta ação.';
-const ALERTAS_RESOLVIDOS_STORAGE_KEY = 'herdon-alertas-resolvidos';
-const ALERTAS_ADIADOS_STORAGE_KEY = 'herdon-alertas-adiados';
 const SIDEBAR_COLLAPSED_STORAGE_KEY = 'herdon-sidebar-collapsed';
 
+// Unificação do motor de alertas (Sprint Paridade 1, bloco 2): `getAlertAckKey`
+// hoje só precisa ler `alert.ackKey`/`alert.id` — os alertas do painel
+// header/Dashboard agora vêm de `gerarAlertasUnificados` via
+// `adaptarAlertaParaPainelLegado` (domain/alertasUnificados.js), que já
+// preenche os dois com o `id` estável do motor único. Mantido como função
+// (não inline) por compatibilidade com o prop `getAlertAckKey` que
+// `AppHeader.jsx` recebe.
 function getAlertAckKey(alert) {
-  if (alert?.ackKey) return String(alert.ackKey);
-  if (alert?.id) return String(alert.id);
-  const tipo = String(alert?.type || alert?.tipo || alert?.category || 'geral').trim().toLowerCase();
-  const titulo = String(alert?.title || alert?.titulo || '').trim().toLowerCase();
-  const rota = String(alert?.route || alert?.rota || alert?.acao?.rota || alert?.pagina || 'dashboard').trim().toLowerCase();
-  const referencia = String(
-    alert?.date
-    || alert?.data
-    || alert?.dueDate
-    || alert?.proxima
-    || alert?.reference
-    || alert?.referencia
-    || ''
-  ).slice(0, 10);
-  return `${tipo}-${titulo}-${rota}-${referencia}`;
-}
-
-function readJsonStorage(key, fallback) {
-  try {
-    const raw = localStorage.getItem(key);
-    if (!raw) return fallback;
-    const parsed = JSON.parse(raw);
-    return parsed ?? fallback;
-  } catch {
-    return fallback;
-  }
-}
-
-function writeJsonStorage(key, value) {
-  try {
-    localStorage.setItem(key, JSON.stringify(value));
-  } catch {
-    // storage indisponivel
-  }
-}
-
-function normalizeResolvedAlertEntries(entries = []) {
-  return (Array.isArray(entries) ? entries : [])
-    .map((item) => {
-      if (typeof item === 'string') return item;
-      if (item && typeof item === 'object') return item.chave || item.ackKey || item.id || null;
-      return null;
-    })
-    .filter(Boolean)
-    .map((item) => String(item));
-}
-
-function normalizeSnoozedAlertEntries(entries = []) {
-  return (Array.isArray(entries) ? entries : [])
-    .map((item) => {
-      if (!item) return null;
-      if (typeof item === 'string') return null;
-      const chave = item.chave || item.ackKey || item.id || null;
-      const ate = item.ate || item.snoozeUntil || null;
-      if (!chave || !ate) return null;
-      return {
-        chave: String(chave),
-        ate: String(ate),
-        snoozeUntil: String(item.snoozeUntil || ate),
-      };
-    })
-    .filter(Boolean);
+  return String(alert?.ackKey ?? alert?.id ?? '');
 }
 
 function readSidebarCollapsedState() {
@@ -601,63 +543,65 @@ export default function App() {
     window.location.replace('/');
   }
 
-  const alertasResolvidos = useMemo(
-    () => (Array.isArray(db?.alertas_resolvidos) ? db.alertas_resolvidos : []),
+  // Unificação do motor de alertas (Sprint Paridade 1, bloco 2): fonte única
+  // `gerarAlertasUnificados` (mesma da Central e do Telegram), com tratativa
+  // em `alertas_tratativas` (mesma tabela/mecanismo da Central) — não mais
+  // `buildAlerts`/`alertas_resolvidos`/`alertas_adiados` (motor legado
+  // aposentado). `adaptarAlertaParaPainelLegado` traduz para a forma que
+  // `AppHeader.jsx`/`DashboardPage.jsx` já esperam, sem precisar reescrever
+  // esses componentes. Efeito colateral único e esperado desta migração:
+  // alertas já resolvidos/adiados sob a identidade antiga (`ackKey`
+  // heurístico) não têm equivalente na tratativa nova (que usa o `id`
+  // estável do motor único) — voltam a aparecer como ativos uma vez após o
+  // deploy. As tabelas antigas não são apagadas (ficam como histórico).
+  const alertasTratativas = useMemo(
+    () => (Array.isArray(db?.alertas_tratativas) ? db.alertas_tratativas : []),
     [db]
   );
-  const alertasAdiados = useMemo(
-    () => (Array.isArray(db?.alertas_adiados) ? db.alertas_adiados : []),
-    [db]
-  );
-
-  const resolvedAlertKeys = useMemo(() => {
-    const storageKeys = normalizeResolvedAlertEntries(readJsonStorage(ALERTAS_RESOLVIDOS_STORAGE_KEY, []));
-    const dbKeys = normalizeResolvedAlertEntries(alertasResolvidos);
-    return new Set([...storageKeys, ...dbKeys]);
-  }, [alertasResolvidos]);
-
-  const snoozedAlerts = useMemo(() => {
-    const storageEntries = normalizeSnoozedAlertEntries(readJsonStorage(ALERTAS_ADIADOS_STORAGE_KEY, []));
-    const dbEntries = normalizeSnoozedAlertEntries(alertasAdiados);
-    const merged = new Map();
-    [...storageEntries, ...dbEntries].forEach((item) => {
-      if (!item?.chave) return;
-      merged.set(item.chave, item);
-    });
-    return Array.from(merged.values());
-  }, [alertasAdiados]);
 
   // Sprint 21: alertas gerados só a partir dos dados da fazenda ativa —
   // antes usava `db` completo e misturava alertas de todas as fazendas na
   // Central de Alertas e no Dashboard.
-  const rawAlerts = useMemo(() => {
-    return buildAlerts(dbFazendaAtiva).map((alert) => ({
-      ...alert,
-      route: alert?.pagina || null,
-      ackKey: getAlertAckKey(alert),
-    }));
-  }, [dbFazendaAtiva]);
-
-  const alerts = useMemo(
-    () => rawAlerts.filter((alert) => {
-      const chave = getAlertAckKey(alert);
-      if (resolvedAlertKeys.has(chave)) return false;
-      const adiado = snoozedAlerts.find((item) => item?.chave === chave);
-      const ate = adiado?.ate || adiado?.snoozeUntil || null;
-      if (!ate) return true;
-      return String(ate) < TODAY_BOOT_ISO;
-    }),
-    [rawAlerts, resolvedAlertKeys, snoozedAlerts]
+  const alertasUnificadosBrutos = useMemo(
+    () => gerarAlertasUnificados(dbFazendaAtiva),
+    [dbFazendaAtiva]
   );
 
-  function logAlertAction(action, ackKey, beforeCount, afterCount) {
-    if (!import.meta.env.DEV) return;
-    console.info('[HERDON_ALERT_ACTION]', {
-      action,
-      ackKey,
-      beforeCount,
-      afterCount,
+  const alertasVisiveis = useMemo(
+    () => aplicarTratativasAosAlertas(alertasUnificadosBrutos, alertasTratativas, new Date()).filter((a) => a.visivel),
+    [alertasUnificadosBrutos, alertasTratativas]
+  );
+
+  const alerts = useMemo(
+    () => alertasVisiveis.map(adaptarAlertaParaPainelLegado),
+    [alertasVisiveis]
+  );
+
+  /** Cria ou atualiza a tratativa do alerta (mesmo mecanismo de AlertasPage.jsx::registrarTratativa). */
+  async function registrarTratativaHeader(alert, status, extra = {}) {
+    const alertaId = alert?.id ?? alert?.ackKey;
+    if (!alertaId) return { persisted: false };
+    const resultado = await salvarTratativaAlerta(db, session, {
+      alertaId,
+      alertaTipo: alert?.tipo || null,
+      origem: alert?.tipo || null,
+      status,
+      ownerUserId: session?.user?.id || null,
+      ...extra,
     });
+    if (resultado.persisted) {
+      setDb((prev) => {
+        const atuais = Array.isArray(prev?.alertas_tratativas) ? prev.alertas_tratativas : [];
+        if (resultado.isUpdate) {
+          return {
+            ...prev,
+            alertas_tratativas: atuais.map((t) => (String(t.alerta_id) === String(alertaId) ? { ...t, ...resultado.data } : t)),
+          };
+        }
+        return { ...prev, alertas_tratativas: [...atuais, resultado.data] };
+      });
+    }
+    return resultado;
   }
 
   async function marcarAlertaComoFeito(alert) {
@@ -665,36 +609,12 @@ export default function App() {
       showToast({ type: 'error', message: MENSAGEM_SEM_PERMISSAO });
       return;
     }
-    const chave = getAlertAckKey(alert);
-    if (!chave) {
+    const resultado = await registrarTratativaHeader(alert, STATUS_TRATATIVA.RESOLVIDO);
+    if (!resultado.persisted) {
+      showToast({ type: 'warning', message: resultado.error || 'Não foi possível resolver agora.' });
       return;
     }
-
-    const beforeCount = alerts.length;
-    setDb((prev) => {
-      const atuais = normalizeResolvedAlertEntries(prev?.alertas_resolvidos || []);
-      return {
-        ...prev,
-        alertas_resolvidos: Array.from(new Set([...atuais, chave])),
-      };
-    });
-    const atuaisStorage = normalizeResolvedAlertEntries(readJsonStorage(ALERTAS_RESOLVIDOS_STORAGE_KEY, []));
-    writeJsonStorage(ALERTAS_RESOLVIDOS_STORAGE_KEY, Array.from(new Set([...atuaisStorage, chave])));
-    logAlertAction('resolver', chave, beforeCount, Math.max(beforeCount - 1, 0));
     showToast({ type: 'success', message: 'Notificação resolvida.' });
-
-    const persisted = await createOperationalRecord('alertas_resolvidos', {
-      chave,
-      resolvedAt: new Date().toISOString(),
-      origem: 'header_notificacoes',
-    }, session);
-    setDb((prev) => ({
-      ...prev,
-      alertas_resolvidos: Array.from(new Set([...normalizeResolvedAlertEntries(prev?.alertas_resolvidos || []), chave])),
-    }));
-    if (!persisted.persisted) {
-      showToast({ type: 'warning', message: 'Alerta resolvido apenas localmente.' });
-    }
   }
 
   async function adiarAlerta(alert, opcao = '1') {
@@ -702,32 +622,17 @@ export default function App() {
       showToast({ type: 'error', message: MENSAGEM_SEM_PERMISSAO });
       return;
     }
-    const chave = getAlertAckKey(alert);
-    if (!chave) return;
     const ate = parseSnoozeDate(opcao);
     if (!ate) {
       showToast({ type: 'warning', message: 'Data inválida para adiamento.' });
       return;
     }
-    const payload = { chave, ate, snoozeUntil: ate };
-    const beforeCount = alerts.length;
-    setDb((prev) => ({
-      ...prev,
-      alertas_adiados: [
-        ...normalizeSnoozedAlertEntries(prev?.alertas_adiados || []).filter((item) => item?.chave !== chave),
-        payload,
-      ],
-    }));
-    const storageAtual = normalizeSnoozedAlertEntries(readJsonStorage(ALERTAS_ADIADOS_STORAGE_KEY, []))
-      .filter((item) => item?.chave !== chave);
-    writeJsonStorage(ALERTAS_ADIADOS_STORAGE_KEY, [...storageAtual, payload]);
-    logAlertAction('adiar', chave, beforeCount, Math.max(beforeCount - 1, 0));
+    const resultado = await registrarTratativaHeader(alert, STATUS_TRATATIVA.ADIADO, { adiadoAte: ate });
+    if (!resultado.persisted) {
+      showToast({ type: 'warning', message: resultado.error || 'Não foi possível adiar agora.' });
+      return;
+    }
     showToast({ type: 'success', message: 'Lembrete adiado.' });
-    const persisted = await createOperationalRecord('alertas_adiados', {
-      ...payload,
-      origem: 'header_notificacoes',
-    }, session);
-    if (!persisted.persisted) showToast({ type: 'warning', message: 'Lembrete adiado apenas localmente.' });
   }
 
   const userContext = { id: user?.id || null, email: user?.email || '' };
@@ -1105,7 +1010,6 @@ export default function App() {
           tabAtiva={tabAtiva}
           onTabChange={setTabAtiva}
           getAlertAckKey={getAlertAckKey}
-          alertDebugState={{ resolvedAlertKeys, snoozedAlerts }}
         />
 
         <div key={pageKey} className="page-wrapper">
