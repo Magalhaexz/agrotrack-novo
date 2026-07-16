@@ -545,7 +545,36 @@ export function prepararCadastro(intencao, dados, ctx = {}) {
     // ── Sprint de expansão do bot operacional: 8 novos cadastros/ações ──────
     case INTENCOES.CADASTRAR_LOTE: {
       const plano = prepararCadastroLote(db, { ...dados, nome: dados.nome_lote }, { fazendaId: ctx.fazendaId ?? null });
-      return plano.ok ? { ...plano, tipo: 'cadastro_lote' } : plano;
+      if (!plano.ok) return plano;
+      // Sprint Paridade 1, bloco 4: transacional via `criar_lote_completo` —
+      // mesma validação/resolução de `prepararCadastroLote` (reaproveitada
+      // sem alteração), só reempacotada em params de RPC em vez de um insert
+      // avulso. A RPC também cria o grupo em `animais` e a pesagem inicial
+      // (side-effects que o insert avulso nunca replicava — ver matriz de
+      // paridade), atomicamente com o lote.
+      const registro = plano.writes[0].registro;
+      return {
+        ok: true,
+        tipo: 'cadastro_lote',
+        resumo: plano.resumo,
+        rpc: {
+          nome: 'criar_lote_completo',
+          params: {
+            p_faz_id: registro.faz_id,
+            p_nome: registro.nome,
+            p_qtd: registro.qtd,
+            p_sexo: registro.sexo,
+            p_raca: registro.raca || null,
+            p_pastagem_id: registro.pastagem_id,
+            p_peso_inicial: registro.p_ini || null,
+            p_data_entrada: registro.entrada,
+            p_origem: registro.origem || null,
+            p_observacao: registro.obs || null,
+            p_categoria_animal: registro.categoria_animal || null,
+            p_rendimento_carcaca: registro.rendimento_carcaca,
+          },
+        },
+      };
     }
     case INTENCOES.CADASTRAR_PASTO: {
       const plano = prepararCadastroPasto(db, { ...dados, nome: dados.nome_pasto }, { fazendaId: ctx.fazendaId ?? null });

@@ -38,10 +38,6 @@ export function prepararEdicaoPesagem(db, dados) {
   if (!alvo) return erro('PESAGEM_NAO_ENCONTRADA');
 
   const novaData = dados?.data || alvo.data || hojeLocalISO();
-  const pesagensAtualizadas = (db.pesagens || []).map((p) => (
-    Number(p.id) === Number(alvo.id) ? { ...p, peso_medio: peso, data: novaData } : p
-  ));
-  const { pesoAtual, ultimaPesagem } = recalcularPesoAtualLote(db, lote.id, pesagensAtualizadas);
 
   return {
     ok: true,
@@ -53,10 +49,13 @@ export function prepararEdicaoPesagem(db, dados) {
       `Peso novo: ${peso} kg`,
       `Data: ${novaData}`,
     ],
-    writes: [
-      { tabela: 'pesagens', tipo: 'update', match: { id: alvo.id }, patch: { peso_medio: peso, data: novaData } },
-      { tabela: 'lotes', tipo: 'update', match: { id: lote.id }, patch: { p_at: pesoAtual, peso_atual: pesoAtual, peso_medio_atual: pesoAtual, ultima_pesagem: ultimaPesagem } },
-    ],
+    // Sprint Paridade 1, bloco 4: transacional via `editar_ultima_pesagem_lote`
+    // — a RPC recalcula `lotes.p_at`/`ultima_pesagem` no próprio banco, com a
+    // mesma fórmula de `recalcularPesoAtualLote`, mas server-side.
+    rpc: {
+      nome: 'editar_ultima_pesagem_lote',
+      params: { p_pesagem_id: alvo.id, p_novo_peso: peso, p_nova_data: novaData },
+    },
   };
 }
 
@@ -73,8 +72,11 @@ export function prepararExclusaoPesagem(db, dados) {
   const alvo = pesagensDeLoteMaisRecente(db, lote.id);
   if (!alvo) return erro('PESAGEM_NAO_ENCONTRADA');
 
+  // Só para o texto de confirmação — a RPC recalcula de novo, sobre o db
+  // fresco, no momento do /confirmar (mesmo padrão de idempotência das
+  // demais operações transacionais).
   const pesagensRestantes = (db.pesagens || []).filter((p) => Number(p.id) !== Number(alvo.id));
-  const { pesoAtual, ultimaPesagem } = recalcularPesoAtualLote(db, lote.id, pesagensRestantes);
+  const { ultimaPesagem } = recalcularPesoAtualLote(db, lote.id, pesagensRestantes);
 
   return {
     ok: true,
@@ -85,9 +87,11 @@ export function prepararExclusaoPesagem(db, dados) {
       `Pesagem: ${Number(alvo.peso_medio) || 0} kg em ${alvo.data}`,
       ultimaPesagem ? `Nova última pesagem: ${ultimaPesagem}` : 'O lote ficará sem nenhuma pesagem registrada.',
     ],
-    writes: [
-      { tabela: 'pesagens', tipo: 'delete', match: { id: alvo.id } },
-      { tabela: 'lotes', tipo: 'update', match: { id: lote.id }, patch: { p_at: pesoAtual, peso_atual: pesoAtual, peso_medio_atual: pesoAtual, ultima_pesagem: ultimaPesagem } },
-    ],
+    // Sprint Paridade 1, bloco 4: transacional via `excluir_ultima_pesagem_lote`
+    // (inclui o fallback pela média dos animais quando não sobra pesagem).
+    rpc: {
+      nome: 'excluir_ultima_pesagem_lote',
+      params: { p_pesagem_id: alvo.id },
+    },
   };
 }

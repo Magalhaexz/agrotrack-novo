@@ -63,9 +63,9 @@ export function prepararTransferenciaAnimais(db, { loteOrigemId, loteDestinoId, 
   if (qtd > resumoOrigem.qtd) return erro('ANIMAIS_INSUFICIENTES');
 
   const pesoTransferido = resumoOrigem.peso; // animais saem com a média da origem
+  // Remover à média não muda a média da origem — `registrar_saida_lote` não
+  // toca em `p_at` da origem (mesmo comportamento de venda/morte).
   const origemQtdFinal = resumoOrigem.qtd - qtd;
-  // Remover à média não muda a média da origem; mantém o peso quando ainda há animais.
-  const origemPesoFinal = origemQtdFinal > 0 ? resumoOrigem.peso : 0;
   const destinoQtdFinal = resumoDestino.qtd + qtd;
   const destinoPesoFinal = destinoQtdFinal
     ? (resumoDestino.qtd * resumoDestino.peso + qtd * pesoTransferido) / destinoQtdFinal
@@ -80,19 +80,27 @@ export function prepararTransferenciaAnimais(db, { loteOrigemId, loteDestinoId, 
       origemQtdFinal,
       destinoQtdFinal,
     },
-    writes: {
-      movimentacaoAnimal: {
-        lote_id: Number(origem.id),
-        destino_lote_id: Number(destino.id),
-        lote_destino: destino.nome,
-        tipo: 'transferencia_saida',
-        qtd,
-        peso_medio: pesoTransferido,
-        valor_total: 0,
-        origem: 'telegram',
+    // Sprint Paridade 1, bloco 4: transacional via `registrar_saida_lote`
+    // (mesma RPC de venda/morte, tipo 'transferencia_saida') — substitui o
+    // antigo objeto `writes` bespoke aplicado por 3 awaits sequenciais sem
+    // transação. `p_peso_destino_final` carrega a reponderação já calculada
+    // acima, preservando o comportamento antigo (origem não muda de peso
+    // médio; destino recalcula a média com os animais recebidos).
+    rpc: {
+      nome: 'registrar_saida_lote',
+      params: {
+        p_lote_id: Number(origem.id),
+        p_tipo: 'transferencia_saida',
+        p_qtd: qtd,
+        p_peso_medio: pesoTransferido,
+        p_valor_total: 0,
+        p_custo_por_cabeca: 0,
+        p_data: hojeLocalISO(),
+        p_comprador_fornecedor: '',
+        p_obs: 'Transferência via Telegram',
+        p_destino_lote_id: Number(destino.id),
+        p_peso_destino_final: destinoPesoFinal,
       },
-      loteOrigem: { id: Number(origem.id), qtd: origemQtdFinal, p_at: origemPesoFinal },
-      loteDestino: { id: Number(destino.id), qtd: destinoQtdFinal, p_at: destinoPesoFinal },
     },
   };
 }
@@ -150,47 +158,8 @@ function prepararSaidaLote(db, { loteId, quantidade, valor, data, motivo, obs },
 
   const dataFinal = data || hojeLocalISO();
   const novaQtd = resumoAtual.qtd - qtd;
-  const novoPeso = novaQtd > 0 ? resumoAtual.peso : 0;
   const valorTotal = tipoSaida === 'venda' ? (Number(valor) || 0) : 0;
-
-  const writes = [
-    {
-      tabela: 'movimentacoes_animais',
-      tipo: 'insert',
-      registro: {
-        lote_id: Number(lote.id),
-        tipo: tipoSaida,
-        qtd,
-        peso_medio: resumoAtual.peso,
-        valor_total: valorTotal,
-        custo_por_cabeca: qtd > 0 ? valorTotal / qtd : 0,
-        data: dataFinal,
-        comprador_fornecedor: '',
-        obs: motivo || obs || (tipoSaida === 'venda' ? 'Venda via Telegram' : 'Perda via Telegram'),
-        origem: 'telegram',
-      },
-    },
-    { tabela: 'lotes', tipo: 'update', match: { id: Number(lote.id) }, patch: { qtd: novaQtd, p_at: novoPeso } },
-  ];
-
-  if (tipoSaida === 'venda' && valorTotal > 0) {
-    writes.push({
-      tabela: 'movimentacoes_financeiras',
-      tipo: 'insert',
-      registro: {
-        tipo: 'receita',
-        categoria: 'venda_animal',
-        lote_id: Number(lote.id),
-        valor: valorTotal,
-        data: dataFinal,
-        data_competencia: dataFinal,
-        status: 'realizado',
-        descricao: `Venda de ${qtd} animal(is) do lote ${lote.nome}`,
-        origem_tipo: 'movimentacao_animal',
-        origem: 'telegram',
-      },
-    });
-  }
+  const obsFinal = motivo || obs || (tipoSaida === 'venda' ? 'Venda via Telegram' : 'Perda via Telegram');
 
   return {
     ok: true,
@@ -203,7 +172,22 @@ function prepararSaidaLote(db, { loteId, quantidade, valor, data, motivo, obs },
       data: dataFinal,
       motivo: motivo || null,
     },
-    writes,
+    // Sprint Paridade 1, bloco 4: transacional via `registrar_saida_lote`
+    // (venda gera receita quando há valor > 0; morte/descarte nunca geram).
+    rpc: {
+      nome: 'registrar_saida_lote',
+      params: {
+        p_lote_id: Number(lote.id),
+        p_tipo: tipoSaida,
+        p_qtd: qtd,
+        p_peso_medio: resumoAtual.peso,
+        p_valor_total: valorTotal,
+        p_custo_por_cabeca: qtd > 0 ? valorTotal / qtd : 0,
+        p_data: dataFinal,
+        p_comprador_fornecedor: '',
+        p_obs: obsFinal,
+      },
+    },
   };
 }
 
@@ -217,7 +201,7 @@ export function prepararVendaAnimais(db, params) {
   if (!plano.ok) return plano;
   return {
     ok: true,
-    writes: plano.writes,
+    rpc: plano.rpc,
     resumo: [
       'Confirme a venda:',
       '',
@@ -241,7 +225,7 @@ export function prepararMorteAnimais(db, params) {
   if (!plano.ok) return plano;
   return {
     ok: true,
-    writes: plano.writes,
+    rpc: plano.rpc,
     resumo: [
       'Confirme a baixa por morte/perda:',
       '',
@@ -289,12 +273,20 @@ export function prepararFinalizarLote(db, { loteId, motivo, data }) {
       '',
       'Depois de finalizado, o lote não aceita mais pesagens, ajustes de lotação, vendas, mortes/perdas ou trocas de pasto — o histórico é preservado.',
     ],
-    writes: [{
-      tabela: 'lotes',
-      tipo: 'update',
-      match: { id: Number(lote.id) },
-      patch: { status: 'encerrado', data_encerramento: dataFinal, data_venda: null, motivo_encerramento: motivoFinal },
-    }],
+    // Sprint Paridade 1, bloco 4: transacional via `finalizar_lote`, que
+    // também valida server-side que o lote não está finalizado (fecha a
+    // corrida entre duas finalizações simultâneas). `motivo_encerramento`
+    // não existe como coluna em `lotes` — a RPC grava o motivo em `obs`.
+    rpc: {
+      nome: 'finalizar_lote',
+      params: {
+        p_lote_id: Number(lote.id),
+        p_status: 'encerrado',
+        p_data_encerramento: dataFinal,
+        p_data_venda: null,
+        p_motivo: motivoFinal,
+      },
+    },
   };
 }
 
@@ -327,10 +319,17 @@ export function prepararAjusteLotacao(db, { loteId, quantidade, motivo, data }) 
       `Diferença: ${resultado.resumo.delta > 0 ? '+' : ''}${resultado.resumo.delta}`,
       `Motivo: ${String(motivo || '').trim()}`,
     ],
-    writes: [
-      { tabela: 'lotes', tipo: 'update', match: { id: lote.id }, patch: { qtd: resultado.writes.loteUpdate.qtd } },
-      { tabela: 'movimentacoes_animais', tipo: 'insert', registro: resultado.writes.movimentacao },
-    ],
+    // Sprint Paridade 1, bloco 4: transacional via `ajustar_lotacao_lote`
+    // (mesma validação de `buildAjusteLotacaoPatch`, agora também no banco).
+    rpc: {
+      nome: 'ajustar_lotacao_lote',
+      params: {
+        p_lote_id: Number(lote.id),
+        p_nova_qtd: resultado.resumo.qtdNova,
+        p_motivo: String(motivo || '').trim(),
+        p_data: data || hojeLocalISO(),
+      },
+    },
   };
 }
 

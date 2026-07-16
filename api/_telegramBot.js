@@ -28,6 +28,7 @@ import {
 } from '../src/domain/telegram/conversas.js';
 import { obterFerramenta } from '../src/domain/telegram/telegramToolsRegistry.js';
 import { perfilTemPermissao } from '../src/auth/perfis.js';
+import { interpretarEdicaoCampo, aplicarEdicaoPendente } from '../src/domain/telegram/edicaoPendente.js';
 
 // Intenções que o novo bot atende; as demais (DESCONHECIDO) caem no fluxo
 // legado (Sprint 8), preservando o comportamento atual.
@@ -221,6 +222,17 @@ async function processarComandoBotInterno({ client, conexao, texto, chatId, agor
     }
     // Slash-command explícito durante conversa: interrompe a conversa e segue.
     await encerrarConversa(client, conversa.id, STATUS_CONVERSA.CANCELADA);
+  }
+
+  // 0.5 Confirmação editável (Sprint Paridade 1, bloco 4): texto livre pode
+  //     corrigir UM campo de um cadastro já pendente ("troque o pasto para
+  //     Pasto Sul") sem reiniciar a conversa. Só quando não há conversa ativa
+  //     (ela já é dona do texto livre acima) e existe uma operação pendente
+  //     do tipo 'cadastro' — `tentarEditarPendente` devolve null quando não
+  //     há nada a interceptar, e a mensagem segue o fluxo normal.
+  if (!ehSlash) {
+    const respostaEdicao = await tentarEditarPendente(client, conexao, chatId, texto, agora);
+    if (respostaEdicao) return { texto: respostaEdicao };
   }
 
   if (!INTENCOES_ATENDIDAS.has(intent.intencao)) return null;
@@ -509,6 +521,62 @@ async function finalizarCadastro(client, conexao, db, intencao, dados, conversa,
   return [...plano.resumo, '', 'Responda /confirmar para concluir ou /cancelar para desistir.'].join('\n');
 }
 
+// ── Confirmação editável (Sprint Paridade 1, bloco 4) ────────────────────────
+// Corrige UM campo de uma operação `cadastro` ainda pendente, sem reiniciar a
+// conversa. Reaproveita o mesmo `buscarPendente`/`calcularExpiraEm` do resto
+// do fluxo de confirmação; a revalidação em si é 100% do módulo puro
+// `edicaoPendente.js` (mesmo `prepararCadastro` de sempre). Devolve `null`
+// quando não há nada a interceptar (sem pendência, tipo não editável, ou a
+// mensagem não é uma frase de edição) — a chamada segue o fluxo normal.
+async function tentarEditarPendente(client, conexao, chatId, texto, agora) {
+  const op = await buscarPendente(client, chatId);
+  if (!op || op.tipo_operacao !== 'cadastro') return null;
+
+  const edicao = interpretarEdicaoCampo(texto);
+  if (!edicao) return null;
+
+  const { intencao, dados } = op.payload || {};
+  const dbConta = await montarDbDaConta(client, conexao.owner_user_id);
+  const db = filtrarDbPorFazenda(dbConta, op.fazenda_id);
+  const resultado = aplicarEdicaoPendente({
+    intencao,
+    dadosAtuais: dados,
+    campoBruto: edicao.campoBruto,
+    valorBruto: edicao.valorBruto,
+    ctx: { db, hoje: agora, fazendaId: op.fazenda_id ?? null },
+  });
+
+  if (!resultado.ok) {
+    if (resultado.erro === 'CAMPO_AMBIGUO') {
+      return `Há mais de um campo parecido com "${edicao.campoBruto}": ${resultado.candidatos.join(', ')}. Seja mais específico.`;
+    }
+    if (resultado.erro === 'CAMPO_NAO_RECONHECIDO') {
+      return `Não reconheço o campo "${edicao.campoBruto}" neste cadastro.`;
+    }
+    if (resultado.candidatos) {
+      return `Há mais de um resultado com esse nome:\n\n${listaNumerada(resultado.candidatos)}`;
+    }
+    return MSG[resultado.erro] || MSG.FALHA;
+  }
+
+  // action_id estável: UPDATE na mesma linha pendente, nunca cria uma nova.
+  // Guarda `.eq('status', STATUS.PENDENTE)` contra uma corrida com /confirmar.
+  const { data: atualizado, error } = await client.from('telegram_operacoes_pendentes')
+    .update({ payload: { intencao, dados: resultado.dadosNovos }, expira_em: calcularExpiraEm(agora).toISOString() })
+    .eq('id', op.id).eq('status', STATUS.PENDENTE)
+    .select('id').maybeSingle();
+  if (error || !atualizado) return MSG.FALHA;
+
+  const campoLabel = String(resultado.campo).replace(/_/g, ' ');
+  return [
+    `${campoLabel.charAt(0).toUpperCase()}${campoLabel.slice(1)} alterado.`,
+    '',
+    ...resultado.resultado.resumo,
+    '',
+    'Responda /confirmar para concluir ou /cancelar para desistir.',
+  ].join('\n');
+}
+
 async function executarCadastro(client, conexao, op) {
   const { intencao, dados } = op.payload || {};
   // Revalida permissão na execução (Parte 19).
@@ -520,7 +588,8 @@ async function executarCadastro(client, conexao, op) {
   const plano = prepararCadastro(intencao, dados, { db, hoje: new Date(), fazendaId: op.fazenda_id ?? null });
   if (!plano.ok) throw new Error(plano.erro);
 
-  await aplicarWrites(client, conexao, plano.writes);
+  if (plano.rpc) await aplicarRpc(client, conexao, plano.rpc);
+  else await aplicarWrites(client, conexao, plano.writes);
   await registrarAuditoria(client, conexao, {
     acao: plano.tipo, intencao, sucesso: true, dados_posteriores: dados,
   });
@@ -548,11 +617,22 @@ export async function executarFerramentaCatalogo(client, conexao, op) {
   const plano = ferramenta.execute(db, params, { fazendaId: op.fazenda_id ?? null });
   if (!plano.ok) throw new Error(plano.erro || 'FALHA');
 
-  await aplicarWrites(client, conexao, plano.writes);
+  if (plano.rpc) await aplicarRpc(client, conexao, plano.rpc);
+  else await aplicarWrites(client, conexao, plano.writes);
   await registrarAuditoria(client, conexao, {
     acao: nomeFerramenta, intencao: nomeFerramenta, sucesso: true, dados_posteriores: params,
   });
   return ferramenta.formatResult(plano, { confirmado: true });
+}
+
+// Sprint Paridade 1, bloco 4: chamada transacional — substitui `aplicarWrites`
+// para as operações migradas para RPC (`op.payload.rpc`/`plano.rpc`). Uma
+// única chamada `client.rpc(...)` cujo corpo já é uma transação de banco
+// (tudo aplica ou nada aplica), ao contrário de `aplicarWrites`, que é um
+// `for` sequencial sem checagem de erro nenhuma entre passos.
+async function aplicarRpc(client, conexao, rpc) {
+  const { error } = await client.rpc(rpc.nome, { p_owner_user_id: conexao.owner_user_id, ...rpc.params });
+  if (error) throw new Error(error.message || 'RPC_FALHOU');
 }
 
 export async function aplicarWrites(client, conexao, writes) {
@@ -624,24 +704,17 @@ async function confirmar(client, conexao, chatId, agora) {
   }
 }
 
-// Recalcula sobre o db fresco (idempotente / sem qty velha) e aplica os writes.
+// Recalcula sobre o db fresco (idempotente / sem qty velha) e aplica via RPC
+// transacional (Sprint Paridade 1, bloco 4) — antes eram 3 awaits sequenciais
+// sem transação (nem checagem de erro entre eles); agora um único
+// `registrar_saida_lote` (tipo 'transferencia_saida').
 async function executarTransferencia(client, conexao, op) {
   const dbConta = await montarDbDaConta(client, conexao.owner_user_id);
   const db = filtrarDbPorFazenda(dbConta, op.fazenda_id);
   const plano = prepararTransferenciaAnimais(db, op.payload);
   if (!plano.ok) throw new Error(plano.erro);
 
-  const hoje = new Date().toISOString().slice(0, 10);
-  await client.from('movimentacoes_animais').insert({
-    owner_user_id: conexao.owner_user_id,
-    ...plano.writes.movimentacaoAnimal,
-    data: hoje,
-    obs: 'Transferência via Telegram',
-  });
-  await client.from('lotes').update({ qtd: plano.writes.loteOrigem.qtd, p_at: plano.writes.loteOrigem.p_at })
-    .eq('id', plano.writes.loteOrigem.id).eq('owner_user_id', conexao.owner_user_id);
-  await client.from('lotes').update({ qtd: plano.writes.loteDestino.qtd, p_at: plano.writes.loteDestino.p_at })
-    .eq('id', plano.writes.loteDestino.id).eq('owner_user_id', conexao.owner_user_id);
+  await aplicarRpc(client, conexao, plano.rpc);
 
   await registrarAuditoria(client, conexao, {
     acao: 'transferir_animais', intencao: 'TRANSFERIR_ANIMAIS_ENTRE_LOTES', sucesso: true,

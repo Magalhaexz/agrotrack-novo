@@ -24,7 +24,6 @@ import { prepararCadastroItemEstoque } from './cadastroItemEstoque.js';
 import { prepararSaidaEstoque } from './acoesEstoque.js';
 import { prepararTrocaLotePasto } from './acoesPasto.js';
 import { resolverLotePorNome } from './resolvedores.js';
-import { hojeLocalISO } from '../dataCivil.js';
 
 const erro = (codigo) => ({ ok: false, erro: codigo });
 
@@ -162,11 +161,10 @@ const transferirAnimais = {
     return {
       ok: true,
       resumo: ['Confirme a transferência:', '', `Origem: ${plano.resumo.origemNome}`, `Destino: ${plano.resumo.destinoNome}`, `Quantidade: ${plano.resumo.quantidade} animais`],
-      writes: [
-        { tabela: 'movimentacoes_animais', tipo: 'insert', registro: { ...plano.writes.movimentacaoAnimal, data: hojeLocalISO(), obs: 'Transferência via Telegram' } },
-        { tabela: 'lotes', tipo: 'update', match: { id: plano.writes.loteOrigem.id }, patch: { qtd: plano.writes.loteOrigem.qtd, p_at: plano.writes.loteOrigem.p_at } },
-        { tabela: 'lotes', tipo: 'update', match: { id: plano.writes.loteDestino.id }, patch: { qtd: plano.writes.loteDestino.qtd, p_at: plano.writes.loteDestino.p_at } },
-      ],
+      // Sprint Paridade 1, bloco 4: `prepararTransferenciaAnimais` agora devolve
+      // um plano de RPC transacional (`registrar_saida_lote`) em vez de um
+      // `writes` bespoke — repassa direto, mesma RPC do caminho principal.
+      rpc: plano.rpc,
     };
   },
   formatResult: (r, opts) => formatarConfirmacao(r.resumo, opts),

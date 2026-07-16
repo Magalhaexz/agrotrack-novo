@@ -1,15 +1,15 @@
 // Troca de lote de pasto via linguagem natural (bot operacional determinístico). Puro, sem I/O.
 //
-// ponytail: a RPC `mover_lote_para_pasto` (supabase/migrations/
-// 20260619113446_lote_pastagens_historico.sql) já existe e faz exatamente
-// isto no app — mas ela é SECURITY INVOKER e depende da RLS do chamador para
-// recusar lote/pasto de outra conta. O webhook do Telegram usa o cliente de
-// service role (RLS ignorada), então chamar a RPC direto abriria uma
-// movimentação cross-conta silenciosa. Em vez disso espelhamos a mesma
-// validação aqui, operando sobre o `db` que o orquestrador já recortou pela
-// conta/fazenda — a mesma garantia de escopo que todo outro write do bot já
-// usa (ver acoesLote.js). Upgrade futuro: expor uma function() SECURITY
-// DEFINER equivalente e chamá-la com o owner_user_id validado explicitamente.
+// Sprint Paridade 1, bloco 4: a RPC `mover_lote_para_pasto` (supabase/
+// migrations/20260619113446_lote_pastagens_historico.sql) é SECURITY INVOKER
+// e depende da RLS do chamador — o webhook usa o client de service-role (RLS
+// ignorada), então nunca pôde chamá-la direto (upgrade já cogitado no
+// ponytail anterior deste arquivo). Agora existe uma gêmea SECURITY DEFINER,
+// `mover_lote_para_pasto_bot` (migration 20260716120000), que aceita
+// `p_owner_user_id` explícito e unifica troca+retirada (destino opcional) —
+// esta função ainda resolve nome→registro e valida amigavelmente (mesmas
+// mensagens de erro com candidatos), mas devolve `rpc:{...}` em vez de
+// `writes:[...]`: a aplicação passa a ser atômica.
 import { normalizarChave } from './resolvedores.js';
 import { loteEstaBloqueado } from '../../pages/lotesLogic.js';
 import { isMesmoPastoAtual } from '../../components/lotes/movimentacaoPastoLogic.js';
@@ -88,23 +88,17 @@ export function prepararTrocaLotePasto(db, dados) {
       motivo ? `Motivo: ${motivo}` : null,
       `Data: ${dataMovimentacao}`,
     ].filter(Boolean),
-    writes: [
-      {
-        tabela: 'lote_pastagens_historico',
-        tipo: 'insert',
-        registro: {
-          lote_id: lote.id,
-          faz_id: lote.faz_id,
-          pastagem_origem_id: lote.pastagem_id ?? null,
-          pastagem_destino_id: pastagem.id,
-          data_movimentacao: dataMovimentacao,
-          quantidade_cabecas: quantidadeCabecas,
-          motivo,
-          observacoes: dados?.observacoes || null,
-        },
+    rpc: {
+      nome: 'mover_lote_para_pasto_bot',
+      params: {
+        p_lote_id: lote.id,
+        p_pastagem_destino_id: pastagem.id,
+        p_data: dataMovimentacao,
+        p_quantidade_cabecas: quantidadeCabecas,
+        p_motivo: motivo,
+        p_observacoes: dados?.observacoes || null,
       },
-      { tabela: 'lotes', tipo: 'update', match: { id: lote.id }, patch: { pastagem_id: pastagem.id } },
-    ],
+    },
   };
 }
 
@@ -136,22 +130,16 @@ export function prepararRetirarLotePasto(db, dados) {
       '',
       'O lote fica sem pasto vinculado até uma nova movimentação.',
     ],
-    writes: [
-      {
-        tabela: 'lote_pastagens_historico',
-        tipo: 'insert',
-        registro: {
-          lote_id: lote.id,
-          faz_id: lote.faz_id,
-          pastagem_origem_id: lote.pastagem_id ?? null,
-          pastagem_destino_id: null,
-          data_movimentacao: dataMovimentacao,
-          quantidade_cabecas: null,
-          motivo: String(dados?.motivo || '').trim() || null,
-          observacoes: dados?.observacoes || null,
-        },
+    rpc: {
+      nome: 'mover_lote_para_pasto_bot',
+      params: {
+        p_lote_id: lote.id,
+        p_pastagem_destino_id: null,
+        p_data: dataMovimentacao,
+        p_quantidade_cabecas: null,
+        p_motivo: String(dados?.motivo || '').trim() || null,
+        p_observacoes: dados?.observacoes || null,
       },
-      { tabela: 'lotes', tipo: 'update', match: { id: lote.id }, patch: { pastagem_id: null } },
-    ],
+    },
   };
 }
