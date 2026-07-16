@@ -152,3 +152,90 @@ test('trocar_lote_pasto de pasto de outra fazenda é rejeitado', () => {
   const r = prepararCadastro(INTENCOES.TROCAR_LOTE_PASTO, { lote: 'Recria', pasto: 'Longe' }, { db: dbOutraFazenda, hoje: HOJE, fazendaId: 1 });
   assert.equal(r.erro, 'PASTO_OUTRA_FAZENDA');
 });
+
+// ── Sprint de expansão do bot operacional: 8 novos cadastros/ações ──────────
+const dbComRebanho = () => ({
+  ...db(),
+  fazendas: [{ id: 1, nome: 'Fazenda Um' }],
+  lotes: db().lotes.map((l) => ({ ...l, qtd: 30, p_at: 380, supl_meta_dias: 30 })),
+});
+const ctxComRebanho = () => ({ db: dbComRebanho(), hoje: HOJE, fazendaId: 1 });
+
+test('prepararCadastro cadastrar_lote insere lote novo na fazenda do contexto', () => {
+  const r = prepararCadastro(INTENCOES.CADASTRAR_LOTE, { nome_lote: 'Nova Recria', quantidade: 20, sexo: 'macho' }, ctxComRebanho());
+  assert.equal(r.ok, true);
+  assert.equal(r.tipo, 'cadastro_lote');
+  assert.equal(r.writes[0].tabela, 'lotes');
+  assert.equal(r.writes[0].registro.nome, 'Nova Recria');
+  assert.equal(r.writes[0].registro.faz_id, 1);
+  assert.equal(r.writes[0].registro.qtd, 20);
+});
+
+test('prepararCadastro cadastrar_pasto insere pasto novo na fazenda do contexto', () => {
+  const r = prepararCadastro(INTENCOES.CADASTRAR_PASTO, { nome_pasto: 'Pasto Leste', area: 12 }, ctxComRebanho());
+  assert.equal(r.ok, true);
+  assert.equal(r.tipo, 'cadastro_pasto');
+  assert.equal(r.writes[0].tabela, 'pastagens');
+  assert.equal(r.writes[0].registro.nome, 'Pasto Leste');
+  assert.equal(r.writes[0].registro.faz_id, 1);
+});
+
+test('prepararCadastro registrar_venda resolve o lote pelo nome e gera receita', () => {
+  const r = prepararCadastro(INTENCOES.REGISTRAR_VENDA, { lote: 'Recria 01', quantidade: 10, valor: 25000 }, ctxComRebanho());
+  assert.equal(r.ok, true);
+  assert.equal(r.tipo, 'venda');
+  const loteUpdate = r.writes.find((w) => w.tabela === 'lotes');
+  assert.equal(loteUpdate.patch.qtd, 20);
+  const financeiro = r.writes.find((w) => w.tabela === 'movimentacoes_financeiras');
+  assert.equal(financeiro.registro.valor, 25000);
+});
+
+test('registrar_venda lote inexistente', () => {
+  assert.equal(prepararCadastro(INTENCOES.REGISTRAR_VENDA, { lote: 'Inexistente', quantidade: 5 }, ctxComRebanho()).erro, 'LOTE_NAO_ENCONTRADO');
+});
+
+test('prepararCadastro registrar_morte nunca gera lançamento financeiro', () => {
+  const r = prepararCadastro(INTENCOES.REGISTRAR_MORTE, { lote: 'Recria 01', quantidade: 2, motivo: 'Doença' }, ctxComRebanho());
+  assert.equal(r.ok, true);
+  assert.equal(r.tipo, 'morte');
+  assert.equal(r.writes.some((w) => w.tabela === 'movimentacoes_financeiras'), false);
+});
+
+test('prepararCadastro finalizar_lote atualiza só o status do lote', () => {
+  const r = prepararCadastro(INTENCOES.FINALIZAR_LOTE, { lote: 'Recria 01', motivo: 'Ciclo encerrado' }, ctxComRebanho());
+  assert.equal(r.ok, true);
+  assert.equal(r.tipo, 'finalizar_lote');
+  assert.equal(r.writes[0].patch.status, 'encerrado');
+});
+
+test('prepararCadastro cadastrar_manejo insere em sanitario', () => {
+  const r = prepararCadastro(INTENCOES.CADASTRAR_MANEJO, { lote: 'Recria 01', tipo: 'vacina', quantidade_animais: 30 }, ctxComRebanho());
+  assert.equal(r.ok, true);
+  assert.equal(r.tipo, 'manejo');
+  assert.equal(r.writes[0].tabela, 'sanitario');
+  assert.equal(r.writes[0].registro.lote_id, 10);
+});
+
+test('cadastrar_manejo exige tipo e quantidade de animais', () => {
+  assert.equal(prepararCadastro(INTENCOES.CADASTRAR_MANEJO, { lote: 'Recria 01', tipo: '', quantidade_animais: 10 }, ctxComRebanho()).erro, 'TIPO_VAZIO');
+  assert.equal(prepararCadastro(INTENCOES.CADASTRAR_MANEJO, { lote: 'Recria 01', tipo: 'vacina', quantidade_animais: 0 }, ctxComRebanho()).erro, 'QUANTIDADE_INVALIDA');
+});
+
+test('prepararCadastro cadastrar_planejamento_suplementacao atualiza o lote sem baixar estoque', () => {
+  const r = prepararCadastro(INTENCOES.CADASTRAR_PLANEJAMENTO_SUPLEMENTACAO, { lote: 'Recria 01', produto: 'Ração', quantidade_por_cabeca: 2 }, ctxComRebanho());
+  assert.equal(r.ok, true);
+  assert.equal(r.tipo, 'planejamento_suplementacao');
+  assert.equal(r.writes.length, 1);
+  assert.equal(r.writes[0].tabela, 'lotes');
+});
+
+test('prepararCadastro registrar_consumo_suplementacao baixa estoque e vincula fazenda do contexto', () => {
+  const r = prepararCadastro(INTENCOES.REGISTRAR_CONSUMO_SUPLEMENTACAO, { lote: 'Recria 01', produto: 'sal', quantidade: 3 }, ctxComRebanho());
+  assert.equal(r.ok, true);
+  assert.equal(r.tipo, 'consumo_suplementacao');
+  const consumo = r.writes.find((w) => w.tabela === 'consumo_suplementacao');
+  assert.equal(consumo.registro.fazenda_id, 1);
+  assert.equal(consumo.registro.quantidade, 3);
+  const estoqueUpdate = r.writes.find((w) => w.tabela === 'estoque');
+  assert.equal(estoqueUpdate.patch.quantidade_atual, 4);
+});

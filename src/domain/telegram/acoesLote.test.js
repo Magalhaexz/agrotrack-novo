@@ -1,6 +1,9 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { prepararTransferenciaAnimais, prepararRenomearLote } from './acoesLote.js';
+import {
+  prepararTransferenciaAnimais, prepararRenomearLote,
+  prepararVendaAnimais, prepararMorteAnimais, prepararFinalizarLote,
+} from './acoesLote.js';
 
 function db() {
   return {
@@ -104,4 +107,69 @@ test('renomear rejeita vazio, igual e duplicado', () => {
 
 test('renomear lote inexistente', () => {
   assert.equal(prepararRenomearLote(db(), { loteId: 99, novoNome: 'X' }).erro, 'LOTE_NAO_ENCONTRADO');
+});
+
+// ── Venda ────────────────────────────────────────────────────────────────────
+test('venda válida atualiza qtd e gera receita quando valor > 0', () => {
+  const r = prepararVendaAnimais(db(), { loteId: 10, quantidade: 10, valor: 25000, data: '2026-07-15' });
+  assert.equal(r.ok, true);
+  assert.ok(r.resumo.some((l) => l === 'Quantidade atual: 82 cabeças'));
+  assert.ok(r.resumo.some((l) => /Quantidade vendida: 10/.test(l)));
+  assert.ok(r.resumo.some((l) => /Quantidade restante: 72/.test(l)));
+  const movAnimal = r.writes.find((w) => w.tabela === 'movimentacoes_animais');
+  assert.equal(movAnimal.registro.tipo, 'venda');
+  assert.equal(movAnimal.registro.qtd, 10);
+  const loteUpdate = r.writes.find((w) => w.tabela === 'lotes');
+  assert.equal(loteUpdate.patch.qtd, 72);
+  const financeiro = r.writes.find((w) => w.tabela === 'movimentacoes_financeiras');
+  assert.equal(financeiro.registro.tipo, 'receita');
+  assert.equal(financeiro.registro.categoria, 'venda_animal');
+  assert.equal(financeiro.registro.valor, 25000);
+});
+
+test('venda sem valor não gera lançamento financeiro', () => {
+  const r = prepararVendaAnimais(db(), { loteId: 10, quantidade: 5 });
+  assert.equal(r.ok, true);
+  assert.equal(r.writes.some((w) => w.tabela === 'movimentacoes_financeiras'), false);
+});
+
+test('venda rejeita quantidade acima do disponível, inválida e lote bloqueado/inexistente', () => {
+  assert.equal(prepararVendaAnimais(db(), { loteId: 10, quantidade: 999 }).erro, 'ANIMAIS_INSUFICIENTES');
+  assert.equal(prepararVendaAnimais(db(), { loteId: 10, quantidade: 0 }).erro, 'QUANTIDADE_INVALIDA');
+  assert.equal(prepararVendaAnimais(db(), { loteId: 12, quantidade: 1 }).erro, 'LOTE_BLOQUEADO');
+  assert.equal(prepararVendaAnimais(db(), { loteId: 99, quantidade: 1 }).erro, 'LOTE_NAO_ENCONTRADO');
+});
+
+// ── Morte / perda ────────────────────────────────────────────────────────────
+test('morte válida atualiza qtd e nunca gera receita', () => {
+  const r = prepararMorteAnimais(db(), { loteId: 10, quantidade: 2, motivo: 'Doença respiratória' });
+  assert.equal(r.ok, true);
+  const movAnimal = r.writes.find((w) => w.tabela === 'movimentacoes_animais');
+  assert.equal(movAnimal.registro.tipo, 'morte');
+  assert.equal(movAnimal.registro.valor_total, 0);
+  assert.equal(movAnimal.registro.obs, 'Doença respiratória');
+  assert.equal(r.writes.some((w) => w.tabela === 'movimentacoes_financeiras'), false);
+  const loteUpdate = r.writes.find((w) => w.tabela === 'lotes');
+  assert.equal(loteUpdate.patch.qtd, 80);
+});
+
+test('morte rejeita quantidade acima do disponível', () => {
+  assert.equal(prepararMorteAnimais(db(), { loteId: 10, quantidade: 999 }).erro, 'ANIMAIS_INSUFICIENTES');
+});
+
+// ── Finalizar lote ───────────────────────────────────────────────────────────
+test('finalizar lote válido preserva histórico e só atualiza status', () => {
+  const r = prepararFinalizarLote(db(), { loteId: 10, motivo: 'Ciclo encerrado', data: '2026-07-15' });
+  assert.equal(r.ok, true);
+  assert.equal(r.writes.length, 1);
+  assert.equal(r.writes[0].tabela, 'lotes');
+  assert.equal(r.writes[0].patch.status, 'encerrado');
+  assert.equal(r.writes[0].patch.motivo_encerramento, 'Ciclo encerrado');
+  assert.equal(r.writes[0].patch.data_encerramento, '2026-07-15');
+});
+
+test('finalizar lote exige motivo e rejeita lote já finalizado/inexistente', () => {
+  assert.equal(prepararFinalizarLote(db(), { loteId: 10, motivo: '  ' }).erro, 'MOTIVO_VAZIO');
+  assert.equal(prepararFinalizarLote(db(), { loteId: 12, motivo: 'X' }).erro, 'LOTE_JA_FINALIZADO');
+  assert.equal(prepararFinalizarLote(db(), { loteId: 99, motivo: 'X' }).erro, 'LOTE_NAO_ENCONTRADO');
 });

@@ -237,3 +237,78 @@ test('ambiguidade genérica de lote continua funcionando quando NÃO menciona pa
   const r = i('trocar lote Recria para lote Engorda');
   assert.equal(r.intencao, INTENCOES.AMBIGUO);
 });
+
+// ── Sprint de expansão do bot operacional: 8 novos cadastros/ações ──────────
+test('cadastrar lote: verbo de criação + "lote"', () => {
+  for (const txt of ['Cadastre o lote Recria com 30 machos.', 'Crie um lote com 25 novilhas de 380 kg.', 'Cadastre o lote Engorda na Fazenda Um.']) {
+    const r = i(txt);
+    assert.equal(r.intencao, INTENCOES.CADASTRAR_LOTE, txt);
+    assert.equal(r.requerConfirmacao, true, txt);
+  }
+});
+
+test('cadastrar pasto: verbo de criação + "pasto"', () => {
+  for (const txt of ['Cadastre o Pasto Norte com 18 hectares.', 'Crie um pasto chamado Capim Sul.', 'Adicione um pasto com capacidade de 40 cabeças.']) {
+    const r = i(txt);
+    assert.equal(r.intencao, INTENCOES.CADASTRAR_PASTO, txt);
+    assert.equal(r.requerConfirmacao, true, txt);
+  }
+});
+
+test('registrar venda: vender/vendi/vendeu/registrar venda', () => {
+  for (const txt of ['Venda 10 animais do lote Recria.', 'Registre a venda de 15 cabeças do lote Engorda por 45 mil.', 'Vendi metade do lote hoje.']) {
+    const r = i(txt);
+    assert.equal(r.intencao, INTENCOES.REGISTRAR_VENDA, txt);
+    assert.equal(r.requerConfirmacao, true, txt);
+  }
+});
+
+test('registrar morte: morreram/perda de/baixa por morte', () => {
+  for (const txt of ['Morreram 2 animais do lote Recria.', 'Registre perda de uma cabeça.', 'Dê baixa por morte no lote 8.']) {
+    const r = i(txt);
+    assert.equal(r.intencao, INTENCOES.REGISTRAR_MORTE, txt);
+    assert.equal(r.requerConfirmacao, true, txt);
+  }
+});
+
+test('finalizar lote: finalizar/encerrar/marcar como finalizado', () => {
+  for (const txt of ['Finalize o lote Confinamento.', 'Encerre o lote Recria.', 'Marque o lote 12 como finalizado.']) {
+    const r = i(txt);
+    assert.equal(r.intencao, INTENCOES.FINALIZAR_LOTE, txt);
+    assert.equal(r.requerConfirmacao, true, txt);
+  }
+});
+
+test('cadastrar manejo sanitário: vacinar/vermifugar/tratar', () => {
+  for (const txt of ['Vacinei o lote Recria hoje.', 'Registre vermifugação no lote 7.', 'Cadastre aplicação de ivermectina.', 'Registre tratamento em 30 animais.']) {
+    const r = i(txt);
+    assert.equal(r.intencao, INTENCOES.CADASTRAR_MANEJO, txt);
+    assert.equal(r.requerConfirmacao, true, txt);
+  }
+});
+
+test('planejamento de suplementação: planejar/cadastrar alimentação', () => {
+  for (const txt of ['Planeje 2 kg por cabeça de ração para o lote Recria.', 'Cadastre alimentação diária com sal proteínado.', 'Planeje 30 dias de suplementação.']) {
+    const r = i(txt);
+    assert.equal(r.intencao, INTENCOES.CADASTRAR_PLANEJAMENTO_SUPLEMENTACAO, txt);
+    assert.equal(r.requerConfirmacao, true, txt);
+  }
+});
+
+test('consumo de suplementação: registrar consumo/usei + produto/baixa da alimentação', () => {
+  for (const txt of ['Registre consumo de 80 kg de sal no lote Recria.', 'Usei 3 sacos de ração no lote Engorda.', 'Dê baixa da alimentação de hoje.']) {
+    const r = i(txt);
+    assert.equal(r.intencao, INTENCOES.REGISTRAR_CONSUMO_SUPLEMENTACAO, txt);
+    assert.equal(r.requerConfirmacao, true, txt);
+  }
+});
+
+test('consumo de suplementação não colide com baixa de estoque genérica (testes pré-existentes preservados)', () => {
+  assert.equal(i('usei 3 litros de vermifugo').intencao, INTENCOES.DAR_BAIXA_ESTOQUE);
+  assert.equal(i('consumi 20 kg de sal no lote').intencao, INTENCOES.DAR_BAIXA_ESTOQUE);
+  assert.equal(i('dar baixa em 50 kg de sal').intencao, INTENCOES.DAR_BAIXA_ESTOQUE);
+});
+
+test('registrar morte não colide com dar baixa de estoque genérico', () => {
+  assert.equal(i('dar baixa em 50 kg de sal').intencao, INTENCOES.DAR_BAIXA_ESTOQUE);
+});
