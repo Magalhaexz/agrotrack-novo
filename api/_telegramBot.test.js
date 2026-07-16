@@ -18,12 +18,18 @@ function makeClient(tables) {
       return Promise.resolve({ data: null, error: null });
     }
     update(patch) { this._op = 'update'; this._patch = patch; return this; }
+    delete() { this._op = 'delete'; return this; }
     _match(r) { return this.filters.every(([c, v]) => String(r[c]) === String(v)); }
     _run(single) {
       const arr = tables[this.table] || [];
       if (this._op === 'update') {
         const matched = arr.filter((r) => this._match(r));
         matched.forEach((r) => Object.assign(r, this._patch));
+        return { data: single ? (matched[0] || null) : matched, error: null };
+      }
+      if (this._op === 'delete') {
+        const matched = arr.filter((r) => this._match(r));
+        tables[this.table] = arr.filter((r) => !this._match(r));
         return { data: single ? (matched[0] || null) : matched, error: null };
       }
       const matched = arr.filter((r) => this._match(r));
@@ -641,4 +647,129 @@ test('cadastro completo de lote: confirma e cria o grupo em animais + pesagem in
   assert.equal(grupo.qtd, 25);
   const pesagemInicial = tables.pesagens.find((p) => p.lote_id === loteCriado.id);
   assert.equal(pesagemInicial.peso_medio, 350);
+});
+
+// ── Sprint Paridade 1, bloco 5: alertas, edição completa de lote,
+//    resumo consolidado, exclusão de fazenda/pasto ─────────────────────────
+test('resolver alerta: lista numerada, resolve por posição, grava em alertas_tratativas', async () => {
+  const tables = baseTables('operador');
+  tables.estoque = [{ id: 1, produto: 'Sal mineral', data_validade: '2020-01-01', alerta_dias_antes: 5, quantidade_atual: 100, quantidade_minima: 10, owner_user_id: 'o1' }];
+  const client = makeClient(tables);
+  const c = conexao();
+  const lista = await processarComandoBot({ client, conexao: c, texto: '/alertas', chatId: '123' });
+  assert.match(lista.texto, /1\. .*vencid/i);
+  const p1 = await processarComandoBot({ client, conexao: c, texto: 'resolver alerta 1', chatId: '123' });
+  assert.match(p1.texto, /Vou marcar como resolvido/);
+  const r = await processarComandoBot({ client, conexao: c, texto: '/confirmar', chatId: '123' });
+  assert.match(r.texto, /Alerta atualizado/i);
+  assert.equal(tables.alertas_tratativas.length, 1);
+  assert.equal(tables.alertas_tratativas[0].status, 'resolvido');
+  assert.equal(tables.alertas_tratativas[0].owner_user_id, 'o1');
+});
+
+test('reabrir alerta: remove a tratativa (delete), alerta volta a aparecer', async () => {
+  const tables = baseTables('operador');
+  tables.estoque = [{ id: 1, produto: 'Sal mineral', data_validade: '2020-01-01', alerta_dias_antes: 5, quantidade_atual: 100, quantidade_minima: 10, owner_user_id: 'o1' }];
+  const client = makeClient(tables);
+  const c = conexao();
+  await processarComandoBot({ client, conexao: c, texto: 'resolver alerta 1', chatId: '123' });
+  await processarComandoBot({ client, conexao: c, texto: '/confirmar', chatId: '123' });
+  assert.equal(tables.alertas_tratativas.length, 1);
+
+  const antesReabrir = await processarComandoBot({ client, conexao: c, texto: 'reabrir o alerta vencido', chatId: '123' });
+  assert.match(antesReabrir.texto, /Vou reabrir/);
+  const r = await processarComandoBot({ client, conexao: c, texto: '/confirmar', chatId: '123' });
+  assert.match(r.texto, /Alerta reaberto/i);
+  assert.equal(tables.alertas_tratativas.length, 0);
+
+  const listaDepois = await processarComandoBot({ client, conexao: c, texto: '/alertas', chatId: '123' });
+  assert.match(listaDepois.texto, /vencid/i);
+});
+
+test('reabrir sem tratativa existente recusa (nada para reabrir)', async () => {
+  const tables = baseTables('operador');
+  tables.estoque = [{ id: 1, produto: 'Sal mineral', data_validade: '2020-01-01', alerta_dias_antes: 5, quantidade_atual: 100, quantidade_minima: 10, owner_user_id: 'o1' }];
+  const client = makeClient(tables);
+  const c = conexao();
+  const r = await processarComandoBot({ client, conexao: c, texto: 'reabrir o alerta vencido', chatId: '123' });
+  assert.match(r.texto, /não está tratado/i);
+});
+
+test('visualizador não consegue tratar alerta', async () => {
+  const tables = baseTables('visualizador');
+  tables.estoque = [{ id: 1, produto: 'Sal mineral', data_validade: '2020-01-01', alerta_dias_antes: 5, quantidade_atual: 100, quantidade_minima: 10, owner_user_id: 'o1' }];
+  const client = makeClient(tables);
+  const r = await processarComandoBot({ client, conexao: conexao(), texto: 'resolver alerta 1', chatId: '123' });
+  assert.match(r.texto, /permissão/);
+  assert.equal(tables.alertas_tratativas.length, 0);
+});
+
+test('resumo consolidado de todas as fazendas', async () => {
+  const tables = baseTables('operador');
+  tables.fazendas.push({ id: 2, nome: 'Boa Vista', owner_user_id: 'o1' });
+  tables.lotes[1].faz_id = 2; // Engorda 02 passa a ser da Boa Vista
+  const client = makeClient(tables);
+  const r = await processarComandoBot({ client, conexao: conexao(), texto: 'resumo de todas as fazendas', chatId: '123' });
+  assert.match(r.texto, /Resumo consolidado/);
+  assert.match(r.texto, /Santa Clara/);
+  assert.match(r.texto, /Boa Vista/);
+});
+
+test('editar lote: peso inicial e data de entrada em mensagens separadas', async () => {
+  const tables = baseTables('operador');
+  const client = makeClient(tables);
+  const c = conexao();
+  await processarComandoBot({ client, conexao: c, texto: 'altere o peso inicial do lote Recria 01 para 380 kg', chatId: '123' });
+  // demais campos opcionais perguntados em seguida — responde "não" até a confirmação:
+  let r;
+  for (let i = 0; i < 5; i += 1) {
+    r = await processarComandoBot({ client, conexao: c, texto: 'não', chatId: '123' });
+    if (/Confirme a edição do lote/.test(r.texto)) break;
+  }
+  assert.match(r.texto, /Confirme a edição do lote/);
+  assert.match(r.texto, /Peso inicial: 380 kg/);
+  const conf = await processarComandoBot({ client, conexao: c, texto: '/confirmar', chatId: '123' });
+  assert.match(conf.texto, /Registrado/i);
+  assert.equal(tables.lotes.find((l) => l.id === 10).p_ini, 380);
+});
+
+test('excluir fazenda: recusa com vínculos, aceita sem vínculos', async () => {
+  // fazendas:editar não está em operador — só proprietario/gerente (mesma
+  // matriz do app, ver src/auth/perfis.js).
+  const tables = baseTables('gerente');
+  const client = makeClient(tables);
+  const c = conexao();
+  // Santa Clara (id 1) tem lotes vinculados — a guarda já recusa na proposta,
+  // antes até de pedir confirmação (falha rápido, sem gerar uma pendência).
+  const p1 = await processarComandoBot({ client, conexao: c, texto: 'excluir a fazenda Santa Clara', chatId: '123' });
+  assert.match(p1.texto, /vinculados/i);
+  assert.equal(tables.fazendas.length, 1);
+
+  // Fazenda nova, sem vínculo nenhum — deve funcionar:
+  tables.fazendas.push({ id: 2, nome: 'Fazenda Vazia', owner_user_id: 'o1' });
+  const p2 = await processarComandoBot({ client, conexao: c, texto: 'excluir a fazenda Vazia', chatId: '123' });
+  assert.match(p2.texto, /Confirme a exclusão da fazenda/);
+  const r2 = await processarComandoBot({ client, conexao: c, texto: '/confirmar', chatId: '123' });
+  assert.match(r2.texto, /Fazenda excluída/i);
+  assert.equal(tables.fazendas.some((f) => f.nome === 'Fazenda Vazia'), false);
+});
+
+test('excluir pasto: recusa com lote ativo ocupando, aceita depois de retirado', async () => {
+  // pastagens:excluir não está em operador — só proprietario/gerente.
+  const tables = baseTables('gerente');
+  tables.pastagens = [{ id: 'pasto-a', nome: 'Capim Sul', faz_id: 1, owner_user_id: 'o1' }];
+  tables.lotes[0].pastagem_id = 'pasto-a';
+  const client = makeClient(tables);
+  const c = conexao();
+  // Guarda recusa já na proposta (falha rápido, sem gerar pendência):
+  const p1 = await processarComandoBot({ client, conexao: c, texto: 'excluir o pasto Capim Sul', chatId: '123' });
+  assert.match(p1.texto, /ocupado|vinculado/i);
+  assert.equal(tables.pastagens.length, 1);
+
+  tables.lotes[0].pastagem_id = null; // retirado do pasto
+  const p2 = await processarComandoBot({ client, conexao: c, texto: 'excluir o pasto Capim Sul', chatId: '123' });
+  const r2 = await processarComandoBot({ client, conexao: c, texto: '/confirmar', chatId: '123' });
+  assert.match(p2.texto, /Confirme a exclusão do pasto/);
+  assert.match(r2.texto, /Pasto excluído/i);
+  assert.equal(tables.pastagens.length, 0);
 });

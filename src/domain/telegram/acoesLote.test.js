@@ -209,3 +209,16 @@ test('edição de lote rejeita sexo inválido, nenhum campo, lote bloqueado/inex
   assert.equal(prepararEdicaoLote(db(), { loteId: 12, raca: 'X' }).erro, 'LOTE_BLOQUEADO');
   assert.equal(prepararEdicaoLote(db(), { loteId: 99, raca: 'X' }).erro, 'LOTE_NAO_ENCONTRADO');
 });
+
+// ── Edição de peso inicial / data de entrada (Sprint Paridade 1, bloco 5) ───
+test('edição de lote altera peso inicial e data de entrada (colunas reais: p_ini/entrada)', () => {
+  const r = prepararEdicaoLote(db(), { loteId: 10, pesoInicial: 380, dataEntrada: '2026-07-10' });
+  assert.equal(r.ok, true);
+  assert.equal(r.writes[0].patch.p_ini, 380);
+  assert.equal(r.writes[0].patch.entrada, '2026-07-10');
+});
+
+test('edição de lote rejeita peso inicial inválido', () => {
+  assert.equal(prepararEdicaoLote(db(), { loteId: 10, pesoInicial: 0 }).erro, 'PESO_INVALIDO');
+  assert.equal(prepararEdicaoLote(db(), { loteId: 10, pesoInicial: -5 }).erro, 'PESO_INVALIDO');
+});
