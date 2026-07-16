@@ -25,6 +25,9 @@ export const TABELAS_NECESSARIAS = [
   // Bot operacional (Sprint): resolução de responsável por nome ao cadastrar
   // tarefa por linguagem natural.
   'funcionarios',
+  // Sprint de expansão do bot operacional: consumo de suplementação
+  // (registrar_consumo_suplementacao escreve aqui).
+  'consumo_suplementacao',
 ];
 
 export async function montarDbDaConta(client, ownerUserId) {

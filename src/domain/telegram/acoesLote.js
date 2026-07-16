@@ -11,6 +11,7 @@
 // os dois passam a importar dele; até lá, os testes garantem paridade.
 import { toNumber } from '../calcHelpers.js';
 import { normalizarChave } from './resolvedores.js';
+import { hojeLocalISO } from '../dataCivil.js';
 
 function loteAtivo(lote) {
   return String(lote?.status || 'ativo').toLowerCase() !== 'encerrado';
@@ -120,5 +121,178 @@ export function prepararRenomearLote(db, { loteId, novoNome }) {
     ok: true,
     resumo: { nomeAnterior: lote.nome, nomeNovo: nome },
     writes: { loteUpdate: { id: Number(lote.id), nome } },
+  };
+}
+
+// ── Venda / morte via linguagem natural (bot operacional determinístico) ────
+// Puro, sem I/O. Diferente das duas funções acima (transferência/renomeação,
+// que usam o objeto `writes` bespoke executado por `executarTransferencia`/
+// `executarRenomear` em `_telegramBot.js`): estas seguem o padrão em ARRAY de
+// `acoesEstoque.js`/`acoesPasto.js`, consumido pelo motor de cadastro
+// genérico (`cadastros.js` + `aplicarWrites`).
+//
+// ponytail: mesma fórmula de `registrarSaidaAnimal` (src/services/
+// movimentacoes.js) — peso médio da origem não muda ao retirar a média;
+// venda/abate geram receita, morte não. Ver nota no topo do arquivo sobre
+// por que é espelhada e não importada.
+function prepararSaidaLote(db, { loteId, quantidade, valor, data, motivo, obs }, { tipoSaida }) {
+  const lotes = Array.isArray(db?.lotes) ? db.lotes : [];
+  const lote = lotes.find((l) => Number(l.id) === Number(loteId));
+  if (!lote) return erro('LOTE_NAO_ENCONTRADO');
+  if (!loteAtivo(lote)) return erro('LOTE_BLOQUEADO');
+
+  const qtd = Number(quantidade);
+  if (!Number.isInteger(qtd) || qtd <= 0) return erro('QUANTIDADE_INVALIDA');
+
+  const resumoAtual = resumoAgregado(db, lote);
+  if (qtd > resumoAtual.qtd) return erro('ANIMAIS_INSUFICIENTES', { qtdAtual: resumoAtual.qtd });
+
+  const dataFinal = data || hojeLocalISO();
+  const novaQtd = resumoAtual.qtd - qtd;
+  const novoPeso = novaQtd > 0 ? resumoAtual.peso : 0;
+  const valorTotal = tipoSaida === 'venda' ? (Number(valor) || 0) : 0;
+
+  const writes = [
+    {
+      tabela: 'movimentacoes_animais',
+      tipo: 'insert',
+      registro: {
+        lote_id: Number(lote.id),
+        tipo: tipoSaida,
+        qtd,
+        peso_medio: resumoAtual.peso,
+        valor_total: valorTotal,
+        custo_por_cabeca: qtd > 0 ? valorTotal / qtd : 0,
+        data: dataFinal,
+        comprador_fornecedor: '',
+        obs: motivo || obs || (tipoSaida === 'venda' ? 'Venda via Telegram' : 'Perda via Telegram'),
+        origem: 'telegram',
+      },
+    },
+    { tabela: 'lotes', tipo: 'update', match: { id: Number(lote.id) }, patch: { qtd: novaQtd, p_at: novoPeso } },
+  ];
+
+  if (tipoSaida === 'venda' && valorTotal > 0) {
+    writes.push({
+      tabela: 'movimentacoes_financeiras',
+      tipo: 'insert',
+      registro: {
+        tipo: 'receita',
+        categoria: 'venda_animal',
+        lote_id: Number(lote.id),
+        valor: valorTotal,
+        data: dataFinal,
+        data_competencia: dataFinal,
+        status: 'realizado',
+        descricao: `Venda de ${qtd} animal(is) do lote ${lote.nome}`,
+        origem_tipo: 'movimentacao_animal',
+        origem: 'telegram',
+      },
+    });
+  }
+
+  return {
+    ok: true,
+    resumo: {
+      loteNome: lote.nome,
+      quantidadeAtual: resumoAtual.qtd,
+      quantidadeSaida: qtd,
+      quantidadeRestante: novaQtd,
+      valor: valorTotal,
+      data: dataFinal,
+      motivo: motivo || null,
+    },
+    writes,
+  };
+}
+
+/**
+ * Prepara a venda de animais de um lote. Puro: não altera nada.
+ * @param {object} db db recortado pela fazenda ativa.
+ * @param {{ loteId, quantidade, valor?, data?, obs? }} params
+ */
+export function prepararVendaAnimais(db, params) {
+  const plano = prepararSaidaLote(db, params, { tipoSaida: 'venda' });
+  if (!plano.ok) return plano;
+  return {
+    ok: true,
+    writes: plano.writes,
+    resumo: [
+      'Confirme a venda:',
+      '',
+      `Lote: ${plano.resumo.loteNome}`,
+      `Quantidade atual: ${plano.resumo.quantidadeAtual} cabeças`,
+      `Quantidade vendida: ${plano.resumo.quantidadeSaida} cabeças`,
+      `Quantidade restante: ${plano.resumo.quantidadeRestante} cabeças`,
+      plano.resumo.valor > 0 ? `Valor: R$ ${plano.resumo.valor.toFixed(2).replace('.', ',')}` : 'Valor: não informado',
+      `Data: ${plano.resumo.data}`,
+    ],
+  };
+}
+
+/**
+ * Prepara a baixa por morte/perda de animais de um lote. Nunca gera receita.
+ * @param {object} db db recortado pela fazenda ativa.
+ * @param {{ loteId, quantidade, data?, motivo?, obs? }} params
+ */
+export function prepararMorteAnimais(db, params) {
+  const plano = prepararSaidaLote(db, params, { tipoSaida: 'morte' });
+  if (!plano.ok) return plano;
+  return {
+    ok: true,
+    writes: plano.writes,
+    resumo: [
+      'Confirme a baixa por morte/perda:',
+      '',
+      `Lote: ${plano.resumo.loteNome}`,
+      `Quantidade atual: ${plano.resumo.quantidadeAtual} cabeças`,
+      `Quantidade da perda: ${plano.resumo.quantidadeSaida} cabeças`,
+      `Quantidade restante: ${plano.resumo.quantidadeRestante} cabeças`,
+      plano.resumo.motivo ? `Motivo: ${plano.resumo.motivo}` : null,
+      `Data: ${plano.resumo.data}`,
+    ].filter(Boolean),
+  };
+}
+
+// ── Finalização de lote via linguagem natural ────────────────────────────────
+// ponytail: espelha `FechamentoLoteModal.jsx` + `LotesPage.jsx::handleFechamento`
+// — um simples update de status, sem tocar pasto/pesagens/custos (o app
+// também não toca: histórico é sempre preservado).
+/**
+ * @param {object} db db recortado pela fazenda ativa.
+ * @param {{ loteId, motivo, data? }} params
+ */
+export function prepararFinalizarLote(db, { loteId, motivo, data }) {
+  const lotes = Array.isArray(db?.lotes) ? db.lotes : [];
+  const lote = lotes.find((l) => Number(l.id) === Number(loteId));
+  if (!lote) return erro('LOTE_NAO_ENCONTRADO');
+  if (!loteAtivo(lote)) return erro('LOTE_JA_FINALIZADO');
+
+  const motivoFinal = String(motivo || '').trim();
+  if (!motivoFinal) return erro('MOTIVO_VAZIO');
+
+  const dataFinal = data || hojeLocalISO();
+  const pastagens = Array.isArray(db?.pastagens) ? db.pastagens : [];
+  const pastoAtual = lote.pastagem_id != null ? pastagens.find((p) => Number(p.id) === Number(lote.pastagem_id)) : null;
+
+  return {
+    ok: true,
+    resumo: [
+      'Confirme a finalização do lote:',
+      '',
+      `Lote: ${lote.nome}`,
+      `Quantidade atual: ${toNumber(lote.qtd)} cabeças`,
+      `Pasto atual: ${pastoAtual?.nome || 'não definido'}`,
+      `Data: ${dataFinal}`,
+      `Motivo: ${motivoFinal}`,
+      '',
+      'Depois de finalizado, o lote não aceita mais pesagens, ajustes de lotação, vendas, mortes/perdas ou trocas de pasto — o histórico é preservado.',
+    ],
+    writes: [{
+      tabela: 'lotes',
+      tipo: 'update',
+      match: { id: Number(lote.id) },
+      patch: { status: 'encerrado', data_encerramento: dataFinal, data_venda: null, motivo_encerramento: motivoFinal },
+    }],
   };
 }

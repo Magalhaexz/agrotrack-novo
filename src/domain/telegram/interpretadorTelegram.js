@@ -33,6 +33,9 @@ const VOCABULARIO_BASE = [
   'resumo', 'alertas', 'manejos', 'despesa', 'receita', 'renomear',
   'confirmar', 'cancelar', 'ajuda', 'tarefa', 'produto', 'item', 'pasto',
   'fazendas', 'lotes',
+  // Sprint de expansão do bot operacional — novos cadastros/ações:
+  'venda', 'morte', 'finalizar', 'vacina', 'vermifugo', 'suplementacao',
+  'planejar', 'consumo',
 ];
 const DICIONARIO_TOLERANCIA = [...new Set([...palavrasConhecidas(), ...VOCABULARIO_BASE])];
 

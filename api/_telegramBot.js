@@ -41,6 +41,11 @@ const INTENCOES_ATENDIDAS = new Set([
   // Sprint bot operacional determinístico — novos cadastros/ações:
   INTENCOES.CADASTRAR_TAREFA, INTENCOES.CADASTRAR_ITEM_ESTOQUE,
   INTENCOES.DAR_BAIXA_ESTOQUE, INTENCOES.TROCAR_LOTE_PASTO,
+  // Sprint de expansão do bot operacional — 8 novos cadastros/ações:
+  INTENCOES.CADASTRAR_LOTE, INTENCOES.CADASTRAR_PASTO,
+  INTENCOES.REGISTRAR_VENDA, INTENCOES.REGISTRAR_MORTE, INTENCOES.FINALIZAR_LOTE,
+  INTENCOES.CADASTRAR_MANEJO, INTENCOES.CADASTRAR_PLANEJAMENTO_SUPLEMENTACAO,
+  INTENCOES.REGISTRAR_CONSUMO_SUPLEMENTACAO,
 ]);
 
 // Intenções que exigem uma fazenda definida (recorte). Fazendas e ajuda não.
@@ -52,6 +57,10 @@ const INTENCOES_ESCOPADAS = new Set([
   INTENCOES.CADASTRAR_RECEITA, INTENCOES.REGISTRAR_ENTRADA_ESTOQUE,
   INTENCOES.CADASTRAR_TAREFA, INTENCOES.CADASTRAR_ITEM_ESTOQUE,
   INTENCOES.DAR_BAIXA_ESTOQUE, INTENCOES.TROCAR_LOTE_PASTO,
+  INTENCOES.CADASTRAR_LOTE, INTENCOES.CADASTRAR_PASTO,
+  INTENCOES.REGISTRAR_VENDA, INTENCOES.REGISTRAR_MORTE, INTENCOES.FINALIZAR_LOTE,
+  INTENCOES.CADASTRAR_MANEJO, INTENCOES.CADASTRAR_PLANEJAMENTO_SUPLEMENTACAO,
+  INTENCOES.REGISTRAR_CONSUMO_SUPLEMENTACAO,
 ]);
 
 const MSG = {
@@ -78,6 +87,21 @@ const MSG = {
   ITEM_AMBIGUO: 'Há mais de um item com esse nome. Seja mais específico.',
   LOTE_AMBIGUO: 'Há mais de um lote com esse nome. Seja mais específico.',
   CADASTRO_CANCELADO: 'Cadastro cancelado.',
+  // Sprint de expansão do bot operacional — novos cadastros/ações:
+  FAZENDA_NAO_DEFINIDA: 'Não sei em qual fazenda cadastrar isso. Envie "usar fazenda NOME" antes.',
+  SEXO_INVALIDO: 'Informe o sexo do grupo: machos, fêmeas ou misto.',
+  SEXO_VAZIO: 'Informe o sexo do grupo: machos, fêmeas ou misto.',
+  AREA_INVALIDA: 'Informe uma área válida, em hectares.',
+  CAPACIDADE_INVALIDA: 'Informe uma capacidade de suporte válida.',
+  PASTO_NAO_ENCONTRADO: 'Não encontrei esse pasto na fazenda atual. Envie /ajuda para ver os comandos.',
+  PASTO_AMBIGUO: 'Há mais de um pasto com esse nome. Seja mais específico.',
+  PASTO_OUTRA_FAZENDA: 'Esse pasto pertence a outra fazenda.',
+  LOTE_BLOQUEADO: 'Esse lote está finalizado e não aceita novas movimentações.',
+  LOTE_JA_FINALIZADO: 'Esse lote já está finalizado.',
+  MOTIVO_VAZIO: 'Informe o motivo.',
+  TIPO_VAZIO: 'Informe o tipo de manejo.',
+  PRODUTO_VAZIO: 'Informe o produto.',
+  SALDO_INSUFICIENTE: 'Estoque insuficiente para essa quantidade.',
 };
 
 function ajuda() {

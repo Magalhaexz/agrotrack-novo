@@ -34,6 +34,15 @@ export const INTENCOES = {
   CADASTRAR_ITEM_ESTOQUE: 'CADASTRAR_ITEM_ESTOQUE',
   DAR_BAIXA_ESTOQUE: 'DAR_BAIXA_ESTOQUE',
   TROCAR_LOTE_PASTO: 'TROCAR_LOTE_PASTO',
+  // Sprint de expansão do bot operacional — cadastros/ações que ainda faltavam:
+  CADASTRAR_LOTE: 'CADASTRAR_LOTE',
+  CADASTRAR_PASTO: 'CADASTRAR_PASTO',
+  REGISTRAR_VENDA: 'REGISTRAR_VENDA',
+  REGISTRAR_MORTE: 'REGISTRAR_MORTE',
+  FINALIZAR_LOTE: 'FINALIZAR_LOTE',
+  CADASTRAR_MANEJO: 'CADASTRAR_MANEJO',
+  CADASTRAR_PLANEJAMENTO_SUPLEMENTACAO: 'CADASTRAR_PLANEJAMENTO_SUPLEMENTACAO',
+  REGISTRAR_CONSUMO_SUPLEMENTACAO: 'REGISTRAR_CONSUMO_SUPLEMENTACAO',
   CONFIRMAR: 'CONFIRMAR',
   CANCELAR: 'CANCELAR',
   AMBIGUO: 'AMBIGUO',
@@ -97,6 +106,28 @@ const RE_CAD_TAREFA = /^\/?(?:cadastr\w+|criar?|crie|anot\w+)\s+(?:uma?\s+)?(?:t
 // explícito que distingue "criar um item novo" de "somar quantidade a um
 // item existente" (ambíguo em português sem esse sinal).
 const RE_CAD_ITEM_ESTOQUE = /\bitem\s+novo\b|\bnovo\s+item\b|\bproduto\s+novo\b|\bnovo\s+produto\b|^\/?(?:cadastr\w+|criar?|crie)\s+(?:um\s+)?(?:item|produto)\b/i;
+
+// --- Sprint de expansão do bot operacional: 8 novos cadastros/ações ---
+// Lote/pasto NOVOS: verbo de criação + o substantivo logo em seguida (nunca
+// colide com VER_LOTE/RE_CAD_ITEM_ESTOQUE — nenhum dos dois começa com
+// "cadastrar/criar/crie" seguido de "lote"/"pasto").
+const RE_CAD_LOTE = /^\/?(?:cadastr\w+|criar?|crie)\s+(?:um\s+|o\s+)?lote\b/i;
+const RE_CAD_PASTO = /^\/?(?:cadastr\w+|criar?|crie|adicion\w+)\s+(?:um\s+|o\s+)?pasto\b/i;
+// Venda/morte: verbos próprios, checados ANTES de RE_SAIDA_ESTOQUE (baixa
+// genérica) e RE_CAD_DESPESA/RECEITA (não compartilham verbo).
+const RE_REG_VENDA = /^\/?(?:vend[ae]|vendeu|vendi)\b|^\/?registr\w+\s+(?:a\s+)?venda\b/i;
+const RE_REG_MORTE = /^\/?(?:morr\w+|perda\s+de)\b|^\/?registr\w+\s+(?:a\s+)?(?:morte|perda)\b|\bbaixa\s+por\s+morte\b/i;
+// Finalizar lote: "finalizar/encerrar" + lote, ou "marque o lote X como finalizado".
+const RE_FINALIZAR_LOTE = /^\/?(?:finaliz\w+|encerr\w+)\b.*\blote\b|\bmarque\s+o\s+lote\b.*\bfinalizado\b/i;
+// Manejo sanitário: verbo específico no início, ou verbo genérico de cadastro
+// + substantivo do domínio (evita colidir com despesa/receita/tarefa).
+const RE_CAD_MANEJO = /^\/?(?:vacin\w+|vermifug\w+)\b|\bmanejo\s+sanit[áa]rio\b|^\/?(?:cadastr\w+|registr\w+|aplic\w+)\s+.*\b(?:vacina[çc][ãa]o|vermifuga[çc][ãa]o|ivermectina|tratamento)\b/i;
+// Suplementação: planejamento ("planeje"/"alimentação") checado antes do
+// consumo realizado; ambos checados ANTES de RE_SAIDA_ESTOQUE (que também
+// reconhece "usei"/"consumi" de forma genérica) — a palavra de produto
+// (ração/sal/suplemento/trato/proteinado) é o sinal que desambigua.
+const RE_PLANEJ_SUPL = /^\/?planej\w+\b|^\/?cadastr\w+\s+.*\balimenta[çc][ãa]o\b/i;
+const RE_CONSUMO_SUPL = /^\/?registr\w+\s+(?:o\s+)?consumo\b.*\b(?:sal|ra[çc][ãa]o|suplement\w*|trato|proteinado)\b|^\/?us(?:ei|ou|amos|ar)\b.*\b(?:sal|ra[çc][ãa]o|suplement\w*|trato|proteinado)\b|\bbaixa\s+da\s+alimenta[çc][ãa]o\b/i;
 
 // --- Fazenda ---
 const RE_SELECIONAR_FAZENDA = /^\/?(?:usar|selecionar|ativar|trocar\s+para|mudar\s+para|trocar|mudar|escolher)\s+(?:a\s+|de\s+|para\s+a\s+)?fazenda\s+(.+?)$/i;
@@ -203,6 +234,19 @@ export function interpretarComandoTelegram(texto) {
   //     Tarefa e item de estoque novo checados antes dos demais: "item de
   //     estoque" precisa vir antes de RE_REG_ENT_ESTOQUE (ambos contêm a
   //     palavra "estoque").
+  // 6c. Sprint de expansão: lote/pasto novos, venda/morte/finalização e
+  //     manejo/suplementação — checados ANTES dos cadastros genéricos de
+  //     estoque (a palavra de produto/verbo específico é o sinal que
+  //     desambigua "usei 3 sacos de ração" de uma baixa de estoque genérica).
+  if (RE_CAD_LOTE.test(t)) return intent(INTENCOES.CADASTRAR_LOTE, {}, true);
+  if (RE_CAD_PASTO.test(t)) return intent(INTENCOES.CADASTRAR_PASTO, {}, true);
+  if (RE_REG_VENDA.test(t)) return intent(INTENCOES.REGISTRAR_VENDA, {}, true);
+  if (RE_REG_MORTE.test(t)) return intent(INTENCOES.REGISTRAR_MORTE, {}, true);
+  if (RE_FINALIZAR_LOTE.test(t)) return intent(INTENCOES.FINALIZAR_LOTE, {}, true);
+  if (RE_CAD_MANEJO.test(t)) return intent(INTENCOES.CADASTRAR_MANEJO, {}, true);
+  if (RE_PLANEJ_SUPL.test(t)) return intent(INTENCOES.CADASTRAR_PLANEJAMENTO_SUPLEMENTACAO, {}, true);
+  if (RE_CONSUMO_SUPL.test(t)) return intent(INTENCOES.REGISTRAR_CONSUMO_SUPLEMENTACAO, {}, true);
+
   if (RE_CAD_TAREFA.test(t)) return intent(INTENCOES.CADASTRAR_TAREFA, {}, true);
   if (RE_CAD_ITEM_ESTOQUE.test(t)) return intent(INTENCOES.CADASTRAR_ITEM_ESTOQUE, {}, true);
   if (RE_REG_PESAGEM.test(t)) return intent(INTENCOES.REGISTRAR_PESAGEM, {}, true);

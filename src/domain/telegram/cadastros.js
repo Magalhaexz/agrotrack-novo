@@ -12,6 +12,11 @@ import { prepararCadastroTarefa } from './cadastroTarefa.js';
 import { prepararCadastroItemEstoque } from './cadastroItemEstoque.js';
 import { prepararSaidaEstoque } from './acoesEstoque.js';
 import { prepararTrocaLotePasto } from './acoesPasto.js';
+import { prepararCadastroLote } from './cadastroLote.js';
+import { prepararCadastroPasto } from './cadastroPasto.js';
+import { prepararVendaAnimais, prepararMorteAnimais, prepararFinalizarLote } from './acoesLote.js';
+import { prepararCadastroManejo } from './cadastroManejo.js';
+import { prepararPlanejamentoSuplementacao, prepararConsumoSuplementacao } from './suplementacao.js';
 
 import { hojeLocalISO } from '../dataCivil.js';
 const erro = (codigo) => ({ ok: false, erro: codigo });
@@ -140,6 +145,117 @@ export const CATALOGO_CADASTROS = {
       return { ok: true };
     },
   },
+  // ── Sprint de expansão do bot operacional: 8 novos cadastros/ações ────────
+  [INTENCOES.CADASTRAR_LOTE]: {
+    tipo: 'cadastro',
+    slots: [
+      { nome: 'nome_lote', tipo: 'texto', pergunta: 'Qual o nome do lote?' },
+      { nome: 'quantidade', tipo: 'quantidade', pergunta: 'Quantas cabeças?' },
+      { nome: 'sexo', tipo: 'texto', pergunta: 'Qual o sexo do grupo? (machos, fêmeas ou misto)' },
+      { nome: 'peso', tipo: 'peso', pergunta: 'Qual o peso médio inicial, em kg? (ou "não" se ainda não sabe)', obrigatorio: false, perguntar: true },
+      { nome: 'pasto', tipo: 'opcional_texto', pergunta: 'Vai para qual pasto? (envie o nome ou "não")', obrigatorio: false, perguntar: true },
+    ],
+    validar(dados) {
+      if (!String(dados.nome_lote || '').trim()) return erro('NOME_VAZIO');
+      if (!(Number(dados.quantidade) > 0)) return erro('QUANTIDADE_INVALIDA');
+      if (!String(dados.sexo || '').trim()) return erro('SEXO_VAZIO');
+      return { ok: true };
+    },
+  },
+  [INTENCOES.CADASTRAR_PASTO]: {
+    tipo: 'cadastro',
+    slots: [
+      { nome: 'nome_pasto', tipo: 'texto', pergunta: 'Qual o nome do pasto?' },
+      { nome: 'area', tipo: 'quantidade', pergunta: 'Quantos hectares tem o pasto? (ou "não" se não souber)', obrigatorio: false, perguntar: true },
+      { nome: 'capacidade', tipo: 'quantidade', pergunta: 'Qual a capacidade de suporte do pasto? (número, ou "não" se não souber)', obrigatorio: false, perguntar: true },
+    ],
+    validar(dados) {
+      if (!String(dados.nome_pasto || '').trim()) return erro('NOME_VAZIO');
+      return { ok: true };
+    },
+  },
+  [INTENCOES.REGISTRAR_VENDA]: {
+    tipo: 'cadastro',
+    slots: [
+      { nome: 'lote', tipo: 'lote', pergunta: 'De qual lote?' },
+      { nome: 'quantidade', tipo: 'quantidade', pergunta: 'Quantos animais foram vendidos?' },
+      { nome: 'valor', tipo: 'valor', pergunta: 'Qual foi o valor da venda? (ou "não" se ainda não sabe)', obrigatorio: false, perguntar: true },
+      { nome: 'data', tipo: 'data', pergunta: 'Em qual data?', obrigatorio: false },
+    ],
+    validar(dados) {
+      if (!(Number(dados.quantidade) > 0)) return erro('QUANTIDADE_INVALIDA');
+      return { ok: true };
+    },
+  },
+  [INTENCOES.REGISTRAR_MORTE]: {
+    tipo: 'cadastro',
+    slots: [
+      { nome: 'lote', tipo: 'lote', pergunta: 'De qual lote?' },
+      { nome: 'quantidade', tipo: 'quantidade', pergunta: 'Quantos animais foram perdidos?' },
+      { nome: 'motivo', tipo: 'opcional_texto', pergunta: 'Qual o motivo? (ou "não")', obrigatorio: false, perguntar: true },
+      { nome: 'data', tipo: 'data', pergunta: 'Em qual data?', obrigatorio: false },
+    ],
+    validar(dados) {
+      if (!(Number(dados.quantidade) > 0)) return erro('QUANTIDADE_INVALIDA');
+      return { ok: true };
+    },
+  },
+  [INTENCOES.FINALIZAR_LOTE]: {
+    tipo: 'cadastro',
+    slots: [
+      { nome: 'lote', tipo: 'lote', pergunta: 'Qual lote?' },
+      { nome: 'motivo', tipo: 'texto', pergunta: 'Qual o motivo do encerramento?' },
+      { nome: 'data', tipo: 'data', pergunta: 'Em qual data?', obrigatorio: false },
+    ],
+    validar(dados) {
+      if (!String(dados.motivo || '').trim()) return erro('MOTIVO_VAZIO');
+      return { ok: true };
+    },
+  },
+  [INTENCOES.CADASTRAR_MANEJO]: {
+    tipo: 'cadastro',
+    slots: [
+      { nome: 'lote', tipo: 'lote', pergunta: 'Em qual lote?' },
+      { nome: 'tipo', tipo: 'texto', pergunta: 'Qual o tipo de manejo? (ex.: vacina, vermífugo, tratamento)' },
+      { nome: 'quantidade_animais', tipo: 'quantidade', pergunta: 'Quantos animais foram tratados?' },
+      { nome: 'produto', tipo: 'opcional_texto', pergunta: 'Qual o produto utilizado? (nome do item de estoque, ou "não")', obrigatorio: false, perguntar: true },
+      { nome: 'quantidade_produto', tipo: 'quantidade', pergunta: 'Quanto do produto foi utilizado? (ou "não")', obrigatorio: false, perguntar: true },
+      { nome: 'data', tipo: 'data', pergunta: 'Em qual data?', obrigatorio: false },
+    ],
+    validar(dados) {
+      if (!String(dados.tipo || '').trim()) return erro('TIPO_VAZIO');
+      if (!(Number(dados.quantidade_animais) > 0)) return erro('QUANTIDADE_INVALIDA');
+      return { ok: true };
+    },
+  },
+  [INTENCOES.CADASTRAR_PLANEJAMENTO_SUPLEMENTACAO]: {
+    tipo: 'cadastro',
+    slots: [
+      { nome: 'lote', tipo: 'lote', pergunta: 'Para qual lote?' },
+      { nome: 'produto', tipo: 'texto', pergunta: 'Qual o produto/suplemento?' },
+      { nome: 'quantidade_por_cabeca', tipo: 'quantidade', pergunta: 'Quanto por cabeça, em kg/dia?' },
+      { nome: 'periodo_dias', tipo: 'quantidade', pergunta: 'Por quantos dias? (ou "não")', obrigatorio: false, perguntar: true },
+    ],
+    validar(dados) {
+      if (!String(dados.produto || '').trim()) return erro('PRODUTO_VAZIO');
+      if (!(Number(dados.quantidade_por_cabeca) > 0)) return erro('QUANTIDADE_INVALIDA');
+      return { ok: true };
+    },
+  },
+  [INTENCOES.REGISTRAR_CONSUMO_SUPLEMENTACAO]: {
+    tipo: 'cadastro',
+    slots: [
+      { nome: 'lote', tipo: 'lote', pergunta: 'De qual lote?' },
+      { nome: 'produto', tipo: 'texto', pergunta: 'Qual o produto?' },
+      { nome: 'quantidade', tipo: 'quantidade', pergunta: 'Qual a quantidade consumida?' },
+      { nome: 'data', tipo: 'data', pergunta: 'Em qual data?', obrigatorio: false },
+    ],
+    validar(dados) {
+      if (!String(dados.produto || '').trim()) return erro('PRODUTO_VAZIO');
+      if (!(Number(dados.quantidade) > 0)) return erro('QUANTIDADE_INVALIDA');
+      return { ok: true };
+    },
+  },
 };
 
 export function slotsDoCadastro(intencao) {
@@ -163,6 +279,11 @@ export function extrairDadosIniciais(intencao, texto, ctx = {}) {
     else if (slot.nome === 'item') v = extrairItemEstoque(texto);
     else if (slot.nome === 'titulo') v = extrairTitulo(texto);
     else if (slot.nome === 'nome') v = extrairNomeProduto(texto);
+    // Sprint de expansão do bot operacional — novos cadastros/ações:
+    else if (slot.nome === 'nome_lote') v = extrairNomeApos(texto, ['lote']);
+    else if (slot.nome === 'nome_pasto') v = extrairNomeApos(texto, ['pasto']);
+    else if (slot.nome === 'produto') v = extrairItemEstoque(texto);
+    else if (slot.nome === 'tipo') v = extrairTipoManejo(texto);
     else if (slot.tipo === 'valor') v = extrairValor(texto);
     else if (slot.tipo === 'peso') v = extrairPeso(texto);
     else if (slot.tipo === 'quantidade') v = extrairQuantidade(texto)?.quantidade ?? null;
@@ -224,6 +345,16 @@ function extrairNomeProduto(texto) {
     const candidato = m?.[1]?.trim();
     if (candidato) return candidato;
   }
+  return null;
+}
+
+/** Tipo de manejo sanitário: detecta o verbo/substantivo já usado na mensagem
+ * ("vacinei", "vermifugação") para não perguntar de novo o óbvio. */
+function extrairTipoManejo(texto) {
+  const chave = normalizarChave(texto);
+  if (/vacin/.test(chave)) return 'vacina';
+  if (/vermifug/.test(chave)) return 'vermifugo';
+  if (/tratamento|tratar/.test(chave)) return 'tratamento';
   return null;
 }
 
@@ -304,6 +435,42 @@ export function prepararCadastro(intencao, dados, ctx = {}) {
     case INTENCOES.TROCAR_LOTE_PASTO: {
       const plano = prepararTrocaLotePasto(db, dados);
       return plano.ok ? { ...plano, tipo: 'troca_pasto' } : plano;
+    }
+    // ── Sprint de expansão do bot operacional: 8 novos cadastros/ações ──────
+    case INTENCOES.CADASTRAR_LOTE: {
+      const plano = prepararCadastroLote(db, { ...dados, nome: dados.nome_lote }, { fazendaId: ctx.fazendaId ?? null });
+      return plano.ok ? { ...plano, tipo: 'cadastro_lote' } : plano;
+    }
+    case INTENCOES.CADASTRAR_PASTO: {
+      const plano = prepararCadastroPasto(db, { ...dados, nome: dados.nome_pasto }, { fazendaId: ctx.fazendaId ?? null });
+      return plano.ok ? { ...plano, tipo: 'cadastro_pasto' } : plano;
+    }
+    case INTENCOES.REGISTRAR_VENDA: {
+      if (!loteId) return erro('LOTE_NAO_ENCONTRADO');
+      const plano = prepararVendaAnimais(db, { loteId, quantidade: dados.quantidade, valor: dados.valor, data: dados.data });
+      return plano.ok ? { ...plano, tipo: 'venda' } : plano;
+    }
+    case INTENCOES.REGISTRAR_MORTE: {
+      if (!loteId) return erro('LOTE_NAO_ENCONTRADO');
+      const plano = prepararMorteAnimais(db, { loteId, quantidade: dados.quantidade, data: dados.data, motivo: dados.motivo });
+      return plano.ok ? { ...plano, tipo: 'morte' } : plano;
+    }
+    case INTENCOES.FINALIZAR_LOTE: {
+      if (!loteId) return erro('LOTE_NAO_ENCONTRADO');
+      const plano = prepararFinalizarLote(db, { loteId, motivo: dados.motivo, data: dados.data });
+      return plano.ok ? { ...plano, tipo: 'finalizar_lote' } : plano;
+    }
+    case INTENCOES.CADASTRAR_MANEJO: {
+      const plano = prepararCadastroManejo(db, dados);
+      return plano.ok ? { ...plano, tipo: 'manejo' } : plano;
+    }
+    case INTENCOES.CADASTRAR_PLANEJAMENTO_SUPLEMENTACAO: {
+      const plano = prepararPlanejamentoSuplementacao(db, dados);
+      return plano.ok ? { ...plano, tipo: 'planejamento_suplementacao' } : plano;
+    }
+    case INTENCOES.REGISTRAR_CONSUMO_SUPLEMENTACAO: {
+      const plano = prepararConsumoSuplementacao(db, dados, { fazendaId: ctx.fazendaId ?? null });
+      return plano.ok ? { ...plano, tipo: 'consumo_suplementacao' } : plano;
     }
     default:
       return erro('CADASTRO_DESCONHECIDO');
