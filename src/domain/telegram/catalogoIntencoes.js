@@ -23,6 +23,11 @@ export const CATALOGO_INTENCOES = {
   [INTENCOES.CADASTRAR_DESPESA]: { tipo: 'cadastro', exemplos: ['gastei 500 reais com sal'] },
   [INTENCOES.CADASTRAR_RECEITA]: { tipo: 'cadastro', exemplos: ['recebi 15 mil pela venda'] },
   [INTENCOES.REGISTRAR_ENTRADA_ESTOQUE]: { tipo: 'cadastro', exemplos: ['adicionar 20 sacos de sal no estoque'] },
+  // Sprint bot operacional determinístico — novos cadastros/ações:
+  [INTENCOES.CADASTRAR_TAREFA]: { tipo: 'cadastro', exemplos: ['crie uma tarefa para pesar o lote amanha', 'me lembra de comprar sal'] },
+  [INTENCOES.CADASTRAR_ITEM_ESTOQUE]: { tipo: 'cadastro', exemplos: ['cadastre um item novo', 'novo produto Sal Proteinado'] },
+  [INTENCOES.DAR_BAIXA_ESTOQUE]: { tipo: 'cadastro', exemplos: ['dar baixa em 50 kg de sal', 'usei 3 litros de vermifugo'] },
+  [INTENCOES.TROCAR_LOTE_PASTO]: { tipo: 'cadastro', exemplos: ['mova o lote Recria para o pasto Norte'] },
   [INTENCOES.CONFIRMAR]: { tipo: 'sistema', exemplos: ['/confirmar', 'confirmo'] },
   [INTENCOES.CANCELAR]: { tipo: 'sistema', exemplos: ['/cancelar', 'cancelar'] },
   [INTENCOES.AMBIGUO]: { tipo: 'sistema', exemplos: ['trocar lote 1 para lote 2'] },

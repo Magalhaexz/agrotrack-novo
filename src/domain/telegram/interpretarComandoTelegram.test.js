@@ -158,3 +158,82 @@ test('nenhuma consulta muda dados (requerConfirmacao só em ação)', () => {
     assert.equal(i(txt).requerConfirmacao, false, txt);
   }
 });
+
+// ── Sprint bot operacional determinístico: 4 novos cadastros/ações ──────────
+test('cadastrar tarefa: cadastrar/criar/lembrete/lembra de/agendar', () => {
+  for (const txt of [
+    'cadastre uma tarefa para pesar o lote',
+    'crie uma tarefa para comprar sal dia 20',
+    'me lembra de pesar o lote Recria amanha',
+    'lembra de comprar sal',
+    'agende vacinacao para sexta-feira',
+  ]) {
+    const r = i(txt);
+    assert.equal(r.intencao, INTENCOES.CADASTRAR_TAREFA, txt);
+    assert.equal(r.requerConfirmacao, true, txt);
+  }
+});
+
+test('tarefa não colide com consulta de tarefas (plural, sem verbo de ação)', () => {
+  // "tarefas" no plural sem gatilho de cadastro cai fora do classificador
+  // determinístico deste arquivo — é atendido pelo fallback legado (Sprint 8).
+  assert.notEqual(i('quais tarefas estao atrasadas').intencao, INTENCOES.CADASTRAR_TAREFA);
+});
+
+test('cadastrar item de estoque NOVO — distinto de entrada em item existente', () => {
+  for (const txt of ['cadastre um item novo', 'novo produto Sal Proteinado', 'crie um item de estoque', 'produto novo Ivermectina']) {
+    assert.equal(i(txt).intencao, INTENCOES.CADASTRAR_ITEM_ESTOQUE, txt);
+  }
+  // "cadastre 20 sacos de sal mineral" não tem a palavra "estoque" nem
+  // "item"/"produto" — não é classificado por este arquivo (o orquestrador
+  // pede para o produtor ser mais específico); o que importa aqui é que
+  // NÃO vira REGISTRAR_ENTRADA_ESTOQUE por engano (a palavra "estoque"
+  // decide isso, e não está presente).
+  assert.notEqual(i('cadastre 20 sacos de sal mineral').intencao, INTENCOES.REGISTRAR_ENTRADA_ESTOQUE);
+});
+
+test('item de estoque novo tem prioridade sobre entrada de estoque (ambos contêm "estoque")', () => {
+  assert.equal(i('cadastre um item de estoque').intencao, INTENCOES.CADASTRAR_ITEM_ESTOQUE);
+});
+
+test('dar baixa em estoque: baixa/retirar/usar/consumir/saiu', () => {
+  for (const txt of [
+    'dar baixa em 50 kg de sal',
+    'retirar 10 sacos de racao',
+    'usei 3 litros de vermifugo',
+    'consumi 20 kg de sal no lote',
+    'saiu 15 kg de sal do estoque',
+  ]) {
+    const r = i(txt);
+    assert.equal(r.intencao, INTENCOES.DAR_BAIXA_ESTOQUE, txt);
+    assert.equal(r.requerConfirmacao, true, txt);
+  }
+});
+
+test('dar baixa não colide com entrada de estoque (verbos opostos)', () => {
+  assert.equal(i('adicionar 300 kg de racao no estoque').intencao, INTENCOES.REGISTRAR_ENTRADA_ESTOQUE);
+  assert.equal(i('dar baixa em 300 kg de racao').intencao, INTENCOES.DAR_BAIXA_ESTOQUE);
+});
+
+test('trocar lote de pasto: mover/trocar/mandar + pasto', () => {
+  for (const txt of [
+    'mova o lote Recria para o pasto Norte',
+    'mover o lote 8 para o pasto Sul',
+    'troque o lote Recria de pasto',
+    'mande o lote para o pasto do Rio',
+  ]) {
+    const r = i(txt);
+    assert.equal(r.intencao, INTENCOES.TROCAR_LOTE_PASTO, txt);
+    assert.equal(r.requerConfirmacao, true, txt);
+  }
+});
+
+test('troca de pasto tem prioridade sobre a ambiguidade genérica de lote (não vira AMBIGUO)', () => {
+  const r = i('trocar o lote Recria para o pasto Norte');
+  assert.equal(r.intencao, INTENCOES.TROCAR_LOTE_PASTO);
+});
+
+test('ambiguidade genérica de lote continua funcionando quando NÃO menciona pasto', () => {
+  const r = i('trocar lote Recria para lote Engorda');
+  assert.equal(r.intencao, INTENCOES.AMBIGUO);
+});

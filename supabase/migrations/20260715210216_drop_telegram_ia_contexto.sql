@@ -1,0 +1,11 @@
+-- Sprint remoção da Anthropic — dropa a tabela criada exclusivamente para o
+-- contexto de mensagens da arquitetura LLM (histórico livre para enviar à
+-- Claude API). Sem provedor de IA, um histórico de mensagens em texto livre
+-- não tem uso: o interpretador determinístico não "lê" conversas passadas
+-- para desambiguar como um LLM faria. O preenchimento progressivo de campos
+-- (seção 12 do novo spec) já é coberto por `telegram_conversas`
+-- (intencao_atual/etapa_atual/dados_coletados/expira_em), que continua
+-- intocada. Tabela nunca chegou a receber tráfego real (criada e removida
+-- na mesma sprint bloqueadora, antes de qualquer chave de API ser
+-- provisionada).
+DROP TABLE IF EXISTS public.telegram_ia_contexto;

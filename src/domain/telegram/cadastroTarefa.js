@@ -1,8 +1,9 @@
-// Cadastro de tarefa via linguagem natural (Assistente IA). Puro, sem I/O.
-// Mesma tabela/campos de `EMPTY_TASK` em `src/pages/TarefasPage.jsx` — não é
-// um cadastro por conversa em etapas (a IA extrai os campos da mensagem em
-// uma única chamada); o slot que faltar vira pergunta de esclarecimento do
-// próprio modelo, não um estado de conversa novo.
+// Cadastro de tarefa via linguagem natural (bot operacional determinístico).
+// Puro, sem I/O. Mesma tabela/campos de `EMPTY_TASK` em
+// `src/pages/TarefasPage.jsx`. Validação e escrita ficam aqui; a extração de
+// entidades da mensagem e o preenchimento progressivo de campos ausentes
+// (slot-filling por conversa) são responsabilidade de `cadastros.js` +
+// `conversas.js` — este arquivo só recebe `dados` já resolvidos.
 import { resolverLotePorNome, normalizarChave } from './resolvedores.js';
 import { hojeLocalISO } from '../dataCivil.js';
 

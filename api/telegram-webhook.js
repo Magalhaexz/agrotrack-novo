@@ -1,19 +1,16 @@
 /* global process */
-// Webhook do Telegram (Sprint 7 + Sprint 8 + hotfix comandos + Assistente IA)
-// — recebe updates do Bot API e diferencia cinco tipos de mensagem:
+// Webhook do Telegram (Sprint 7 + Sprint 8 + hotfix comandos + Bot
+// Operacional determinístico) — recebe updates do Bot API e diferencia
+// quatro tipos de mensagem:
 //   1. código HERDON-XXXXXX de pareamento (Sprint 7, fluxo inalterado);
-//   2. comando/frase determinística do bot interativo (`_telegramBot.js`,
-//      regex/aliases, sem IA) — tentado primeiro por ser grátis e já testado;
-//   2b. quando (2) não reconhece a mensagem, o Assistente IA
-//      (`_telegramIA.js`, Claude API com ferramentas) tenta interpretar em
-//      linguagem natural — só ativa se ANTHROPIC_API_KEY estiver configurada
-//      e a API responder; qualquer indisponibilidade cai para o passo 3 sem
-//      erro visível ao usuário (seção 29 do spec: bot continua funcionando
-//      100% sem IA);
+//   2. comando/frase reconhecida pelo bot operacional (`_telegramBot.js`,
+//      interpretador determinístico — normalização, sinônimos, tolerância a
+//      erro de digitação, pontuação de confiança — nenhuma chamada a
+//      provedor de IA em nenhum ponto);
 //   3. comando fixo do Sprint 8 (/relatorio, /prioridades, /pagamentos,
 //      /estoque, /tarefas, /lotes) ou pergunta livre por palavra-chave
-//      (`src/domain/telegramIntent.js`) — SEM IA generativa, só reaproveita
-//      o Motor Único de Alertas (Sprint 5) já calculado;
+//      (`src/domain/telegramIntent.js`) — mesmo motor determinístico, só
+//      reaproveita o Motor Único de Alertas (Sprint 5) já calculado;
 //   4. texto sem código nem comando: orienta a enviar o código de vínculo.
 //
 // O usuário é sempre identificado pelo `telegram_chat_id` já salvo em
@@ -31,7 +28,6 @@ import { aplicarTratativasAosAlertas } from '../src/domain/tratativasAlertas.js'
 import { classificarIntencaoTelegram, INTENCOES } from '../src/domain/telegramIntent.js';
 import { interpretarComandoTelegram, gerarRespostaComandoTelegram } from '../src/domain/telegramComandos.js';
 import { processarComandoBot } from './_telegramBot.js';
-import { processarMensagemIA } from './_telegramIA.js';
 import { avaliarRateLimitTelegram, LIMITE_PADRAO, LIMITE_VINCULO } from '../src/domain/telegramRateLimit.js';
 import {
   gerarRelatorioDiarioTelegram,
@@ -226,21 +222,6 @@ export default async function handler(req, res) {
       console.error('[telegram-webhook] erro no bot interativo', error);
       await enviarMensagemTelegramParaChat(chatId, MSG_ERRO_RESPOSTA).catch(() => null);
       return res.status(200).json({ ok: true, bot: false });
-    }
-
-    // Assistente IA (linguagem natural): só tentado quando o bot
-    // determinístico acima não reconheceu a mensagem. `processarMensagemIA`
-    // nunca lança para fora — devolve null tanto por chave ausente quanto por
-    // qualquer erro do provedor, e nesse caso o fluxo segue para o Sprint 8
-    // abaixo exatamente como se a IA não existisse.
-    try {
-      const respostaIA = await processarMensagemIA({ client, conexao, texto, chatId });
-      if (respostaIA) {
-        await enviarMensagemTelegramParaChat(chatId, respostaIA.texto).catch(() => null);
-        return res.status(200).json({ ok: true, ia: true });
-      }
-    } catch (error) {
-      console.error('[telegram-webhook] erro no assistente ia — seguindo para o fallback sem ia', error);
     }
   }
 

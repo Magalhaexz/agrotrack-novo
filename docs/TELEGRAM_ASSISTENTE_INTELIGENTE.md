@@ -1,4 +1,23 @@
-# Assistente Inteligente HERDON no Telegram
+# Assistente Inteligente HERDON no Telegram (HISTÓRICO — arquitetura removida)
+
+> ⚠️ **Este documento descreve uma arquitetura que foi integralmente
+> removida na sprint seguinte** ("Remoção da Claude API e consolidação do
+> bot operacional gratuito do Telegram"). A integração com a Claude API
+> descrita abaixo **não existe mais no código** — não há `ANTHROPIC_API_KEY`,
+> não há `@anthropic-ai/sdk`, não há nenhuma chamada a provedor de IA. O bot
+> do Telegram voltou a ser 100% determinístico (regex + sinônimos +
+> tolerância a erro de digitação), sem custo de IA. Ver
+> [`docs/TELEGRAM_BOT_OPERACIONAL_SEM_IA.md`](TELEGRAM_BOT_OPERACIONAL_SEM_IA.md)
+> para a arquitetura atual. Este arquivo é mantido só como registro
+> histórico de por que a arquitetura foi tentada e por que foi revertida
+> (decisão do usuário, reabrindo — e depois reconfirmando — a decisão
+> original do Sprint 8 de não usar IA paga).
+>
+> O que **sobreviveu** da sprint da Claude API (nada foi jogado fora):
+> o catálogo de ferramentas (`telegramToolsRegistry.js`), as 4 operações
+> novas (`cadastrar_tarefa`, `cadastrar_item_estoque`, `dar_baixa_estoque`,
+> `trocar_lote_pasto`) e o mecanismo de confirmação/idempotência — só o
+> *interpretador* de linguagem natural trocou de Claude para determinístico.
 
 Sprint bloqueador. Base original: commit `e3a3267`. Transforma o bot do
 Telegram, hoje 100% determinístico (regex/aliases, "sem IA generativa" por

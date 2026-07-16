@@ -8,6 +8,10 @@
 import { INTENCOES } from './interpretarComandoTelegram.js';
 import { extrairValor, extrairPeso, extrairData, extrairQuantidade, extrairNomeApos, parseNumeroBR } from './extrairEntidades.js';
 import { resolverLotePorNome, normalizarChave } from './resolvedores.js';
+import { prepararCadastroTarefa } from './cadastroTarefa.js';
+import { prepararCadastroItemEstoque } from './cadastroItemEstoque.js';
+import { prepararSaidaEstoque } from './acoesEstoque.js';
+import { prepararTrocaLotePasto } from './acoesPasto.js';
 
 import { hojeLocalISO } from '../dataCivil.js';
 const erro = (codigo) => ({ ok: false, erro: codigo });
@@ -87,6 +91,55 @@ export const CATALOGO_CADASTROS = {
       return { ok: true };
     },
   },
+  // ── Sprint bot operacional determinístico: 4 novos cadastros/ações ────────
+  [INTENCOES.CADASTRAR_TAREFA]: {
+    tipo: 'cadastro',
+    slots: [
+      { nome: 'titulo', tipo: 'texto', pergunta: 'Qual o título da tarefa?' },
+      { nome: 'data_vencimento', tipo: 'data', pergunta: 'Para qual data?' },
+      { nome: 'lote', tipo: 'opcional_texto', pergunta: 'Está vinculada a algum lote? (envie o nome ou "não")', obrigatorio: false, perguntar: true },
+    ],
+    validar(dados) {
+      if (!String(dados.titulo || '').trim()) return erro('TITULO_VAZIO');
+      if (!dados.data_vencimento) return erro('DATA_VENCIMENTO_VAZIA');
+      return { ok: true };
+    },
+  },
+  [INTENCOES.CADASTRAR_ITEM_ESTOQUE]: {
+    tipo: 'cadastro',
+    slots: [
+      { nome: 'nome', tipo: 'texto', pergunta: 'Qual o nome do produto?' },
+      { nome: 'quantidade_inicial', tipo: 'quantidade', pergunta: 'Qual a quantidade inicial? (ou "não" se ainda não vai entrar quantidade)', obrigatorio: false, perguntar: true },
+    ],
+    validar(dados) {
+      if (!String(dados.nome || '').trim()) return erro('NOME_VAZIO');
+      return { ok: true };
+    },
+  },
+  [INTENCOES.DAR_BAIXA_ESTOQUE]: {
+    tipo: 'cadastro',
+    slots: [
+      { nome: 'item', tipo: 'texto', pergunta: 'Qual item de estoque?' },
+      { nome: 'quantidade', tipo: 'quantidade', pergunta: 'Qual a quantidade?' },
+    ],
+    validar(dados) {
+      if (!(Number(dados.quantidade) > 0)) return erro('QUANTIDADE_INVALIDA');
+      if (!String(dados.item || '').trim()) return erro('ITEM_VAZIO');
+      return { ok: true };
+    },
+  },
+  [INTENCOES.TROCAR_LOTE_PASTO]: {
+    tipo: 'cadastro',
+    slots: [
+      { nome: 'lote', tipo: 'lote', pergunta: 'Qual lote?' },
+      { nome: 'pasto', tipo: 'texto', pergunta: 'Para qual pasto?' },
+    ],
+    validar(dados) {
+      if (!String(dados.lote || '').trim()) return erro('LOTE_VAZIO');
+      if (!String(dados.pasto || '').trim()) return erro('PASTO_VAZIO');
+      return { ok: true };
+    },
+  },
 };
 
 export function slotsDoCadastro(intencao) {
@@ -105,8 +158,11 @@ export function extrairDadosIniciais(intencao, texto, ctx = {}) {
   for (const slot of cad.slots) {
     let v = null;
     if (slot.nome === 'lote') v = extrairNomeApos(texto, ['lote']);
+    else if (slot.nome === 'pasto') v = extrairNomeApos(texto, ['pasto']);
     else if (slot.nome === 'descricao') v = extrairDescricao(texto);
     else if (slot.nome === 'item') v = extrairItemEstoque(texto);
+    else if (slot.nome === 'titulo') v = extrairTitulo(texto);
+    else if (slot.nome === 'nome') v = extrairNomeProduto(texto);
     else if (slot.tipo === 'valor') v = extrairValor(texto);
     else if (slot.tipo === 'peso') v = extrairPeso(texto);
     else if (slot.tipo === 'quantidade') v = extrairQuantidade(texto)?.quantidade ?? null;
@@ -134,6 +190,40 @@ function extrairItemEstoque(texto) {
   if (m) return m[1].trim();
   m = orig.match(/\bde\s+(.+?)\s+no\s+estoque\b/i);
   if (m) return m[1].trim();
+  return null;
+}
+
+/** Título de tarefa: após "tarefa (para|de)"/"lembrete (para|de)"/"lembra de". */
+function extrairTitulo(texto) {
+  const orig = String(texto || '');
+  let m = orig.match(/\b(?:tarefa|lembrete)\s+(?:para|de)\s+(.+?)(?:\s+(?:dia|hoje|ontem|amanha|no\s+lote|na\s+fazenda)\b|[.,;!?]|$)/i);
+  if (m) return m[1].trim();
+  m = orig.match(/\bme\s+lembr[ae]\s+de\s+(.+?)(?:\s+(?:dia|hoje|ontem|amanha|no\s+lote|na\s+fazenda)\b|[.,;!?]|$)/i);
+  if (m) return m[1].trim();
+  m = orig.match(/^\/?agend\w+\s+(.+?)(?:\s+(?:para|dia|hoje|ontem|amanha)\b|[.,;!?]|$)/i);
+  if (m) return m[1].trim();
+  return null;
+}
+
+/**
+ * Nome de produto novo: após "item novo"/"novo item"/"produto novo"/"novo
+ * produto" (cadastro de item de estoque). Exige as DUAS palavras presentes
+ * — "item"/"produto" sozinho é ambíguo demais para arriscar (poderia
+ * capturar a palavra "novo" como se fosse o nome, quando a mensagem só diz
+ * "cadastre um item novo" sem nome nenhum ainda — nesse caso o slot deve
+ * perguntar, não inventar "novo" como nome do produto).
+ */
+function extrairNomeProduto(texto) {
+  const orig = String(texto || '');
+  const padroes = [
+    /\bnovo\s+(?:item|produto)\s+(?:chamado\s+)?(.+?)(?:\s+(?:no|na|com|de|para)\b|[.,;!?]|$)/i,
+    /\b(?:item|produto)\s+novo\s+(?:chamado\s+)?(.+?)(?:\s+(?:no|na|com|de|para)\b|[.,;!?]|$)/i,
+  ];
+  for (const re of padroes) {
+    const m = orig.match(re);
+    const candidato = m?.[1]?.trim();
+    if (candidato) return candidato;
+  }
   return null;
 }
 
@@ -198,6 +288,22 @@ export function prepararCadastro(intencao, dados, ctx = {}) {
           { tabela: 'estoque', tipo: 'update', match: { id: item.id }, patch: { quantidade_atual: atual + qtd } },
         ],
       };
+    }
+    case INTENCOES.CADASTRAR_TAREFA: {
+      const plano = prepararCadastroTarefa(db, dados, { fazendaId: ctx.fazendaId ?? null });
+      return plano.ok ? { ...plano, tipo: 'tarefa' } : plano;
+    }
+    case INTENCOES.CADASTRAR_ITEM_ESTOQUE: {
+      const plano = prepararCadastroItemEstoque(db, dados, { fazendaId: ctx.fazendaId ?? null });
+      return plano.ok ? { ...plano, tipo: 'item_estoque' } : plano;
+    }
+    case INTENCOES.DAR_BAIXA_ESTOQUE: {
+      const plano = prepararSaidaEstoque(db, dados);
+      return plano.ok ? { ...plano, tipo: 'saida_estoque' } : plano;
+    }
+    case INTENCOES.TROCAR_LOTE_PASTO: {
+      const plano = prepararTrocaLotePasto(db, dados);
+      return plano.ok ? { ...plano, tipo: 'troca_pasto' } : plano;
     }
     default:
       return erro('CADASTRO_DESCONHECIDO');

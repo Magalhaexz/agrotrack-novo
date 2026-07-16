@@ -26,12 +26,19 @@ const PERMISSAO_POR_INTENCAO = {
   [INTENCOES.CADASTRAR_DESPESA]: 'financeiro:editar',
   [INTENCOES.CADASTRAR_RECEITA]: 'financeiro:editar',
   [INTENCOES.REGISTRAR_ENTRADA_ESTOQUE]: 'estoque:movimentar',
+  // Sprint bot operacional determinístico — novos cadastros/ações:
+  [INTENCOES.CADASTRAR_TAREFA]: 'tarefas:editar',
+  [INTENCOES.CADASTRAR_ITEM_ESTOQUE]: 'estoque:editar',
+  [INTENCOES.DAR_BAIXA_ESTOQUE]: 'estoque:movimentar',
+  [INTENCOES.TROCAR_LOTE_PASTO]: 'lotes:editar',
 };
 
 // Cadastros que abrem conversa em etapas (slot-filling) quando falta dado.
 const INTENCOES_CADASTRO = new Set([
   INTENCOES.REGISTRAR_PESAGEM, INTENCOES.CADASTRAR_DESPESA,
   INTENCOES.CADASTRAR_RECEITA, INTENCOES.REGISTRAR_ENTRADA_ESTOQUE,
+  INTENCOES.CADASTRAR_TAREFA, INTENCOES.CADASTRAR_ITEM_ESTOQUE,
+  INTENCOES.DAR_BAIXA_ESTOQUE, INTENCOES.TROCAR_LOTE_PASTO,
 ]);
 
 export function intencaoEhCadastro(intencao) {

@@ -8,7 +8,8 @@ import { gerarAlertasUnificados } from '../src/domain/alertasUnificados.js';
 import { aplicarTratativasAosAlertas } from '../src/domain/tratativasAlertas.js';
 import { prepararAlertasEscopados, enriquecerAlertasComFazenda } from '../src/domain/telegramFazenda.js';
 import { filtrarDbPorFazenda } from '../src/domain/escopoFazenda.js';
-import { interpretarComandoTelegram, INTENCOES } from '../src/domain/telegram/interpretarComandoTelegram.js';
+import { INTENCOES } from '../src/domain/telegram/interpretarComandoTelegram.js';
+import { interpretarMensagemTelegram, LIMIAR_EXECUTAR } from '../src/domain/telegram/interpretadorTelegram.js';
 import { podeExecutarComandoTelegram, intencaoEhCadastro } from '../src/domain/telegram/permissoesTelegram.js';
 import { resolverFazendaPorNome, resolverLotePorNome } from '../src/domain/telegram/resolvedores.js';
 import {
@@ -37,6 +38,9 @@ const INTENCOES_ATENDIDAS = new Set([
   INTENCOES.RENOMEAR_LOTE, INTENCOES.CONFIRMAR, INTENCOES.CANCELAR, INTENCOES.AMBIGUO,
   INTENCOES.REGISTRAR_PESAGEM, INTENCOES.CADASTRAR_DESPESA, INTENCOES.CADASTRAR_RECEITA,
   INTENCOES.REGISTRAR_ENTRADA_ESTOQUE,
+  // Sprint bot operacional determinístico — novos cadastros/ações:
+  INTENCOES.CADASTRAR_TAREFA, INTENCOES.CADASTRAR_ITEM_ESTOQUE,
+  INTENCOES.DAR_BAIXA_ESTOQUE, INTENCOES.TROCAR_LOTE_PASTO,
 ]);
 
 // Intenções que exigem uma fazenda definida (recorte). Fazendas e ajuda não.
@@ -46,6 +50,8 @@ const INTENCOES_ESCOPADAS = new Set([
   INTENCOES.VER_PESAGENS, INTENCOES.RESUMO, INTENCOES.TRANSFERIR_ANIMAIS_ENTRE_LOTES,
   INTENCOES.RENOMEAR_LOTE, INTENCOES.REGISTRAR_PESAGEM, INTENCOES.CADASTRAR_DESPESA,
   INTENCOES.CADASTRAR_RECEITA, INTENCOES.REGISTRAR_ENTRADA_ESTOQUE,
+  INTENCOES.CADASTRAR_TAREFA, INTENCOES.CADASTRAR_ITEM_ESTOQUE,
+  INTENCOES.DAR_BAIXA_ESTOQUE, INTENCOES.TROCAR_LOTE_PASTO,
 ]);
 
 const MSG = {
@@ -132,9 +138,29 @@ export async function registrarAuditoria(client, conexao, dados) {
 /**
  * Ponto de entrada. Retorna { texto } a enviar, ou null quando a intenção não é
  * atendida por este bot (o webhook então segue com o fluxo legado).
+ *
+ * Camada fina sobre `processarComandoBotInterno`: classifica a mensagem UMA
+ * vez com o interpretador determinístico central (`interpretadorTelegram.js`
+ * — normalização + sinônimos + tolerância a erro de digitação + confiança,
+ * seção 6/11 do spec do bot operacional) e, quando a interpretação só foi
+ * possível depois de CORRIGIR uma palavra (confiança 0.65 — o degrau mais
+ * incerto), avisa o produtor da correção feita antes de mostrar a resposta,
+ * em vez de silenciosamente assumir que adivinhou certo.
  */
 export async function processarComandoBot({ client, conexao, texto, chatId, agora = new Date() }) {
-  const intent = interpretarComandoTelegram(texto);
+  const intent = interpretarMensagemTelegram(texto);
+  const resultado = await processarComandoBotInterno({ client, conexao, texto, chatId, agora, intent });
+  if (!resultado) return resultado;
+
+  const corrigiu = intent.confidence > 0 && intent.confidence < LIMIAR_EXECUTAR && intent.correcoes?.length > 0;
+  if (corrigiu) {
+    const { original, corrigida } = intent.correcoes[0];
+    return { texto: `(Entendi "${original}" como "${corrigida}" — se não era isso, envie /cancelar e reformule.)\n\n${resultado.texto}` };
+  }
+  return resultado;
+}
+
+async function processarComandoBotInterno({ client, conexao, texto, chatId, agora, intent }) {
   const ehSlash = String(texto || '').trim().startsWith('/');
   // Cancelamento EXPLÍCITO — não inclui um "não" solto, que dentro de uma
   // conversa é resposta a um slot opcional (ex.: "pertence a algum lote?").
@@ -425,7 +451,7 @@ async function continuarConversa(client, conexao, conversa, texto, agora) {
 
 // Slots completos → valida, cria operação pendente e pede /confirmar.
 async function finalizarCadastro(client, conexao, db, intencao, dados, conversa, agora) {
-  const plano = prepararCadastro(intencao, dados, { db, hoje: agora });
+  const plano = prepararCadastro(intencao, dados, { db, hoje: agora, fazendaId: conexao.fazenda_id ?? null });
   if (!plano.ok) return MSG[plano.erro] || MSG.FALHA;
 
   const ok = await salvarOperacaoPendente(client, conexao, 'cadastro', { intencao, dados }, agora);
@@ -442,7 +468,7 @@ async function executarCadastro(client, conexao, op) {
 
   const dbConta = await montarDbDaConta(client, conexao.owner_user_id);
   const db = filtrarDbPorFazenda(dbConta, op.fazenda_id);
-  const plano = prepararCadastro(intencao, dados, { db, hoje: new Date() });
+  const plano = prepararCadastro(intencao, dados, { db, hoje: new Date(), fazendaId: op.fazenda_id ?? null });
   if (!plano.ok) throw new Error(plano.erro);
 
   await aplicarWrites(client, conexao, plano.writes);
@@ -452,14 +478,15 @@ async function executarCadastro(client, conexao, op) {
   return `${plano.resumo[0].replace('Confirme', 'Registrado').replace(':', '.')}`;
 }
 
-// ── Execução de uma ferramenta do Assistente IA já confirmada ───────────────
-// Único ponto de saída das 4 ferramentas novas desta sprint E das duas ações
-// críticas existentes (transferir/renomear) quando chamadas pela IA — a
-// versão determinística delas continua usando `executarTransferencia`/
-// `executarRenomear` acima, intocadas. Mesmo padrão das demais execuções:
+// ── Execução de uma ferramenta do catálogo (telegramToolsRegistry) já
+// confirmada. Ponto de saída genérico para qualquer ferramenta despachada
+// pelo interpretador determinístico (`interpretadorTelegram.js`) que não
+// seja uma das duas ações críticas legadas (`transferir_animais`/
+// `renomear_lote`, que continuam usando `executarTransferencia`/
+// `executarRenomear` acima, intocadas). Mesmo padrão das demais execuções:
 // recarrega o db fresco (idempotente contra saldo desatualizado) e revalida
 // a permissão no momento da confirmação, não só na proposta.
-export async function executarFerramentaIA(client, conexao, op) {
+export async function executarFerramentaCatalogo(client, conexao, op) {
   const { tool: nomeFerramenta, params } = op.payload || {};
   const ferramenta = obterFerramenta(nomeFerramenta);
   if (!ferramenta) throw new Error('FERRAMENTA_DESCONHECIDA');
@@ -533,7 +560,7 @@ async function confirmar(client, conexao, chatId, agora) {
     if (op.tipo_operacao === 'transferir_animais') texto = await executarTransferencia(client, conexao, op);
     else if (op.tipo_operacao === 'renomear_lote') texto = await executarRenomear(client, conexao, op);
     else if (op.tipo_operacao === 'cadastro') texto = await executarCadastro(client, conexao, op);
-    else if (op.tipo_operacao === 'ia_tool') texto = await executarFerramentaIA(client, conexao, op);
+    else if (op.tipo_operacao === 'ferramenta_bot') texto = await executarFerramentaCatalogo(client, conexao, op);
     else throw new Error('TIPO_DESCONHECIDO');
     await client.from('telegram_operacoes_pendentes').update({ status: STATUS.EXECUTADA, executado_em: new Date().toISOString() }).eq('id', op.id);
     return texto;

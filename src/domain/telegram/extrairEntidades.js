@@ -172,10 +172,14 @@ export function extrairPeriodo(texto, hoje = new Date()) {
 /**
  * Extrai o nome candidato de lote/fazenda após uma preposição/keyword.
  * Ex.: "no lote Engorda 02" → "Engorda 02". Não resolve; só recorta o texto.
+ * A negação logo após a palavra-chave evita capturar o PRÓPRIO stopword como
+ * nome quando ele vem colado (ex.: "o lote amanha" sem nada entre os dois —
+ * sem a negação, "amanha" vira erroneamente o "nome do lote", já que não há
+ * espaço+stopword ainda por vir para fechar a captura antes do fim da string).
  */
 export function extrairNomeApos(texto, palavras = ['lote', 'fazenda']) {
   const stop = 'para|no|na|com|de|dia|hoje|ontem|amanha|por|pesou|pesa|pesagem|reais|kg|quilos?|sacos?|litros?';
-  const re = new RegExp(`\\b(?:${palavras.join('|')})\\s+([\\p{L}\\d][\\p{L}\\d\\s]*?)(?:\\s+(?:${stop})\\b|[.,;!?]|$)`, 'iu');
+  const re = new RegExp(`\\b(?:${palavras.join('|')})\\s+(?!(?:${stop})\\b)([\\p{L}\\d][\\p{L}\\d\\s]*?)(?:\\s+(?:${stop})\\b|[.,;!?]|$)`, 'iu');
   const m = String(texto || '').match(re);
   return m ? m[1].trim() : null;
 }

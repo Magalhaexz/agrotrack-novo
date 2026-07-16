@@ -1,12 +1,12 @@
-// Testes da integração do Assistente IA com o orquestrador existente
-// (`_telegramBot.js`): a operação pendente tipo_operacao='ia_tool' criada
-// pelo orquestrador da IA (`_telegramIA.js`, não testado aqui isoladamente
-// por depender da Claude API) é confirmada/executada pelo MESMO `/confirmar`
-// determinístico já testado em `_telegramBot.test.js` — é esse acoplamento
+// Testes da integração do catálogo de ferramentas (telegramToolsRegistry)
+// com o orquestrador existente (`_telegramBot.js`): a operação pendente
+// tipo_operacao='ferramenta_bot' criada pelo interpretador determinístico
+// (`interpretadorTelegram.js`) é confirmada/executada pelo MESMO
+// `/confirmar` já testado em `_telegramBot.test.js` — é esse acoplamento
 // que este arquivo garante que não quebrou.
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { processarComandoBot, salvarOperacaoPendente, executarFerramentaIA } from './_telegramBot.js';
+import { processarComandoBot, salvarOperacaoPendente, executarFerramentaCatalogo } from './_telegramBot.js';
 
 function makeClient(tables) {
   class Q {
@@ -54,10 +54,10 @@ function baseTables(perfil = 'operador') {
 
 const conexao = () => ({ id: 'c1', owner_user_id: 'o1', user_id: 'u1', telegram_chat_id: '123', fazenda_id: 1 });
 
-test('salvarOperacaoPendente(ia_tool) + /confirmar executa cadastrar_tarefa via executarFerramentaIA', async () => {
+test('salvarOperacaoPendente(ferramenta_bot) + /confirmar executa cadastrar_tarefa via executarFerramentaCatalogo', async () => {
   const tables = baseTables('operador');
   const client = makeClient(tables);
-  const ok = await salvarOperacaoPendente(client, conexao(), 'ia_tool', {
+  const ok = await salvarOperacaoPendente(client, conexao(), 'ferramenta_bot', {
     tool: 'cadastrar_tarefa', params: { titulo: 'Pesar o lote 12', data_vencimento: '2026-07-20' },
   }, new Date());
   assert.equal(ok, true);
@@ -72,7 +72,7 @@ test('salvarOperacaoPendente(ia_tool) + /confirmar executa cadastrar_tarefa via 
 test('ferramenta desconhecida no payload nunca executa nada e vira falha genérica', async () => {
   const tables = baseTables('operador');
   const client = makeClient(tables);
-  await salvarOperacaoPendente(client, conexao(), 'ia_tool', { tool: 'ferramenta_inventada', params: {} }, new Date());
+  await salvarOperacaoPendente(client, conexao(), 'ferramenta_bot', { tool: 'ferramenta_inventada', params: {} }, new Date());
   const r = await processarComandoBot({ client, conexao: conexao(), texto: '/confirmar', chatId: '123' });
   assert.match(r.texto, /Não consegui concluir/);
   assert.equal(tables.tarefas.length, 0);
@@ -81,7 +81,7 @@ test('ferramenta desconhecida no payload nunca executa nada e vira falha genéri
 test('visualizador não consegue confirmar uma ferramenta de escrita (revalidação de permissão na execução)', async () => {
   const tables = baseTables('operador'); // cria como operador (podia)...
   const client = makeClient(tables);
-  await salvarOperacaoPendente(client, conexao(), 'ia_tool', {
+  await salvarOperacaoPendente(client, conexao(), 'ferramenta_bot', {
     tool: 'dar_baixa_estoque', params: { item: 'Sal Mineral', quantidade: 10 },
   }, new Date());
   // ...perfil muda para visualizador ANTES da confirmação (ex.: rebaixado no meio do fluxo)
@@ -91,11 +91,11 @@ test('visualizador não consegue confirmar uma ferramenta de escrita (revalidaç
   assert.equal(tables.estoque[0].quantidade_atual, 100); // saldo intocado
 });
 
-test('executarFerramentaIA aplica os writes de dar_baixa_estoque e decrementa o saldo real', async () => {
+test('executarFerramentaCatalogo aplica os writes de dar_baixa_estoque e decrementa o saldo real', async () => {
   const tables = baseTables('operador');
   const client = makeClient(tables);
   const op = { fazenda_id: 1, payload: { tool: 'dar_baixa_estoque', params: { item: 'Sal Mineral', quantidade: 30 } } };
-  const texto = await executarFerramentaIA(client, conexao(), op);
+  const texto = await executarFerramentaCatalogo(client, conexao(), op);
   assert.match(texto, /Registrado/);
   assert.equal(tables.estoque[0].quantidade_atual, 70);
   assert.equal(tables.movimentacoes_estoque.length, 1);
@@ -104,14 +104,14 @@ test('executarFerramentaIA aplica os writes de dar_baixa_estoque e decrementa o 
 test('idempotência: confirmar duas vezes a mesma operação só executa uma vez', async () => {
   const tables = baseTables('operador');
   const client = makeClient(tables);
-  await salvarOperacaoPendente(client, conexao(), 'ia_tool', {
+  await salvarOperacaoPendente(client, conexao(), 'ferramenta_bot', {
     tool: 'cadastrar_tarefa', params: { titulo: 'X', data_vencimento: '2026-07-20' },
   }, new Date());
   await processarComandoBot({ client, conexao: conexao(), texto: '/confirmar', chatId: '123' });
   // A operação já saiu de status='pendente' (virou 'executada') — o segundo
   // /confirmar não encontra mais nenhuma operação PENDENTE para este chat
   // (mesmo comportamento de `buscarPendente` para qualquer tipo_operacao,
-  // não é específico do ia_tool). O ponto do teste é: não duplica a tarefa.
+  // não é específico deste tipo). O ponto do teste é: não duplica a tarefa.
   const r2 = await processarComandoBot({ client, conexao: conexao(), texto: '/confirmar', chatId: '123' });
   assert.match(r2.texto, /Não há nenhuma operação/);
   assert.equal(tables.tarefas.length, 1);

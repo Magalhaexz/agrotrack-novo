@@ -29,6 +29,11 @@ export const INTENCOES = {
   CADASTRAR_DESPESA: 'CADASTRAR_DESPESA',
   CADASTRAR_RECEITA: 'CADASTRAR_RECEITA',
   REGISTRAR_ENTRADA_ESTOQUE: 'REGISTRAR_ENTRADA_ESTOQUE',
+  // Sprint bot operacional determinístico — novos cadastros/ações:
+  CADASTRAR_TAREFA: 'CADASTRAR_TAREFA',
+  CADASTRAR_ITEM_ESTOQUE: 'CADASTRAR_ITEM_ESTOQUE',
+  DAR_BAIXA_ESTOQUE: 'DAR_BAIXA_ESTOQUE',
+  TROCAR_LOTE_PASTO: 'TROCAR_LOTE_PASTO',
   CONFIRMAR: 'CONFIRMAR',
   CANCELAR: 'CANCELAR',
   AMBIGUO: 'AMBIGUO',
@@ -68,6 +73,11 @@ const RE_TRANSFERIR_SEM_QTD = /^\/?(?:transferir|mover|passar|movimentar)\s+(?:a
 const RE_RENOMEAR = /^\/?(?:renomear|renomeie)\s+(?:o\s+)?lote\s+(.+?)\s+(?:para|pra|como)\s+(.+?)$/i;
 // "trocar lote 1 para lote 2": trocar/mudar + lote, sem qty — ambíguo (Parte 19).
 const RE_TROCAR_LOTE_AMBIGUO = /^\/?(?:trocar|mudar|passar)\s+(?:o\s+)?lote\s+(.+?)\s+(?:para|pra)\s+(?:o\s+)?(?:lote\s+)?(.+?)$/i;
+// Troca de PASTO: precisa ser checada ANTES de RE_TROCAR_LOTE_AMBIGUO — "trocar
+// o lote X para o pasto Y" também bateria na ambiguidade genérica de lote se
+// checada depois (o destino "o pasto Y" passa no grupo de captura opcional
+// dela). A palavra "pasto" é o sinal que desambigua as duas leituras.
+const RE_TROCAR_PASTO = /^\/?(?:mov\w+|trocar|troque|mand\w+|lev\w+)\b.*\bpasto\b|\btrocar_pasto\b/i;
 
 // --- Cadastros (ações mutáveis; a extração de dados fica no orquestrador) ---
 // Gatilho imperativo OU verbo de registro no início — nunca perguntas
@@ -76,6 +86,17 @@ const RE_CAD_DESPESA = /^\/?(?:cadastr\w+|registr\w+|lan[çc]\w+|anot\w+)\s+(?:u
 const RE_CAD_RECEITA = /^\/?(?:cadastr\w+|registr\w+|lan[çc]\w+|anot\w+)\s+(?:uma?\s+)?receita\b|^\/?recebi\b|\breceita de\b/i;
 const RE_REG_PESAGEM = /^\/?(?:registr\w+|cadastr\w+|anot\w+)\s+(?:uma?\s+)?pesagem\b|\bpesagem de\b|\bpesou\b|\bpeso m[ée]dio de\b/i;
 const RE_REG_ENT_ESTOQUE = /^\/?(?:cadastr\w+|registr\w+|adicion\w+|coloc\w+|dar entrada)\b.*\bestoque\b|\bentr(?:ou|ada de)\b.*\b(?:kg|sacos?|litros?|fardos?|un)\b|^\/?adicion\w+\s+\d+/i;
+
+// --- Sprint bot operacional determinístico: 4 novos cadastros/ações ---
+// Tarefa: checada antes de despesa/receita (nenhuma colisão de palavra, mas
+// mantém a ordem lógica dos cadastros existentes).
+const RE_CAD_TAREFA = /^\/?(?:cadastr\w+|criar?|crie|anot\w+)\s+(?:uma?\s+)?(?:tarefa|lembrete)\b|^\/?agend\w+\b|\bme\s+lembr[ae]\b|\blembr[ae]\s+de\b|\btarefa\b/i;
+// Item de estoque NOVO: precisa vir ANTES de RE_REG_ENT_ESTOQUE — "cadastre
+// um item de estoque" contém a palavra "estoque" e cairia na entrada
+// genérica se checado depois. A palavra "item"/"produto" é o sinal
+// explícito que distingue "criar um item novo" de "somar quantidade a um
+// item existente" (ambíguo em português sem esse sinal).
+const RE_CAD_ITEM_ESTOQUE = /\bitem\s+novo\b|\bnovo\s+item\b|\bproduto\s+novo\b|\bnovo\s+produto\b|^\/?(?:cadastr\w+|criar?|crie)\s+(?:um\s+)?(?:item|produto)\b/i;
 
 // --- Fazenda ---
 const RE_SELECIONAR_FAZENDA = /^\/?(?:usar|selecionar|ativar|trocar\s+para|mudar\s+para|trocar|mudar|escolher)\s+(?:a\s+|de\s+|para\s+a\s+)?fazenda\s+(.+?)$/i;
@@ -86,6 +107,11 @@ const RE_VER_LOTE = /^\/?(?:ver\s+|detalhes?\s+d[eo]\s+|mostrar\s+|consultar\s+)
 const RE_LISTAR_LOTES = /^\/?(?:lotes|ver\s+lotes|listar\s+lotes|mostrar\s+lotes|meus\s+lotes|quais\s+(?:s[ãa]o\s+)?(?:os\s+)?(?:meus\s+)?lotes)\b|\blotes\b/i;
 
 // --- Estoque ---
+// Saída/baixa de estoque: checada nas ações mutáveis (junto aos outros
+// cadastros), não aqui nas consultas — mantida perto por serem do mesmo
+// domínio. Não colide com RE_REG_ENT_ESTOQUE (verbos diferentes: "dar
+// baixa"/"retirar"/"usar"/"consumir" nunca aparecem na alternância de entrada).
+const RE_SAIDA_ESTOQUE = /^\/?(?:dar\s+baixa|de\s+baixa|retir\w+|us(?:ar|ei|ou|amos)|consum\w+)\b|\bsaiu\b.*\b(?:estoque|kg|sacos?|litros?|fardos?)\b|\bestoque_saida\b/i;
 const RE_ESTOQUE_QUANTO_TENHO = /quanto\s+(?:tenho|tem|resta)\s+de\s+(.+?)$/i;
 const RE_ESTOQUE_ITEM = /^\/?estoque\s+(.+?)$/i;
 const RE_ESTOQUE_BAIXO = /estoque\s+baixo|o\s+que\s+est[áa]\s+acabando|acabando|abaixo\s+do\s+m[íi]nimo/i;
@@ -158,6 +184,10 @@ export function interpretarComandoTelegram(texto) {
     }, true);
   }
 
+  // 5b. Troca de pasto — checada ANTES da ambiguidade genérica de lote (a
+  //     presença da palavra "pasto" desfaz a ambiguidade transferir/renomear).
+  if (RE_TROCAR_PASTO.test(t)) return intent(INTENCOES.TROCAR_LOTE_PASTO, {}, true);
+
   // 6. "trocar lote X para Y" sem quantidade → ambíguo (não assume destrutivo).
   m = t.match(RE_TROCAR_LOTE_AMBIGUO);
   if (m) {
@@ -170,9 +200,15 @@ export function interpretarComandoTelegram(texto) {
   // 6b. Cadastros (ações mutáveis). Checados antes das consultas equivalentes
   //     (ex.: pesagem cadastro antes de VER_PESAGENS). A extração dos dados é
   //     feita pelo orquestrador (extrairEntidades) — aqui só classifica.
+  //     Tarefa e item de estoque novo checados antes dos demais: "item de
+  //     estoque" precisa vir antes de RE_REG_ENT_ESTOQUE (ambos contêm a
+  //     palavra "estoque").
+  if (RE_CAD_TAREFA.test(t)) return intent(INTENCOES.CADASTRAR_TAREFA, {}, true);
+  if (RE_CAD_ITEM_ESTOQUE.test(t)) return intent(INTENCOES.CADASTRAR_ITEM_ESTOQUE, {}, true);
   if (RE_REG_PESAGEM.test(t)) return intent(INTENCOES.REGISTRAR_PESAGEM, {}, true);
   if (RE_CAD_DESPESA.test(t)) return intent(INTENCOES.CADASTRAR_DESPESA, {}, true);
   if (RE_CAD_RECEITA.test(t)) return intent(INTENCOES.CADASTRAR_RECEITA, {}, true);
+  if (RE_SAIDA_ESTOQUE.test(t)) return intent(INTENCOES.DAR_BAIXA_ESTOQUE, {}, true);
   if (RE_REG_ENT_ESTOQUE.test(t)) return intent(INTENCOES.REGISTRAR_ENTRADA_ESTOQUE, {}, true);
 
   // 7. Estoque com item/quantidade (antes do estoque genérico).

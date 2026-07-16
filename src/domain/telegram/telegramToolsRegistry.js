@@ -1,10 +1,12 @@
-// Catálogo central de ferramentas do Assistente IA do Telegram. Puro, sem I/O
-// próprio — cada entrada só declara metadados e chama funções de domínio já
-// existentes (formatadores de consulta, `acoesLote.js`, `cadastros.js`, e os
-// 4 novos preparadores desta sprint). A IA NUNCA executa nada fora deste
-// catálogo: o orquestrador só aceita chamadas cujo `name` exista aqui, valida
-// `requiredFields` e `requiredPermission` antes de qualquer escrita, e nunca
-// interpreta o JSON do modelo como instrução — só como candidato a validar.
+// Catálogo central de ferramentas do bot operacional do Telegram
+// (interpretador determinístico — sem provedor de IA em nenhum ponto). Puro,
+// sem I/O próprio — cada entrada só declara metadados e chama funções de
+// domínio já existentes (formatadores de consulta, `acoesLote.js`,
+// `cadastros.js`, e os 4 preparadores novos da consolidação determinística).
+// O orquestrador NUNCA executa nada fora deste catálogo: só aceita chamadas
+// cujo `name` exista aqui, valida `requiredFields` e `requiredPermission`
+// antes de qualquer escrita, e nunca interpreta um payload como instrução —
+// só como candidato a validar.
 //
 // riskLevel:
 //   'leitura'          → executa direto, sem confirmação.
@@ -161,7 +163,7 @@ const transferirAnimais = {
       ok: true,
       resumo: ['Confirme a transferência:', '', `Origem: ${plano.resumo.origemNome}`, `Destino: ${plano.resumo.destinoNome}`, `Quantidade: ${plano.resumo.quantidade} animais`],
       writes: [
-        { tabela: 'movimentacoes_animais', tipo: 'insert', registro: { ...plano.writes.movimentacaoAnimal, data: hojeLocalISO(), obs: 'Transferência via Assistente IA' } },
+        { tabela: 'movimentacoes_animais', tipo: 'insert', registro: { ...plano.writes.movimentacaoAnimal, data: hojeLocalISO(), obs: 'Transferência via Telegram' } },
         { tabela: 'lotes', tipo: 'update', match: { id: plano.writes.loteOrigem.id }, patch: { qtd: plano.writes.loteOrigem.qtd, p_at: plano.writes.loteOrigem.p_at } },
         { tabela: 'lotes', tipo: 'update', match: { id: plano.writes.loteDestino.id }, patch: { qtd: plano.writes.loteDestino.qtd, p_at: plano.writes.loteDestino.p_at } },
       ],
@@ -407,7 +409,7 @@ export function obterFerramenta(name) {
   return TOOLS_BY_NAME.get(name) || null;
 }
 
-/** Ferramentas que um perfil pode usar — nunca oferece à IA algo que o usuário não pode confirmar. */
+/** Ferramentas que um perfil pode usar — nunca oferece ao interpretador algo que o usuário não pode confirmar. */
 export function ferramentasPermitidas(perfilTemPermissaoFn, perfil) {
   return TELEGRAM_TOOLS.filter((t) => perfilTemPermissaoFn(perfil, t.requiredPermission));
 }

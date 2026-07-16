@@ -193,3 +193,113 @@ test('trocar de fazenda com uma única fazenda funciona; multi-fazenda sem sele�
   const r = await processarComandoBot({ client, conexao: semSelecao, texto: '/lotes', chatId: '123' });
   assert.match(r.texto, /mais de uma fazenda/i);
 });
+
+// ── Sprint bot operacional determinístico: 4 novos cadastros/ações (fim a fim) ──
+test('cadastrar tarefa: título e data extraídos de uma mensagem, lote perguntado em seguida, depois confirma', async () => {
+  const tables = baseTables('operador');
+  const client = makeClient(tables);
+  const c = conexao();
+  const p1 = await processarComandoBot({ client, conexao: c, texto: 'crie uma tarefa para pesar o lote amanha', chatId: '123' });
+  assert.match(p1.texto, /vinculada a algum lote/i);
+  const p2 = await processarComandoBot({ client, conexao: c, texto: 'não', chatId: '123' });
+  assert.match(p2.texto, /Confirme a tarefa/);
+  const r = await processarComandoBot({ client, conexao: c, texto: '/confirmar', chatId: '123' });
+  assert.match(r.texto, /Registrado/i);
+  assert.equal(tables.tarefas.length, 1);
+  assert.equal(tables.tarefas[0].status, 'pendente');
+  assert.equal(tables.tarefas[0].owner_user_id, 'o1');
+});
+
+test('cadastrar item de estoque novo em várias etapas (slot-filling)', async () => {
+  const tables = baseTables('gerente');
+  const client = makeClient(tables);
+  const c = conexao();
+  let r = await processarComandoBot({ client, conexao: c, texto: 'cadastre um item novo', chatId: '123' });
+  assert.match(r.texto, /nome do produto/i);
+  r = await processarComandoBot({ client, conexao: c, texto: 'Sal Proteinado', chatId: '123' });
+  assert.match(r.texto, /quantidade inicial/i);
+  r = await processarComandoBot({ client, conexao: c, texto: 'não', chatId: '123' });
+  assert.match(r.texto, /Confirme o novo item/);
+  r = await processarComandoBot({ client, conexao: c, texto: '/confirmar', chatId: '123' });
+  assert.match(r.texto, /Registrado/i);
+  assert.equal(tables.estoque.some((e) => e.produto === 'Sal Proteinado'), true);
+});
+
+test('dar baixa em estoque valida saldo e decrementa após confirmar', async () => {
+  const tables = baseTables('operador');
+  tables.estoque = [{ id: 1, produto: 'Sal Mineral 90', quantidade_atual: 100, unidade: 'kg', owner_user_id: 'o1' }];
+  const client = makeClient(tables);
+  const c = conexao();
+  const p1 = await processarComandoBot({ client, conexao: c, texto: 'dar baixa em 30 kg de sal', chatId: '123' });
+  assert.match(p1.texto, /Confirme a saída de estoque/);
+  const r = await processarComandoBot({ client, conexao: c, texto: '/confirmar', chatId: '123' });
+  assert.match(r.texto, /Registrado/i);
+  assert.equal(tables.estoque[0].quantidade_atual, 70);
+});
+
+test('mover lote para outro pasto por mensagem única → confirma → aplica', async () => {
+  const tables = baseTables('operador');
+  tables.pastagens = [
+    { id: 'pasto-a', nome: 'Capim Sul', faz_id: 1, owner_user_id: 'o1' },
+    { id: 'pasto-b', nome: 'Capim Norte', faz_id: 1, owner_user_id: 'o1' },
+  ];
+  tables.lotes[0].faz_id = 1;
+  tables.lotes[0].pastagem_id = 'pasto-a';
+  const client = makeClient(tables);
+  const c = conexao();
+  const p1 = await processarComandoBot({ client, conexao: c, texto: 'mova o lote Recria 01 para o pasto Capim Norte', chatId: '123' });
+  assert.match(p1.texto, /Confirme a movimentação de pasto/);
+  const r = await processarComandoBot({ client, conexao: c, texto: '/confirmar', chatId: '123' });
+  assert.match(r.texto, /Registrado/i);
+  assert.equal(tables.lotes.find((l) => l.id === 10).pastagem_id, 'pasto-b');
+});
+
+test('mover lote para pasto registra o histórico de movimentação', async () => {
+  const tables = baseTables('operador');
+  tables.pastagens = [
+    { id: 'pasto-a', nome: 'Capim Sul', faz_id: 1, owner_user_id: 'o1' },
+    { id: 'pasto-b', nome: 'Capim Norte', faz_id: 1, owner_user_id: 'o1' },
+  ];
+  tables.lote_pastagens_historico = [];
+  tables.lotes[0].faz_id = 1;
+  tables.lotes[0].pastagem_id = 'pasto-a';
+  const client = makeClient(tables);
+  const c = conexao();
+  await processarComandoBot({ client, conexao: c, texto: 'mova o lote Recria 01 para o pasto Capim Norte', chatId: '123' });
+  await processarComandoBot({ client, conexao: c, texto: '/confirmar', chatId: '123' });
+  assert.equal(tables.lote_pastagens_historico.length, 1);
+  assert.equal(tables.lote_pastagens_historico[0].pastagem_destino_id, 'pasto-b');
+});
+
+test('visualizador não consegue trocar lote de pasto nem dar baixa em estoque', async () => {
+  const tables = baseTables('visualizador');
+  const client = makeClient(tables);
+  const c = conexao();
+  const r1 = await processarComandoBot({ client, conexao: c, texto: 'mova o lote Recria 01 para o pasto Norte', chatId: '123' });
+  assert.match(r1.texto, /permissão/);
+  const r2 = await processarComandoBot({ client, conexao: c, texto: 'dar baixa em 10 kg de sal', chatId: '123' });
+  assert.match(r2.texto, /permissão/);
+});
+
+// ── Interpretador determinístico central: tolerância a erro de digitação ────
+test('mensagem sem erro (confiança alta) não recebe nenhuma nota de correção', async () => {
+  const client = makeClient(baseTables());
+  const r = await processarComandoBot({ client, conexao: conexao(), texto: '/resumo', chatId: '123' });
+  assert.equal(/Entendi ".*" como/.test(r.texto), false);
+});
+
+test('erro de digitação simples é corrigido e o produtor é avisado da correção, sem perder a intenção', async () => {
+  const client = makeClient(baseTables());
+  const r = await processarComandoBot({ client, conexao: conexao(), texto: 'resumu da fazenda', chatId: '123' });
+  assert.match(r.texto, /Entendi "resumu" como "resumo"/);
+  assert.match(r.texto, /Santa Clara/); // resposta real do /resumo continua presente, só com a nota na frente
+});
+
+test('correção de digitação preserva o nome próprio do lote (não corrompe "Recria")', async () => {
+  const tables = baseTables('operador');
+  const client = makeClient(tables);
+  const r = await processarComandoBot({ client, conexao: conexao(), texto: 'registrar pesajen de 425 kg no lote Recria 01', chatId: '123' });
+  assert.match(r.texto, /Entendi "pesajen" como "pesagem"/);
+  assert.match(r.texto, /Confirme a pesagem/);
+  assert.match(r.texto, /Recria 01/);
+});

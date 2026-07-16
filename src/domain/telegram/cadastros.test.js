@@ -6,15 +6,20 @@ import { INTENCOES } from './interpretarComandoTelegram.js';
 const HOJE = new Date(Date.UTC(2026, 6, 10));
 const db = () => ({
   lotes: [
-    { id: 10, nome: 'Recria 01', status: 'ativo' },
-    { id: 11, nome: 'Engorda 02', status: 'ativo' },
+    { id: 10, nome: 'Recria 01', status: 'ativo', faz_id: 1, pastagem_id: 'pasto-a' },
+    { id: 11, nome: 'Engorda 02', status: 'ativo', faz_id: 1, pastagem_id: 'pasto-a' },
   ],
   estoque: [
     { id: 1, produto: 'Sal mineral', quantidade_atual: 7, unidade: 'sacos' },
     { id: 2, produto: 'Milho', quantidade_atual: 8400, unidade: 'kg' },
   ],
+  pastagens: [
+    { id: 'pasto-a', nome: 'Capim Sul', faz_id: 1 },
+    { id: 'pasto-b', nome: 'Capim Norte', faz_id: 1 },
+  ],
+  funcionarios: [{ id: 5, nome: 'João Silva' }],
 });
-const ctx = () => ({ db: db(), hoje: HOJE });
+const ctx = () => ({ db: db(), hoje: HOJE, fazendaId: 1 });
 
 test('extração inicial de pesagem por mensagem única', () => {
   const d = extrairDadosIniciais(INTENCOES.REGISTRAR_PESAGEM, 'registre pesagem de 425 kg no lote Engorda 02', ctx());
@@ -95,4 +100,55 @@ test('entrada de estoque resolve item e atualiza saldo', () => {
 
 test('entrada de estoque item inexistente', () => {
   assert.equal(prepararCadastro(INTENCOES.REGISTRAR_ENTRADA_ESTOQUE, { item: 'inexistente', quantidade: 5 }, ctx()).erro, 'ITEM_NAO_ENCONTRADO');
+});
+
+// ── Sprint bot operacional determinístico: 4 novos cadastros/ações ──────────
+test('prepararCadastro cadastrar_tarefa insere em tarefas com fazenda_id do contexto', () => {
+  const r = prepararCadastro(INTENCOES.CADASTRAR_TAREFA, { titulo: 'Pesar lote', data_vencimento: '2026-07-20' }, ctx());
+  assert.equal(r.ok, true);
+  assert.equal(r.tipo, 'tarefa');
+  assert.equal(r.writes[0].tabela, 'tarefas');
+  assert.equal(r.writes[0].registro.titulo, 'Pesar lote');
+  assert.equal(r.writes[0].registro.fazenda_id, 1);
+});
+
+test('cadastrar_tarefa exige título e data de vencimento', () => {
+  assert.equal(prepararCadastro(INTENCOES.CADASTRAR_TAREFA, { data_vencimento: '2026-07-20' }, ctx()).erro, 'TITULO_VAZIO');
+  assert.equal(prepararCadastro(INTENCOES.CADASTRAR_TAREFA, { titulo: 'X' }, ctx()).erro, 'DATA_VENCIMENTO_VAZIA');
+});
+
+test('prepararCadastro cadastrar_item_estoque insere item novo em estoque', () => {
+  const r = prepararCadastro(INTENCOES.CADASTRAR_ITEM_ESTOQUE, { nome: 'Sal Proteinado', quantidade_inicial: 20 }, ctx());
+  assert.equal(r.ok, true);
+  assert.equal(r.tipo, 'item_estoque');
+  assert.equal(r.writes[0].tabela, 'estoque');
+  assert.equal(r.writes[0].registro.produto, 'Sal Proteinado');
+  assert.equal(r.writes[0].registro.quantidade_atual, 20);
+});
+
+test('prepararCadastro dar_baixa_estoque decrementa o saldo real', () => {
+  const r = prepararCadastro(INTENCOES.DAR_BAIXA_ESTOQUE, { item: 'sal', quantidade: 3 }, ctx());
+  assert.equal(r.ok, true);
+  assert.equal(r.tipo, 'saida_estoque');
+  const upd = r.writes.find((w) => w.tabela === 'estoque');
+  assert.equal(upd.patch.quantidade_atual, 4);
+});
+
+test('dar_baixa_estoque impede saldo negativo', () => {
+  assert.equal(prepararCadastro(INTENCOES.DAR_BAIXA_ESTOQUE, { item: 'sal', quantidade: 999 }, ctx()).erro, 'SALDO_INSUFICIENTE');
+});
+
+test('prepararCadastro trocar_lote_pasto move o lote sem alterar quantidade', () => {
+  const r = prepararCadastro(INTENCOES.TROCAR_LOTE_PASTO, { lote: 'Recria', pasto: 'Capim Norte' }, ctx());
+  assert.equal(r.ok, true);
+  assert.equal(r.tipo, 'troca_pasto');
+  const updLote = r.writes.find((w) => w.tabela === 'lotes');
+  assert.equal(updLote.patch.pastagem_id, 'pasto-b');
+  assert.equal('qtd' in updLote.patch, false);
+});
+
+test('trocar_lote_pasto de pasto de outra fazenda é rejeitado', () => {
+  const dbOutraFazenda = { ...db(), pastagens: [...db().pastagens, { id: 'pasto-c', nome: 'Longe', faz_id: 99 }] };
+  const r = prepararCadastro(INTENCOES.TROCAR_LOTE_PASTO, { lote: 'Recria', pasto: 'Longe' }, { db: dbOutraFazenda, hoje: HOJE, fazendaId: 1 });
+  assert.equal(r.erro, 'PASTO_OUTRA_FAZENDA');
 });

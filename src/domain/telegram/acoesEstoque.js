@@ -1,4 +1,4 @@
-// Saída/baixa de estoque via linguagem natural (Assistente IA). Puro, sem I/O.
+// Saída/baixa de estoque via linguagem natural (bot operacional determinístico). Puro, sem I/O.
 //
 // ponytail: espelha `registrarSaidaEstoque` (src/services/movimentacoes.js)
 // em vez de importar de lá, porque aquele arquivo é escrito contra o cliente

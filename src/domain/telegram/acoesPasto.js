@@ -1,4 +1,4 @@
-// Troca de lote de pasto via linguagem natural (Assistente IA). Puro, sem I/O.
+// Troca de lote de pasto via linguagem natural (bot operacional determinístico). Puro, sem I/O.
 //
 // ponytail: a RPC `mover_lote_para_pasto` (supabase/migrations/
 // 20260619113446_lote_pastagens_historico.sql) já existe e faz exatamente

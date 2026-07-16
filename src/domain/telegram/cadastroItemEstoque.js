@@ -1,5 +1,5 @@
-// Cadastro de um item NOVO de estoque via linguagem natural (Assistente IA).
-// Puro, sem I/O. Distinto de REGISTRAR_ENTRADA_ESTOQUE (que só soma
+// Cadastro de um item NOVO de estoque via linguagem natural (bot operacional
+// determinístico). Puro, sem I/O. Distinto de REGISTRAR_ENTRADA_ESTOQUE (que só soma
 // quantidade a um item já existente) — este cria a linha em `estoque`.
 // Duplica os pares produto/nome, unidade/unidade_medida e
 // valor_unitario/custo_unitario/preco_unitario de propósito: mesmo padrão de
