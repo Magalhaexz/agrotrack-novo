@@ -498,6 +498,55 @@ abre um buraco novo, só herda o gap existente.
 - **Motor de alerta duplicado**: avaliado, não corrigido nesta sprint —
   ver `docs/TELEGRAM_PARIDADE_COMPLETA_APP.md` para o plano de migração.
 
+## 17. Sprint Paridade 1 — continuação (bloco 2/3): motor de alertas unificado + 6 novas intenções
+
+Continuação a partir de `710566f`. Custo de IA continua zero.
+
+**Motor de alertas unificado** (3º bloqueio estrutural corrigido): o
+painel legado do Dashboard/header (`utils/alerts.js` +
+`alertas_resolvidos`/`alertas_adiados`) foi trocado por
+`gerarAlertasUnificados` + `alertas_tratativas` — a mesma fonte e a mesma
+tabela que a Central e o Telegram já usavam. `domain/alertasUnificados.js::adaptarAlertaParaPainelLegado`
+traduz para a forma que `AppHeader.jsx`/`DashboardPage.jsx` já esperavam,
+sem reescrever esses componentes. Dashboard, Central, Telegram e
+relatório diário agora leem exatamente a mesma tratativa para a mesma
+conta/fazenda/data. Isso NÃO adiciona uma ação de resolver/adiar ao bot —
+só remove o bloqueio que impedia adicionar uma no futuro com segurança.
+
+| Intenção | Tipo | Preparer/domínio reaproveitado | Tabela | Confirmação | Permissão |
+| --- | --- | --- | --- | --- | --- |
+| `editar_pesagem` | cadastro | `cadastroPesagem.js` + `domain/pesagensLote.js` (extraído de `PesagensPage.jsx`) | `pesagens` (update) + `lotes` (recalcula `p_at`) | sim | `pesagens:editar` |
+| `excluir_pesagem` | cadastro | idem | `pesagens` (delete) + `lotes` | sim | `pesagens:excluir` |
+| `ajustar_lotacao` | cadastro | `acoesLote.js::prepararAjusteLotacao` (reaproveita `lotesLogic.js::buildAjusteLotacaoPatch` direto) | `lotes` (update) + `movimentacoes_animais` (insert, tipo `ajuste`) | sim | `lotes:editar` |
+| `editar_lote` | cadastro | `acoesLote.js::prepararEdicaoLote` (sem domínio dedicado no app — página só faz update direto) | `lotes` (update: sexo/raça/observação) | sim | `lotes:editar` |
+| `editar_pasto` | cadastro | `cadastroPasto.js::prepararEdicaoPasto` (idem, sem domínio dedicado) | `pastagens` (update: área/capacidade/observação) | sim | `pastagens:editar` |
+| `retirar_lote_pasto` | cadastro | `acoesPasto.js::prepararRetirarLotePasto` (espelha `prepararTrocaLotePasto` com destino nulo) | `lote_pastagens_historico` (insert) + `lotes` (update) | sim | `lotes:editar` |
+
+`aplicarWrites` (`api/_telegramBot.js`) ganhou suporte a `tipo:'delete'`
+(só `insert`/`update` existiam) para `excluir_pesagem`.
+
+### Extração de domínio: `domain/pesagensLote.js`
+
+`PesagensPage.jsx::recalculateLoteFromPesagens` (recálculo de `lote.p_at`/
+`ultima_pesagem` a partir do histórico) e as funções auxiliares
+(`resolveTipoPesagem`, `resolverUltimaPesagemLote`, `calculateAverageGmdByLote`)
+foram extraídas para `domain/pesagensLote.js` — a página passou a
+reaproveitar essas funções em vez de manter uma cópia local. O bot usa a
+MESMA fórmula para `editar_pesagem`/`excluir_pesagem`, garantindo que o
+peso atual do lote nunca diverge entre os dois caminhos.
+
+### Pendências reais desta continuação
+
+- Confirmação editável (corrigir um campo específico sem reiniciar a
+  conversa) — não implementada.
+- RPC transacional nova — avaliado, não criado (ver
+  `docs/TELEGRAM_PARIDADE_COMPLETA_APP.md`, seção "Sprint Paridade 1 —
+  continuação").
+- Ação de escrita de alertas no bot (resolver/ignorar/adiar) — motor
+  unificado agora permite, mas a intenção em si não foi adicionada.
+- Edição de peso inicial/data de entrada/origem/pasto do lote; visão
+  consolidada/resumo/exclusão de fazenda; excluir/inativar pasto; nova
+  pesagem em lote via batch/individual por animal.
+
 Ver `docs/TELEGRAM_PARIDADE_COMPLETA_APP.md` para a matriz completa
-atualizada, pendências do módulo (edição de lote, pesagem, pasto) e
-totais reais.
+atualizada e os totais reais.

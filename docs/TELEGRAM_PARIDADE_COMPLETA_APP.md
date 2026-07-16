@@ -56,8 +56,8 @@ verificadas contra `src/domain/telegram/interpretarComandoTelegram.js` e
 | Listar lotes | Consulta | `lotes:ver` | `LotesPage.jsx:856-947` | ✅ `LISTAR_LOTES` | ✅ | ⛔ |
 | Ver detalhe (9 abas) | Consulta | `lotes:ver` | `LoteDetailsPanel.jsx` + 9 tabs | 🟡 `VER_LOTE` (resumo, não as 9 abas) | ✅ | ⛔ |
 | Cadastrar lote | Escrita | `lotes:editar` | `LotesPage.jsx:650-717`; auto-cria `animais` grupo + pesagem inicial (`lotesLogic.js:137-182`) | 🟡 `CADASTRAR_LOTE` — **não replica os 2 side-effects automáticos do app** (grupo `animais` e pesagem inicial); Resultado/Decisão de venda podem mostrar "dados insuficientes" para um lote criado via bot | ✅ | ⛔ |
-| Editar lote | Escrita | `lotes:editar` | `LotesPage.jsx:604-648` | ⛔ | — | ⛔ |
-| Ajuste de lotação | Escrita | `lotes:editar` | `lotesLogic.js:192-220` | ⛔ | — | ⛔ |
+| Editar lote | Escrita | `lotes:editar` | `LotesPage.jsx:604-648` | 🟡 `EDITAR_LOTE` (Sprint Paridade 1) — sexo/raça/observação; peso inicial/data de entrada/origem/pasto ainda não | ✅ | ⛔ |
+| Ajuste de lotação | Escrita | `lotes:editar` | `lotesLogic.js:192-220` | ✅ `AJUSTAR_LOTACAO` (Sprint Paridade 1) — reaproveita `buildAjusteLotacaoPatch` direto, mesma função do app | ✅ | ⛔ |
 | Venda | Escrita | `animais:movimentar` | `services/movimentacoes.js:302-470` | ✅ `REGISTRAR_VENDA` | ✅ | ⛔ |
 | Morte/perda | Escrita | `animais:movimentar` | idem, tipoSaida `morte`/`descarte` | ✅ `REGISTRAR_MORTE` | ✅ | ⛔ |
 | Transferência de saída / entre lotes | Escrita | `animais:movimentar` | `movimentacoes.js:170-291,325-381` | ✅ `TRANSFERIR_ANIMAIS_ENTRE_LOTES` | ✅ | ⛔ |
@@ -70,7 +70,7 @@ verificadas contra `src/domain/telegram/interpretarComandoTelegram.js` e
 | Nova pesagem a partir do lote | Escrita | `pesagens:editar` | `LotesPage.jsx:558-593` (versão simplificada) | ✅ `REGISTRAR_PESAGEM` (fluxo genérico, não o específico do lote) | ✅ | ⛔ |
 | Relatório do lote / compartilhar (WhatsApp) | Consulta | `lotes:ver`/`relatorios:ver` | `relatorioLote.js`, `whatsappResumo.js::gerarResumoLoteTexto` | ⛔ — **gerador de texto já existe e é reaproveitável** para um comando "enviar relatório do lote" | — | ⛔ |
 
-**Lotes: 17 operações, 9 cobertas (parcial ou total) = ~53%** (era ~47%). Edição de lote (nome/sexo/raça/peso inicial/data/pasto/observação) e ajuste de lotação seguem sem cobertura — deferidos para o próximo bloco.
+**Lotes: 17 operações, 11 cobertas (parcial ou total) = ~65%** (era ~53%). Nesta rodada: `AJUSTAR_LOTACAO` (reaproveita `buildAjusteLotacaoPatch` de `lotesLogic.js`, mesma função que o app usa) e `EDITAR_LOTE` (sexo/raça/observação — nome já era coberto por `RENOMEAR_LOTE`; peso inicial/data de entrada/origem/pasto seguem sem edição via bot).
 
 ## Pesagens
 
@@ -79,12 +79,12 @@ verificadas contra `src/domain/telegram/interpretarComandoTelegram.js` e
 | Histórico/última/GMD | Consulta | `pesagens:ver` | `PesagensPage.jsx:897-941` | ✅ `VER_PESAGENS` | ✅ | ⛔ |
 | Nova pesagem (simples) | Escrita | `pesagens:editar` | `PesagensPage.jsx:725-807` | ✅ `REGISTRAR_PESAGEM` | ✅ | ⛔ |
 | Nova pesagem (batch/individual por lote) | Escrita | `pesagens:editar` | `PesagensPage.jsx:483-723` / duplicado em `AcompanhamentoPesoPage.jsx` | ⛔ (bot só cobre o fluxo simples) | — | ⛔ |
-| Editar pesagem | Escrita | `pesagens:editar` | `PesagensPage.jsx:339-346,725-772` | ⛔ — avaliado e adiado na Sprint Paridade 1: exige extrair `recalculateLoteFromPesagens` (hoje inline na página, não é módulo de domínio) antes de replicar no bot | — | ⛔ |
-| Excluir/cancelar pesagem | Escrita | `pesagens:excluir` | `PesagensPage.jsx:348-402` | ⛔ — mesma decisão de adiamento acima | — | ⛔ |
+| Editar pesagem | Escrita | `pesagens:editar` | `PesagensPage.jsx:339-346,725-772` | ✅ `EDITAR_PESAGEM` (Sprint Paridade 1, bloco 3) — `recalculateLoteFromPesagens` extraído para `domain/pesagensLote.js` (reaproveitado por `PesagensPage.jsx` e pelo bot); só a pesagem de LOTE mais recente, não pesagem individual por animal | ✅ | ⛔ |
+| Excluir/cancelar pesagem | Escrita | `pesagens:excluir` | `PesagensPage.jsx:348-402` | ✅ `EXCLUIR_PESAGEM` (Sprint Paridade 1, bloco 3) — mesma extração acima; `aplicarWrites` do bot ganhou suporte a `tipo:'delete'` | ✅ | ⛔ |
 | Lotes sem pesagem recente | Consulta | `pesagens:ver` | `hojeNaFazenda.js:22-29` (duplicado inline em `PesagensPage.jsx`) | 🟡 (aparece dentro de `VER_ALERTAS`, não como consulta dedicada) | — | ⛔ |
 | Evolução/gráfico de peso | Consulta | `animais:ver` | `AcompanhamentoPesoPage.jsx` + `PesoChart.jsx` | ⛔ | — | ⛔ |
 
-**Pesagens: 7 operações, 3 cobertas = ~43%.**
+**Pesagens: 7 operações, 5 cobertas = ~71%** (era ~43%). Batch/individual por lote e o gráfico de evolução seguem sem cobertura.
 
 ## Pastagens
 
@@ -92,16 +92,16 @@ verificadas contra `src/domain/telegram/interpretarComandoTelegram.js` e
 |---|---|---|---|---|---|---|
 | Listar pastos | Consulta | `pastagens:ver` | `PastagensPage.jsx:431-501` | ✅ `LISTAR_PASTOS` (Sprint Paridade 1) — reaproveita `calcularOcupacaoPastos` (`ocupacaoPastos.js`), mesma fonte da página | ✅ | ⛔ |
 | Cadastrar pasto | Escrita | `pastagens:editar` | `PastagensPage.jsx:208-227` | ✅ `CADASTRAR_PASTO` | ✅ | ⛔ |
-| Editar pasto | Escrita | `pastagens:editar` | `PastagensPage.jsx:188-207` | ⛔ | — | ⛔ |
-| Excluir/inativar pasto | Escrita | `pastagens:excluir` | `PastagensPage.jsx:232-256` (sem guarda de lote vinculado, diferente de Fazendas) | ⛔ | — | ⛔ |
+| Editar pasto | Escrita | `pastagens:editar` | `PastagensPage.jsx:188-207` | ✅ `EDITAR_PASTO` (Sprint Paridade 1, bloco 3) — área/capacidade/observação; não inventa "tipo de capim" | ✅ | ⛔ |
+| Excluir/inativar pasto | Escrita | `pastagens:excluir` | `PastagensPage.jsx:232-256` (sem guarda de lote vinculado, diferente de Fazendas) | ⛔ — ação destrutiva sem guarda no próprio app; deixada de fora até o app corrigir a guarda | — | ⛔ |
 | Capacidade (UA/ha, diagnóstico) | Consulta | `pastagens:ver` | `unidadeAnimal.js:25-43` | ⛔ | — | ⛔ |
-| Ocupação/lotação por pasto | Consulta | `pastagens:ver` | `ocupacaoPastos.js:55-120` | ⛔ | — | ⛔ |
+| Ocupação/lotação por pasto | Consulta | `pastagens:ver` | `ocupacaoPastos.js:55-120` | 🟡 (aparece dentro de `LISTAR_PASTOS`, sem consulta dedicada por pasto único) | — | ⛔ |
 | Histórico de movimentações | Consulta | — | `movimentacaoPastos.js:83-93` | ⛔ | — | ⛔ |
-| Retirar/mover lote de pasto | Escrita | `lotes:editar` | (mesma op de Lotes, ver acima) | ✅ `TROCAR_LOTE_PASTO` | ✅ | ⛔ |
-| Listar pastos vazios | Consulta | `relatorios:ver` | `ocupacaoPastos.js:17-19`, `hojeNaFazenda.js:103-137` | ⛔ | — | ⛔ |
-| Listar pastos sobrecarregados | Consulta | `relatorios:ver` | `relatorios.js::buildRelatorioPastagens` | ⛔ | — | ⛔ |
+| Retirar/mover lote de pasto | Escrita | `lotes:editar` | (mesma op de Lotes, ver acima) | ✅ `TROCAR_LOTE_PASTO` (mover) + `RETIRAR_LOTE_PASTO` (Sprint Paridade 1, retirar sem novo destino) | ✅ | ⛔ |
+| Listar pastos vazios | Consulta | `relatorios:ver` | `ocupacaoPastos.js:17-19`, `hojeNaFazenda.js:103-137` | 🟡 (aparece dentro de `LISTAR_PASTOS`, sem filtro dedicado) | — | ⛔ |
+| Listar pastos sobrecarregados | Consulta | `relatorios:ver` | `relatorios.js::buildRelatorioPastagens` | 🟡 (idem — `LISTAR_PASTOS` já mostra o status de cada pasto) | — | ⛔ |
 
-**Pastagens: 9 operações-núcleo (excluindo o histórico morto de fazenda), 3 cobertas = ~33%** (era ~22%). Cadastrar/editar/inativar pasto e capacidade/ocupação detalhada por pasto seguem sem cobertura.
+**Pastagens: 9 operações-núcleo (excluindo o histórico morto de fazenda), 6 cobertas (total ou parcial) = ~67%** (era ~33%). Excluir/inativar pasto e histórico de movimentações seguem sem cobertura.
 
 ## Estoque
 
@@ -246,25 +246,37 @@ verificadas contra `src/domain/telegram/interpretarComandoTelegram.js` e
 | Por lote/fazenda | Consulta | `dashboard:ver` | `AlertasPage.jsx:151-183` | 🟡 (recorte por fazenda ativa já existe; por lote não) | — | ⛔ |
 | Vencidos/vencendo hoje/próx. 7-30d | Consulta | `dashboard:ver` | `centralAlertas.js::classificarPrazo` | 🟡 (o bot lista, sem separar por janela) | — | ⛔ |
 | Resumo (total/críticos/vencidos) | Consulta | `dashboard:ver` | `centralAlertas.js::resumirCentralAlertas` | 🟡 (contagem simples no cabeçalho da resposta) | — | ⛔ |
-| Marcar "em análise" | Escrita | `tarefas:editar` | `AlertasPage.jsx:194-226` → `alertas_tratativas` | ⛔ — **gap real: bot só lê, nunca trata** | — | ⛔ |
-| Resolver | Escrita | `tarefas:editar` | `AlertasPage.jsx:228-235` | ⛔ | — | ⛔ |
+| Marcar "em análise" | Escrita | `tarefas:editar` | `AlertasPage.jsx:194-226` → `alertas_tratativas` | ⛔ — **bot ainda só lê, nunca trata** (não implementado nesta rodada — ver seção "Sprint Paridade 1" abaixo) | — | ⛔ |
+| Resolver | Escrita | `tarefas:editar` | `AlertasPage.jsx:228-235`; header/Dashboard também resolvem, mesma tabela desde a unificação | ⛔ | — | ⛔ |
 | Ignorar | Escrita | `tarefas:editar` | `AlertasPage.jsx:237-244` | ⛔ | — | ⛔ |
-| Adiar | Escrita | `tarefas:editar` | `AlertasPage.jsx:246-264` | ⛔ | — | ⛔ |
+| Adiar | Escrita | `tarefas:editar` | `AlertasPage.jsx:246-264`; header/Dashboard também adiam, mesma tabela desde a unificação | ⛔ | — | ⛔ |
 | Histórico (resolvidos/ignorados) | Consulta | `dashboard:ver` | filtro "Histórico" na Central | ⛔ | — | ⛔ |
 | Executar ação recomendada | — | — | **não existe execução direta nem no app** (só navegação manual) | ⛔ (nada a espelhar) | — | ⛔ |
 
-**Alertas: 8 operações reais (excluindo a execução que não existe), 1 coberta = ~13%.**
+**Alertas: 8 operações reais (excluindo a execução que não existe), 1 coberta = ~13%.** Sem mudança de cobertura do bot nesta rodada — o trabalho foi na unificação do motor (abaixo), pré-requisito que agora libera a próxima rodada para adicionar ações de escrita com segurança.
 
-> **Achado importante**: existem **dois motores de alerta coexistindo** —
-> o novo/autoritativo (`alertasUnificados.js`+`centralAlertas.js`,
-> usado pela Central **e** pelo Telegram) e um **legado ainda ativo**
-> dentro do `DashboardPage.jsx` (`utils/alerts.js`, resolver/adiar
-> gravando em `alertas_resolvidos`/`alertas_adiados`, tabelas
-> **diferentes** de `alertas_tratativas`). Um alerta resolvido no
-> Dashboard antigo não aparece como resolvido na Central nem no bot, e
-> vice-versa. Antes de o bot ganhar ação de "resolver/adiar", os dois
-> motores precisam ser unificados — do contrário o bot criaria uma
-> **terceira** fonte de verdade de tratativa.
+> **Atualização (Sprint Paridade 1, bloco 2 — motor de alertas unificado)**:
+> o achado abaixo, registrado no checkpoint anterior, **foi corrigido**.
+> O painel legado do Dashboard (aba "Todos os alertas" e o sino do header,
+> `AppHeader.jsx`) **não usa mais** `utils/alerts.js`/
+> `alertas_resolvidos`/`alertas_adiados` — agora consome
+> `gerarAlertasUnificados` + `aplicarTratativasAosAlertas`, a mesma fonte
+> e a mesma tabela `alertas_tratativas` da Central e do Telegram, via um
+> adaptador (`domain/alertasUnificados.js::adaptarAlertaParaPainelLegado`)
+> que traduz para a forma que os dois componentes já esperavam — sem
+> reescrevê-los. Resolver/adiar num alerta pelo header agora grava na
+> mesma tratativa que a Central lê, e vice-versa. Testes de equivalência
+> em `domain/alertasUnificados.test.js`. Efeito colateral único e
+> esperado: alertas já resolvidos/adiados sob a identidade antiga
+> (`ackKey` heurístico) voltam a aparecer como ativos uma vez após o
+> deploy — as tabelas antigas não foram apagadas, ficam como histórico.
+>
+> Texto original do achado (mantido por registro): existiam **dois
+> motores de alerta coexistindo** — o novo/autoritativo
+> (`alertasUnificados.js`+`centralAlertas.js`) e um legado no
+> `DashboardPage.jsx` (`utils/alerts.js`), com tabelas de tratativa
+> diferentes. Um alerta resolvido no Dashboard antigo não aparecia como
+> resolvido na Central nem no bot, e vice-versa.
 
 ## Equipe e Permissões
 
@@ -315,14 +327,14 @@ verificadas contra `src/domain/telegram/interpretarComandoTelegram.js` e
 
 ---
 
-## Totais (atualizado na Sprint Paridade 1)
+## Totais (atualizado — Sprint Paridade 1, continuação/bloco 2-3)
 
 ```text
 Módulo                          Operações mapeadas   Cobertas (✅/🟡)   % aproximado
-Fazendas                        6                     4                 67%  (era 33%)
-Lotes                           17                    9                 53%  (era 47%)
-Pesagens                        7                     3                 43%  (avaliado, adiado)
-Pastagens                       9                     3                 33%  (era 22%)
+Fazendas                        6                     4                 67%
+Lotes                           17                    11                65%  (era 53%)
+Pesagens                        7                     5                 71%  (era 43%)
+Pastagens                       9                     6                 67%  (era 33%)
 Estoque                         12                    6                 50%
 Suplementação                   10                    3                 30%
 Sanidade                        10                    5                 50%
@@ -331,28 +343,28 @@ Custos                          7                     1                 14%
 Tarefas                         7                     1                 14%
 Rotinas                         6                     0                 0%
 Calendário                      5                     0                 0%
-Alertas                         8                     1                 13%
+Alertas                         8                     1                 13%  (motor unificado — ver seção Alertas)
 Equipe                          6                     0 (maioria 🔒)    n/a — fora de escopo
 Assinatura                      3 (+2 sempre 🔒)       0                 0%
 Configurações                   5 (majoritariamente 🔒/fora de escopo)  n/a
 Relatórios/Exportações          3                      1 (parcial)      ~33%
 
 Operações encontradas: ~133 (módulos operacionais, excluindo Equipe/Config/Assinatura-pagamento tratados como fora de escopo)
-Operações implementadas (✅ ou 🟡): ~42 (era ~38; +4 nesta sprint: cadastrar_fazenda, renomear_fazenda, listar_pastos, consultar_resultado_lote)
-Operações testadas (automatizado): ~32 das implementadas
-Operações validadas no app real: 0 (correções de bloqueio verificadas por leitura/lint/teste, não por uso manual na UI)
+Operações implementadas (✅ ou 🟡): ~52 (era ~42; +10 nesta rodada: editar_pesagem, excluir_pesagem, ajustar_lotacao, editar_lote, editar_pasto, retirar_lote_pasto — 6 operações novas — mais consolidação de listar_pastos cobrindo parcialmente vazios/sobrecarregados/ocupação-por-pasto)
+Operações testadas (automatizado): ~42 das implementadas
+Operações validadas no app real: 0 (verificado só por leitura de código, lint, teste automatizado e boot sem erro no navegador — sem login real)
 Operações validadas no Telegram real: 0
 Exceções justificadas (nunca automatizáveis por política): 9 (convites/papéis de equipe, checkout/pagamento, credenciais/backup destrutivo)
 ```
 
-**Paridade operacional total estimada (fora as exceções por política): ~32%** (era ~29%).
+**Paridade operacional total estimada (fora as exceções por política): ~39%** (era ~32%).
 Isto **não é** uma declaração de conclusão — é o estado real medido nesta
-sprint, para orientar a priorização abaixo. `P0`/`P1` conhecidos deste
-bloco (Fazendas/Lotes/Pesagens/Pastagens + os 2 bloqueios corrigidos): **0**.
-O 3º bloqueio estrutural (motor de alerta duplicado) segue aberto —
-não é P0/P1 *deste* bloco (não bloqueia nenhuma das 4 operações
-implementadas aqui), mas é uma dependência explícita para o próximo bloco
-que tocar Alertas.
+rodada. `P0`/`P1` conhecidos deste bloco (Fazendas/Lotes/Pesagens/Pastagens
++ unificação do motor de alertas): **0**. Itens explicitamente NÃO
+concluídos (não são bloqueio, são escopo restante — ver seção "Sprint
+Paridade 1 — continuação" ao final): confirmação editável, RPC
+transacional nova, ação de escrita de alertas no bot, edição completa de
+lote (peso inicial/data/origem/pasto), fazenda consolidada/excluir/resumo.
 
 ---
 
@@ -379,32 +391,25 @@ próprio app, encontrados como efeito colateral da leitura de código.
    verificada por consistência de padrão com `TarefasPage.jsx` (que
    também não tem teste de componente) + lint/build, não por um teste
    automatizado dedicado.
-3. **Dois motores de alerta coexistindo** (ver nota na seção Alertas
-   acima) — o painel legado do Dashboard (`utils/alerts.js`, 485 linhas)
-   continua ativo em paralelo à Central (`alertasUnificados.js`, 640
-   linhas), com tabelas de tratativa diferentes
-   (`alertas_resolvidos`/`alertas_adiados` vs `alertas_tratativas`).
-   **Avaliado e adiado nesta sprint** — não é um "rename", os dois
-   motores têm modelos de dados incompatíveis (itens individuais vs.
-   grupos agregados com pluralização), e a migração troca o que usuários
-   reais veem hoje no Dashboard. Plano de migração concreto para a
-   próxima sprint que tocar Alertas:
-   - Trocar a fonte de `DashboardPage.jsx`/`App.jsx` (`buildAlerts` de
-     `utils/alerts.js`) por `gerarAlertasUnificados` (`alertasUnificados.js`),
-     adaptando a renderização do painel do Dashboard ao modelo agregado
-     (grupos, não itens individuais).
-   - Trocar `marcarAlertaComoFeito`/`adiarAlerta` (`App.jsx`, gravam em
-     `alertas_resolvidos`/`alertas_adiados`) por
-     `salvarTratativaAlerta`/`STATUS_TRATATIVA` (`services/tratativasAlertas.js`,
-     grava em `alertas_tratativas`) — mesma função já usada por
-     `AlertasPage.jsx`.
-   - Decidir o que fazer com linhas já existentes em
-     `alertas_resolvidos`/`alertas_adiados` de contas reais (migração de
-     dados ou período de leitura dupla) antes de remover as tabelas
-     antigas.
-   - Só depois disso, adicionar ao bot uma ação de escrita
-     (tratar/resolver/reabrir alerta) — nunca antes, para não criar uma
-     terceira fonte de verdade.
+3. ~~**Dois motores de alerta coexistindo**~~ — **corrigido nesta
+   continuação da Sprint Paridade 1.** `DashboardPage.jsx`/`App.jsx`
+   trocaram `buildAlerts` (`utils/alerts.js`) por `gerarAlertasUnificados`
+   + `aplicarTratativasAosAlertas`, com um adaptador
+   (`domain/alertasUnificados.js::adaptarAlertaParaPainelLegado`) que
+   traduz para a forma que `AppHeader.jsx`/`DashboardPage.jsx` já
+   esperavam — nenhum dos dois componentes precisou ser reescrito.
+   `marcarAlertaComoFeito`/`adiarAlerta` agora gravam em
+   `alertas_tratativas` via `salvarTratativaAlerta`, a mesma função e
+   tabela que `AlertasPage.jsx` já usava. `utils/alerts.js` continua
+   existindo (ainda usado por `domain/relatorios.js::buildResumoGeralFazenda`,
+   um relatório sob demanda fora do escopo desta unificação — não migrado
+   nesta rodada). Efeito colateral único e esperado: alertas resolvidos/
+   adiados sob a identidade antiga voltam a aparecer ativos uma vez após
+   o deploy (tabelas antigas preservadas como histórico, não apagadas).
+   Testes de equivalência em `domain/alertasUnificados.test.js`. **Não
+   incluído nesta correção**: uma ação de escrita (resolver/adiar) no
+   próprio bot do Telegram — a unificação era pré-requisito para isso,
+   não a implementação da ação em si.
 4. **Permissão divergente**: `suplementacao:editar` existe em
    `perfis.js` e é o que o bot do Telegram usa, mas a UI web de
    Suplementação sempre checa `estoque:editar` — as duas superfícies
@@ -465,46 +470,62 @@ alteração de senha/dados de credencial, backup/limpeza de dados.
 
 ## Validação real no Telegram
 
-**Continua pendente para as 32 intenções existentes e para todas as
-listadas como cobertas nesta matriz.** Nenhuma foi testada num Telegram
-real nesta sessão — sem acesso a conta/bot ao vivo neste ambiente. Não
-declarar "validado no Telegram" com base em teste automatizado (1381
-testes passando cobrem lógica pura e integração via `prepararCadastro`,
-não o aplicativo real do Telegram).
+**Continua pendente para as 32 intenções existentes.** Nenhuma foi testada
+num Telegram real nesta sessão — sem acesso a conta/bot ao vivo neste
+ambiente. Não declarar "validado no Telegram" com base em teste
+automatizado (1426 testes passando cobrem lógica pura e integração via
+`prepararCadastro`, não o aplicativo real do Telegram nem o app web ao
+vivo — a única verificação de app real feita foi um boot sem erro de
+console na tela de login, sem autenticação).
 
-## Sprint Paridade 1 — resumo
+## Sprint Paridade 1 — continuação (bloco 2 e 3)
 
-Continuação a partir de `53f6bec`. Escopo real entregue (nem tudo que o
+Continuação a partir de `710566f`. Escopo real entregue (nem tudo que o
 sprint pedia — ver pendências abaixo):
 
-- **2 dos 3 bloqueios estruturais corrigidos**: exclusão de consumo de
-  suplementação (estoque não devolvido) e permissões ausentes em
-  Rotinas/Calendário. O 3º (motor de alerta duplicado) foi avaliado e
-  adiado com um plano de migração concreto documentado acima — migrar às
-  cegas o painel de alertas do Dashboard, usado por usuários reais hoje,
-  sem QA ao vivo, era um risco desproporcional ao resto desta sprint.
-- **4 operações novas**: `cadastrar_fazenda`, `renomear_fazenda`,
-  `listar_pastos`, `consultar_resultado_lote` — todas reaproveitando
-  domínio já existente (`getResumoLote`, `calcularOcupacaoPastos`),
-  nenhuma regra paralela criada.
+- **3º bloqueio estrutural corrigido: motor de alerta unificado.**
+  Migração completa do painel legado do Dashboard/header para a mesma
+  fonte canônica e a mesma tabela de tratativa da Central e do Telegram
+  (`gerarAlertasUnificados` + `alertas_tratativas`), sem reescrever os
+  componentes de UI (adaptador de forma). Ver detalhe na seção Alertas e
+  nos achados adicionais. Com isso, os **3 bloqueios estruturais da
+  auditoria original estão corrigidos.**
+- **6 operações novas**: `editar_pesagem`, `excluir_pesagem`,
+  `ajustar_lotacao`, `editar_lote`, `editar_pasto`, `retirar_lote_pasto`.
+  Duas reaproveitam domínio existente diretamente
+  (`buildAjusteLotacaoPatch` de `lotesLogic.js`, sem nenhuma regra nova);
+  duas exigiram extrair uma fórmula antes inline
+  (`PesagensPage.jsx::recalculateLoteFromPesagens` →
+  `domain/pesagensLote.js`, agora reaproveitada pelas duas telas + bot);
+  as outras duas (`editar_lote`/`editar_pasto`) não têm domínio dedicado
+  no app (a página só faz `updateOperationalRecord` direto), então o
+  preparer do bot é a única validação além da resolução de entidade.
 - **Não implementado nesta rodada** (ficam para o próximo bloco):
-  editar lote, ajuste de lotação, editar/excluir pesagem, editar/excluir/
-  cadastrar pasto, consolidada de fazendas, excluir fazenda. Pesagens em
-  particular foi avaliado e adiado — a lógica de recálculo de `lote.p_at`
-  está inline em `PesagensPage.jsx`, não extraída, e replicá-la no bot
-  sem extrair primeiro criaria uma 3ª cópia da mesma fórmula (o mesmo
-  problema que a correção do bloqueio #1 acabou de resolver para
-  suplementação).
-- **Confirmação editável, transações compostas em RPC nova, e testes de
-  idempotência/outra-conta/outra-fazenda para as 4 operações novas NÃO
-  foram feitos nesta rodada** — as 4 operações são todas simples (1-3
-  writes sequenciais via `aplicarWrites`, mesmo padrão das 12 anteriores),
-  sem operação verdadeiramente composta que exigisse uma RPC nova. Os
-  testes escritos cobrem classificação, validação de campos e resolução
-  de entidade (ambíguo/inexistente/duplicado), não os eixos adicionais
-  pedidos (retry de webhook, timeout, erro de banco) — mesma lacuna que já
-  existia para as 12 intenções anteriores, não introduzida nem fechada
-  aqui.
+  confirmação editável (alterar um campo específico sem reiniciar a
+  conversa); RPC transacional nova; ação de escrita de alertas no bot
+  (resolver/ignorar/adiar/em análise — a unificação do motor era o
+  pré-requisito, feito agora, mas a ação em si não foi adicionada);
+  edição de peso inicial/data de entrada/origem/pasto do lote; visão
+  consolidada, resumo por fazenda e exclusão de fazenda; excluir/inativar
+  pasto; nova pesagem em lote no formato batch/individual por animal.
+- **Transações atômicas / RPC nova — avaliado, não implementado.** Todas
+  as 22 operações de escrita do bot (as 16 anteriores + as 6 desta
+  rodada) seguem o mesmo padrão já usado em toda a base: uma sequência de
+  inserts/updates via `aplicarWrites`, sem transação de banco. Este é um
+  risco pré-existente em toda a aplicação (não introduzido nem agravado
+  aqui) — a única RPC real do domínio (`mover_lote_para_pasto`) nem é
+  chamada pelo bot, por ser `SECURITY INVOKER` e depender de RLS que o
+  service role ignora (nota `ponytail:` em `acoesPasto.js`). Criar uma
+  RPC nova seria uma mudança de schema (`supabase/migrations/`) que
+  exigiria desenho de `SECURITY DEFINER` cuidadoso e validação contra
+  RLS/service role antes de aplicar — decisão deliberadamente não tomada
+  nesta rodada sem uma revisão dedicada de segurança.
+- **Idempotência/multi-fazenda para as 6 operações novas**: não geraram
+  teste dedicado por operação — o mecanismo (uma operação pendente por
+  chat, transição atômica no `/confirmar`, gate de fazenda em
+  `INTENCOES_ESCOPADAS`) é compartilhado por todas as intenções e já é
+  testado genericamente (`operacoesPendentes.test.js`); mesma decisão já
+  tomada para as 12 intenções anteriores.
 - **Paridade completa do HERDON não é declarada.** Isto é um checkpoint.
 
 ## Custo de IA
