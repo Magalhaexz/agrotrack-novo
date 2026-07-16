@@ -308,13 +308,6 @@ cai automaticamente para esse fallback — comportamento inalterado.
 
 ## 13. Limitações conhecidas
 
-- **7 operações do spec original não foram implementadas nesta sprint**
-  (decisão explícita de escopo): `cadastrar_lote`, `cadastrar_pasto`,
-  `registrar_venda`, `registrar_morte`, `finalizar_lote`, manejo
-  sanitário (`cadastrar_manejo`), planejamento/consumo de suplementação.
-  Nenhuma delas existia antes desta sprint nem na versão com Claude API —
-  ficam para uma sprint futura, com a mesma pesquisa de campos exatos já
-  aplicada às 4 novas desta rodada.
 - A faixa de confiança 0.80 (sinônimo reconhecido) não gera nenhuma nota
   de transparência ao usuário — só a 0.65 (correção de digitação) gera.
   Decisão deliberada (ver seção 3) para não adicionar fricção a um
@@ -335,3 +328,134 @@ cancelamento, confirmação repetida, visualizador, duas fazendas, saldo
 insuficiente e entidade inexistente através do aplicativo real — todos já
 cobertos por teste automatizado equivalente, mas não observados ao vivo
 nesta sessão.
+
+## 15. Sprint de expansão — as 8 operações que faltavam
+
+Continuação direta desta sprint (base `89624be`), completando a lista de
+"limitações conhecidas" da seção 13 original. Mesma arquitetura, mesmo
+motor de conversa (`cadastros.js` + `conversas.js`), **custo de IA
+continua zero** — nenhuma das 8 intenções novas usa qualquer provedor
+externo.
+
+| Intenção | Preparer puro | Escreve em | Confirmação | Permissão |
+| --- | --- | --- | --- | --- |
+| `cadastrar_lote` | `cadastroLote.js` | `lotes` (insert) | sim | `lotes:editar` |
+| `cadastrar_pasto` | `cadastroPasto.js` | `pastagens` (insert) | sim | `pastagens:editar` |
+| `registrar_venda` | `acoesLote.js::prepararVendaAnimais` | `movimentacoes_animais` + `lotes` + `movimentacoes_financeiras` (se valor > 0) | sim | `animais:movimentar` |
+| `registrar_morte` | `acoesLote.js::prepararMorteAnimais` | `movimentacoes_animais` + `lotes` (nunca financeiro) | sim | `animais:movimentar` |
+| `finalizar_lote` | `acoesLote.js::prepararFinalizarLote` | `lotes` (só status/motivo/data) | sim | `lotes:editar` |
+| `cadastrar_manejo` | `cadastroManejo.js` | `sanitario` + `estoque`/`movimentacoes_estoque` (se produto e saldo suficientes) | sim | `sanitario:editar` |
+| `cadastrar_planejamento_suplementacao` | `suplementacao.js::prepararPlanejamentoSuplementacao` | `lotes` (campos `supl_*`/`consumo_*`, nunca estoque) | sim | `suplementacao:editar` |
+| `registrar_consumo_suplementacao` | `suplementacao.js::prepararConsumoSuplementacao` | `consumo_suplementacao` + `estoque` + `movimentacoes_financeiras` | sim | `suplementacao:editar` |
+
+Todas as 8 são cadastros por conversa em etapas (`INTENCOES_CADASTRO` em
+`permissoesTelegram.js`) — a mensagem inicial extrai o que der, o slot que
+faltar vira pergunta; nada é gravado sem passar por `/confirmar`. Todas
+foram adicionadas a `INTENCOES_ATENDIDAS` e `INTENCOES_ESCOPADAS`
+(`api/_telegramBot.js`) — contas com mais de uma fazenda precisam
+selecionar a fazenda antes de iniciar qualquer uma delas.
+
+### Campos e regras por operação
+
+- **`cadastrar_lote`**: nome, quantidade (cabeças), sexo (`macho`/`femea`/
+  `misto`, com sinônimos plural/gênero), peso médio inicial (opcional),
+  pasto (opcional, valida mesma fazenda). Fazenda resolvida do contexto da
+  conexão (ou automaticamente quando a conta só tem uma) —
+  `FAZENDA_NAO_DEFINIDA` se não houver uma fazenda clara. Bloqueia nome
+  duplicado de lote ativo na mesma fazenda. Escreve os mesmos defaults
+  numéricos de `LotesPage.jsx::buildLoteSavePatch` (rendimento de carcaça
+  52%, sem investimento/GMD meta, etc.) — não abre o assistente de
+  planejamento econômico completo do formulário web.
+- **`cadastrar_pasto`**: nome, área em hectares (opcional) e capacidade de
+  suporte (opcional, número livre — o app não define uma unidade fixa no
+  formulário). Não inclui "tipo de capim": a tabela `pastagens` não tem
+  essa coluna hoje, então o bot não inventa uma.
+- **`registrar_venda`** / **`registrar_morte`**: mesma fórmula de
+  `registrarSaidaAnimal` (`services/movimentacoes.js`) espelhada em
+  `acoesLote.js` (ver nota `ponytail:` no topo do arquivo) — peso médio de
+  quem sai é a média atual do lote, `lote.qtd` nunca fica negativo
+  (`ANIMAIS_INSUFICIENTES`), venda com valor > 0 gera receita
+  (`categoria: venda_animal`), morte nunca gera lançamento financeiro.
+  Ambas rejeitam lote finalizado (`LOTE_BLOQUEADO`).
+- **`finalizar_lote`**: espelha `FechamentoLoteModal.jsx` +
+  `LotesPage.jsx::handleFechamento` — só atualiza `status`,
+  `data_encerramento` e `motivo_encerramento`; nunca mexe em pasto,
+  pesagens ou custos (histórico sempre preservado). Motivo é obrigatório;
+  lote já finalizado devolve `LOTE_JA_FINALIZADO`.
+- **`cadastrar_manejo`**: lote, tipo (detecta `vacina`/`vermifugo`/
+  `tratamento` pelo próprio verbo da mensagem — "vacinei" já preenche o
+  tipo sem perguntar de novo), quantidade de animais tratados, produto e
+  quantidade de produto (ambos opcionais). Reaproveita
+  `domain/estoqueSanidade.js::calcularBaixaSanitaria` (Sprint 15) para a
+  baixa de estoque — **mesma política do app**: saldo insuficiente não
+  bloqueia o manejo, só pula a baixa e devolve um aviso explícito na
+  confirmação. Carência/próxima dose ficam de fora dos slots (não estavam
+  nos exemplos do spec) — podem ser adicionadas depois sem quebrar nada.
+- **`cadastrar_planejamento_suplementacao`**: não existe tabela de
+  planejamento separada — o planejamento vive nos próprios campos
+  `supl_nome`/`consumo_tipo`/`consumo_por_cabeca_dia`/`supl_meta_dias` da
+  linha em `lotes` (Bloco 4 de `LoteForm.jsx`). A intenção só faz um
+  `update` desses campos; nunca toca em estoque.
+- **`registrar_consumo_suplementacao`**: espelha
+  `SuplementacaoConsumoModal.jsx` — grava em `consumo_suplementacao`
+  (payload com `quantidade_total`/`qtd_total`/`quantidade` duplicados de
+  propósito, mesmo padrão do app), baixa `estoque.quantidade_atual` e gera
+  despesa (`categoria: nutricao`). Bloqueia saldo insuficiente
+  (`SALDO_INSUFICIENTE`) — ao contrário do manejo sanitário, aqui a regra
+  do app é impedir saldo negativo, não só avisar. `consumo_suplementacao`
+  foi adicionada a `TABELAS_NECESSARIAS` (`api/_herdonDb.js`).
+
+### Interpretação determinística
+
+8 novas `INTENCOES` + regexes em `interpretarComandoTelegram.js`,
+verificadas ANTES dos cadastros genéricos de estoque (a palavra de
+produto — `ração`/`sal`/`suplemento`/`trato`/`proteinado` — ou o verbo
+específico — `vacinar`/`vermifugar`/`vender`/`morrer`/`finalizar` — é o
+sinal que desambigua "usei 3 sacos de ração" de uma baixa de estoque
+genérica, no mesmo espírito da desambiguação `item_novo` ×
+`entrada_estoque` da rodada anterior). `venda`/`morte`/`finalizar`/
+`vacina`/`vermifugo`/`suplementacao`/`planejar`/`consumo` entraram no
+vocabulário-âncora de tolerância a erro de digitação
+(`interpretadorTelegram.js`).
+
+### Segurança e integridade
+
+Mesmas garantias das 4 intenções anteriores, sem nenhum mecanismo novo:
+`db` chega recortado por conta/fazenda antes de qualquer resolução de
+nome; `writes` são montados campo a campo (nunca `{...dados}`); todo IDs
+adulterado no payload nunca chega perto de uma tabela porque os
+preparers só leem os campos nomeados. Idempotência e confirmação
+reaproveitam `telegram_operacoes_pendentes`/`telegram_conversas`
+existentes — nenhuma tabela nova foi criada.
+
+### Testes
+
+**51 testes novos** (1304 → 1355), um arquivo de teste por preparer
+(`cadastroLote.test.js`, `cadastroPasto.test.js`, `cadastroManejo.test.js`,
+`suplementacao.test.js`), extensão de `acoesLote.test.js` (venda/morte/
+finalizar), extensão de `interpretarComandoTelegram.test.js` (classificação
+das 8 intenções + não-colisão com `DAR_BAIXA_ESTOQUE` pré-existente) e de
+`cadastros.test.js` (integração via `prepararCadastro`). O
+`catalogoIntencoes.test.js` (drift-guard) cobre as 8 automaticamente, sem
+precisar de teste dedicado.
+
+### Validação real no Telegram
+
+**Não realizada nesta sessão** — mesma limitação da seção 14: implantar em
+produção e trocar mensagens reais com o bot alteram estado fora deste
+ambiente de desenvolvimento. Fica como pendência explícita, com os
+cenários da seção 18 do sprint (as 8 mensagens de exemplo + cancelar,
+alterar campo, confirmar duas vezes, visualizador, duas fazendas, erro de
+digitação, ambiguidade, saldo insuficiente, lote inexistente) já cobertos
+por teste automatizado equivalente.
+
+### Pendências reais (fora do escopo desta rodada)
+
+- Data de entrada do lote (`cadastrar_lote`) e carência/próxima dose
+  (`cadastrar_manejo`) não são perguntadas — sempre usam a data de hoje ou
+  ficam nulas. Podem virar slots opcionais depois, sem mudar o preparer.
+- `cadastrar_pasto` não pergunta "tipo de capim" (coluna inexistente hoje
+  na tabela `pastagens`).
+- Estorno de consumo de suplementação (mencionado no spec) segue só pelo
+  fluxo de edição existente no app — não foi criada uma intenção de bot
+  dedicada para isso.
