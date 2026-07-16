@@ -6,6 +6,7 @@ import { getResumoLote } from '../domain/resumoLote';
 import { gerarNovoId } from '../utils/id';
 import { formatNumber } from '../utils/calculations';
 import { toNumber } from '../domain/calcHelpers.js';
+import { calcularCustoConsumo } from '../domain/custoProdutoNutricional';
 import { createOperationalRecord, updateOperationalRecord } from '../services/operationalPersistence';
 
 import { hojeLocalISO } from '../domain/dataCivil.js';
@@ -116,8 +117,11 @@ function calculateTotal({ mode, heads, pesoMedio, manualTotal, perHead, percentu
   return toNumberSafe(manualTotal, 0);
 }
 
+// produto.valor_unitario já é o custo por unidade de controle (kg/litro/
+// unidade) — nunca custo por embalagem (ver domain/custoProdutoNutricional.js).
 function getConsumptionCost(quantity, produto) {
-  return toNumber(quantity) * toNumber(produto?.valor_unitario || produto?.custo_unitario || produto?.preco_unitario);
+  const custoPorUnidadeControle = toNumber(produto?.valor_unitario || produto?.custo_unitario || produto?.preco_unitario);
+  return calcularCustoConsumo({ quantidadeConsumida: quantity, custoPorUnidadeControle });
 }
 
 function buildInitialData(db, record = null) {

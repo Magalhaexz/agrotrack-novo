@@ -12,6 +12,12 @@ import { formatNumber } from '../utils/calculations';
 import { createOperationalRecord, updateOperationalRecord } from '../services/operationalPersistence';
 import { excluirEEstornarConsumoSuplementacao } from '../services/consumoSuplementacao';
 import { calcularConsumoDiarioTotalPorProduto, calcularDiasRestantesEstoque } from '../domain/previsaoConsumoEstoque';
+import {
+  calcularResumoProdutoNutricional,
+  formatarRotuloEmbalagem,
+  rotuloCustoPorEmbalagem,
+  resolverCustoPorEmbalagemParaEdicao,
+} from '../domain/custoProdutoNutricional';
 
 function getActiveFarmId(fazendaSelecionada) {
   const direct = fazendaSelecionada?.id ?? fazendaSelecionada?.fazenda_id ?? fazendaSelecionada?.fazendaSelecionadaId ?? null;
@@ -54,19 +60,31 @@ function getProdutosNutricionais(db) {
 }
 
 function getProdutoEditData(item) {
-  const conteudo = Number(item?.metadata?.conteudo_por_embalagem || 0);
+  const metadata = item?.metadata || {};
+  const conteudo = Number(metadata.conteudo_por_embalagem || 0);
   const quantidadeAtual = Number(item?.quantidade_atual || item?.quantidade || 0);
-  const quantidadeEmbalagens = conteudo > 0 ? quantidadeAtual / conteudo : quantidadeAtual;
+
+  // Quantidade de embalagens: prioriza o valor salvo em metadata (estável,
+  // não sofre deriva após consumo parcial baixar o estoque). Só cai para o
+  // cálculo por divisão em registros antigos que não guardavam esse campo
+  // — nesses, o resultado pode não bater mais depois de consumos, mas é a
+  // melhor estimativa disponível.
+  const quantidadeEmbalagensSalva = metadata.quantidade_embalagens;
+  const quantidadeEmbalagens = quantidadeEmbalagensSalva !== undefined && quantidadeEmbalagensSalva !== null && quantidadeEmbalagensSalva !== ''
+    ? Number(quantidadeEmbalagensSalva)
+    : (conteudo > 0 ? quantidadeAtual / conteudo : quantidadeAtual);
+
+  const custoPorEmbalagem = resolverCustoPorEmbalagemParaEdicao(item);
 
   return {
     produto: item?.produto || item?.nome || '',
     subcategoria: item?.subcategoria || 'Ração',
     unidade_medida: item?.unidade_medida || item?.unidade || 'kg',
     quantidade_embalagens: quantidadeEmbalagens ? String(quantidadeEmbalagens) : '',
-    tipo_embalagem: item?.metadata?.tipo_embalagem || 'saco',
+    tipo_embalagem: metadata.tipo_embalagem || 'saco',
     conteudo_por_embalagem: conteudo ? String(conteudo) : '',
-    unidade_conteudo: item?.metadata?.unidade_conteudo || 'kg',
-    valor_unitario: item?.valor_unitario ?? item?.custo_unitario ?? item?.preco_unitario ?? '',
+    unidade_conteudo: metadata.unidade_conteudo || 'kg',
+    custo_por_embalagem: custoPorEmbalagem ? String(custoPorEmbalagem) : '',
     fornecedor: item?.fornecedor || '',
     validade: item?.validade || item?.data_validade || '',
     obs: item?.obs || item?.observacoes || '',
@@ -530,8 +548,14 @@ function ProdutoNutricionalModal({ db, setDb, session, activeFarmId, onClose, sh
   }, [initialData]);
   /* eslint-enable react-hooks/set-state-in-effect */
 
-  const totalEstoque = Number(form.quantidade_embalagens || 0) * Number(form.conteudo_por_embalagem || 0);
-  const custoTotal = totalEstoque * Number(form.valor_unitario || 0);
+  const quantidadeEmbalagens = Number(form.quantidade_embalagens || 0);
+  const conteudoPorEmbalagem = Number(form.conteudo_por_embalagem || 0);
+  const custoPorEmbalagem = Number(form.custo_por_embalagem || 0);
+  const { quantidadeTotalEstoque, custoTotal, custoPorUnidadeControle } = calcularResumoProdutoNutricional({
+    quantidadeEmbalagens,
+    conteudoPorEmbalagem,
+    custoPorEmbalagem,
+  });
   const isEdit = Boolean(initialData?.id);
 
   async function salvar() {
@@ -539,16 +563,16 @@ function ProdutoNutricionalModal({ db, setDb, session, activeFarmId, onClose, sh
       setErro('Informe o nome do produto.');
       return;
     }
-    if (Number(form.quantidade_embalagens || 0) <= 0) {
+    if (quantidadeEmbalagens <= 0) {
       setErro('Informe a quantidade em estoque.');
       return;
     }
-    if (Number(form.conteudo_por_embalagem || 0) <= 0) {
+    if (conteudoPorEmbalagem <= 0) {
       setErro('Informe o conteúdo por embalagem.');
       return;
     }
-    if (Number(form.valor_unitario || 0) < 0) {
-      setErro('Informe um custo unitário válido.');
+    if (custoPorEmbalagem < 0) {
+      setErro('Informe um custo por embalagem válido.');
       return;
     }
 
@@ -556,7 +580,7 @@ function ProdutoNutricionalModal({ db, setDb, session, activeFarmId, onClose, sh
       ? initialData
       : (db.estoque || []).find((item) => String(item.produto || item.nome || '').toLowerCase() === String(form.produto || '').trim().toLowerCase());
 
-    const quantidadeFinal = existente && !isEdit ? Number(existente.quantidade_atual || 0) + totalEstoque : totalEstoque;
+    const quantidadeFinal = existente && !isEdit ? Number(existente.quantidade_atual || 0) + quantidadeTotalEstoque : quantidadeTotalEstoque;
 
     const payload = {
       produto: String(form.produto || '').trim(),
@@ -568,9 +592,13 @@ function ProdutoNutricionalModal({ db, setDb, session, activeFarmId, onClose, sh
       fazenda_id: existente?.fazenda_id ?? activeFarmId,
       quantidade_atual: quantidadeFinal,
       quantidade: quantidadeFinal,
-      valor_unitario: Number(form.valor_unitario || 0),
-      custo_unitario: Number(form.valor_unitario || 0),
-      preco_unitario: Number(form.valor_unitario || 0),
+      // valor_unitario/custo_unitario/preco_unitario são o custo por unidade
+      // DE CONTROLE (kg/litro/unidade) — nunca o custo por embalagem. É o
+      // que o consumo diário e o financeiro multiplicam pela quantidade
+      // consumida (ver SuplementacaoConsumoModal.jsx::getConsumptionCost).
+      valor_unitario: custoPorUnidadeControle,
+      custo_unitario: custoPorUnidadeControle,
+      preco_unitario: custoPorUnidadeControle,
       fornecedor: form.fornecedor,
       validade: form.validade || null,
       data_validade: form.validade || null,
@@ -580,8 +608,10 @@ function ProdutoNutricionalModal({ db, setDb, session, activeFarmId, onClose, sh
         ...(existente?.metadata || {}),
         modulo: 'nutricao',
         tipo_embalagem: form.tipo_embalagem,
-        conteudo_por_embalagem: Number(form.conteudo_por_embalagem || 0),
+        quantidade_embalagens: quantidadeEmbalagens,
+        conteudo_por_embalagem: conteudoPorEmbalagem,
         unidade_conteudo: form.unidade_conteudo,
+        custo_por_embalagem: custoPorEmbalagem,
         custo_total: custoTotal,
       },
     };
@@ -665,22 +695,27 @@ function ProdutoNutricionalModal({ db, setDb, session, activeFarmId, onClose, sh
             <option>unidade</option>
           </select>
         </label>
-        <Input label="Custo unitário" type="number" value={form.valor_unitario} onChange={(e) => setForm((p) => ({ ...p, valor_unitario: e.target.value }))} />
+        <Input
+          label={rotuloCustoPorEmbalagem(form.tipo_embalagem)}
+          type="number"
+          value={form.custo_por_embalagem}
+          onChange={(e) => setForm((p) => ({ ...p, custo_por_embalagem: e.target.value }))}
+        />
         <Input label="Fornecedor" value={form.fornecedor} onChange={(e) => setForm((p) => ({ ...p, fornecedor: e.target.value }))} />
         <Input label="Validade" type="date" value={form.validade} onChange={(e) => setForm((p) => ({ ...p, validade: e.target.value }))} />
         <Input label="Observação" value={form.obs} onChange={(e) => setForm((p) => ({ ...p, obs: e.target.value }))} />
         {erro ? <p className="err" style={{ gridColumn: '1 / -1' }}>{erro}</p> : null}
       </div>
       <p>
-        Total calculado:
+        Estoque calculado: <strong>{formatNumber(quantidadeTotalEstoque, 2)} {form.unidade_conteudo}</strong>
         {' '}
-        <strong>{formatNumber(totalEstoque, 2)} {form.unidade_conteudo}</strong>
+        ({formatNumber(quantidadeEmbalagens, 0)} {formatarRotuloEmbalagem(form.tipo_embalagem, quantidadeEmbalagens)} × {formatNumber(conteudoPorEmbalagem, 2)} {form.unidade_conteudo})
+        <br />
+        Custo total: <strong>R$ {formatNumber(custoTotal, 2)}</strong>
         {' '}
         |
         {' '}
-        Custo total:
-        {' '}
-        <strong>R$ {formatNumber(custoTotal, 2)}</strong>
+        Custo equivalente: <strong>R$ {formatNumber(custoPorUnidadeControle, 2)}/{form.unidade_conteudo}</strong>
       </p>
     </Modal>
   );
