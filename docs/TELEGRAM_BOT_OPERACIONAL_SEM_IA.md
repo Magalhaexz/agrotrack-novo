@@ -459,3 +459,45 @@ por teste automatizado equivalente.
 - Estorno de consumo de suplementação (mencionado no spec) segue só pelo
   fluxo de edição existente no app — não foi criada uma intenção de bot
   dedicada para isso.
+
+## 16. Sprint Paridade 1 — 4 novas intenções (Fazendas/Lotes/Pastagens)
+
+Continuação a partir de `53f6bec`, primeira rodada de implementação após
+`docs/TELEGRAM_PARIDADE_COMPLETA_APP.md`. Mesma arquitetura, custo de IA
+zero.
+
+| Intenção | Tipo | Preparer/formatador | Tabela | Confirmação | Permissão |
+| --- | --- | --- | --- | --- | --- |
+| `cadastrar_fazenda` | cadastro | `cadastroFazenda.js::prepararCadastroFazenda` | `fazendas` (insert) | sim | `fazendas:editar` |
+| `renomear_fazenda` | cadastro | `cadastroFazenda.js::prepararRenomearFazenda` | `fazendas` (update) | sim | `fazendas:editar` |
+| `listar_pastos` | consulta | `respostasConsulta.js::formatarPastagens` (reaproveita `domain/ocupacaoPastos.js`) | leitura | não | `pastagens:ver` |
+| `consultar_resultado_lote` | consulta | `respostasConsulta.js::formatarResultadoLote` (reaproveita `domain/resumoLote.js`) | leitura | não | `lotes:ver` |
+
+`cadastrar_fazenda`/`renomear_fazenda` NÃO entram em `INTENCOES_ESCOPADAS`
+— cadastrar ou renomear uma fazenda não pode depender de já ter uma
+fazenda selecionada (seria circular). `listar_pastos`/
+`consultar_resultado_lote` entram normalmente, como qualquer consulta.
+
+`cadastrar_fazenda` não valida o limite de fazendas do plano
+(`canCreateFarm`, `services/subscriptions.js`) — lacuna documentada, não
+corrigida: é a mesma ausência de validação de assinatura na camada de
+dados já registrada no backlog do app (RLS não valida plano, só o
+client-side valida). O bot criar uma fazenda acima do limite do plano não
+abre um buraco novo, só herda o gap existente.
+
+### Correções estruturais desta sprint (não são intenções novas)
+
+- **Bug de integridade corrigido**: exclusão de consumo de suplementação
+  agora usa uma única função (`domain/consumoSuplementacao.js` +
+  `services/consumoSuplementacao.js`), reaproveitada por `LotesPage.jsx`
+  e `SuplementacaoPage.jsx` — antes, só uma das duas telas devolvia o
+  estoque ao excluir o mesmo tipo de registro.
+- **Gap de permissão corrigido**: `RotinaPage.jsx`/
+  `CalendarioOperacionalPage.jsx` agora checam `hasPermission` antes de
+  criar/editar/excluir/concluir, como as demais páginas operacionais.
+- **Motor de alerta duplicado**: avaliado, não corrigido nesta sprint —
+  ver `docs/TELEGRAM_PARIDADE_COMPLETA_APP.md` para o plano de migração.
+
+Ver `docs/TELEGRAM_PARIDADE_COMPLETA_APP.md` para a matriz completa
+atualizada, pendências do módulo (edição de lote, pesagem, pasto) e
+totais reais.

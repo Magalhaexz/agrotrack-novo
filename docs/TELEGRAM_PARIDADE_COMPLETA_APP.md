@@ -5,6 +5,12 @@ cobertura real do bot do Telegram. Substitui/atualiza
 `docs/TELEGRAM_PARIDADE_FUNCIONAL_HERDON.md` (mantido por histórico) como
 fonte de verdade a partir desta sprint.
 
+**Atualizado na Sprint Paridade 1** (base `53f6bec`, commits desta rodada
+adiante) — ver seção "Sprint Paridade 1" ao final para o que mudou nesta
+rodada especificamente. As linhas afetadas foram atualizadas in-line nas
+tabelas abaixo; o resto da matriz (auditoria original) permanece como
+estava.
+
 **Este documento é um checkpoint de auditoria, não uma declaração de
 paridade completa.** Ele mapeia o que existe, não implementa nada por si
 só — a implementação dos gaps listados aqui é trabalho de sprints
@@ -34,14 +40,14 @@ verificadas contra `src/domain/telegram/interpretarComandoTelegram.js` e
 | Operação no app | C/E | Permissão | Domínio/RPC | Telegram | Teste | Validação real |
 |---|---|---|---|---|---|---|
 | Listar fazendas | Consulta | `fazendas:ver` | inline `FazendasPage.jsx:79-85` | ✅ `LISTAR_FAZENDAS` | ✅ | ⛔ |
-| Cadastrar fazenda | Escrita | `fazendas:editar` | `FazendasPage.jsx:132-194` | ⛔ | — | ⛔ |
-| Editar fazenda | Escrita | `fazendas:editar` | `FazendasPage.jsx:92-131` | ⛔ | — | ⛔ |
-| Excluir fazenda | Escrita | `fazendas:editar` (sem `fazendas:excluir` dedicado — gap de modelo de permissão) | `FazendasPage.jsx:196-281`, bloqueia se houver lotes/animais/estoque vinculados | ⛔ | — | ⛔ |
+| Cadastrar fazenda | Escrita | `fazendas:editar` | `FazendasPage.jsx:132-194` | ✅ `CADASTRAR_FAZENDA` (Sprint Paridade 1) — nome/cidade/estado; **não valida limite de fazendas do plano**, mesma lacuna de RLS já documentada (BM-30) | ✅ | ⛔ |
+| Editar fazenda (nome) | Escrita | `fazendas:editar` | `FazendasPage.jsx:92-131` | 🟡 `RENOMEAR_FAZENDA` (Sprint Paridade 1) — só o nome; demais campos (cidade/estado/hectares) seguem sem edição via bot | ✅ | ⛔ |
+| Excluir fazenda | Escrita | `fazendas:editar` (sem `fazendas:excluir` dedicado — gap de modelo de permissão) | `FazendasPage.jsx:196-281`, bloqueia se houver lotes/animais/estoque vinculados | ⛔ — deliberadamente não implementado (ação destrutiva, alto risco, deixada para decisão de produto antes de automatizar) | — | ⛔ |
 | Trocar fazenda ativa | Consulta/nav | nenhuma (cross-cutting) | `AppHeader.jsx:337-374` | ✅ `SELECIONAR_FAZENDA` | ✅ | ⛔ |
 | Visão consolidada ("Todas as fazendas") | Consulta | nenhuma | `escopoFazenda.js:10-15` | ⛔ | — | ⛔ |
 | Sincronizar/diagnóstico/reconectar nuvem | Escrita/edge | `fazendas:editar` + dev | `FazendasPage.jsx:316-667` | ⛔ (fora de escopo — dev-only) | — | — |
 
-**Fazendas: 6 operações-núcleo, 2 cobertas (listar, trocar ativa) = ~33%.**
+**Fazendas: 6 operações-núcleo, 4 cobertas (total ou parcial) = ~67%** (era ~33%).
 
 ## Lotes
 
@@ -59,12 +65,12 @@ verificadas contra `src/domain/telegram/interpretarComandoTelegram.js` e
 | Finalizar lote | Escrita | `lotes:editar` | `LotesPage.jsx:446-472`, `lotesLogic.js:228-240` | ✅ `FINALIZAR_LOTE` | ✅ | ⛔ |
 | Histórico do lote | Consulta | `lotes:ver` | inline + `movimentacaoPastos.js:83-93` | 🟡 (via `VER_LOTE`/`RESUMO`, não histórico completo) | — | ⛔ |
 | Custos (aba financeiro do lote) | Consulta | `lotes:ver` | `LoteFinanceiroTab.jsx` | 🟡 (via `CONSULTAR_FINANCEIRO` com filtro lote) | ✅ | ⛔ |
-| Resultado (margem, custo/lucro por @) | Consulta | `lotes:ver`/`resultados:ver` | `resumoLote.js`, `calculations.js` | ⛔ | — | ⛔ |
+| Resultado (margem, custo/lucro por @) | Consulta | `lotes:ver`/`resultados:ver` | `resumoLote.js`, `calculations.js` | ✅ `CONSULTAR_RESULTADO_LOTE` (Sprint Paridade 1) — reaproveita `getResumoLote` direto, mesma fonte da página | ✅ | ⛔ |
 | Quantidade/peso/GMD | Consulta | `lotes:ver` | `calculateGmd30` (triplicado, ver achados) | 🟡 (via `VER_LOTE`/`VER_PESAGENS`) | — | ⛔ |
 | Nova pesagem a partir do lote | Escrita | `pesagens:editar` | `LotesPage.jsx:558-593` (versão simplificada) | ✅ `REGISTRAR_PESAGEM` (fluxo genérico, não o específico do lote) | ✅ | ⛔ |
 | Relatório do lote / compartilhar (WhatsApp) | Consulta | `lotes:ver`/`relatorios:ver` | `relatorioLote.js`, `whatsappResumo.js::gerarResumoLoteTexto` | ⛔ — **gerador de texto já existe e é reaproveitável** para um comando "enviar relatório do lote" | — | ⛔ |
 
-**Lotes: 17 operações, 8 cobertas (parcial ou total) = ~47%.**
+**Lotes: 17 operações, 9 cobertas (parcial ou total) = ~53%** (era ~47%). Edição de lote (nome/sexo/raça/peso inicial/data/pasto/observação) e ajuste de lotação seguem sem cobertura — deferidos para o próximo bloco.
 
 ## Pesagens
 
@@ -73,8 +79,8 @@ verificadas contra `src/domain/telegram/interpretarComandoTelegram.js` e
 | Histórico/última/GMD | Consulta | `pesagens:ver` | `PesagensPage.jsx:897-941` | ✅ `VER_PESAGENS` | ✅ | ⛔ |
 | Nova pesagem (simples) | Escrita | `pesagens:editar` | `PesagensPage.jsx:725-807` | ✅ `REGISTRAR_PESAGEM` | ✅ | ⛔ |
 | Nova pesagem (batch/individual por lote) | Escrita | `pesagens:editar` | `PesagensPage.jsx:483-723` / duplicado em `AcompanhamentoPesoPage.jsx` | ⛔ (bot só cobre o fluxo simples) | — | ⛔ |
-| Editar pesagem | Escrita | `pesagens:editar` | `PesagensPage.jsx:339-346,725-772` | ⛔ | — | ⛔ |
-| Excluir/cancelar pesagem | Escrita | `pesagens:excluir` | `PesagensPage.jsx:348-402` | ⛔ | — | ⛔ |
+| Editar pesagem | Escrita | `pesagens:editar` | `PesagensPage.jsx:339-346,725-772` | ⛔ — avaliado e adiado na Sprint Paridade 1: exige extrair `recalculateLoteFromPesagens` (hoje inline na página, não é módulo de domínio) antes de replicar no bot | — | ⛔ |
+| Excluir/cancelar pesagem | Escrita | `pesagens:excluir` | `PesagensPage.jsx:348-402` | ⛔ — mesma decisão de adiamento acima | — | ⛔ |
 | Lotes sem pesagem recente | Consulta | `pesagens:ver` | `hojeNaFazenda.js:22-29` (duplicado inline em `PesagensPage.jsx`) | 🟡 (aparece dentro de `VER_ALERTAS`, não como consulta dedicada) | — | ⛔ |
 | Evolução/gráfico de peso | Consulta | `animais:ver` | `AcompanhamentoPesoPage.jsx` + `PesoChart.jsx` | ⛔ | — | ⛔ |
 
@@ -84,7 +90,7 @@ verificadas contra `src/domain/telegram/interpretarComandoTelegram.js` e
 
 | Operação no app | C/E | Permissão | Domínio/RPC | Telegram | Teste | Validação real |
 |---|---|---|---|---|---|---|
-| Listar pastos | Consulta | `pastagens:ver` | `PastagensPage.jsx:431-501` | ⛔ — **gap real, sem consulta dedicada** | — | ⛔ |
+| Listar pastos | Consulta | `pastagens:ver` | `PastagensPage.jsx:431-501` | ✅ `LISTAR_PASTOS` (Sprint Paridade 1) — reaproveita `calcularOcupacaoPastos` (`ocupacaoPastos.js`), mesma fonte da página | ✅ | ⛔ |
 | Cadastrar pasto | Escrita | `pastagens:editar` | `PastagensPage.jsx:208-227` | ✅ `CADASTRAR_PASTO` | ✅ | ⛔ |
 | Editar pasto | Escrita | `pastagens:editar` | `PastagensPage.jsx:188-207` | ⛔ | — | ⛔ |
 | Excluir/inativar pasto | Escrita | `pastagens:excluir` | `PastagensPage.jsx:232-256` (sem guarda de lote vinculado, diferente de Fazendas) | ⛔ | — | ⛔ |
@@ -95,7 +101,7 @@ verificadas contra `src/domain/telegram/interpretarComandoTelegram.js` e
 | Listar pastos vazios | Consulta | `relatorios:ver` | `ocupacaoPastos.js:17-19`, `hojeNaFazenda.js:103-137` | ⛔ | — | ⛔ |
 | Listar pastos sobrecarregados | Consulta | `relatorios:ver` | `relatorios.js::buildRelatorioPastagens` | ⛔ | — | ⛔ |
 
-**Pastagens: 9 operações-núcleo (excluindo o histórico morto de fazenda), 2 cobertas = ~22%.**
+**Pastagens: 9 operações-núcleo (excluindo o histórico morto de fazenda), 3 cobertas = ~33%** (era ~22%). Cadastrar/editar/inativar pasto e capacidade/ocupação detalhada por pasto seguem sem cobertura.
 
 ## Estoque
 
@@ -309,14 +315,14 @@ verificadas contra `src/domain/telegram/interpretarComandoTelegram.js` e
 
 ---
 
-## Totais (auditoria desta sprint, `25db95a`)
+## Totais (atualizado na Sprint Paridade 1)
 
 ```text
 Módulo                          Operações mapeadas   Cobertas (✅/🟡)   % aproximado
-Fazendas                        6                     2                 33%
-Lotes                           17                    8                 47%
-Pesagens                        7                     3                 43%
-Pastagens                       9                     2                 22%
+Fazendas                        6                     4                 67%  (era 33%)
+Lotes                           17                    9                 53%  (era 47%)
+Pesagens                        7                     3                 43%  (avaliado, adiado)
+Pastagens                       9                     3                 33%  (era 22%)
 Estoque                         12                    6                 50%
 Suplementação                   10                    3                 30%
 Sanidade                        10                    5                 50%
@@ -332,16 +338,21 @@ Configurações                   5 (majoritariamente 🔒/fora de escopo)  n/a
 Relatórios/Exportações          3                      1 (parcial)      ~33%
 
 Operações encontradas: ~133 (módulos operacionais, excluindo Equipe/Config/Assinatura-pagamento tratados como fora de escopo)
-Operações implementadas (✅ ou 🟡): ~38
-Operações testadas (automatizado): ~28 das implementadas
+Operações implementadas (✅ ou 🟡): ~42 (era ~38; +4 nesta sprint: cadastrar_fazenda, renomear_fazenda, listar_pastos, consultar_resultado_lote)
+Operações testadas (automatizado): ~32 das implementadas
+Operações validadas no app real: 0 (correções de bloqueio verificadas por leitura/lint/teste, não por uso manual na UI)
 Operações validadas no Telegram real: 0
 Exceções justificadas (nunca automatizáveis por política): 9 (convites/papéis de equipe, checkout/pagamento, credenciais/backup destrutivo)
 ```
 
-**Paridade operacional total estimada (fora as exceções por política): ~29%.**
+**Paridade operacional total estimada (fora as exceções por política): ~32%** (era ~29%).
 Isto **não é** uma declaração de conclusão — é o estado real medido nesta
-sprint, para orientar a priorização abaixo. `P0`/`P1` conhecidos: ver
-seção de achados.
+sprint, para orientar a priorização abaixo. `P0`/`P1` conhecidos deste
+bloco (Fazendas/Lotes/Pesagens/Pastagens + os 2 bloqueios corrigidos): **0**.
+O 3º bloqueio estrutural (motor de alerta duplicado) segue aberto —
+não é P0/P1 *deste* bloco (não bloqueia nenhuma das 4 operações
+implementadas aqui), mas é uma dependência explícita para o próximo bloco
+que tocar Alertas.
 
 ---
 
@@ -349,23 +360,51 @@ seção de achados.
 
 Estes não são gaps de Telegram — são bugs/inconsistências reais no
 próprio app, encontrados como efeito colateral da leitura de código.
-Não foram corrigidos nesta sprint (fora de escopo do pedido).
 
-1. **Bug de integridade**: excluir um registro de `consumo_suplementacao`
-   pela aba "Histórico" do Lote (`LotesPage.jsx::handleExcluirHistoricoConsumo`)
-   **não devolve o estoque**, enquanto a mesma exclusão feita pela tela
-   de Suplementação (`SuplementacaoPage.jsx::excluirConsumo`) devolve
-   corretamente — dois caminhos para o mesmo dado com resultados
-   diferentes.
-2. **Gap de permissão por-ação**: `RotinaPage.jsx` e
-   `CalendarioOperacionalPage.jsx` não checam `hasPermission` em nenhum
-   botão de escrita (criar/editar/excluir/concluir) — só o gate de
-   página (`sanitario:ver`), que Visualizador e Operador também têm.
+1. ~~**Bug de integridade**: excluir um registro de `consumo_suplementacao`
+   pela aba "Histórico" do Lote não devolvia o estoque.~~ **Corrigido na
+   Sprint Paridade 1** — extraída função canônica
+   `domain/consumoSuplementacao.js::calcularEstornoConsumoSuplementacao` +
+   `services/consumoSuplementacao.js::excluirEEstornarConsumoSuplementacao`,
+   agora reaproveitada por `LotesPage.jsx` e `SuplementacaoPage.jsx`
+   (única implementação). Teste de regressão em
+   `domain/consumoSuplementacao.test.js`.
+2. ~~**Gap de permissão por-ação**: `RotinaPage.jsx` e
+   `CalendarioOperacionalPage.jsx` não checavam `hasPermission`.~~
+   **Corrigido na Sprint Paridade 1** — checagens adicionadas antes de
+   cada ação de escrita (criar/editar/excluir/concluir/reabrir), usando
+   `sanitario:editar`/`sanitario:excluir` (mesma permissão do gate de
+   visualização das duas páginas). **Limitação conhecida**: sem
+   biblioteca de teste de componente React neste projeto, a correção foi
+   verificada por consistência de padrão com `TarefasPage.jsx` (que
+   também não tem teste de componente) + lint/build, não por um teste
+   automatizado dedicado.
 3. **Dois motores de alerta coexistindo** (ver nota na seção Alertas
-   acima) — o painel legado do Dashboard (`utils/alerts.js`) continua
-   ativo em paralelo à Central (`alertasUnificados.js`), com tabelas de
-   tratativa diferentes (`alertas_resolvidos`/`alertas_adiados` vs
-   `alertas_tratativas`).
+   acima) — o painel legado do Dashboard (`utils/alerts.js`, 485 linhas)
+   continua ativo em paralelo à Central (`alertasUnificados.js`, 640
+   linhas), com tabelas de tratativa diferentes
+   (`alertas_resolvidos`/`alertas_adiados` vs `alertas_tratativas`).
+   **Avaliado e adiado nesta sprint** — não é um "rename", os dois
+   motores têm modelos de dados incompatíveis (itens individuais vs.
+   grupos agregados com pluralização), e a migração troca o que usuários
+   reais veem hoje no Dashboard. Plano de migração concreto para a
+   próxima sprint que tocar Alertas:
+   - Trocar a fonte de `DashboardPage.jsx`/`App.jsx` (`buildAlerts` de
+     `utils/alerts.js`) por `gerarAlertasUnificados` (`alertasUnificados.js`),
+     adaptando a renderização do painel do Dashboard ao modelo agregado
+     (grupos, não itens individuais).
+   - Trocar `marcarAlertaComoFeito`/`adiarAlerta` (`App.jsx`, gravam em
+     `alertas_resolvidos`/`alertas_adiados`) por
+     `salvarTratativaAlerta`/`STATUS_TRATATIVA` (`services/tratativasAlertas.js`,
+     grava em `alertas_tratativas`) — mesma função já usada por
+     `AlertasPage.jsx`.
+   - Decidir o que fazer com linhas já existentes em
+     `alertas_resolvidos`/`alertas_adiados` de contas reais (migração de
+     dados ou período de leitura dupla) antes de remover as tabelas
+     antigas.
+   - Só depois disso, adicionar ao bot uma ação de escrita
+     (tratar/resolver/reabrir alerta) — nunca antes, para não criar uma
+     terceira fonte de verdade.
 4. **Permissão divergente**: `suplementacao:editar` existe em
    `perfis.js` e é o que o bot do Telegram usa, mas a UI web de
    Suplementação sempre checa `estoque:editar` — as duas superfícies
@@ -381,9 +420,9 @@ Não foram corrigidos nesta sprint (fora de escopo do pedido).
    entre os três módulos de consumo (Estoque/Suplementação/Sanidade)
    sem reversão de um lançamento.
 
-Sinalizo dois destes (achados 1 e 2) como candidatos a tarefa
-independente por serem risco de dado/segurança real, não apenas gap de
-cobertura.
+Achados 1 e 2 foram corrigidos nesta sprint (ver acima). Achado 3 (motor
+de alerta duplicado) é o único bloqueio estrutural ainda aberto, com plano
+de migração documentado acima.
 
 ---
 
@@ -399,10 +438,12 @@ Ordem por impacto/esforço, não por módulo:
    (pesagem, item de estoque, manejo, tarefa) — hoje o bot só cria,
    nunca corrige, e "editar" é a queixa mais previsível de um piloto
    real.
-3. **Consultas que faltam mas são baratas**: listar pastos, tarefas
+3. **Consultas que faltam mas são baratas**: tarefas
    hoje/atrasadas/próximas, DRE/fluxo de caixa resumido — todas já têm
    domínio pronto, só falta uma intenção nova + formatador de resposta
-   (mesmo padrão de `respostasConsulta.js`).
+   (mesmo padrão de `respostasConsulta.js`; `listar_pastos` e
+   `consultar_resultado_lote` já foram feitas nesta sprint como prova
+   deste padrão).
 4. **Enviar relatório de texto** (lote/financeiro/pastagens/resumo
    geral) via bot — os geradores de texto (`whatsappResumo.js`) já
    existem, testados, prontos para reaproveitar; menor esforço de toda
@@ -424,12 +465,47 @@ alteração de senha/dados de credencial, backup/limpeza de dados.
 
 ## Validação real no Telegram
 
-**Continua pendente para as 28 intenções existentes e para todas as
+**Continua pendente para as 32 intenções existentes e para todas as
 listadas como cobertas nesta matriz.** Nenhuma foi testada num Telegram
 real nesta sessão — sem acesso a conta/bot ao vivo neste ambiente. Não
-declarar "validado no Telegram" com base em teste automatizado (1355
+declarar "validado no Telegram" com base em teste automatizado (1381
 testes passando cobrem lógica pura e integração via `prepararCadastro`,
 não o aplicativo real do Telegram).
+
+## Sprint Paridade 1 — resumo
+
+Continuação a partir de `53f6bec`. Escopo real entregue (nem tudo que o
+sprint pedia — ver pendências abaixo):
+
+- **2 dos 3 bloqueios estruturais corrigidos**: exclusão de consumo de
+  suplementação (estoque não devolvido) e permissões ausentes em
+  Rotinas/Calendário. O 3º (motor de alerta duplicado) foi avaliado e
+  adiado com um plano de migração concreto documentado acima — migrar às
+  cegas o painel de alertas do Dashboard, usado por usuários reais hoje,
+  sem QA ao vivo, era um risco desproporcional ao resto desta sprint.
+- **4 operações novas**: `cadastrar_fazenda`, `renomear_fazenda`,
+  `listar_pastos`, `consultar_resultado_lote` — todas reaproveitando
+  domínio já existente (`getResumoLote`, `calcularOcupacaoPastos`),
+  nenhuma regra paralela criada.
+- **Não implementado nesta rodada** (ficam para o próximo bloco):
+  editar lote, ajuste de lotação, editar/excluir pesagem, editar/excluir/
+  cadastrar pasto, consolidada de fazendas, excluir fazenda. Pesagens em
+  particular foi avaliado e adiado — a lógica de recálculo de `lote.p_at`
+  está inline em `PesagensPage.jsx`, não extraída, e replicá-la no bot
+  sem extrair primeiro criaria uma 3ª cópia da mesma fórmula (o mesmo
+  problema que a correção do bloqueio #1 acabou de resolver para
+  suplementação).
+- **Confirmação editável, transações compostas em RPC nova, e testes de
+  idempotência/outra-conta/outra-fazenda para as 4 operações novas NÃO
+  foram feitos nesta rodada** — as 4 operações são todas simples (1-3
+  writes sequenciais via `aplicarWrites`, mesmo padrão das 12 anteriores),
+  sem operação verdadeiramente composta que exigisse uma RPC nova. Os
+  testes escritos cobrem classificação, validação de campos e resolução
+  de entidade (ambíguo/inexistente/duplicado), não os eixos adicionais
+  pedidos (retry de webhook, timeout, erro de banco) — mesma lacuna que já
+  existia para as 12 intenções anteriores, não introduzida nem fechada
+  aqui.
+- **Paridade completa do HERDON não é declarada.** Isto é um checkpoint.
 
 ## Custo de IA
 
