@@ -223,9 +223,9 @@ grant execute on function public.ajustar_lotacao_lote(uuid, bigint, numeric, tex
 -- Já era um único UPDATE (atômico por natureza) — o ganho real aqui é mover a
 -- guarda "lote já finalizado" (`loteEstaBloqueado`, hoje só em JS) para dentro
 -- do banco, fechando a corrida entre duas finalizações simultâneas.
--- Nota: `motivo_encerramento` não existe como coluna em `lotes` (achado
--- separado, fora do escopo deste RPC — ver pendências do relatório final);
--- o motivo é gravado em `obs`, a única coluna de texto livre real da tabela.
+-- Confirmado contra o schema real (information_schema, não o dump estático em
+-- docs/): `lotes.motivo_encerramento` EXISTE (text, nullable) — grava lá,
+-- igual ao app (`LotesPage.jsx::handleFechamento`).
 create or replace function public.finalizar_lote(
   p_owner_user_id uuid,
   p_lote_id bigint,
@@ -263,7 +263,7 @@ begin
      set status = p_status,
          data_encerramento = p_data_encerramento,
          data_venda = case when p_status = 'vendido' then coalesce(p_data_venda, p_data_encerramento) else null end,
-         obs = case when trim(coalesce(p_motivo, '')) <> '' then trim(p_motivo) else v_lote.obs end
+         motivo_encerramento = case when trim(coalesce(p_motivo, '')) <> '' then trim(p_motivo) else v_lote.motivo_encerramento end
    where id = p_lote_id;
 end;
 $$;
@@ -350,8 +350,11 @@ grant execute on function public.mover_lote_para_pasto_bot(uuid, bigint, uuid, d
 -- ── 5. Editar a última pesagem de um lote ────────────────────────────────────
 -- Porta `recalcularPesoAtualLote` (src/domain/pesagensLote.js:52-60): depois
 -- de editar, relê a pesagem de lote mais recente e recalcula `p_at`/
--- `ultima_pesagem` a partir dela — nunca deixa o lote com peso desatualizado
--- em relação ao próprio histórico que acabou de mudar.
+-- `peso_atual`/`peso_medio_atual`/`ultima_pesagem` a partir dela — nunca
+-- deixa o lote com peso desatualizado em relação ao próprio histórico que
+-- acabou de mudar. As três colunas de peso existem de fato no schema real
+-- (confirmado via information_schema) e o app já as mantém em sincronia
+-- (`PesagensPage.jsx`); a RPC replica o mesmo conjunto.
 create or replace function public.editar_ultima_pesagem_lote(
   p_owner_user_id uuid,
   p_pesagem_id bigint,
@@ -395,6 +398,8 @@ begin
 
     update public.lotes
        set p_at = coalesce(v_ultimo_peso, p_at),
+           peso_atual = coalesce(v_ultimo_peso, peso_atual),
+           peso_medio_atual = coalesce(v_ultimo_peso, peso_medio_atual),
            ultima_pesagem = v_ultima_data
      where id = v_pesagem.lote_id and owner_user_id = p_owner_user_id;
   end if;
@@ -447,6 +452,8 @@ begin
 
     update public.lotes
        set p_at = coalesce(v_ultimo_peso, v_fallback, p_at),
+           peso_atual = coalesce(v_ultimo_peso, v_fallback, peso_atual),
+           peso_medio_atual = coalesce(v_ultimo_peso, v_fallback, peso_medio_atual),
            ultima_pesagem = v_ultima_data
      where id = v_pesagem.lote_id and owner_user_id = p_owner_user_id;
   end if;
