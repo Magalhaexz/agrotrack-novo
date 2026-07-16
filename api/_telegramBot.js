@@ -50,6 +50,9 @@ const INTENCOES_ATENDIDAS = new Set([
   // Sprint Paridade 1 — Fazendas/Lotes/Pesagens/Pastagens:
   INTENCOES.CADASTRAR_FAZENDA, INTENCOES.RENOMEAR_FAZENDA,
   INTENCOES.LISTAR_PASTOS, INTENCOES.CONSULTAR_RESULTADO_LOTE,
+  INTENCOES.EDITAR_PESAGEM, INTENCOES.EXCLUIR_PESAGEM,
+  INTENCOES.AJUSTAR_LOTACAO, INTENCOES.EDITAR_LOTE,
+  INTENCOES.EDITAR_PASTO, INTENCOES.RETIRAR_LOTE_PASTO,
 ]);
 
 // Intenções que exigem uma fazenda definida (recorte). Fazendas e ajuda não.
@@ -66,6 +69,9 @@ const INTENCOES_ESCOPADAS = new Set([
   INTENCOES.CADASTRAR_MANEJO, INTENCOES.CADASTRAR_PLANEJAMENTO_SUPLEMENTACAO,
   INTENCOES.REGISTRAR_CONSUMO_SUPLEMENTACAO,
   INTENCOES.LISTAR_PASTOS, INTENCOES.CONSULTAR_RESULTADO_LOTE,
+  INTENCOES.EDITAR_PESAGEM, INTENCOES.EXCLUIR_PESAGEM,
+  INTENCOES.AJUSTAR_LOTACAO, INTENCOES.EDITAR_LOTE,
+  INTENCOES.EDITAR_PASTO, INTENCOES.RETIRAR_LOTE_PASTO,
 ]);
 
 const MSG = {
@@ -109,6 +115,10 @@ const MSG = {
   SALDO_INSUFICIENTE: 'Estoque insuficiente para essa quantidade.',
   FAZENDA_AMBIGUA: 'Há mais de uma fazenda com esse nome. Seja mais específico.',
   FAZENDA_VAZIA: 'Informe qual fazenda.',
+  PESAGEM_NAO_ENCONTRADA: 'Não encontrei nenhuma pesagem registrada para esse lote.',
+  SEM_ALTERACAO: 'A nova quantidade é igual à atual — nada para ajustar.',
+  LOTE_SEM_PASTO: 'Esse lote já não tem pasto vinculado.',
+  NENHUM_CAMPO_INFORMADO: 'Informe ao menos um campo para alterar.',
 };
 
 function ajuda() {
@@ -551,6 +561,10 @@ export async function aplicarWrites(client, conexao, writes) {
       await client.from(w.tabela).insert({ owner_user_id: conexao.owner_user_id, ...w.registro });
     } else if (w.tipo === 'update') {
       let q = client.from(w.tabela).update(w.patch);
+      Object.entries(w.match || {}).forEach(([k, v]) => { q = q.eq(k, v); });
+      await q.eq('owner_user_id', conexao.owner_user_id);
+    } else if (w.tipo === 'delete') {
+      let q = client.from(w.tabela).delete();
       Object.entries(w.match || {}).forEach(([k, v]) => { q = q.eq(k, v); });
       await q.eq('owner_user_id', conexao.owner_user_id);
     }

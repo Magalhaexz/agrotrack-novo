@@ -12,6 +12,7 @@
 import { toNumber } from '../calcHelpers.js';
 import { normalizarChave } from './resolvedores.js';
 import { hojeLocalISO } from '../dataCivil.js';
+import { buildAjusteLotacaoPatch } from '../../pages/lotesLogic.js';
 
 function loteAtivo(lote) {
   return String(lote?.status || 'ativo').toLowerCase() !== 'encerrado';
@@ -294,5 +295,87 @@ export function prepararFinalizarLote(db, { loteId, motivo, data }) {
       match: { id: Number(lote.id) },
       patch: { status: 'encerrado', data_encerramento: dataFinal, data_venda: null, motivo_encerramento: motivoFinal },
     }],
+  };
+}
+
+// ── Ajuste de lotação e edição básica (Sprint Paridade 1, bloco 3) ──────────
+// ponytail: `buildAjusteLotacaoPatch` (src/pages/lotesLogic.js) já é uma
+// função pura reaproveitada pelo próprio LotesPage.jsx — o bot só resolve o
+// lote por nome e traduz o plano para o formato de `writes` em array que o
+// motor de cadastro usa (aplicarWrites). Nenhuma regra nova.
+/**
+ * @param {object} db db recortado pela fazenda ativa.
+ * @param {{ loteId, quantidade, motivo, data? }} params
+ */
+export function prepararAjusteLotacao(db, { loteId, quantidade, motivo, data }) {
+  const lotes = Array.isArray(db?.lotes) ? db.lotes : [];
+  const lote = lotes.find((l) => Number(l.id) === Number(loteId));
+  if (!lote) return erro('LOTE_NAO_ENCONTRADO');
+  if (!loteAtivo(lote)) return erro('LOTE_BLOQUEADO');
+
+  const resultado = buildAjusteLotacaoPatch({ lote, novaQtd: quantidade, motivo, data });
+  if (!resultado.ok) return erro(resultado.erro);
+
+  return {
+    ok: true,
+    resumo: [
+      'Confirme o ajuste de lotação:',
+      '',
+      `Lote: ${lote.nome}`,
+      `Quantidade atual: ${resultado.resumo.qtdAnterior}`,
+      `Nova quantidade: ${resultado.resumo.qtdNova}`,
+      `Diferença: ${resultado.resumo.delta > 0 ? '+' : ''}${resultado.resumo.delta}`,
+      `Motivo: ${String(motivo || '').trim()}`,
+    ],
+    writes: [
+      { tabela: 'lotes', tipo: 'update', match: { id: lote.id }, patch: { qtd: resultado.writes.loteUpdate.qtd } },
+      { tabela: 'movimentacoes_animais', tipo: 'insert', registro: resultado.writes.movimentacao },
+    ],
+  };
+}
+
+// ponytail: edição de campos básicos (sexo/raça/observação) não tem regra de
+// negócio própria no app (LotesPage.jsx só faz `updateOperationalRecord`
+// direto) — não há domínio para reaproveitar aqui além da resolução do lote.
+const SEXO_ALIASES_EDICAO = {
+  macho: 'macho', machos: 'macho',
+  femea: 'femea', femeas: 'femea', 'fêmea': 'femea', 'fêmeas': 'femea',
+  misto: 'misto', mistos: 'misto', mista: 'misto',
+};
+
+/**
+ * @param {object} db db recortado pela fazenda ativa.
+ * @param {{ loteId, sexo?, raca?, observacao? }} params — só os campos informados são alterados.
+ */
+export function prepararEdicaoLote(db, { loteId, sexo, raca, observacao }) {
+  const lotes = Array.isArray(db?.lotes) ? db.lotes : [];
+  const lote = lotes.find((l) => Number(l.id) === Number(loteId));
+  if (!lote) return erro('LOTE_NAO_ENCONTRADO');
+  if (!loteAtivo(lote)) return erro('LOTE_BLOQUEADO');
+
+  const patch = {};
+  const resumoCampos = [];
+
+  if (sexo != null && String(sexo).trim()) {
+    const sexoChave = SEXO_ALIASES_EDICAO[normalizarChave(sexo)];
+    if (!sexoChave) return erro('SEXO_INVALIDO');
+    patch.sexo = sexoChave;
+    resumoCampos.push(`Sexo: ${sexoChave}`);
+  }
+  if (raca != null && String(raca).trim()) {
+    patch.raca = String(raca).trim();
+    resumoCampos.push(`Raça: ${patch.raca}`);
+  }
+  if (observacao != null && String(observacao).trim()) {
+    patch.obs = String(observacao).trim();
+    resumoCampos.push(`Observação: ${patch.obs}`);
+  }
+
+  if (Object.keys(patch).length === 0) return erro('NENHUM_CAMPO_INFORMADO');
+
+  return {
+    ok: true,
+    resumo: ['Confirme a edição do lote:', '', `Lote: ${lote.nome}`, ...resumoCampos],
+    writes: [{ tabela: 'lotes', tipo: 'update', match: { id: lote.id }, patch }],
   };
 }

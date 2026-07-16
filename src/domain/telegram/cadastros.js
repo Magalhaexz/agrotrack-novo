@@ -11,11 +11,15 @@ import { resolverLotePorNome, normalizarChave } from './resolvedores.js';
 import { prepararCadastroTarefa } from './cadastroTarefa.js';
 import { prepararCadastroItemEstoque } from './cadastroItemEstoque.js';
 import { prepararSaidaEstoque } from './acoesEstoque.js';
-import { prepararTrocaLotePasto } from './acoesPasto.js';
+import { prepararTrocaLotePasto, prepararRetirarLotePasto } from './acoesPasto.js';
 import { prepararCadastroLote } from './cadastroLote.js';
-import { prepararCadastroPasto } from './cadastroPasto.js';
+import { prepararCadastroPasto, prepararEdicaoPasto } from './cadastroPasto.js';
 import { prepararCadastroFazenda, prepararRenomearFazenda } from './cadastroFazenda.js';
-import { prepararVendaAnimais, prepararMorteAnimais, prepararFinalizarLote } from './acoesLote.js';
+import { prepararEdicaoPesagem, prepararExclusaoPesagem } from './cadastroPesagem.js';
+import {
+  prepararVendaAnimais, prepararMorteAnimais, prepararFinalizarLote,
+  prepararAjusteLotacao, prepararEdicaoLote,
+} from './acoesLote.js';
 import { prepararCadastroManejo } from './cadastroManejo.js';
 import { prepararPlanejamentoSuplementacao, prepararConsumoSuplementacao } from './suplementacao.js';
 
@@ -282,6 +286,73 @@ export const CATALOGO_CADASTROS = {
       return { ok: true };
     },
   },
+  [INTENCOES.EDITAR_PESAGEM]: {
+    tipo: 'cadastro',
+    slots: [
+      { nome: 'lote', tipo: 'lote', pergunta: 'De qual lote?' },
+      { nome: 'peso', tipo: 'peso', pergunta: 'Qual o novo peso médio, em kg?' },
+    ],
+    validar(dados) {
+      if (!(Number(dados.peso) > 0)) return erro('PESO_INVALIDO');
+      return { ok: true };
+    },
+  },
+  [INTENCOES.EXCLUIR_PESAGEM]: {
+    tipo: 'cadastro',
+    slots: [
+      { nome: 'lote', tipo: 'lote', pergunta: 'De qual lote?' },
+    ],
+    validar() {
+      return { ok: true };
+    },
+  },
+  [INTENCOES.AJUSTAR_LOTACAO]: {
+    tipo: 'cadastro',
+    slots: [
+      { nome: 'lote', tipo: 'lote', pergunta: 'Qual lote?' },
+      { nome: 'quantidade', tipo: 'quantidade', pergunta: 'Qual a nova quantidade de cabeças?' },
+      { nome: 'motivo', tipo: 'texto', pergunta: 'Qual o motivo do ajuste?' },
+    ],
+    validar(dados) {
+      if (!String(dados.motivo || '').trim()) return erro('MOTIVO_VAZIO');
+      return { ok: true };
+    },
+  },
+  [INTENCOES.EDITAR_LOTE]: {
+    tipo: 'cadastro',
+    slots: [
+      { nome: 'lote', tipo: 'lote', pergunta: 'Qual lote?' },
+      { nome: 'sexo', tipo: 'opcional_texto', pergunta: 'Novo sexo do grupo? (machos, fêmeas ou misto, ou "não")', obrigatorio: false, perguntar: true },
+      { nome: 'raca', tipo: 'opcional_texto', pergunta: 'Nova raça? (ou "não")', obrigatorio: false, perguntar: true },
+      { nome: 'observacao', tipo: 'opcional_texto', pergunta: 'Nova observação? (ou "não")', obrigatorio: false, perguntar: true },
+    ],
+    validar() {
+      return { ok: true };
+    },
+  },
+  [INTENCOES.EDITAR_PASTO]: {
+    tipo: 'cadastro',
+    slots: [
+      { nome: 'pasto', tipo: 'texto', pergunta: 'Qual pasto?' },
+      { nome: 'area', tipo: 'quantidade', pergunta: 'Nova área, em hectares? (ou "não")', obrigatorio: false, perguntar: true },
+      { nome: 'capacidade', tipo: 'quantidade', pergunta: 'Nova capacidade de suporte? (ou "não")', obrigatorio: false, perguntar: true },
+      { nome: 'obs', tipo: 'opcional_texto', pergunta: 'Nova observação? (ou "não")', obrigatorio: false, perguntar: true },
+    ],
+    validar(dados) {
+      if (!String(dados.pasto || '').trim()) return erro('PASTO_VAZIO');
+      return { ok: true };
+    },
+  },
+  [INTENCOES.RETIRAR_LOTE_PASTO]: {
+    tipo: 'cadastro',
+    slots: [
+      { nome: 'lote', tipo: 'lote', pergunta: 'Qual lote?' },
+      { nome: 'motivo', tipo: 'opcional_texto', pergunta: 'Motivo? (ou "não")', obrigatorio: false, perguntar: true },
+    ],
+    validar() {
+      return { ok: true };
+    },
+  },
 };
 
 export function slotsDoCadastro(intencao) {
@@ -515,6 +586,32 @@ export function prepararCadastro(intencao, dados, ctx = {}) {
     case INTENCOES.RENOMEAR_FAZENDA: {
       const plano = prepararRenomearFazenda(db, { fazendaAtual: dados.fazenda_atual, novoNome: dados.novo_nome });
       return plano.ok ? { ...plano, tipo: 'renomear_fazenda' } : plano;
+    }
+    case INTENCOES.EDITAR_PESAGEM: {
+      const plano = prepararEdicaoPesagem(db, dados);
+      return plano.ok ? { ...plano, tipo: 'editar_pesagem' } : plano;
+    }
+    case INTENCOES.EXCLUIR_PESAGEM: {
+      const plano = prepararExclusaoPesagem(db, dados);
+      return plano.ok ? { ...plano, tipo: 'excluir_pesagem' } : plano;
+    }
+    case INTENCOES.AJUSTAR_LOTACAO: {
+      if (!loteId) return erro('LOTE_NAO_ENCONTRADO');
+      const plano = prepararAjusteLotacao(db, { loteId, quantidade: dados.quantidade, motivo: dados.motivo, data: dados.data });
+      return plano.ok ? { ...plano, tipo: 'ajuste_lotacao' } : plano;
+    }
+    case INTENCOES.EDITAR_LOTE: {
+      if (!loteId) return erro('LOTE_NAO_ENCONTRADO');
+      const plano = prepararEdicaoLote(db, { loteId, sexo: dados.sexo, raca: dados.raca, observacao: dados.observacao });
+      return plano.ok ? { ...plano, tipo: 'editar_lote' } : plano;
+    }
+    case INTENCOES.EDITAR_PASTO: {
+      const plano = prepararEdicaoPasto(db, dados);
+      return plano.ok ? { ...plano, tipo: 'editar_pasto' } : plano;
+    }
+    case INTENCOES.RETIRAR_LOTE_PASTO: {
+      const plano = prepararRetirarLotePasto(db, dados);
+      return plano.ok ? { ...plano, tipo: 'retirar_lote_pasto' } : plano;
     }
     default:
       return erro('CADASTRO_DESCONHECIDO');

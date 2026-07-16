@@ -9,16 +9,16 @@ import { useToast } from '../hooks/useToast';
 import { useAuth } from '../auth/useAuth';
 import { daysBetween, toDateKey } from '../domain/calcHelpers.js';
 import {
+  resolveTipoPesagem,
+  recalcularPesoAtualLote,
+  calculateAverageGmdByLote,
+} from '../domain/pesagensLote.js';
+import {
   createOperationalRecord,
   deleteOperationalRecord,
   persistCollectionMutation,
   updateOperationalRecord,
 } from '../services/operationalPersistence';
-
-function toFiniteNumber(value, fallback = 0) {
-  const normalized = Number(value);
-  return Number.isFinite(normalized) ? normalized : fallback;
-}
 
 function normalizeIdKey(value) {
   if (value === undefined || value === null) return null;
@@ -111,90 +111,22 @@ function buildSafePesagemPayload(payload = {}) {
   return Object.fromEntries(Object.entries(safe).filter(([, value]) => value !== undefined));
 }
 
-function resolveTipoPesagem(item) {
-  if (item?.tipo === 'animal' || item?.origem === 'animal') return 'animal';
-  return 'lote';
-}
-
-function resolveLatestPesagem(pesagens) {
-  return [...(pesagens || [])]
-    .map((item) => ({ ...item, data: toDateKey(item?.data) }))
-    .filter((item) => item?.data)
-    .sort((a, b) => {
-      if (a.data !== b.data) return b.data.localeCompare(a.data);
-      return toFiniteNumber(b.id) - toFiniteNumber(a.id);
-    })[0] || null;
-}
-
-function calculateAverageGmdByLote(pesagens = []) {
-  const pesagensPorLote = new Map();
-
-  (pesagens || []).forEach((pesagem) => {
-    if (resolveTipoPesagem(pesagem) !== 'lote') return;
-    const loteId = Number(pesagem?.lote_id);
-    if (!Number.isFinite(loteId) || loteId <= 0) return;
-    if (!pesagensPorLote.has(loteId)) pesagensPorLote.set(loteId, []);
-    pesagensPorLote.get(loteId).push(pesagem);
-  });
-
-  const gmdValues = [];
-  pesagensPorLote.forEach((lotePesagens) => {
-    const sorted = [...lotePesagens]
-      .map((item) => ({ ...item, data: toDateKey(item?.data) }))
-      .filter((item) => item?.data && Number.isFinite(Number(item?.peso_medio)))
-      .sort((a, b) => a.data.localeCompare(b.data));
-
-    if (sorted.length < 2) return;
-
-    const primeira = sorted[0];
-    const ultima = sorted[sorted.length - 1];
-    const dias = daysBetween(primeira.data, ultima.data);
-    if (!Number.isFinite(dias) || dias <= 0) return;
-
-    const ganho = Number(ultima.peso_medio) - Number(primeira.peso_medio);
-    const gmd = ganho / dias;
-    if (Number.isFinite(gmd)) gmdValues.push(gmd);
-  });
-
-  if (!gmdValues.length) return null;
-  const media = gmdValues.reduce((total, value) => total + value, 0) / gmdValues.length;
-  return Number.isFinite(media) ? media : null;
-}
-
+// resolveTipoPesagem/resolveLatestPesagem/calculateAverageGmdByLote agora
+// vêm de domain/pesagensLote.js (Sprint Paridade 1, bloco 3) — extraídos
+// daqui para serem reaproveitados pelo bot do Telegram sem duplicar a regra.
 function recalculateLoteFromPesagens(prevDb, loteId, nextPesagens) {
   const lotes = Array.isArray(prevDb?.lotes) ? prevDb.lotes : [];
-  const animais = Array.isArray(prevDb?.animais) ? prevDb.animais : [];
   const normalizedLoteId = Number(loteId);
-
-  const pesagensLote = (nextPesagens || []).filter((item) => (
-    resolveTipoPesagem(item) === 'lote' && Number(item?.lote_id) === normalizedLoteId
-  ));
-  const latestPesagem = resolveLatestPesagem(pesagensLote);
-
-  const fallbackPesoFromAnimais = (() => {
-    const grupos = animais.filter((item) => Number(item?.lote_id) === normalizedLoteId);
-    const qtd = grupos.reduce((sum, item) => sum + toFiniteNumber(item?.qtd), 0);
-    if (qtd <= 0) return 0;
-    const pesoTotal = grupos.reduce(
-      (sum, item) => sum + toFiniteNumber(item?.p_at) * toFiniteNumber(item?.qtd),
-      0
-    );
-    return qtd > 0 ? pesoTotal / qtd : 0;
-  })();
-
-  const nextPesoAtual = latestPesagem
-    ? toFiniteNumber(latestPesagem.peso_medio, fallbackPesoFromAnimais)
-    : fallbackPesoFromAnimais;
-  const nextUltimaPesagem = latestPesagem?.data || null;
+  const { pesoAtual, ultimaPesagem } = recalcularPesoAtualLote(prevDb, normalizedLoteId, nextPesagens);
 
   const nextLotes = lotes.map((lote) => {
     if (Number(lote?.id) !== normalizedLoteId) return lote;
     return {
       ...lote,
-      p_at: nextPesoAtual,
-      peso_atual: nextPesoAtual,
-      peso_medio_atual: nextPesoAtual,
-      ultima_pesagem: nextUltimaPesagem,
+      p_at: pesoAtual,
+      peso_atual: pesoAtual,
+      peso_medio_atual: pesoAtual,
+      ultima_pesagem: ultimaPesagem,
     };
   });
 

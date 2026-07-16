@@ -107,3 +107,51 @@ export function prepararTrocaLotePasto(db, dados) {
     ],
   };
 }
+
+/**
+ * Retira um lote do pasto atual, sem vincular a um novo (mesma regra de
+ * `prepararTrocaLotePasto`, com destino nulo — nunca altera `lote.qtd`).
+ * @param {object} db — já recortado pela fazenda ativa da conexão.
+ * @param {{ lote, motivo?, observacoes?, data? }} dados
+ */
+export function prepararRetirarLotePasto(db, dados) {
+  const rl = resolverLotePorNomeQualquerStatus(db.lotes, dados?.lote);
+  if (rl.status === 'ambiguo') return erro('LOTE_AMBIGUO', { candidatos: rl.candidatos });
+  if (rl.status !== 'ok') return erro('LOTE_NAO_ENCONTRADO');
+  const lote = rl.lote;
+  if (loteEstaBloqueado(lote)) return erro('LOTE_BLOQUEADO');
+  if (!lote.pastagem_id) return erro('LOTE_SEM_PASTO');
+
+  const pastagemAtual = (Array.isArray(db.pastagens) ? db.pastagens : []).find((p) => String(p.id) === String(lote.pastagem_id));
+  const dataMovimentacao = dados?.data || hojeLocalISO();
+
+  return {
+    ok: true,
+    resumo: [
+      'Confirme a retirada do pasto:',
+      '',
+      `Lote: ${lote.nome}`,
+      `Pasto atual: ${pastagemAtual?.nome || 'não definido'}`,
+      `Data: ${dataMovimentacao}`,
+      '',
+      'O lote fica sem pasto vinculado até uma nova movimentação.',
+    ],
+    writes: [
+      {
+        tabela: 'lote_pastagens_historico',
+        tipo: 'insert',
+        registro: {
+          lote_id: lote.id,
+          faz_id: lote.faz_id,
+          pastagem_origem_id: lote.pastagem_id ?? null,
+          pastagem_destino_id: null,
+          data_movimentacao: dataMovimentacao,
+          quantidade_cabecas: null,
+          motivo: String(dados?.motivo || '').trim() || null,
+          observacoes: dados?.observacoes || null,
+        },
+      },
+      { tabela: 'lotes', tipo: 'update', match: { id: lote.id }, patch: { pastagem_id: null } },
+    ],
+  };
+}

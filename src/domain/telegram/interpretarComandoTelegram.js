@@ -48,6 +48,12 @@ export const INTENCOES = {
   RENOMEAR_FAZENDA: 'RENOMEAR_FAZENDA',
   LISTAR_PASTOS: 'LISTAR_PASTOS',
   CONSULTAR_RESULTADO_LOTE: 'CONSULTAR_RESULTADO_LOTE',
+  EDITAR_PESAGEM: 'EDITAR_PESAGEM',
+  EXCLUIR_PESAGEM: 'EXCLUIR_PESAGEM',
+  AJUSTAR_LOTACAO: 'AJUSTAR_LOTACAO',
+  EDITAR_LOTE: 'EDITAR_LOTE',
+  EDITAR_PASTO: 'EDITAR_PASTO',
+  RETIRAR_LOTE_PASTO: 'RETIRAR_LOTE_PASTO',
   CONFIRMAR: 'CONFIRMAR',
   CANCELAR: 'CANCELAR',
   AMBIGUO: 'AMBIGUO',
@@ -149,6 +155,24 @@ const RE_LISTAR_PASTOS = /^\/?(?:pastos?|ver\s+pastos?|listar\s+pastos?|mostrar\
 // início da frase — "resultado do lote X" nunca bate nela), mas mantido
 // antes por clareza de leitura da cascata.
 const RE_RESULTADO_LOTE = /\b(?:resultado|margem|lucro)\s+d[eo]\s+lote\s+(.+?)$/i;
+// Editar/excluir pesagem: verbos próprios ("corrija/edite"/"excluir/cancelar"),
+// checados antes de RE_REG_PESAGEM (que não usa esses verbos, sem colisão).
+const RE_EDITAR_PESAGEM = /^\/?(?:corrija|corrigir|edite|editar|altere|alterar)\s+(?:a\s+)?pesagem\b/i;
+const RE_EXCLUIR_PESAGEM = /^\/?(?:excluir|exclua|cancelar|cancele)\s+(?:a\s+)?(?:[uú]ltima\s+)?pesagem\b/i;
+// Ajuste de lotação: verbo próprio ("ajuste/ajustar"), nunca confundido com
+// cadastro/renomeação/venda/morte (verbos distintos).
+const RE_AJUSTAR_LOTACAO = /^\/?ajust\w*\s+(?:o\s+)?lote\b/i;
+// Editar lote: sinalizado pelo CAMPO citado (sexo/raça/observação), não pelo
+// verbo — "altere"/"editar" sozinhos colidiriam com pesagem/fazenda, que já
+// exigem seu próprio substantivo (pesagem/fazenda) logo em seguida.
+const RE_EDITAR_LOTE = /^\/?(?:altere|alterar|edite|editar)\b.*\b(?:sexo|ra[çc]a|observa[çc][ãa]o)\b/i;
+// Editar pasto: verbo + "pasto", checado depois de CADASTRAR_PASTO (verbos
+// diferentes: cadastrar/criar/crie/adicionar vs. editar/alterar).
+const RE_EDITAR_PASTO = /^\/?(?:edite|editar|altere|alterar)\s+(?:o\s+)?pasto\b/i;
+// Retirar lote do pasto: precisa vir ANTES de RE_SAIDA_ESTOQUE — "retirar"
+// sozinho é gatilho de baixa de estoque; a presença de "lote"+"pasto" é o
+// sinal que desambigua.
+const RE_RETIRAR_LOTE_PASTO = /^\/?retir\w+\b.*\blote\b.*\bpasto\b/i;
 
 // --- Fazenda ---
 const RE_SELECIONAR_FAZENDA = /^\/?(?:usar|selecionar|ativar|trocar\s+para|mudar\s+para|trocar|mudar|escolher)\s+(?:a\s+|de\s+|para\s+a\s+)?fazenda\s+(.+?)$/i;
@@ -270,6 +294,12 @@ export function interpretarComandoTelegram(texto) {
   if (RE_PLANEJ_SUPL.test(t)) return intent(INTENCOES.CADASTRAR_PLANEJAMENTO_SUPLEMENTACAO, {}, true);
   if (RE_CONSUMO_SUPL.test(t)) return intent(INTENCOES.REGISTRAR_CONSUMO_SUPLEMENTACAO, {}, true);
 
+  if (RE_EDITAR_PESAGEM.test(t)) return intent(INTENCOES.EDITAR_PESAGEM, {}, true);
+  if (RE_EXCLUIR_PESAGEM.test(t)) return intent(INTENCOES.EXCLUIR_PESAGEM, {}, true);
+  if (RE_AJUSTAR_LOTACAO.test(t)) return intent(INTENCOES.AJUSTAR_LOTACAO, {}, true);
+  if (RE_EDITAR_LOTE.test(t)) return intent(INTENCOES.EDITAR_LOTE, {}, true);
+  if (RE_EDITAR_PASTO.test(t)) return intent(INTENCOES.EDITAR_PASTO, {}, true);
+  if (RE_RETIRAR_LOTE_PASTO.test(t)) return intent(INTENCOES.RETIRAR_LOTE_PASTO, {}, true);
   if (RE_CAD_TAREFA.test(t)) return intent(INTENCOES.CADASTRAR_TAREFA, {}, true);
   if (RE_CAD_ITEM_ESTOQUE.test(t)) return intent(INTENCOES.CADASTRAR_ITEM_ESTOQUE, {}, true);
   if (RE_REG_PESAGEM.test(t)) return intent(INTENCOES.REGISTRAR_PESAGEM, {}, true);

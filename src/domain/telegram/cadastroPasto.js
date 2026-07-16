@@ -64,3 +64,48 @@ export function prepararCadastroPasto(db, dados, ctx = {}) {
     }],
   };
 }
+
+/**
+ * Edita campos de um pasto já existente — só os campos informados são
+ * alterados. Não inventa "tipo de capim" (mesma nota do cadastro).
+ * @param {object} db — já recortado pela fazenda ativa da conexão.
+ * @param {object} dados — { pasto, area?, capacidade?, obs? }
+ */
+export function prepararEdicaoPasto(db, dados) {
+  const pastagens = Array.isArray(db?.pastagens) ? db.pastagens : [];
+  const alvo = normalizarChave(dados?.pasto);
+  if (!alvo) return erro('PASTO_VAZIO');
+  const exatas = pastagens.filter((p) => normalizarChave(p.nome) === alvo);
+  const achados = exatas.length > 0 ? exatas : pastagens.filter((p) => normalizarChave(p.nome).includes(alvo));
+  if (achados.length === 0) return erro('PASTO_NAO_ENCONTRADO');
+  if (achados.length > 1) return erro('PASTO_AMBIGUO', { candidatos: achados });
+  const pasto = achados[0];
+
+  const patch = {};
+  const resumoCampos = [];
+  if (dados?.area != null && String(dados.area).trim()) {
+    const areaHa = Number(dados.area);
+    if (!(areaHa >= 0)) return erro('AREA_INVALIDA');
+    patch.area_ha = areaHa;
+    resumoCampos.push(`Área: ${areaHa} ha`);
+  }
+  if (dados?.capacidade != null && String(dados.capacidade).trim()) {
+    const capacidade = Number(dados.capacidade);
+    if (!(capacidade >= 0)) return erro('CAPACIDADE_INVALIDA');
+    patch.capacidade_suporte_ua_ha = capacidade;
+    resumoCampos.push(`Capacidade de suporte: ${capacidade}`);
+  }
+  if (dados?.obs != null && String(dados.obs).trim()) {
+    patch.observacoes = String(dados.obs).trim();
+    patch.obs = patch.observacoes;
+    resumoCampos.push(`Observação: ${patch.observacoes}`);
+  }
+
+  if (Object.keys(patch).length === 0) return erro('NENHUM_CAMPO_INFORMADO');
+
+  return {
+    ok: true,
+    resumo: ['Confirme a edição do pasto:', '', `Pasto: ${pasto.nome}`, ...resumoCampos],
+    writes: [{ tabela: 'pastagens', tipo: 'update', match: { id: pasto.id }, patch }],
+  };
+}
