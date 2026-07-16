@@ -344,9 +344,15 @@ const SEXO_ALIASES_EDICAO = {
 
 /**
  * @param {object} db db recortado pela fazenda ativa.
- * @param {{ loteId, sexo?, raca?, observacao? }} params — só os campos informados são alterados.
+ * @param {{ loteId, sexo?, raca?, observacao?, pesoInicial?, dataEntrada? }} params — só os campos informados são alterados.
+ *
+ * ponytail: quantidade/pasto/status têm intenções próprias (AJUSTAR_LOTACAO,
+ * TROCAR_LOTE_PASTO, FINALIZAR_LOTE) — não são campos aqui, de propósito,
+ * para "editar lote" nunca contornar a validação/transação dessas RPCs.
+ * "Origem" não existe como coluna em `lotes` (nem na tabela real, nem em
+ * nenhum form do app — `LotesPage.jsx` não tem esse campo) — não inventado.
  */
-export function prepararEdicaoLote(db, { loteId, sexo, raca, observacao }) {
+export function prepararEdicaoLote(db, { loteId, sexo, raca, observacao, pesoInicial, dataEntrada }) {
   const lotes = Array.isArray(db?.lotes) ? db.lotes : [];
   const lote = lotes.find((l) => Number(l.id) === Number(loteId));
   if (!lote) return erro('LOTE_NAO_ENCONTRADO');
@@ -368,6 +374,16 @@ export function prepararEdicaoLote(db, { loteId, sexo, raca, observacao }) {
   if (observacao != null && String(observacao).trim()) {
     patch.obs = String(observacao).trim();
     resumoCampos.push(`Observação: ${patch.obs}`);
+  }
+  if (pesoInicial != null && String(pesoInicial).trim()) {
+    const peso = Number(pesoInicial);
+    if (!(peso > 0)) return erro('PESO_INVALIDO');
+    patch.p_ini = peso;
+    resumoCampos.push(`Peso inicial: ${peso} kg`);
+  }
+  if (dataEntrada != null && String(dataEntrada).trim()) {
+    patch.entrada = String(dataEntrada).trim();
+    resumoCampos.push(`Data de entrada: ${patch.entrada}`);
   }
 
   if (Object.keys(patch).length === 0) return erro('NENHUM_CAMPO_INFORMADO');

@@ -83,3 +83,51 @@ export function prepararRenomearFazenda(db, { fazendaAtual, novoNome } = {}) {
     writes: [{ tabela: 'fazendas', tipo: 'update', match: { id: fazenda.id }, patch: { nome } }],
   };
 }
+
+// ── Exclusão de fazenda (Sprint Paridade 1, bloco 5) ─────────────────────────
+// Espelha a guarda real de `FazendasPage.jsx::excluirFazenda` — mesmos 5
+// tipos de vínculo checados (lotes/animais/financeiro/estoque/sanitário). O
+// app não verifica pastagens/tarefas/suplementação/equipe; o bot também não,
+// de propósito, para não ficar mais restritivo que a própria fonte de
+// verdade (ficaria inconsistente: um dado que o app deixa excluir a fazenda
+// e o bot recusa). Sem inativação — o app não tem esse conceito para
+// fazendas (só delete guardado).
+function fazendaTemVinculos(db, fazendaId) {
+  const chaves = new Set([String(fazendaId)]);
+  const referencia = (item) => {
+    const refs = [item?.faz_id, item?.fazenda_id, item?.fazendaId];
+    return refs.some((ref) => chaves.has(String(ref ?? '')));
+  };
+  return ['lotes', 'animais', 'movimentacoes_financeiras', 'estoque', 'sanitario'].some(
+    (colecao) => (Array.isArray(db?.[colecao]) ? db[colecao] : []).some(referencia)
+  );
+}
+
+/**
+ * @param {object} db — db da conta inteira.
+ * @param {{ fazenda: string }} dados
+ */
+export function prepararExclusaoFazenda(db, { fazenda } = {}) {
+  const fazendas = Array.isArray(db?.fazendas) ? db.fazendas : [];
+  const alvo = normalizarChave(fazenda);
+  if (!alvo) return erro('FAZENDA_VAZIA');
+  const exatas = fazendas.filter((f) => normalizarChave(f.nome) === alvo);
+  const achadas = exatas.length > 0 ? exatas : fazendas.filter((f) => normalizarChave(f.nome).includes(alvo));
+  if (achadas.length === 0) return erro('FAZENDA_NAO_ENCONTRADA');
+  if (achadas.length > 1) return erro('FAZENDA_AMBIGUA', { candidatos: achadas });
+  const alvoFazenda = achadas[0];
+
+  if (fazendaTemVinculos(db, alvoFazenda.id)) return erro('FAZENDA_COM_VINCULOS');
+
+  return {
+    ok: true,
+    resumo: [
+      'Confirme a exclusão da fazenda:',
+      '',
+      `Fazenda: ${alvoFazenda.nome}`,
+      '',
+      'Esta ação não pode ser desfeita pelo bot.',
+    ],
+    writes: [{ tabela: 'fazendas', tipo: 'delete', match: { id: alvoFazenda.id } }],
+  };
+}

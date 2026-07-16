@@ -51,6 +51,17 @@ const PERMISSAO_POR_INTENCAO = {
   [INTENCOES.EDITAR_LOTE]: 'lotes:editar',
   [INTENCOES.EDITAR_PASTO]: 'pastagens:editar',
   [INTENCOES.RETIRAR_LOTE_PASTO]: 'lotes:editar',
+  // Sprint Paridade 1, bloco 5 — alertas, exclusão de fazenda/pasto, resumo:
+  [INTENCOES.MARCAR_ALERTA_EM_ANALISE]: 'tarefas:editar',
+  [INTENCOES.RESOLVER_ALERTA]: 'tarefas:editar',
+  [INTENCOES.IGNORAR_ALERTA]: 'tarefas:editar',
+  [INTENCOES.ADIAR_ALERTA]: 'tarefas:editar',
+  [INTENCOES.REABRIR_ALERTA]: 'tarefas:editar',
+  [INTENCOES.RESUMO_CONSOLIDADO_FAZENDAS]: 'dashboard:ver',
+  // Sem `fazendas:excluir` dedicado — mesmo gap de modelo já documentado
+  // (o app usa `fazendas:editar` para excluir também, ver FazendasPage.jsx).
+  [INTENCOES.EXCLUIR_FAZENDA]: 'fazendas:editar',
+  [INTENCOES.EXCLUIR_PASTO]: 'pastagens:excluir',
 };
 
 // Cadastros que abrem conversa em etapas (slot-filling) quando falta dado.
@@ -67,6 +78,9 @@ const INTENCOES_CADASTRO = new Set([
   INTENCOES.EDITAR_PESAGEM, INTENCOES.EXCLUIR_PESAGEM,
   INTENCOES.AJUSTAR_LOTACAO, INTENCOES.EDITAR_LOTE,
   INTENCOES.EDITAR_PASTO, INTENCOES.RETIRAR_LOTE_PASTO,
+  INTENCOES.MARCAR_ALERTA_EM_ANALISE, INTENCOES.RESOLVER_ALERTA,
+  INTENCOES.IGNORAR_ALERTA, INTENCOES.ADIAR_ALERTA, INTENCOES.REABRIR_ALERTA,
+  INTENCOES.EXCLUIR_FAZENDA, INTENCOES.EXCLUIR_PASTO,
 ]);
 
 export function intencaoEhCadastro(intencao) {

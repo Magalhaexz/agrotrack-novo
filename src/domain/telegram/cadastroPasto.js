@@ -109,3 +109,38 @@ export function prepararEdicaoPasto(db, dados) {
     writes: [{ tabela: 'pastagens', tipo: 'update', match: { id: pasto.id }, patch }],
   };
 }
+
+// ── Exclusão de pasto (Sprint Paridade 1, bloco 5) ───────────────────────────
+// ponytail: o app (`PastagensPage.jsx::excluirPastagem`) exclui SEM checar se
+// algum lote está ocupando o pasto — achado de auditoria, gap real do app,
+// não corrigido aqui (fora de escopo). O bot NÃO replica esse gap: recusa
+// excluir um pasto com lote ativo vinculado, mais seguro que a própria fonte
+// de verdade. Sem inativação — a coluna `pastagens.status` existe mas o app
+// não tem nenhuma ação de UI para alterná-la; não inventamos uma aqui.
+export function prepararExclusaoPasto(db, dados) {
+  const pastagens = Array.isArray(db?.pastagens) ? db.pastagens : [];
+  const alvo = normalizarChave(dados?.pasto);
+  if (!alvo) return erro('PASTO_VAZIO');
+  const exatas = pastagens.filter((p) => normalizarChave(p.nome) === alvo);
+  const achados = exatas.length > 0 ? exatas : pastagens.filter((p) => normalizarChave(p.nome).includes(alvo));
+  if (achados.length === 0) return erro('PASTO_NAO_ENCONTRADO');
+  if (achados.length > 1) return erro('PASTO_AMBIGUO', { candidatos: achados });
+  const pasto = achados[0];
+
+  const lotes = Array.isArray(db?.lotes) ? db.lotes : [];
+  const ocupando = lotes.filter((l) => String(l.pastagem_id) === String(pasto.id)
+    && String(l?.status || 'ativo').toLowerCase() !== 'encerrado');
+  if (ocupando.length > 0) return erro('PASTO_OCUPADO', { candidatos: ocupando });
+
+  return {
+    ok: true,
+    resumo: [
+      'Confirme a exclusão do pasto:',
+      '',
+      `Pasto: ${pasto.nome}`,
+      '',
+      'Esta ação não pode ser desfeita pelo bot.',
+    ],
+    writes: [{ tabela: 'pastagens', tipo: 'delete', match: { id: pasto.id } }],
+  };
+}

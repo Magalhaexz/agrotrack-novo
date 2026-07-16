@@ -13,8 +13,8 @@ import { prepararCadastroItemEstoque } from './cadastroItemEstoque.js';
 import { prepararSaidaEstoque } from './acoesEstoque.js';
 import { prepararTrocaLotePasto, prepararRetirarLotePasto } from './acoesPasto.js';
 import { prepararCadastroLote } from './cadastroLote.js';
-import { prepararCadastroPasto, prepararEdicaoPasto } from './cadastroPasto.js';
-import { prepararCadastroFazenda, prepararRenomearFazenda } from './cadastroFazenda.js';
+import { prepararCadastroPasto, prepararEdicaoPasto, prepararExclusaoPasto } from './cadastroPasto.js';
+import { prepararCadastroFazenda, prepararRenomearFazenda, prepararExclusaoFazenda } from './cadastroFazenda.js';
 import { prepararEdicaoPesagem, prepararExclusaoPesagem } from './cadastroPesagem.js';
 import {
   prepararVendaAnimais, prepararMorteAnimais, prepararFinalizarLote,
@@ -22,6 +22,8 @@ import {
 } from './acoesLote.js';
 import { prepararCadastroManejo } from './cadastroManejo.js';
 import { prepararPlanejamentoSuplementacao, prepararConsumoSuplementacao } from './suplementacao.js';
+import { prepararTratativaAlerta, prepararReabrirAlerta } from './acoesAlerta.js';
+import { STATUS_TRATATIVA } from '../tratativasAlertas.js';
 
 import { hojeLocalISO } from '../dataCivil.js';
 const erro = (codigo) => ({ ok: false, erro: codigo });
@@ -325,6 +327,8 @@ export const CATALOGO_CADASTROS = {
       { nome: 'sexo', tipo: 'opcional_texto', pergunta: 'Novo sexo do grupo? (machos, fêmeas ou misto, ou "não")', obrigatorio: false, perguntar: true },
       { nome: 'raca', tipo: 'opcional_texto', pergunta: 'Nova raça? (ou "não")', obrigatorio: false, perguntar: true },
       { nome: 'observacao', tipo: 'opcional_texto', pergunta: 'Nova observação? (ou "não")', obrigatorio: false, perguntar: true },
+      { nome: 'peso_inicial', tipo: 'peso', pergunta: 'Novo peso inicial, em kg? (ou "não")', obrigatorio: false, perguntar: true },
+      { nome: 'data_entrada', tipo: 'data', pergunta: 'Nova data de entrada? (ou "não")', obrigatorio: false, perguntar: true },
     ],
     validar() {
       return { ok: true };
@@ -353,6 +357,67 @@ export const CATALOGO_CADASTROS = {
       return { ok: true };
     },
   },
+  // ── Sprint Paridade 1, bloco 5: tratativas de alerta ────────────────────
+  [INTENCOES.MARCAR_ALERTA_EM_ANALISE]: {
+    tipo: 'cadastro',
+    slots: [{ nome: 'alerta', tipo: 'texto', pergunta: 'Qual alerta? (envie o número da lista ou parte do título)' }],
+    validar(dados) {
+      if (!String(dados.alerta || '').trim()) return erro('ALERTA_VAZIO');
+      return { ok: true };
+    },
+  },
+  [INTENCOES.RESOLVER_ALERTA]: {
+    tipo: 'cadastro',
+    slots: [{ nome: 'alerta', tipo: 'texto', pergunta: 'Qual alerta? (envie o número da lista ou parte do título)' }],
+    validar(dados) {
+      if (!String(dados.alerta || '').trim()) return erro('ALERTA_VAZIO');
+      return { ok: true };
+    },
+  },
+  [INTENCOES.IGNORAR_ALERTA]: {
+    tipo: 'cadastro',
+    slots: [{ nome: 'alerta', tipo: 'texto', pergunta: 'Qual alerta? (envie o número da lista ou parte do título)' }],
+    validar(dados) {
+      if (!String(dados.alerta || '').trim()) return erro('ALERTA_VAZIO');
+      return { ok: true };
+    },
+  },
+  [INTENCOES.ADIAR_ALERTA]: {
+    tipo: 'cadastro',
+    slots: [
+      { nome: 'alerta', tipo: 'texto', pergunta: 'Qual alerta? (envie o número da lista ou parte do título)' },
+      { nome: 'ate', tipo: 'data', pergunta: 'Adiar até quando?' },
+    ],
+    validar(dados) {
+      if (!String(dados.alerta || '').trim()) return erro('ALERTA_VAZIO');
+      return { ok: true };
+    },
+  },
+  [INTENCOES.REABRIR_ALERTA]: {
+    tipo: 'cadastro',
+    slots: [{ nome: 'alerta', tipo: 'texto', pergunta: 'Qual alerta você quer reabrir? (envie o número da lista ou parte do título)' }],
+    validar(dados) {
+      if (!String(dados.alerta || '').trim()) return erro('ALERTA_VAZIO');
+      return { ok: true };
+    },
+  },
+  // ── Sprint Paridade 1, bloco 5: exclusão de fazenda/pasto ───────────────
+  [INTENCOES.EXCLUIR_FAZENDA]: {
+    tipo: 'cadastro',
+    slots: [{ nome: 'fazenda', tipo: 'texto', pergunta: 'Qual fazenda você quer excluir?' }],
+    validar(dados) {
+      if (!String(dados.fazenda || '').trim()) return erro('FAZENDA_VAZIA');
+      return { ok: true };
+    },
+  },
+  [INTENCOES.EXCLUIR_PASTO]: {
+    tipo: 'cadastro',
+    slots: [{ nome: 'pasto', tipo: 'texto', pergunta: 'Qual pasto você quer excluir?' }],
+    validar(dados) {
+      if (!String(dados.pasto || '').trim()) return erro('PASTO_VAZIO');
+      return { ok: true };
+    },
+  },
 };
 
 export function slotsDoCadastro(intencao) {
@@ -372,6 +437,8 @@ export function extrairDadosIniciais(intencao, texto, ctx = {}) {
     let v = null;
     if (slot.nome === 'lote') v = extrairNomeApos(texto, ['lote']);
     else if (slot.nome === 'pasto') v = extrairNomeApos(texto, ['pasto']);
+    else if (slot.nome === 'alerta') v = extrairNomeApos(texto, ['alerta']);
+    else if (slot.nome === 'fazenda') v = extrairNomeApos(texto, ['fazenda']);
     else if (slot.nome === 'descricao') v = extrairDescricao(texto);
     else if (slot.nome === 'item') v = extrairItemEstoque(texto);
     else if (slot.nome === 'titulo') v = extrairTitulo(texto);
@@ -631,7 +698,10 @@ export function prepararCadastro(intencao, dados, ctx = {}) {
     }
     case INTENCOES.EDITAR_LOTE: {
       if (!loteId) return erro('LOTE_NAO_ENCONTRADO');
-      const plano = prepararEdicaoLote(db, { loteId, sexo: dados.sexo, raca: dados.raca, observacao: dados.observacao });
+      const plano = prepararEdicaoLote(db, {
+        loteId, sexo: dados.sexo, raca: dados.raca, observacao: dados.observacao,
+        pesoInicial: dados.peso_inicial, dataEntrada: dados.data_entrada,
+      });
       return plano.ok ? { ...plano, tipo: 'editar_lote' } : plano;
     }
     case INTENCOES.EDITAR_PASTO: {
@@ -641,6 +711,36 @@ export function prepararCadastro(intencao, dados, ctx = {}) {
     case INTENCOES.RETIRAR_LOTE_PASTO: {
       const plano = prepararRetirarLotePasto(db, dados);
       return plano.ok ? { ...plano, tipo: 'retirar_lote_pasto' } : plano;
+    }
+    // ── Sprint Paridade 1, bloco 5: tratativas de alerta ──────────────────
+    case INTENCOES.MARCAR_ALERTA_EM_ANALISE: {
+      const plano = prepararTratativaAlerta(db, { referencia: dados.alerta, status: STATUS_TRATATIVA.EM_ANALISE }, { identificarFazenda: ctx.fazendaId == null });
+      return plano.ok ? { ...plano, tipo: 'tratativa_alerta' } : plano;
+    }
+    case INTENCOES.RESOLVER_ALERTA: {
+      const plano = prepararTratativaAlerta(db, { referencia: dados.alerta, status: STATUS_TRATATIVA.RESOLVIDO }, { identificarFazenda: ctx.fazendaId == null });
+      return plano.ok ? { ...plano, tipo: 'tratativa_alerta' } : plano;
+    }
+    case INTENCOES.IGNORAR_ALERTA: {
+      const plano = prepararTratativaAlerta(db, { referencia: dados.alerta, status: STATUS_TRATATIVA.IGNORADO }, { identificarFazenda: ctx.fazendaId == null });
+      return plano.ok ? { ...plano, tipo: 'tratativa_alerta' } : plano;
+    }
+    case INTENCOES.ADIAR_ALERTA: {
+      const plano = prepararTratativaAlerta(db, { referencia: dados.alerta, status: STATUS_TRATATIVA.ADIADO, adiadoAte: dados.ate }, { identificarFazenda: ctx.fazendaId == null });
+      return plano.ok ? { ...plano, tipo: 'tratativa_alerta' } : plano;
+    }
+    case INTENCOES.REABRIR_ALERTA: {
+      const plano = prepararReabrirAlerta(db, { referencia: dados.alerta }, { identificarFazenda: ctx.fazendaId == null });
+      return plano.ok ? { ...plano, tipo: 'reabrir_alerta' } : plano;
+    }
+    // ── Sprint Paridade 1, bloco 5: exclusão de fazenda/pasto ─────────────
+    case INTENCOES.EXCLUIR_FAZENDA: {
+      const plano = prepararExclusaoFazenda(db, { fazenda: dados.fazenda });
+      return plano.ok ? { ...plano, tipo: 'excluir_fazenda' } : plano;
+    }
+    case INTENCOES.EXCLUIR_PASTO: {
+      const plano = prepararExclusaoPasto(db, dados);
+      return plano.ok ? { ...plano, tipo: 'excluir_pasto' } : plano;
     }
     default:
       return erro('CADASTRO_DESCONHECIDO');

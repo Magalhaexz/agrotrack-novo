@@ -54,6 +54,15 @@ export const INTENCOES = {
   EDITAR_LOTE: 'EDITAR_LOTE',
   EDITAR_PASTO: 'EDITAR_PASTO',
   RETIRAR_LOTE_PASTO: 'RETIRAR_LOTE_PASTO',
+  // Sprint Paridade 1, bloco 5 — alertas, edição completa de lote, fazendas/pastos:
+  MARCAR_ALERTA_EM_ANALISE: 'MARCAR_ALERTA_EM_ANALISE',
+  RESOLVER_ALERTA: 'RESOLVER_ALERTA',
+  IGNORAR_ALERTA: 'IGNORAR_ALERTA',
+  ADIAR_ALERTA: 'ADIAR_ALERTA',
+  REABRIR_ALERTA: 'REABRIR_ALERTA',
+  RESUMO_CONSOLIDADO_FAZENDAS: 'RESUMO_CONSOLIDADO_FAZENDAS',
+  EXCLUIR_FAZENDA: 'EXCLUIR_FAZENDA',
+  EXCLUIR_PASTO: 'EXCLUIR_PASTO',
   CONFIRMAR: 'CONFIRMAR',
   CANCELAR: 'CANCELAR',
   AMBIGUO: 'AMBIGUO',
@@ -165,7 +174,7 @@ const RE_AJUSTAR_LOTACAO = /^\/?ajust\w*\s+(?:o\s+)?lote\b/i;
 // Editar lote: sinalizado pelo CAMPO citado (sexo/raça/observação), não pelo
 // verbo — "altere"/"editar" sozinhos colidiriam com pesagem/fazenda, que já
 // exigem seu próprio substantivo (pesagem/fazenda) logo em seguida.
-const RE_EDITAR_LOTE = /^\/?(?:altere|alterar|edite|editar)\b.*\b(?:sexo|ra[çc]a|observa[çc][ãa]o)\b/i;
+const RE_EDITAR_LOTE = /^\/?(?:altere|alterar|edite|editar|corrija|corrigir)\b.*\b(?:sexo|ra[çc]a|observa[çc][ãa]o|peso\s+inicial|data\s+de\s+entrada)\b/i;
 // Editar pasto: verbo + "pasto", checado depois de CADASTRAR_PASTO (verbos
 // diferentes: cadastrar/criar/crie/adicionar vs. editar/alterar).
 const RE_EDITAR_PASTO = /^\/?(?:edite|editar|altere|alterar)\s+(?:o\s+)?pasto\b/i;
@@ -173,6 +182,23 @@ const RE_EDITAR_PASTO = /^\/?(?:edite|editar|altere|alterar)\s+(?:o\s+)?pasto\b/
 // sozinho é gatilho de baixa de estoque; a presença de "lote"+"pasto" é o
 // sinal que desambigua.
 const RE_RETIRAR_LOTE_PASTO = /^\/?retir\w+\b.*\blote\b.*\bpasto\b/i;
+
+// --- Sprint Paridade 1, bloco 5: tratativas de alerta ---
+// Verbos próprios por ação — nunca colidem com RE_ALERTAS (consulta, seção
+// 9): essa exige "alerta(s)" logo no início da frase ou um gatilho fixo
+// próprio; aqui o verbo (resolver/ignorar/adiar/reabrir/marcar) sempre vem
+// primeiro, então "resolver alerta X" nunca bate em RE_ALERTAS.
+const RE_RESOLVER_ALERTA = /^\/?resolv\w+\s+(?:o\s+)?alerta\b/i;
+const RE_IGNORAR_ALERTA = /^\/?ignor\w+\s+(?:o\s+)?alerta\b/i;
+const RE_ADIAR_ALERTA = /^\/?adi\w+\s+(?:o\s+)?alerta\b/i;
+const RE_REABRIR_ALERTA = /^\/?reabr\w+\s+(?:o\s+)?alerta\b/i;
+const RE_ALERTA_EM_ANALISE = /^\/?(?:marc\w+|coloc\w+)\b.*\balerta\b.*\ban[áa]lise\b|^\/?(?:marc\w+|coloc\w+)\b.*\ban[áa]lise\b.*\balerta\b/i;
+
+// --- Sprint Paridade 1, bloco 5: exclusão de fazenda/pasto ---
+// Verbos de exclusão, checados fora da seção de cadastro/edição (verbos
+// distintos: excluir/apagar/remover/deletar vs. cadastrar/criar/editar).
+const RE_EXCLUIR_FAZENDA = /^\/?(?:excluir|exclua|apag\w+|remov\w+|delet\w+)\s+(?:a\s+)?fazenda\b/i;
+const RE_EXCLUIR_PASTO = /^\/?(?:excluir|exclua|apag\w+|remov\w+|delet\w+)\s+(?:o\s+)?pasto\b/i;
 
 // --- Fazenda ---
 const RE_SELECIONAR_FAZENDA = /^\/?(?:usar|selecionar|ativar|trocar\s+para|mudar\s+para|trocar|mudar|escolher)\s+(?:a\s+|de\s+|para\s+a\s+)?fazenda\s+(.+?)$/i;
@@ -203,6 +229,10 @@ const RE_ALERTAS = /^\/?alertas?\b|ver\s+alertas?|tem\s+alerta|vacina\s+atrasada
 const RE_MANEJOS = /^\/?manejos?\b|mostrar\s+manejos?|manejos?\s+(?:da\s+)?(?:semana|hoje|atrasad)|manejo\s+atrasad/i;
 const RE_PESAGENS = /^\/?pesagens?\b|[úu]ltimas?\s+pesagens?|qual\s+lote\s+precisa\s+pesar|pr[óo]xima\s+pesagem|ver\s+pesagens?/i;
 const RE_RESUMO = /^\/?resumo\b|resumo\s+d[ao]\s+fazenda|resumo\s+geral/i;
+// Resumo consolidado: checado ANTES de RE_RESUMO (mais específico — "resumo
+// de todas as fazendas" também bateria em RE_RESUMO, que só exige "resumo"
+// no início).
+const RE_RESUMO_CONSOLIDADO = /^\/?resumo\s+(?:de\s+)?(?:todas?\s+(?:as\s+)?fazendas?|consolidado|geral\s+de\s+fazendas?)\b/i;
 
 const RE_AJUDA = /^\/?(?:ajuda|help|comandos|menu|start|iniciar)\b/i;
 const RE_CONFIRMAR = /^\/?(?:confirmar|confirmo|confirma|sim[,!.\s]*(?:confirmar?)?|pode\s+confirmar)\b/i;
@@ -300,6 +330,13 @@ export function interpretarComandoTelegram(texto) {
   if (RE_EDITAR_LOTE.test(t)) return intent(INTENCOES.EDITAR_LOTE, {}, true);
   if (RE_EDITAR_PASTO.test(t)) return intent(INTENCOES.EDITAR_PASTO, {}, true);
   if (RE_RETIRAR_LOTE_PASTO.test(t)) return intent(INTENCOES.RETIRAR_LOTE_PASTO, {}, true);
+  if (RE_RESOLVER_ALERTA.test(t)) return intent(INTENCOES.RESOLVER_ALERTA, {}, true);
+  if (RE_IGNORAR_ALERTA.test(t)) return intent(INTENCOES.IGNORAR_ALERTA, {}, true);
+  if (RE_ADIAR_ALERTA.test(t)) return intent(INTENCOES.ADIAR_ALERTA, {}, true);
+  if (RE_REABRIR_ALERTA.test(t)) return intent(INTENCOES.REABRIR_ALERTA, {}, true);
+  if (RE_ALERTA_EM_ANALISE.test(t)) return intent(INTENCOES.MARCAR_ALERTA_EM_ANALISE, {}, true);
+  if (RE_EXCLUIR_FAZENDA.test(t)) return intent(INTENCOES.EXCLUIR_FAZENDA, {}, true);
+  if (RE_EXCLUIR_PASTO.test(t)) return intent(INTENCOES.EXCLUIR_PASTO, {}, true);
   if (RE_CAD_TAREFA.test(t)) return intent(INTENCOES.CADASTRAR_TAREFA, {}, true);
   if (RE_CAD_ITEM_ESTOQUE.test(t)) return intent(INTENCOES.CADASTRAR_ITEM_ESTOQUE, {}, true);
   if (RE_REG_PESAGEM.test(t)) return intent(INTENCOES.REGISTRAR_PESAGEM, {}, true);
@@ -327,6 +364,7 @@ export function interpretarComandoTelegram(texto) {
   if (RE_ALERTAS.test(t)) return intent(INTENCOES.VER_ALERTAS);
   if (RE_MANEJOS.test(t)) return intent(INTENCOES.VER_MANEJOS);
   if (RE_PESAGENS.test(t)) return intent(INTENCOES.VER_PESAGENS);
+  if (RE_RESUMO_CONSOLIDADO.test(t)) return intent(INTENCOES.RESUMO_CONSOLIDADO_FAZENDAS);
   if (RE_RESUMO.test(t)) return intent(INTENCOES.RESUMO);
 
   // 10. Lotes: resultado (checado antes de VER_LOTE), depois ver um lote

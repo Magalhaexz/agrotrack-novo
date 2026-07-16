@@ -121,7 +121,15 @@ function gerarRespostaIntencao(intencao, { db, alertas }) {
   }
 }
 
-export default async function handler(req, res) {
+// `deps` é um seam de teste: em produção (Vercel) é chamado como
+// `handler(req, res)` e usa os defaults reais (Supabase service-role + envio
+// ao Telegram). O harness de teste injeta um client fake e um capturador de
+// resposta — sem tocar em rede nem no Telegram real. Comportamento de
+// produção idêntico quando `deps` é omitido.
+export default async function handler(req, res, deps = {}) {
+  const getClient = deps.getSupabaseAdminClient || getSupabaseAdminClient;
+  const enviar = deps.enviarMensagemTelegramParaChat || enviarMensagemTelegramParaChat;
+
   if (req.method !== 'POST') {
     return res.status(405).json({ ok: false, message: 'Método não permitido.' });
   }
@@ -158,7 +166,7 @@ export default async function handler(req, res) {
 
   if (codigo) {
     try {
-      const client = getSupabaseAdminClient();
+      const client = getClient();
       const now = new Date();
 
       const { data: codeRow } = await client
@@ -168,7 +176,7 @@ export default async function handler(req, res) {
         .maybeSingle();
 
       if (!isCodeUsable(codeRow, now)) {
-        await enviarMensagemTelegramParaChat(chatId, MSG_INVALIDO).catch(() => null);
+        await enviar(chatId, MSG_INVALIDO).catch(() => null);
         return res.status(200).json({ ok: true, connected: false });
       }
 
@@ -185,26 +193,26 @@ export default async function handler(req, res) {
 
       if (upsertError) {
         console.error('[telegram-webhook] falha ao salvar conexão', upsertError);
-        await enviarMensagemTelegramParaChat(chatId, MSG_INVALIDO).catch(() => null);
+        await enviar(chatId, MSG_INVALIDO).catch(() => null);
         return res.status(200).json({ ok: true, connected: false });
       }
 
       // A conexão já foi salva: avisa o usuário antes de tentar marcar o
       // código como usado, para uma falha nesse passo não virar uma mensagem
       // de "código inválido" incorreta.
-      await enviarMensagemTelegramParaChat(chatId, MSG_SUCESSO).catch(() => null);
+      await enviar(chatId, MSG_SUCESSO).catch(() => null);
       await client.from('telegram_connection_codes').update({ used_at: now.toISOString() }).eq('id', codeRow.id).then(() => null, () => null);
       return res.status(200).json({ ok: true, connected: true });
     } catch (error) {
       console.error('[telegram-webhook] erro inesperado', error);
-      await enviarMensagemTelegramParaChat(chatId, MSG_INVALIDO).catch(() => null);
+      await enviar(chatId, MSG_INVALIDO).catch(() => null);
       return res.status(200).json({ ok: true, connected: false });
     }
   }
 
   // Não é código de pareamento: identifica o usuário só pela conexão já
   // salva. Nunca aceita owner_user_id vindo do texto da mensagem.
-  const client = getSupabaseAdminClient();
+  const client = getClient();
   const conexao = await buscarConexaoAtiva(client, chatId).catch(() => null);
 
   // Bot interativo (novo): só para usuários já vinculados. Interpreta a
@@ -215,12 +223,12 @@ export default async function handler(req, res) {
     try {
       const respostaBot = await processarComandoBot({ client, conexao, texto, chatId });
       if (respostaBot) {
-        await enviarMensagemTelegramParaChat(chatId, respostaBot.texto).catch(() => null);
+        await enviar(chatId, respostaBot.texto).catch(() => null);
         return res.status(200).json({ ok: true, bot: true });
       }
     } catch (error) {
       console.error('[telegram-webhook] erro no bot interativo', error);
-      await enviarMensagemTelegramParaChat(chatId, MSG_ERRO_RESPOSTA).catch(() => null);
+      await enviar(chatId, MSG_ERRO_RESPOSTA).catch(() => null);
       return res.status(200).json({ ok: true, bot: false });
     }
   }
@@ -243,22 +251,22 @@ export default async function handler(req, res) {
           .filter((alerta) => alerta.visivel);
         const alertas = enriquecerAlertasComFazenda(alertasVisiveis, db, identificarFazenda);
         const resposta = gerarRespostaComandoTelegram(comando, { vinculado: true, alertas });
-        await enviarMensagemTelegramParaChat(chatId, resposta).catch(() => null);
+        await enviar(chatId, resposta).catch(() => null);
         return res.status(200).json({ ok: true, comando });
       } catch (error) {
         console.error('[telegram-webhook] erro ao carregar alertas para /alertas', error);
         const resposta = gerarRespostaComandoTelegram(comando, { vinculado: true, alertasErro: true });
-        await enviarMensagemTelegramParaChat(chatId, resposta).catch(() => null);
+        await enviar(chatId, resposta).catch(() => null);
         return res.status(200).json({ ok: true, comando, erro: true });
       }
     }
     const resposta = gerarRespostaComandoTelegram(comando, { vinculado: Boolean(conexao) });
-    await enviarMensagemTelegramParaChat(chatId, resposta).catch(() => null);
+    await enviar(chatId, resposta).catch(() => null);
     return res.status(200).json({ ok: true, comando });
   }
 
   if (!conexao) {
-    await enviarMensagemTelegramParaChat(chatId, MSG_SEM_CODIGO).catch(() => null);
+    await enviar(chatId, MSG_SEM_CODIGO).catch(() => null);
     return res.status(200).json({ ok: true, ignored: true });
   }
 
@@ -268,11 +276,11 @@ export default async function handler(req, res) {
     const alertas = enriquecerAlertasComFazenda(gerarAlertasUnificados(db), db, identificarFazenda);
     const intencao = classificarIntencaoTelegram(texto);
     const resposta = gerarRespostaIntencao(intencao, { db, alertas });
-    await enviarMensagemTelegramParaChat(chatId, resposta).catch(() => null);
+    await enviar(chatId, resposta).catch(() => null);
     return res.status(200).json({ ok: true, respondido: true, intencao });
   } catch (error) {
     console.error('[telegram-webhook] erro ao responder pergunta', error);
-    await enviarMensagemTelegramParaChat(chatId, MSG_ERRO_RESPOSTA).catch(() => null);
+    await enviar(chatId, MSG_ERRO_RESPOSTA).catch(() => null);
     return res.status(200).json({ ok: true, respondido: false });
   }
 }

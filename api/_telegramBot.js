@@ -29,6 +29,7 @@ import {
 import { obterFerramenta } from '../src/domain/telegram/telegramToolsRegistry.js';
 import { perfilTemPermissao } from '../src/auth/perfis.js';
 import { interpretarEdicaoCampo, aplicarEdicaoPendente } from '../src/domain/telegram/edicaoPendente.js';
+import { formatarResumoConsolidadoFazendas } from '../src/domain/telegram/resumoConsolidado.js';
 
 // Intenções que o novo bot atende; as demais (DESCONHECIDO) caem no fluxo
 // legado (Sprint 8), preservando o comportamento atual.
@@ -54,6 +55,11 @@ const INTENCOES_ATENDIDAS = new Set([
   INTENCOES.EDITAR_PESAGEM, INTENCOES.EXCLUIR_PESAGEM,
   INTENCOES.AJUSTAR_LOTACAO, INTENCOES.EDITAR_LOTE,
   INTENCOES.EDITAR_PASTO, INTENCOES.RETIRAR_LOTE_PASTO,
+  // Sprint Paridade 1, bloco 5 — alertas, exclusão de fazenda/pasto, resumo:
+  INTENCOES.MARCAR_ALERTA_EM_ANALISE, INTENCOES.RESOLVER_ALERTA,
+  INTENCOES.IGNORAR_ALERTA, INTENCOES.ADIAR_ALERTA, INTENCOES.REABRIR_ALERTA,
+  INTENCOES.RESUMO_CONSOLIDADO_FAZENDAS,
+  INTENCOES.EXCLUIR_FAZENDA, INTENCOES.EXCLUIR_PASTO,
 ]);
 
 // Intenções que exigem uma fazenda definida (recorte). Fazendas e ajuda não.
@@ -73,6 +79,12 @@ const INTENCOES_ESCOPADAS = new Set([
   INTENCOES.EDITAR_PESAGEM, INTENCOES.EXCLUIR_PESAGEM,
   INTENCOES.AJUSTAR_LOTACAO, INTENCOES.EDITAR_LOTE,
   INTENCOES.EDITAR_PASTO, INTENCOES.RETIRAR_LOTE_PASTO,
+  // Alertas e exclusão de pasto operam dentro de uma fazenda; exclusão de
+  // fazenda e o resumo consolidado são cross-fazenda por natureza (mesmo
+  // padrão de CADASTRAR_FAZENDA/RENOMEAR_FAZENDA, também fora desta lista).
+  INTENCOES.MARCAR_ALERTA_EM_ANALISE, INTENCOES.RESOLVER_ALERTA,
+  INTENCOES.IGNORAR_ALERTA, INTENCOES.ADIAR_ALERTA, INTENCOES.REABRIR_ALERTA,
+  INTENCOES.EXCLUIR_PASTO,
 ]);
 
 const MSG = {
@@ -120,6 +132,16 @@ const MSG = {
   SEM_ALTERACAO: 'A nova quantidade é igual à atual — nada para ajustar.',
   LOTE_SEM_PASTO: 'Esse lote já não tem pasto vinculado.',
   NENHUM_CAMPO_INFORMADO: 'Informe ao menos um campo para alterar.',
+  // Sprint Paridade 1, bloco 5 — alertas, exclusão de fazenda/pasto:
+  ALERTA_VAZIO: 'Informe qual alerta (o número da lista ou parte do título).',
+  ALERTA_NAO_ENCONTRADO: 'Não encontrei esse alerta na lista atual. Envie /alertas para ver os alertas.',
+  ALERTA_AMBIGUO: 'Há mais de um alerta parecido. Seja mais específico.',
+  ALERTA_NAO_TRATADO: 'Esse alerta não está tratado — não há nada para reabrir.',
+  STATUS_INVALIDO: 'Status de tratativa inválido.',
+  DATA_ADIAMENTO_VAZIA: 'Informe até quando adiar.',
+  DADOS_INVALIDOS: 'Não consegui registrar esses dados agora.',
+  FAZENDA_COM_VINCULOS: 'Essa fazenda possui dados vinculados e não pode ser excluída pelo Telegram. Faça a gestão dela no aplicativo.',
+  PASTO_OCUPADO: 'Esse pasto tem lote vinculado no momento — retire o lote antes de excluir.',
 };
 
 function ajuda() {
@@ -311,6 +333,8 @@ async function processarComandoBotInterno({ client, conexao, texto, chatId, agor
       return { texto: formatarPesagens(db) };
     case INTENCOES.RESUMO:
       return { texto: formatarResumo(db, { fazendaNome }) };
+    case INTENCOES.RESUMO_CONSOLIDADO_FAZENDAS:
+      return { texto: formatarResumoConsolidadoFazendas(dbConta) };
     case INTENCOES.LISTAR_PASTOS:
       return { texto: formatarPastagens(db, { fazendaNome }) };
     case INTENCOES.CONSULTAR_RESULTADO_LOTE: {
@@ -337,7 +361,10 @@ async function respostaAlertas(dbConta, conexao) {
   if (alertas.length === 0) return '✅ Nenhum alerta pendente agora.';
   const emoji = { critico: '🔴', atencao: '🟡', decisao: '🟢' };
   const linhas = [`📋 Alertas — ${alertas.length}`, ''];
-  alertas.slice(0, 8).forEach((a) => linhas.push(`${emoji[a.prioridade] || '•'} ${a.titulo}${a.fazendaNome ? ` — ${a.fazendaNome}` : ''}`));
+  // Numerados (Sprint Paridade 1, bloco 5): permite "resolver alerta 3" logo
+  // após listar — mesma lista recomputada (não é estado persistido entre
+  // mensagens), então só é confiável se nada mudou nos alertas nesse meio-tempo.
+  alertas.slice(0, 8).forEach((a, idx) => linhas.push(`${idx + 1}. ${emoji[a.prioridade] || '•'} ${a.titulo}${a.fazendaNome ? ` — ${a.fazendaNome}` : ''}`));
   if (alertas.length > 8) linhas.push(`• +${alertas.length - 8} outro(s)`);
   return linhas.join('\n');
 }
@@ -593,6 +620,22 @@ async function executarCadastro(client, conexao, op) {
   await registrarAuditoria(client, conexao, {
     acao: plano.tipo, intencao, sucesso: true, dados_posteriores: dados,
   });
+  return mensagemSucessoCadastro(plano);
+}
+
+// Mensagem de sucesso pós-execução. A maioria dos cadastros usa o resumo
+// "Confirme X:" → "Registrado X." (transformação genérica). Os tipos cujo
+// resumo começa com um verbo de intenção ("Vou marcar..."/"Vou reabrir...")
+// teriam uma mensagem de sucesso que lê como pré-ação; para esses, uma
+// mensagem própria no passado.
+const SUCESSO_POR_TIPO = {
+  tratativa_alerta: '✅ Alerta atualizado.',
+  reabrir_alerta: '✅ Alerta reaberto.',
+  excluir_fazenda: '✅ Fazenda excluída.',
+  excluir_pasto: '✅ Pasto excluído.',
+};
+function mensagemSucessoCadastro(plano) {
+  if (SUCESSO_POR_TIPO[plano.tipo]) return SUCESSO_POR_TIPO[plano.tipo];
   return `${plano.resumo[0].replace('Confirme', 'Registrado').replace(':', '.')}`;
 }
 
