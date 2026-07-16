@@ -538,10 +538,10 @@ peso atual do lote nunca diverge entre os dois caminhos.
 ### Pendências reais desta continuação
 
 - Confirmação editável (corrigir um campo específico sem reiniciar a
-  conversa) — não implementada.
+  conversa) — não implementada. **Concluída no bloco 4, ver seção 18.**
 - RPC transacional nova — avaliado, não criado (ver
   `docs/TELEGRAM_PARIDADE_COMPLETA_APP.md`, seção "Sprint Paridade 1 —
-  continuação").
+  continuação"). **Concluída no bloco 4, ver seção 18.**
 - Ação de escrita de alertas no bot (resolver/ignorar/adiar) — motor
   unificado agora permite, mas a intenção em si não foi adicionada.
 - Edição de peso inicial/data de entrada/origem/pasto do lote; visão
@@ -550,3 +550,59 @@ peso atual do lote nunca diverge entre os dois caminhos.
 
 Ver `docs/TELEGRAM_PARIDADE_COMPLETA_APP.md` para a matriz completa
 atualizada e os totais reais.
+
+## 18. Sprint Paridade 1 — bloco 4: confirmação editável + RPCs transacionais
+
+Continuação a partir de `cf8e7c1`. Custo de IA continua zero.
+
+**Confirmação editável.** Módulo central `src/domain/telegram/edicaoPendente.js`
+(puro) + integração em `api/_telegramBot.js::tentarEditarPendente`.
+Reconhece frases de correção ("troque/mude/altere/corrija/atualize `<campo>`
+para `<valor>`", e "remover/retirar pasto" como caso especial), acha o slot
+correspondente no catálogo da intenção pendente (nome exato, sinônimo
+pequeno, ou campo composto tipo `nome`→`nome_lote`), e revalida tudo via
+`prepararCadastro` — a mesma resolução de entidade/regra de negócio de uma
+proposta nova. Faz `UPDATE` na mesma linha `telegram_operacoes_pendentes`
+(mesmo `id`), nunca cria uma segunda pendência; revalidação falhando não
+altera a pendência original. Escopo: só operações `tipo_operacao='cadastro'`
+(a maioria das intenções); os 2 tipos legados de payload bespoke
+(`transferir_animais`/`renomear_lote`) ficam sem edição de campo nesta
+rodada.
+
+**RPCs transacionais.** Nova migration
+`supabase/migrations/20260716120000_rpcs_transacionais_lote_pesagem.sql`
+com 8 funções `SECURITY DEFINER` (1 helper + 7 operações):
+
+| RPC | Cobre |
+| --- | --- |
+| `app_assert_owner_write` | helper compartilhado — valida `p_owner_user_id` contra a sessão quando autenticado; confia na checagem de perfil já feita em JS quando é o service-role do bot |
+| `registrar_saida_lote` | venda, morte, abate, descarte, transferência de saída e entre lotes (unificado, mesmo padrão de `services/movimentacoes.js`) |
+| `ajustar_lotacao_lote` | ajuste de lotação (porta `buildAjusteLotacaoPatch`) |
+| `finalizar_lote` | finalização, com guarda server-side contra dupla finalização |
+| `mover_lote_para_pasto_bot` | troca e retirada de pasto (destino opcional) — gêmea `SECURITY DEFINER` de `mover_lote_para_pasto` (`SECURITY INVOKER`, inacessível ao bot) |
+| `editar_ultima_pesagem_lote` | edição, recalcula `lotes.p_at`/`ultima_pesagem` no banco |
+| `excluir_ultima_pesagem_lote` | exclusão, com fallback pela média dos animais |
+| `criar_lote_completo` | cadastro de lote + grupo em `animais` + pesagem inicial + histórico de pasto, atomicamente (fecha o gap de `CADASTRAR_LOTE`) |
+
+Os módulos `acoesLote.js`/`acoesPasto.js`/`cadastroPesagem.js`/
+`cadastros.js` mantêm 100% da resolução/validação de antes, só passaram a
+devolver `rpc:{nome, params}` em vez de `writes:[...]` para essas 8
+operações. `api/_telegramBot.js` ganhou `aplicarRpc` (uma chamada
+`client.rpc(...)`, transacional por natureza) como alternativa a
+`aplicarWrites` (um `for` sequencial sem checagem de erro), escolhida
+quando o plano tem `.rpc`.
+
+**Decisão de escopo**: o app web (`services/movimentacoes.js`) não foi
+migrado para as RPCs nesta rodada — só o bot. **Achado à parte**: dois
+fluxos do app (`peso_medio_atual`, `motivo_encerramento`) escrevem colunas
+de `lotes` que não existem no schema real — não replicado pelas RPCs
+novas, investigação sinalizada separadamente.
+
+**Pendência real**: a migration foi criada e revisada, mas **não aplicada
+em produção** nesta sessão (decisão do usuário) — o código que chama
+`client.rpc(...)` só funciona depois que ela for aplicada. Ação de escrita
+de alertas, edição completa de lote, fazenda consolidada/exclusão, exclusão
+de pasto, pesagem batch, matriz de idempotência/permissão/multi-fazenda
+dedicada, validação autenticada no app e validação real no Telegram
+continuam em aberto — ver `docs/TELEGRAM_PARIDADE_COMPLETA_APP.md`, seção
+"Sprint Paridade 1 — bloco 4".

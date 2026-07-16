@@ -55,14 +55,14 @@ verificadas contra `src/domain/telegram/interpretarComandoTelegram.js` e
 |---|---|---|---|---|---|---|
 | Listar lotes | Consulta | `lotes:ver` | `LotesPage.jsx:856-947` | ✅ `LISTAR_LOTES` | ✅ | ⛔ |
 | Ver detalhe (9 abas) | Consulta | `lotes:ver` | `LoteDetailsPanel.jsx` + 9 tabs | 🟡 `VER_LOTE` (resumo, não as 9 abas) | ✅ | ⛔ |
-| Cadastrar lote | Escrita | `lotes:editar` | `LotesPage.jsx:650-717`; auto-cria `animais` grupo + pesagem inicial (`lotesLogic.js:137-182`) | 🟡 `CADASTRAR_LOTE` — **não replica os 2 side-effects automáticos do app** (grupo `animais` e pesagem inicial); Resultado/Decisão de venda podem mostrar "dados insuficientes" para um lote criado via bot | ✅ | ⛔ |
+| Cadastrar lote | Escrita | `lotes:editar` | `LotesPage.jsx:650-717`; auto-cria `animais` grupo + pesagem inicial (`lotesLogic.js:137-182`) | ✅ `CADASTRAR_LOTE` (Sprint Paridade 1, bloco 4) — via RPC transacional `criar_lote_completo`, agora replica os 2 side-effects automáticos do app (grupo `animais` + pesagem inicial) atomicamente com o lote | ✅ | ⛔ |
 | Editar lote | Escrita | `lotes:editar` | `LotesPage.jsx:604-648` | 🟡 `EDITAR_LOTE` (Sprint Paridade 1) — sexo/raça/observação; peso inicial/data de entrada/origem/pasto ainda não | ✅ | ⛔ |
-| Ajuste de lotação | Escrita | `lotes:editar` | `lotesLogic.js:192-220` | ✅ `AJUSTAR_LOTACAO` (Sprint Paridade 1) — reaproveita `buildAjusteLotacaoPatch` direto, mesma função do app | ✅ | ⛔ |
-| Venda | Escrita | `animais:movimentar` | `services/movimentacoes.js:302-470` | ✅ `REGISTRAR_VENDA` | ✅ | ⛔ |
-| Morte/perda | Escrita | `animais:movimentar` | idem, tipoSaida `morte`/`descarte` | ✅ `REGISTRAR_MORTE` | ✅ | ⛔ |
-| Transferência de saída / entre lotes | Escrita | `animais:movimentar` | `movimentacoes.js:170-291,325-381` | ✅ `TRANSFERIR_ANIMAIS_ENTRE_LOTES` | ✅ | ⛔ |
-| Trocar lote de pasto | Escrita | `lotes:editar` | RPC `mover_lote_para_pasto` (app) / espelhado em JS (bot, ver nota `acoesPasto.js`) | ✅ `TROCAR_LOTE_PASTO` | ✅ | ⛔ |
-| Finalizar lote | Escrita | `lotes:editar` | `LotesPage.jsx:446-472`, `lotesLogic.js:228-240` | ✅ `FINALIZAR_LOTE` | ✅ | ⛔ |
+| Ajuste de lotação | Escrita | `lotes:editar` | `lotesLogic.js:192-220` | ✅ `AJUSTAR_LOTACAO` — transacional via RPC `ajustar_lotacao_lote` (Sprint Paridade 1, bloco 4), que porta a mesma validação de `buildAjusteLotacaoPatch` | ✅ | ⛔ |
+| Venda | Escrita | `animais:movimentar` | `services/movimentacoes.js:302-470` (app, ainda não-transacional); RPC `registrar_saida_lote` (bot, Sprint Paridade 1 bloco 4) | ✅ `REGISTRAR_VENDA` — transacional no bot | ✅ | ⛔ |
+| Morte/perda | Escrita | `animais:movimentar` | idem, tipoSaida `morte`/`descarte` | ✅ `REGISTRAR_MORTE` — mesma RPC `registrar_saida_lote`, nunca lança financeiro | ✅ | ⛔ |
+| Transferência de saída / entre lotes | Escrita | `animais:movimentar` | `movimentacoes.js:170-291,325-381` | ✅ `TRANSFERIR_ANIMAIS_ENTRE_LOTES` — mesma RPC `registrar_saida_lote` (tipo `transferencia_saida`), substitui os 3 awaits sequenciais sem transação que o bot usava antes | ✅ | ⛔ |
+| Trocar lote de pasto | Escrita | `lotes:editar` | RPC `mover_lote_para_pasto` (app, `SECURITY INVOKER`) / RPC gêmea `mover_lote_para_pasto_bot` (bot, `SECURITY DEFINER`, Sprint Paridade 1 bloco 4 — ver nota `acoesPasto.js`) | ✅ `TROCAR_LOTE_PASTO` | ✅ | ⛔ |
+| Finalizar lote | Escrita | `lotes:editar` | `LotesPage.jsx:446-472`, `lotesLogic.js:228-240` | ✅ `FINALIZAR_LOTE` — transacional via RPC `finalizar_lote` (Sprint Paridade 1, bloco 4), que também valida server-side que o lote não está finalizado | ✅ | ⛔ |
 | Histórico do lote | Consulta | `lotes:ver` | inline + `movimentacaoPastos.js:83-93` | 🟡 (via `VER_LOTE`/`RESUMO`, não histórico completo) | — | ⛔ |
 | Custos (aba financeiro do lote) | Consulta | `lotes:ver` | `LoteFinanceiroTab.jsx` | 🟡 (via `CONSULTAR_FINANCEIRO` com filtro lote) | ✅ | ⛔ |
 | Resultado (margem, custo/lucro por @) | Consulta | `lotes:ver`/`resultados:ver` | `resumoLote.js`, `calculations.js` | ✅ `CONSULTAR_RESULTADO_LOTE` (Sprint Paridade 1) — reaproveita `getResumoLote` direto, mesma fonte da página | ✅ | ⛔ |
@@ -79,8 +79,8 @@ verificadas contra `src/domain/telegram/interpretarComandoTelegram.js` e
 | Histórico/última/GMD | Consulta | `pesagens:ver` | `PesagensPage.jsx:897-941` | ✅ `VER_PESAGENS` | ✅ | ⛔ |
 | Nova pesagem (simples) | Escrita | `pesagens:editar` | `PesagensPage.jsx:725-807` | ✅ `REGISTRAR_PESAGEM` | ✅ | ⛔ |
 | Nova pesagem (batch/individual por lote) | Escrita | `pesagens:editar` | `PesagensPage.jsx:483-723` / duplicado em `AcompanhamentoPesoPage.jsx` | ⛔ (bot só cobre o fluxo simples) | — | ⛔ |
-| Editar pesagem | Escrita | `pesagens:editar` | `PesagensPage.jsx:339-346,725-772` | ✅ `EDITAR_PESAGEM` (Sprint Paridade 1, bloco 3) — `recalculateLoteFromPesagens` extraído para `domain/pesagensLote.js` (reaproveitado por `PesagensPage.jsx` e pelo bot); só a pesagem de LOTE mais recente, não pesagem individual por animal | ✅ | ⛔ |
-| Excluir/cancelar pesagem | Escrita | `pesagens:excluir` | `PesagensPage.jsx:348-402` | ✅ `EXCLUIR_PESAGEM` (Sprint Paridade 1, bloco 3) — mesma extração acima; `aplicarWrites` do bot ganhou suporte a `tipo:'delete'` | ✅ | ⛔ |
+| Editar pesagem | Escrita | `pesagens:editar` | `PesagensPage.jsx:339-346,725-772` | ✅ `EDITAR_PESAGEM` — transacional via RPC `editar_ultima_pesagem_lote` (Sprint Paridade 1, bloco 4; substituiu o `writes[]` sequencial da bloco 3); só a pesagem de LOTE mais recente, não pesagem individual por animal | ✅ | ⛔ |
+| Excluir/cancelar pesagem | Escrita | `pesagens:excluir` | `PesagensPage.jsx:348-402` | ✅ `EXCLUIR_PESAGEM` — transacional via RPC `excluir_ultima_pesagem_lote` (Sprint Paridade 1, bloco 4), com o fallback pela média dos animais quando não sobra pesagem | ✅ | ⛔ |
 | Lotes sem pesagem recente | Consulta | `pesagens:ver` | `hojeNaFazenda.js:22-29` (duplicado inline em `PesagensPage.jsx`) | 🟡 (aparece dentro de `VER_ALERTAS`, não como consulta dedicada) | — | ⛔ |
 | Evolução/gráfico de peso | Consulta | `animais:ver` | `AcompanhamentoPesoPage.jsx` + `PesoChart.jsx` | ⛔ | — | ⛔ |
 
@@ -97,7 +97,7 @@ verificadas contra `src/domain/telegram/interpretarComandoTelegram.js` e
 | Capacidade (UA/ha, diagnóstico) | Consulta | `pastagens:ver` | `unidadeAnimal.js:25-43` | ⛔ | — | ⛔ |
 | Ocupação/lotação por pasto | Consulta | `pastagens:ver` | `ocupacaoPastos.js:55-120` | 🟡 (aparece dentro de `LISTAR_PASTOS`, sem consulta dedicada por pasto único) | — | ⛔ |
 | Histórico de movimentações | Consulta | — | `movimentacaoPastos.js:83-93` | ⛔ | — | ⛔ |
-| Retirar/mover lote de pasto | Escrita | `lotes:editar` | (mesma op de Lotes, ver acima) | ✅ `TROCAR_LOTE_PASTO` (mover) + `RETIRAR_LOTE_PASTO` (Sprint Paridade 1, retirar sem novo destino) | ✅ | ⛔ |
+| Retirar/mover lote de pasto | Escrita | `lotes:editar` | (mesma op de Lotes, ver acima) | ✅ `TROCAR_LOTE_PASTO` (mover) + `RETIRAR_LOTE_PASTO` (retirar sem novo destino) — as duas via a mesma RPC `mover_lote_para_pasto_bot` (destino opcional, Sprint Paridade 1 bloco 4) | ✅ | ⛔ |
 | Listar pastos vazios | Consulta | `relatorios:ver` | `ocupacaoPastos.js:17-19`, `hojeNaFazenda.js:103-137` | 🟡 (aparece dentro de `LISTAR_PASTOS`, sem filtro dedicado) | — | ⛔ |
 | Listar pastos sobrecarregados | Consulta | `relatorios:ver` | `relatorios.js::buildRelatorioPastagens` | 🟡 (idem — `LISTAR_PASTOS` já mostra o status de cada pasto) | — | ⛔ |
 
@@ -357,14 +357,19 @@ Operações validadas no Telegram real: 0
 Exceções justificadas (nunca automatizáveis por política): 9 (convites/papéis de equipe, checkout/pagamento, credenciais/backup destrutivo)
 ```
 
-**Paridade operacional total estimada (fora as exceções por política): ~39%** (era ~32%).
-Isto **não é** uma declaração de conclusão — é o estado real medido nesta
-rodada. `P0`/`P1` conhecidos deste bloco (Fazendas/Lotes/Pesagens/Pastagens
-+ unificação do motor de alertas): **0**. Itens explicitamente NÃO
+**Paridade operacional total estimada (fora as exceções por política): ~39%** (era ~32%,
+inalterada nesta rodada — o bloco 4 tornou operações já existentes
+transacionais e adicionou o mecanismo de confirmação editável, não novas
+intenções). `P0`/`P1` conhecidos deste bloco (Fazendas/Lotes/Pesagens/
+Pastagens + unificação do motor de alertas): **0**. Itens explicitamente NÃO
 concluídos (não são bloqueio, são escopo restante — ver seção "Sprint
-Paridade 1 — continuação" ao final): confirmação editável, RPC
-transacional nova, ação de escrita de alertas no bot, edição completa de
-lote (peso inicial/data/origem/pasto), fazenda consolidada/excluir/resumo.
+Paridade 1 — bloco 4" abaixo): ação de escrita de alertas no bot, edição
+completa de lote (peso inicial/data/origem/pasto), fazenda consolidada/
+excluir/resumo, exclusão/inativação de pasto, pesagem em lote no formato
+batch/individual por animal, matriz completa de idempotência/permissão/
+multi-fazenda para as operações novas, validação autenticada no app e
+validação real no Telegram (**confirmação editável e RPC transacional —
+concluídas no bloco 4, ver abaixo**).
 
 ---
 
@@ -527,6 +532,92 @@ sprint pedia — ver pendências abaixo):
   testado genericamente (`operacoesPendentes.test.js`); mesma decisão já
   tomada para as 12 intenções anteriores.
 - **Paridade completa do HERDON não é declarada.** Isto é um checkpoint.
+
+## Sprint Paridade 1 — bloco 4 (confirmação editável + RPCs transacionais)
+
+Continuação a partir de `cf8e7c1`. Escopo: os dois itens marcados no bloco
+anterior como bloqueio estrutural/pré-requisito — confirmação editável e
+transações atômicas — priorizados sobre o restante da lista de 24 critérios
+do sprint (ações de escrita de alertas, edição completa de lote, fazenda
+consolidada/exclusão, exclusão de pasto seguem para o próximo bloco).
+
+- **Confirmação editável — módulo central novo, não replicado por
+  intenção.** `src/domain/telegram/edicaoPendente.js` (puro): reconhece
+  frases como "troque o pasto para Pasto Sul"/"mude a quantidade para 30"/
+  "remover pasto", acha o slot correspondente no catálogo da intenção atual
+  (`CATALOGO_CADASTROS`, com sinônimos pequenos — `cabeças`→`quantidade`,
+  `pastagem`→`pasto` — e casamento por campo composto, ex.: `nome`→
+  `nome_lote`), e revalida tudo via `prepararCadastro` (mesma resolução de
+  entidade/regra de negócio de uma proposta nova). Integrado em
+  `api/_telegramBot.js::tentarEditarPendente`, chamado antes da
+  classificação geral de intenção quando existe uma operação pendente
+  `tipo_operacao='cadastro'` para o chat. A correção faz `UPDATE` na mesma
+  linha pendente (mesmo `id`, `action_id` estável) — nunca cria uma segunda
+  pendência; se a revalidação falhar (ex.: novo pasto ambíguo), a linha
+  pendente original não é tocada, preservando idempotência. **Escopo desta
+  rodada**: só `tipo_operacao='cadastro'` (a maioria das ~20 intenções,
+  inclusive o exemplo do próprio sprint — cadastro de lote); os 2 tipos
+  legados de payload bespoke (`transferir_animais`, `renomear_lote`) não
+  têm edição de campo ainda — gap conhecido, não bloqueio.
+- **Transações atômicas — 8 funções novas, uma migration.**
+  `supabase/migrations/20260716120000_rpcs_transacionais_lote_pesagem.sql`:
+  `app_assert_owner_write` (helper compartilhado) + `registrar_saida_lote`
+  (venda/morte/abate/descarte/transferência de saída e entre lotes, num
+  único corpo — mesma unificação que `services/movimentacoes.js` já usa em
+  JS), `ajustar_lotacao_lote`, `finalizar_lote`, `mover_lote_para_pasto_bot`
+  (gêmea `SECURITY DEFINER` de `mover_lote_para_pasto`, que é
+  `SECURITY INVOKER` e por isso nunca pôde ser chamada pelo bot — ver
+  `ponytail:` em `acoesPasto.js`; unifica troca + retirada com destino
+  opcional), `editar_ultima_pesagem_lote`, `excluir_ultima_pesagem_lote` e
+  `criar_lote_completo` (fecha o gap de `CADASTRAR_LOTE` não replicar o
+  grupo em `animais` e a pesagem inicial). Todas `SECURITY DEFINER`,
+  recebem `p_owner_user_id uuid` explícito (o client do bot é service-role,
+  sem `auth.uid()`) e chamam `app_assert_owner_write` primeiro, que valida
+  esse parâmetro contra a sessão real quando quem chama é autenticado —
+  para o service-role, confia na checagem de perfil já feita em JS antes de
+  chamar a RPC (mesma fronteira de confiança que `aplicarWrites` já usava).
+  Substitui, para essas 8 operações, o padrão anterior (`aplicarWrites`: um
+  `for` sequencial sem checagem de erro nenhuma entre passos, e no caso da
+  transferência, 3 `await`s manuais na mesma situação).
+- **Bot religado às RPCs, app web intocado.** `acoesLote.js`/
+  `acoesPasto.js`/`cadastroPesagem.js`/`cadastros.js` continuam fazendo
+  100% da resolução de entidade e validação amigável de antes (mesmas
+  mensagens de erro com candidatos), só trocaram o que devolvem:
+  `rpc:{nome, params}` em vez de `writes:[...]`. `api/_telegramBot.js`
+  ganhou `aplicarRpc` (uma chamada `client.rpc(...)`) como alternativa a
+  `aplicarWrites`, escolhida quando o plano tem `.rpc`; o restante das
+  intenções (que não fazem parte deste bloco) continua no caminho
+  `writes[]` antigo, sem mudança de comportamento. **Decisão deliberada de
+  escopo**: o app web (`src/services/movimentacoes.js`, ainda
+  `Promise.all` sem transação) não foi migrado para as RPCs nesta rodada —
+  reduz o raio de alcance da mudança a um código já em produção e testado,
+  deixando a migração do app como um fast-follow depois que as RPCs
+  estiverem provadas via o bot.
+- **Achado adicional, fora do escopo de correção desta rodada**: dois
+  fluxos do app escrevem em colunas de `lotes` que não existem em nenhuma
+  migration nem no dump `docs/supabase-production-schema.sql` —
+  `peso_medio_atual` (6 arquivos, incluindo `PesagensPage.jsx`) e
+  `motivo_encerramento` (`LotesPage.jsx::handleFechamento`). As RPCs novas
+  desta rodada **não replicam esse bug** (só escrevem colunas reais: `p_at`/
+  `ultima_pesagem` para pesagem, `obs` para o motivo de encerramento) — mas
+  o próprio app continua enviando esses campos extras ao Supabase, o que
+  pode estar falhando silenciosamente. Investigação e fix ficam para uma
+  sessão dedicada (tarefa sinalizada separadamente).
+- **Não implementado nesta rodada** (ficam para o próximo bloco): ação de
+  escrita de alertas no bot (resolver/ignorar/adiar/em análise), edição de
+  peso inicial/data de entrada/origem/pasto do lote, visão consolidada/
+  resumo por fazenda/exclusão de fazenda, excluir/inativar pasto, nova
+  pesagem em lote no formato batch/individual por animal, matriz dedicada
+  de idempotência/permissão/multi-fazenda para as 8 operações
+  transacionais (reaproveitam o mesmo mecanismo genérico já testado —
+  `operacoesPendentes.test.js` — mesma decisão já tomada nos blocos
+  anteriores), validação autenticada no app e validação real no Telegram.
+- **Migration não aplicada em produção nesta sessão** — só o arquivo SQL
+  foi criado e revisado (lint/testes/build passam sem depender do banco
+  real, já que a suíte de testes usa um client Supabase fake). O código do
+  bot que chama `client.rpc('registrar_saida_lote', ...)` etc. só funciona
+  **depois** que a migration for aplicada no Supabase de produção — pendência
+  real, decisão do usuário nesta sessão.
 
 ## Custo de IA
 
