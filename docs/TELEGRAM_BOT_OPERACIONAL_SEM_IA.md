@@ -637,3 +637,146 @@ nenhum código de `src/services/`/`src/pages/` chama as 8 RPCs (só o bot).
 lote, fazenda consolidada/exclusão, exclusão de pasto, pesagem batch,
 matriz de idempotência/permissão/multi-fazenda dedicada (cobertura
 representativa feita, não exaustiva), validação real no Telegram.
+
+## 20. Sprint Paridade 1 — bloco 5: fechamento das operações restantes
+
+Continuação a partir de `2dc7cbe`. Fecha as pendências reais listadas na
+seção 19 (exceto pesagem batch e validação real no Telegram, tratadas
+abaixo). Custo de IA continua zero.
+
+### Operações adicionadas
+
+- **Ações de escrita de alertas** (`src/domain/telegram/acoesAlerta.js`,
+  5 intenções novas: `MARCAR_ALERTA_EM_ANALISE`, `RESOLVER_ALERTA`,
+  `IGNORAR_ALERTA`, `ADIAR_ALERTA`, `REABRIR_ALERTA`). Usam
+  exclusivamente `alertas_tratativas` — a mesma tabela e a mesma fórmula
+  (`gerarAlertasUnificados` + `aplicarTratativasAosAlertas`) que
+  Dashboard e Central de Alertas já usam, então uma tratativa do bot
+  aparece igual nos três lugares. `/alertas` passou a numerar a lista
+  (`1.`, `2.`, ...) para permitir "resolver alerta 2"; também aceita
+  trecho do título. Reabrir = apagar a tratativa (sem tratativa, o
+  alerta reaparece). "Responsável" não tem coluna própria (nem no app)
+  — dobra dentro de `observacao`. Gate: `tarefas:editar`, igual
+  `AlertasPage.jsx`.
+- **Resumo consolidado de fazendas** (`resumoConsolidado.js`, intenção
+  `RESUMO_CONSOLIDADO_FAZENDAS`) — lotes ativos, cabeças, resultado,
+  itens de estoque, custos/receitas e alertas críticos por fazenda,
+  cada uma recortada por `filtrarDbPorFazenda` (nunca mistura dados
+  entre fazendas da mesma conta). É consulta: permitida sem fazenda
+  ativa, nunca grava.
+- **Exclusão de fazenda** (`cadastroFazenda.js::prepararExclusaoFazenda`,
+  intenção `EXCLUIR_FAZENDA`) — replica a guarda real de
+  `FazendasPage.jsx::excluirFazenda` (bloqueia se houver lotes,
+  animais, financeiro, estoque ou sanitário vinculados). Sem
+  inativação — o app não tem esse conceito para fazenda. Gate:
+  `fazendas:editar` (o app não tem uma permissão dedicada de exclusão
+  de fazenda; documentado como lacuna existente, não introduzida aqui).
+- **Exclusão de pasto** (`cadastroPasto.js::prepararExclusaoPasto`,
+  intenção `EXCLUIR_PASTO`) — mesma ideia, mas com uma guarda que o
+  app **não tem**: recusa excluir um pasto ocupado por lote ativo
+  (`status != 'encerrado'`). É uma melhoria de segurança do bot sobre o
+  app, não uma cópia do comportamento do app — decisão explícita, não
+  descoberta tardia. Gate: `pastagens:excluir` (essa já existe no app).
+- **Edição de lote completada** (`acoesLote.js::prepararEdicaoLote`,
+  intenção `EDITAR_LOTE` ampliada) — agora aceita peso inicial (coluna
+  `p_ini`) e data de entrada (coluna `entrada`). Deliberadamente NÃO
+  aceita quantidade/pasto/status (cada um tem intenção própria:
+  `AJUSTAR_LOTACAO`, `TROCAR_LOTE_PASTO`, `FINALIZAR_LOTE`) nem
+  "origem" (não existe como coluna em `lotes`).
+
+### Correções
+
+- **`owner_user_id` sobrescrito por `null`**: `criarTratativaAlerta`
+  (reaproveitada de `tratativasAlertas.js`) sempre devolvia um objeto
+  com a chave `owner_user_id` (aqui, `null`, por não ter sessão
+  autenticada). O executor `aplicarWrites` monta o registro como
+  `{ owner_user_id: conexao.owner_user_id, ...w.registro }` — o spread
+  do registro, vindo depois, sobrescrevia o owner real pelo `null`.
+  Corrigido em `acoesAlerta.js`: `delete tratativa.owner_user_id` antes
+  de devolver o `write`, deixando o executor injetar o owner
+  verdadeiro (mesma convenção já usada pelo resto do código: nunca
+  incluir `owner_user_id` dentro de um `registro`).
+- **Mensagens de sucesso confusas**: o transform genérico de sucesso
+  (`resumo[0].replace('Confirme','Registrado')`) produzia texto sem
+  sentido para fluxos cujo resumo não começa com "Confirme" (ex.: os de
+  alerta começam com "Vou marcar como..."). Corrigido com um mapa
+  `SUCESSO_POR_TIPO` em `api/_telegramBot.js` (mensagens específicas
+  para tratativa de alerta, reabertura, exclusão de fazenda e de
+  pasto), com fallback ao transform antigo para os demais tipos.
+
+### Matrizes
+
+- **Permissões** (`src/domain/telegram/permissoesMatriz.test.js`):
+  varre as **33** intenções mutáveis (`intencaoEhMutavel`, de um total
+  de 51 intenções reconhecidas) × 4 perfis, com o resultado esperado
+  cruzado manualmente contra `src/auth/perfis.js` (não é circular — não
+  deriva a expectativa da própria função testada). Resultado real:
+  proprietário 33/33, gerente 33/33, operador 27/33 (nega cadastrar
+  despesa, cadastrar receita, cadastrar fazenda, renomear fazenda,
+  excluir fazenda, excluir pasto), visualizador 0/33 (invariante:
+  nunca grava). Também garante que nenhuma intenção mutável fica sem
+  permissão mapeada (nunca "permitido por omissão").
+- **Idempotência e multi-fazenda** (`api/_telegramBotMatrizes.test.js`,
+  6 testes): um representante por ramo do executor (RPC, `writes`
+  insert, `writes` delete, transferência bespoke, renomeação bespoke)
+  — propõe, confirma, confirma de novo; o efeito não muda e existe
+  exatamente 1 linha `executada`. Mais: uma proposta nova cancela a
+  pendência anterior do mesmo chat, nunca acumula. Cobertura é
+  representativa por ramo de código, não uma varredura de todas as 33
+  intenções individualmente — o mecanismo de idempotência
+  (`podeConfirmar`, transição atômica `.eq('status','pendente')`) é
+  compartilhado por todas, então provar uma vez por ramo é suficiente.
+  Multi-fazenda: escrita escopada exige fazenda ativa quando há mais
+  de uma; com fazenda ativa, lote de mesmo nome em outra fazenda não
+  colide; resumo consolidado funciona sem fazenda ativa; pasto de
+  outra fazenda é rejeitado ao mover lote.
+
+### Pesagem em lote — não aplicável
+
+O "pesagem em lote" do app (`PesagensPage.jsx:483-723`) é uma grade de
+pesagem **individual por animal** (grava em `animais` e em `pesagens`
+com `tipo='animal'`) — um modelo de dados diferente do agregado por
+lote que o bot usa em toda a sua base (`REGISTRAR_PESAGEM` já cobre
+"pesagem de lote"). Construir um fluxo de pesagem individual por
+conversa de chat seria uma funcionalidade nova, não um fechamento de
+paridade — por isso marcado **não aplicável** nesta rodada, e não
+implementado.
+
+### Validação do app
+
+Sessão autenticada real confirmada em `localhost:5173` (renderizou
+"Painel Geral / Conectado" sem erro contra o schema pós-migration —
+mais forte que o "abre sem login" de rodadas anteriores). Login feito
+pelo usuário; nenhuma credencial foi vista ou manipulada nesta sessão.
+Três limitações honestas: (1) a conta autenticada (herdonapp@gmail.com)
+está vazia e é diferente da conta QA (`971ee284`, "Fazenda QA Sprint
+34") onde os smoke tests SQL das RPCs rodaram — os efeitos das RPCs
+foram confirmados no banco daquela conta, não clicando nesta UI; (2) o
+app web não chama nenhuma das 8 RPCs transacionais (só o bot as usa),
+então não existe caminho de UI que as exercite; (3) a navegação
+tela-a-tela ficou bloqueada nesta sessão por indisponibilidade
+temporária do classificador de segurança do navegador. Nenhuma
+validação de clique foi inventada para preencher essa lacuna.
+
+### Telegram
+
+Sem acesso a um bot Telegram ao vivo nesta sessão — igual às rodadas
+anteriores. O que existe é o **harness de webhook realista**
+(`api/_telegramWebhookHarness.test.js`, 10 testes): chama o `handler`
+HTTP real de `api/telegram-webhook.js` (não uma função interna) com um
+payload de update do Telegram, passando por autenticação de
+`secret_token`, rate limit, busca de conexão por `chat_id` e todo o
+`processarComandoBot`, com um client Supabase fake e um capturador de
+envio injetados por um seam `deps` novo no handler (comportamento de
+produção idêntico quando `deps` é omitido). Isso é validação por
+harness de webhook realista — **não** é validação no aplicativo
+Telegram real, e o texto do relatório final não deve confundir as
+duas.
+
+### Custo
+
+Zero. Nenhuma das operações novas deste bloco (alertas, resumo
+consolidado, exclusão de fazenda/pasto, edição de lote) chama qualquer
+provedor de IA. Confirmado por grep (`ANTHROPIC_API_KEY`,
+`@anthropic-ai/sdk`, `OpenAI`, `Gemini`) sem ocorrências ativas em
+`src/` ou `api/`.

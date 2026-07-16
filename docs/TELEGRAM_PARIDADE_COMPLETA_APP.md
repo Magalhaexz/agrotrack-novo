@@ -690,6 +690,122 @@ sessão — não validado, não declarado como validado.
 corrigida na mesma sessão, antes de qualquer exposição real fora deste
 processo de ativação).
 
+## Sprint Paridade 1 — bloco 5 (fechamento das operações restantes)
+
+Continuação a partir de `2dc7cbe`. Fecha as linhas viáveis pendentes do
+Bloco 1. Custo de IA: zero (nenhuma operação nova depende de provedor
+externo).
+
+### Operações NOVAS neste bloco
+
+- **Ações de escrita de alertas** (`src/domain/telegram/acoesAlerta.js`):
+  `MARCAR_ALERTA_EM_ANALISE`, `RESOLVER_ALERTA`, `IGNORAR_ALERTA`,
+  `ADIAR_ALERTA`, `REABRIR_ALERTA`. Usam EXCLUSIVAMENTE `alertas_tratativas`
+  (mesma tabela/fórmula de `gerarAlertasUnificados` +
+  `aplicarTratativasAosAlertas` que Dashboard/Central usam — a tratativa
+  registrada pelo bot aparece igual nos três). Alerta endereçável por número
+  (a lista `/alertas` passou a ser numerada) ou por trecho do título;
+  identidade canônica = o `id` estável do motor único (nunca posição de lista
+  persistida). "Responsável" dobra dentro de `observacao` (não há coluna
+  própria, nem no app). Reabrir = `delete` da tratativa (sem tratativa, o
+  alerta volta a aparecer). Gate: `tarefas:editar` (mesmo do `AlertasPage.jsx`).
+  **Bug real corrigido:** `criarTratativaAlerta` sempre incluía
+  `owner_user_id` (aqui, null), e o spread de `aplicarWrites`
+  (`{owner_user_id: conexao..., ...registro}`) era sobrescrito por esse null
+  — agora o módulo remove a chave para o executor injetar o owner real.
+- **Resumo consolidado de fazendas** (`resumoConsolidado.js`):
+  `RESUMO_CONSOLIDADO_FAZENDAS` — lotes/cabeças/estoque/custos/receitas/
+  resultado/alertas críticos por fazenda, recortando cada uma por
+  `filtrarDbPorFazenda` (nunca mistura contas). Consulta consolidada é
+  permitida sem fazenda ativa; escrita nunca.
+- **Exclusão de fazenda** (`cadastroFazenda.js::prepararExclusaoFazenda`):
+  espelha a guarda real de `FazendasPage.jsx::excluirFazenda` (mesmos 5
+  vínculos: lotes/animais/financeiro/estoque/sanitário). Falha rápido na
+  proposta quando há vínculo, com a mensagem exata do sprint. Sem inativação
+  (o app não tem esse conceito para fazenda). Gate: `fazendas:editar`.
+- **Exclusão de pasto** (`cadastroPasto.js::prepararExclusaoPasto`): guarda
+  ADICIONAL que o app NÃO tem — recusa excluir pasto com lote ativo
+  ocupando. Gate: `pastagens:excluir`.
+- **Edição de lote completada**: `peso inicial` (`p_ini`) e `data de entrada`
+  (`entrada`) — colunas reais confirmadas. `quantidade`/`pasto`/`status`
+  deliberadamente NÃO são campos de "editar lote" (têm intenções próprias
+  transacionais: `AJUSTAR_LOTACAO`, `TROCAR_LOTE_PASTO`, `FINALIZAR_LOTE`);
+  "origem" não existe como coluna. Lote finalizado bloqueia edição.
+
+### Pesagem em lote — NÃO APLICÁVEL (exceção justificada)
+
+O "batch weighing" do app (`PesagensPage.jsx:483-723`) é pesagem
+**individual por animal** (cria registros em `animais` + `pesagens`
+`tipo='animal'`, grade de UI com identificação por animal) — modelo de dados
+distinto do agregado por lote que o bot usa em toda a base. Não é "pesar
+vários lotes de uma vez". O bot já cobre pesagem por lote
+(`REGISTRAR_PESAGEM`). Construir um fluxo de pesagem individual por chat
+seria funcionalidade NOVA só para paridade — marcado como **não aplicável**,
+conforme a diretriz do sprint.
+
+### Matrizes sistemáticas
+
+- **Permissões** (`src/domain/telegram/permissoesMatriz.test.js`): itera as
+  **33** intenções mutáveis × 4 perfis, com valores esperados cruzados com
+  `src/auth/perfis.js` (não-circular). Resultado real:
+
+| Perfil | Operações mutáveis permitidas |
+|---|---|
+| Proprietário | 33 / 33 |
+| Gerente | 33 / 33 |
+| Operador | 27 / 33 (nega: cadastrar/renomear/excluir fazenda, cadastrar despesa/receita, excluir pasto) |
+| Visualizador | 0 / 33 (invariante "visualizador nunca grava") |
+
+- **Idempotência** (`api/_telegramBotMatrizes.test.js`): representante por
+  ramo do executor (rpc, writes-insert, writes-delete, bespoke transferir/
+  renomear) — propõe → confirma → confirma de novo → o efeito não muda e há
+  exatamente 1 operação `executada`. Mais: nova proposta cancela a pendência
+  anterior do mesmo chat (não acumula). O mecanismo (transição atômica
+  `.eq('status','pendente')` em `confirmar`) é compartilhado por todas as
+  intenções.
+- **Multi-fazenda** (mesmo arquivo): escrita escopada exige fazenda ativa
+  quando há >1 (bloqueia sem selecionar); com fazenda ativa, lote de mesmo
+  nome em outra fazenda não colide; consulta consolidada permitida sem
+  fazenda; pasto de outra fazenda rejeitado.
+
+### Harness de webhook realista
+
+`api/_telegramWebhookHarness.test.js` passa pelo handler HTTP REAL
+(`api/telegram-webhook.js`): payload de update do Telegram → secret_token →
+rate limit → busca de conexão por chat_id → `processarComandoBot` → resposta
+capturada. Injeta client fake + capturador de envio via um seam `deps` novo
+no handler (produção idêntica quando `deps` é omitido). Cobre: resumo
+consolidado, editar lote, tratar/reabrir alerta, excluir pasto, ambígua,
+visualizador, multi-fazenda, confirmação repetida, sem-conexão. **É
+validação por harness de webhook realista, NÃO validação no aplicativo
+Telegram real** (sem token/bot ao vivo nesta sessão).
+
+### Validação autenticada no app
+
+Sessão autenticada real CONFIRMADA no navegador (`localhost:5173` — "Painel
+Geral / Conectado" renderiza sem erro contra o schema pós-migration; boot
+com login real, mais forte que o "boot sem login" de rodadas anteriores).
+**Limitações honestas:** (1) a conta logada (herdonapp@gmail.com) está vazia
+e é DISTINTA da conta QA (`971ee284`, "Fazenda QA Sprint 34") onde os smoke
+tests SQL rodaram — os efeitos das RPCs foram validados diretamente no banco
+daquela conta, não na UI desta; (2) o app não chama as RPCs novas (só o bot),
+então não há caminho de UI que as exercite; (3) a navegação dirigida pelas
+telas específicas ficou bloqueada nesta sessão pela indisponibilidade
+temporária do classificador do navegador. Não foi fabricada validação de UI.
+
+### Números do bloco 5
+
+```text
+Operações mutáveis do bot (intencaoEhMutavel):  33
+Testadas (unitário + e2e + matriz):             33 (todas cobertas pelas matrizes)
+Validadas por harness de webhook realista:      10 fluxos representativos
+Validadas na UI do app (clique real):           0 (sessão autenticada confirmada; UI não exercitada — ver limitações)
+Validadas no Telegram real:                     0 (sem acesso a bot ao vivo)
+Exceções justificadas no bloco:                 1 (pesagem individual por animal — não aplicável)
+P0 conhecidos do bloco:                         0
+P1 conhecidos do bloco:                         0
+```
+
 ## Custo de IA
 
 Zero — nenhuma operação mapeada aqui, existente ou proposta, depende de
