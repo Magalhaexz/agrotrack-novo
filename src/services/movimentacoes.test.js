@@ -256,6 +256,70 @@ function makeItemEstoque(overrides = {}) {
   return { id: 1, produto: 'Ração', categoria: 'ração', quantidade_atual: 100, valor_unitario: 2, ...overrides };
 }
 
+// ── Regressão P0 (auditoria 360º, EST-01): "tratamento" e tipos inválidos não
+// podem mais falhar silenciosamente — antes devolviam `db` inalterado com um
+// `console.warn`, e o modal (EstoquePage.jsx) fechava como se tivesse dado
+// certo, sem nada persistido. ──
+
+test('registrarSaidaEstoque: "tratamento" é um tipo válido e gera despesa própria (tratamento_sanitario) quando vinculado a um lote', () => {
+  const db = makeEstoqueDb({ estoque: [makeItemEstoque()] });
+  const r = registrarSaidaEstoque(db, {
+    itemId: 1, loteId: 7, quantidade: 5, tipo: 'tratamento', data: hoje,
+  }, {}, { persist: false });
+
+  assert.equal(r.estoque.find((i) => i.id === 1).quantidade_atual, 95);
+  assert.equal(r.movimentacoes_estoque[0].tipo, 'tratamento');
+  assert.equal(r.movimentacoes_financeiras.length, 1);
+  assert.equal(r.movimentacoes_financeiras[0].categoria, 'tratamento_sanitario');
+  assert.equal(r.movimentacoes_financeiras[0].lote_id, 7);
+});
+
+test('registrarSaidaEstoque: tipo inválido lança erro (nunca falha silenciosamente)', () => {
+  const db = makeEstoqueDb({ estoque: [makeItemEstoque()] });
+  assert.throws(
+    () => registrarSaidaEstoque(db, { itemId: 1, quantidade: 5, tipo: 'saida', data: hoje }, {}, { persist: false }),
+    /Tipo de saída inválido/
+  );
+  // db original não deve ter sido mutado nem parcialmente alterado.
+  assert.equal(db.estoque[0].quantidade_atual, 100);
+});
+
+test('registrarSaidaEstoque: item inexistente lança erro', () => {
+  const db = makeEstoqueDb({ estoque: [makeItemEstoque()] });
+  assert.throws(
+    () => registrarSaidaEstoque(db, { itemId: 999, quantidade: 5, tipo: 'consumo', data: hoje }, {}, { persist: false }),
+    /Item de estoque não encontrado/
+  );
+});
+
+test('registrarSaidaEstoque: quantidade inválida lança erro', () => {
+  const db = makeEstoqueDb({ estoque: [makeItemEstoque()] });
+  assert.throws(
+    () => registrarSaidaEstoque(db, { itemId: 1, quantidade: 0, tipo: 'consumo', data: hoje }, {}, { persist: false }),
+    /quantidade válida/
+  );
+});
+
+test('registrarEntradaEstoque: item inexistente lança erro', () => {
+  const db = makeEstoqueDb({ estoque: [makeItemEstoque()] });
+  assert.throws(
+    () => registrarEntradaEstoque(db, { itemId: 999, qtd: 10, custo: 2, data: hoje }, {}, { persist: false }),
+    /Item de estoque não encontrado/
+  );
+});
+
+test('registrarEntradaEstoque: quantidade e custo inválidos lançam erro', () => {
+  const db = makeEstoqueDb({ estoque: [makeItemEstoque()] });
+  assert.throws(
+    () => registrarEntradaEstoque(db, { itemId: 1, qtd: 0, custo: 2, data: hoje }, {}, { persist: false }),
+    /quantidade válida/
+  );
+  assert.throws(
+    () => registrarEntradaEstoque(db, { itemId: 1, qtd: 10, custo: -1, data: hoje }, {}, { persist: false }),
+    /custo unitário válido/
+  );
+});
+
 test('registrarSaidaEstoque: aceita persistContext (4º argumento) sem alterar o resultado do saldo', () => {
   const db = makeEstoqueDb({ estoque: [makeItemEstoque()] });
   const r = registrarSaidaEstoque(db, {

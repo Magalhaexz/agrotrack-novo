@@ -104,7 +104,7 @@ function getCadastroItemInicial(data) {
 }
 
 
-export default function EstoquePage({ db, setDb, onRegistrarSaidaEstoque, navigationIntent = null, fazendaSelecionada = null }) {
+export default function EstoquePage({ db, setDb, onRegistrarSaidaEstoque, onRegistrarEntradaEstoque, navigationIntent = null, fazendaSelecionada = null }) {
   const { showToast } = useToast();
   const { hasPermission, session } = useAuth();
   const mensagemSemPermissao = 'Você não tem permissão para executar esta ação.';
@@ -472,7 +472,7 @@ export default function EstoquePage({ db, setDb, onRegistrarSaidaEstoque, naviga
         />
       )}
       {openEntrada && (
-        <EntradaModal db={db} setDb={setDb} selectedItem={selectedItem} estoqueMap={estoqueMap} onOpenCadastroItem={() => {
+        <EntradaModal db={db} setDb={setDb} selectedItem={selectedItem} onRegistrarEntradaEstoque={onRegistrarEntradaEstoque} estoqueMap={estoqueMap} onOpenCadastroItem={() => {
           if (consolidado) {
             showToast({ type: 'warning', message: 'Selecione uma fazenda específica para cadastrar um item de estoque.' });
             return;
@@ -594,7 +594,7 @@ function CadastroItemModal({ setDb, initialData = null, onClose, hasPermission, 
   );
 }
 
-function EntradaModal({ db, setDb, selectedItem, estoqueMap, onOpenCadastroItem, onClose, hasPermission, showToast, session }) {
+function EntradaModal({ db, selectedItem, onRegistrarEntradaEstoque, estoqueMap, onOpenCadastroItem, onClose, hasPermission, showToast }) {
   const [form, setForm] = useState({
     item_id: selectedItem?.id || '',
     qtd: '',
@@ -611,72 +611,35 @@ function EntradaModal({ db, setDb, selectedItem, estoqueMap, onOpenCadastroItem,
   const item = estoqueMap.get(Number(form.item_id));
   const total = Number(form.qtd || 0) * Number(form.custo || 0);
 
+  // Usa sempre `registrarEntradaEstoque` (services/movimentacoes.js) — nunca
+  // um caminho de persistência próprio da tela. Antes essa duplicação nunca
+  // gerava a despesa de "compra_estoque" (EST-02 da auditoria 360º), porque
+  // a página tinha sua própria lógica de gravação que ignorava o serviço real.
   async function submit() {
     if (!hasPermission('estoque:editar')) {
       showToast({ type: 'error', message: 'Você não tem permissão para executar esta ação.' });
       return;
     }
     if (!form.data || !form.item_id || Number(form.qtd) <= 0) {
-      alert('Preencha todos os campos obrigatórios.');
+      showToast({ type: 'warning', message: 'Preencha todos os campos obrigatórios.' });
       return;
     }
 
     await executar(async () => {
-      const itemAtual = (db?.estoque || []).find((entry) => entry.id === Number(form.item_id));
-      const novoSaldo = getCurrentItemStockBalance(itemAtual) + (parseSafeNumber(form.qtd) ?? 0);
-      const estoquePersist = await updateOperationalRecord('estoque', Number(form.item_id), {
-        quantidade_atual: novoSaldo,
-        quantidade: novoSaldo,
-        valor_unitario: Number(form.custo || itemAtual?.valor_unitario || 0),
-        preco_unitario: Number(form.custo || itemAtual?.preco_unitario || 0),
-        data_validade: form.validade || itemAtual?.data_validade || null,
-      }, session);
-      const movPersist = await createOperationalRecord('movimentacoes_estoque', {
-        item_estoque_id: Number(form.item_id),
-        tipo: 'entrada',
-        quantidade: Number(form.qtd),
-        data: form.data,
-        valor_total: total,
-        obs: form.obs,
-        fornecedor: form.fornecedor,
-        numero_nf: form.nf,
-      }, session);
-
-      setDb((prev) => ({
-        ...prev,
-        estoque: prev.estoque.map((i) => (
-          i.id === Number(form.item_id)
-            ? {
-                ...i,
-                ...(estoquePersist.data || {
-                  quantidade_atual: getCurrentItemStockBalance(i) + (parseSafeNumber(form.qtd) ?? 0),
-                  quantidade: getCurrentItemStockBalance(i) + (parseSafeNumber(form.qtd) ?? 0),
-                  valor_unitario: Number(form.custo || i.valor_unitario),
-                  preco_unitario: Number(form.custo || i.preco_unitario),
-                  data_validade: form.validade || i.data_validade,
-                }),
-              }
-            : i
-        )),
-        movimentacoes_estoque: [
-          ...(prev.movimentacoes_estoque || []),
-          movPersist.data || {
-            id: gerarNovoId(prev.movimentacoes_estoque || []),
-            item_estoque_id: Number(form.item_id),
-            tipo: 'entrada',
-            quantidade: Number(form.qtd),
-            data: form.data,
-            valor_total: total,
-            obs: form.obs,
-            fornecedor: form.fornecedor,
-            numero_nf: form.nf,
-          },
-        ],
-      }));
-
-      if (!estoquePersist.persisted || !movPersist.persisted) {
-        showToast({ type: 'warning', message: 'Não foi possível confirmar a entrada agora.' });
+      try {
+        onRegistrarEntradaEstoque({
+          itemId: Number(form.item_id),
+          qtd: Number(form.qtd),
+          custo: Number(form.custo || 0),
+          data: form.data,
+          fornecedor: form.fornecedor.trim(),
+          obs: [form.nf ? `NF ${form.nf.trim()}` : '', form.obs.trim()].filter(Boolean).join(' • '),
+        });
+      } catch (error) {
+        showToast({ type: 'error', message: error?.message || 'Não foi possível registrar a entrada. Nenhuma alteração foi realizada.' });
+        return;
       }
+      showToast({ type: 'success', message: 'Entrada registrada.' });
       onClose();
     });
   }
@@ -719,7 +682,7 @@ function EntradaModal({ db, setDb, selectedItem, estoqueMap, onOpenCadastroItem,
   );
 }
 
-function SaidaModal({ db, setDb, selectedItem, onRegistrarSaidaEstoque, estoqueMap, onClose, hasPermission, showToast, session }) {
+function SaidaModal({ db, selectedItem, onRegistrarSaidaEstoque, estoqueMap, onClose, hasPermission, showToast }) {
   const [form, setForm] = useState({
     item_id: selectedItem?.id || '',
     tipo: 'consumo',
@@ -741,13 +704,11 @@ function SaidaModal({ db, setDb, selectedItem, onRegistrarSaidaEstoque, estoqueM
         ? `Máximo ${formatNumber(saldo, 2)}`
         : '';
 
-  function categoriaDespesa(cat) {
-    const lowerCat = (cat || '').toLowerCase();
-    if (['ração', 'racao', 'suplemento', 'insumo'].includes(lowerCat)) return 'Alimentação';
-    if (['medicamento', 'sanitário', 'sanitario', 'vacina'].includes(lowerCat)) return 'Sanitário';
-    return 'Outros';
-  }
-
+  // Usa sempre `registrarSaidaEstoque` (services/movimentacoes.js) — é a
+  // única fonte de verdade do enum canônico de tipos (EST-01 da auditoria
+  // 360º). Nunca fecha o modal nem limpa o formulário em caso de erro: o
+  // serviço agora lança (nunca falha silenciosamente), e aqui isso vira uma
+  // mensagem clara, mantendo os dados digitados para o produtor tentar de novo.
   async function submit() {
     if (!hasPermission('estoque:editar')) {
       showToast({ type: 'error', message: 'Você não tem permissão para executar esta ação.' });
@@ -755,12 +716,12 @@ function SaidaModal({ db, setDb, selectedItem, onRegistrarSaidaEstoque, estoqueM
     }
     const qtd = quantidadeInformada ?? 0;
     if (!form.data || !form.item_id || qtd <= 0 || qtd > saldo) {
-      alert('Verifique os campos e a quantidade.');
+      showToast({ type: 'warning', message: 'Verifique os campos e a quantidade.' });
       return;
     }
 
-    if (typeof onRegistrarSaidaEstoque === 'function') {
-      await executar(async () => {
+    await executar(async () => {
+      try {
         onRegistrarSaidaEstoque({
           itemId: Number(form.item_id),
           loteId: form.lote_id ? Number(form.lote_id) : '',
@@ -769,72 +730,13 @@ function SaidaModal({ db, setDb, selectedItem, onRegistrarSaidaEstoque, estoqueM
           data: form.data,
           obs: form.obs.trim(),
         });
-        onClose();
-      });
-      return;
-    }
-
-    const valor = qtd * Number(item?.valor_unitario || item?.preco_unitario || 0);
-    const novoSaldo = saldo - qtd;
-    const estoquePersist = await updateOperationalRecord('estoque', Number(form.item_id), { quantidade_atual: novoSaldo, quantidade: novoSaldo }, session);
-    const movEstoquePersist = await createOperationalRecord('movimentacoes_estoque', {
-      item_estoque_id: Number(form.item_id),
-      tipo: form.tipo,
-      lote_id: form.lote_id ? Number(form.lote_id) : null,
-      quantidade: qtd,
-      data: form.data,
-      valor_total: valor,
-      obs: form.obs,
-    }, session);
-    const movFinancePersist = form.lote_id
-      ? await createOperationalRecord('movimentacoes_financeiras', {
-          tipo: 'despesa',
-          categoria: categoriaDespesa(item?.categoria),
-          valor,
-          data: form.data,
-          lote_id: Number(form.lote_id),
-          descricao: `Consumo de ${item?.produto}`,
-        }, session)
-      : { persisted: true, data: null };
-
-    setDb((prev) => ({
-      ...prev,
-      estoque: prev.estoque.map((i) => (i.id === Number(form.item_id)
-        ? { ...i, ...(estoquePersist.data || { quantidade_atual: getCurrentItemStockBalance(i) - qtd, quantidade: getCurrentItemStockBalance(i) - qtd }) }
-        : i)),
-      movimentacoes_estoque: [
-        ...(prev.movimentacoes_estoque || []),
-        movEstoquePersist.data || {
-          id: gerarNovoId(prev.movimentacoes_estoque || []),
-          item_estoque_id: Number(form.item_id),
-          tipo: form.tipo,
-          lote_id: form.lote_id ? Number(form.lote_id) : null,
-          quantidade: qtd,
-          data: form.data,
-          valor_total: valor,
-          obs: form.obs,
-        },
-      ],
-      movimentacoes_financeiras: form.lote_id
-        ? [
-            ...(prev.movimentacoes_financeiras || []),
-            movFinancePersist.data || {
-              id: gerarNovoId(prev.movimentacoes_financeiras || []),
-              tipo: 'despesa',
-              categoria: categoriaDespesa(item?.categoria),
-              valor,
-              data: form.data,
-              lote_id: Number(form.lote_id),
-              descricao: `Consumo de ${item?.produto}`,
-            },
-          ]
-        : (prev.movimentacoes_financeiras || []),
-    }));
-
-    if (!estoquePersist.persisted || !movEstoquePersist.persisted || !movFinancePersist.persisted) {
-      showToast({ type: 'warning', message: 'Saída salva parcialmente.' });
-    }
-    onClose();
+      } catch (error) {
+        showToast({ type: 'error', message: error?.message || 'Não foi possível registrar a saída do estoque. Nenhuma alteração foi realizada.' });
+        return;
+      }
+      showToast({ type: 'success', message: 'Saída registrada.' });
+      onClose();
+    });
   }
 
   return (
@@ -854,7 +756,6 @@ function SaidaModal({ db, setDb, selectedItem, onRegistrarSaidaEstoque, estoqueM
             <option value="tratamento">Tratamento</option>
             <option value="ajuste">Ajuste</option>
             <option value="perda">Perda</option>
-            <option value="saida">Saída</option>
           </select>
         </label>
         <label className="ui-input-wrap">

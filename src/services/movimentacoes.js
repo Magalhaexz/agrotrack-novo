@@ -539,17 +539,21 @@ export function registrarEntradaEstoque(
 ) {
   const estoque = Array.isArray(db?.estoque) ? db.estoque : [];
   const item = estoque.find((entry) => Number(entry.id) === Number(itemId));
+  // Nunca falha silenciosamente (P0 da auditoria 360º): antes devolvia `db`
+  // inalterado com um `console.warn`, e quem chamava fechava o modal como se
+  // tivesse dado certo. Agora lança, e o modal (EstoquePage.jsx) mostra o erro
+  // e mantém o formulário aberto.
   if (!item) {
-    console.warn(`Item de estoque com ID ${itemId} não encontrado para entrada.`);
-    return db;
+    throw new Error(`Item de estoque não encontrado.`);
   }
 
   const quantidade = toNumber(qtd);
   const custoUnitario = toNumber(custo);
-
-  if (quantidade <= 0 || custoUnitario < 0) {
-    console.warn('Dados de entrada de estoque inválidos (quantidade ou custo).');
-    return db;
+  if (quantidade <= 0) {
+    throw new Error('Informe uma quantidade válida.');
+  }
+  if (custoUnitario < 0) {
+    throw new Error('Informe um custo unitário válido.');
   }
 
   const movimentosEstoque = Array.isArray(db?.movimentacoes_estoque)
@@ -648,23 +652,27 @@ export function registrarSaidaEstoque(
   userContext = {},
   persistContext = {}
 ) {
-  const tiposValidos = ['consumo', 'ajuste', 'perda', 'venda']; // Adicionado 'venda' como tipo válido
+  // Enum canônico das saídas de estoque (auditoria 360º, EST-01): a UI
+  // (EstoquePage.jsx) só pode oferecer tipos que existem aqui — "tratamento"
+  // foi adicionado porque o formulário já o oferecia sem o serviço reconhecer,
+  // e a chamada falhava silenciosamente (`console.warn` + `db` inalterado,
+  // com o modal fechando como se tivesse dado certo). Nunca mais falha
+  // silenciosamente: tipo/item/quantidade inválidos agora lançam erro, e quem
+  // chama (EstoquePage.jsx) mostra a mensagem e mantém o formulário aberto.
+  const tiposValidos = ['consumo', 'tratamento', 'ajuste', 'perda', 'venda'];
   if (!tiposValidos.includes(tipo)) {
-    console.warn(`Tipo de saída de estoque inválido: ${tipo}.`);
-    return db;
+    throw new Error(`Tipo de saída inválido: ${tipo}.`);
   }
 
   const estoque = Array.isArray(db?.estoque) ? db.estoque : [];
   const item = estoque.find((entry) => Number(entry.id) === Number(itemId));
   if (!item) {
-    console.warn(`Item de estoque com ID ${itemId} não encontrado para saída.`);
-    return db;
+    throw new Error('Item de estoque não encontrado.');
   }
 
   const qtd = toNumber(quantidade);
   if (qtd <= 0) {
-    console.warn('Quantidade de saída de estoque inválida (deve ser maior que zero).');
-    return db;
+    throw new Error('Informe uma quantidade válida.');
   }
 
   const saldoAtual = toNumber(item.quantidade_atual);
@@ -708,19 +716,22 @@ export function registrarSaidaEstoque(
     ),
     movimentacoes_financeiras: [
       ...movimentosFinanceiros,
-      // Adiciona movimentação financeira se for consumo ou venda
-      ...(tipo === 'consumo' && loteId
+      // Consumo e tratamento geram despesa quando vinculados a um lote
+      // (ajuste/perda são correções internas, sem lançamento financeiro).
+      ...((tipo === 'consumo' || tipo === 'tratamento') && loteId
         ? [
             {
               id: gerarNovoId(movimentosFinanceiros),
               tipo: 'despesa',
-              categoria: 'consumo_estoque',
+              categoria: tipo === 'tratamento' ? 'tratamento_sanitario' : 'consumo_estoque',
               lote_id: Number(loteId),
               valor: valorTotalSaida,
               data,
               data_competencia: data,
               status: 'realizado',
-              descricao: `Consumo de ${item.produto || 'Item'} para o lote ${loteId}`,
+              descricao: tipo === 'tratamento'
+                ? `Tratamento com ${item.produto || 'Item'} no lote ${loteId}`
+                : `Consumo de ${item.produto || 'Item'} para o lote ${loteId}`,
               origem_tipo: 'movimentacao_estoque',
               origem_id: novoMovEstoqueId,
             },
