@@ -12,6 +12,7 @@ import { INTENCOES } from '../src/domain/telegram/interpretarComandoTelegram.js'
 import { interpretarMensagemTelegram, LIMIAR_EXECUTAR } from '../src/domain/telegram/interpretadorTelegram.js';
 import { podeExecutarComandoTelegram, intencaoEhCadastro } from '../src/domain/telegram/permissoesTelegram.js';
 import { resolverFazendaPorNome, resolverLotePorNome } from '../src/domain/telegram/resolvedores.js';
+import { interpretarSelecaoFazenda } from '../src/domain/telegram/selecaoFazendaPendente.js';
 import {
   formatarFazendas, formatarLotes, formatarLote, formatarEstoque,
   formatarFinanceiro, formatarManejos, formatarPesagens, formatarResumo,
@@ -86,6 +87,14 @@ const INTENCOES_ESCOPADAS = new Set([
   INTENCOES.IGNORAR_ALERTA, INTENCOES.ADIAR_ALERTA, INTENCOES.REABRIR_ALERTA,
   INTENCOES.EXCLUIR_PASTO,
 ]);
+
+// Sentinela do `intencao_atual` usado para marcar, na MESMA tabela
+// `telegram_conversas` das conversas de cadastro, a pendência de "escolha uma
+// fazenda antes de continuar" (bug original: uma resposta como "1" não batia
+// em nenhuma intenção conhecida e caía direto no fallback de ajuda). Nunca
+// colide com um valor de `INTENCOES`, que são todos identificadores de
+// `interpretarComandoTelegram.js`.
+const SELECAO_FAZENDA_SENTINELA = '__SELECIONAR_FAZENDA_PENDENTE__';
 
 const MSG = {
   SEM_PERMISSAO: 'Você não tem permissão para isso nesta fazenda.',
@@ -230,6 +239,13 @@ async function processarComandoBotInterno({ client, conexao, texto, chatId, agor
   // conversa é resposta a um slot opcional (ex.: "pertence a algum lote?").
   const cancelExplicito = /^\/?(?:cancelar|cancela|desistir|abortar)\b/i.test(String(texto || '').trim());
 
+  // -1. Seleção de fazenda pendente tem PRIORIDADE sobre tudo, inclusive o
+  //     fallback de ajuda: uma resposta como "1" nunca bate em nenhuma
+  //     intenção conhecida (`intent.intencao` viria DESCONHECIDO), e sem esta
+  //     checagem cairia direto no fluxo legado do webhook (bug original).
+  const respostaSelecao = await tratarSelecaoFazendaPendente(client, conexao, chatId, texto, ehSlash, cancelExplicito, agora);
+  if (respostaSelecao) return respostaSelecao;
+
   // 0. Conversa em etapas ativa? Texto simples (não-slash) é resposta a ela.
   //    /comando ou cancelamento explícito interrompem. (Parte 4)
   const conversa = await buscarConversaAtiva(client, chatId, agora);
@@ -294,13 +310,18 @@ async function processarComandoBotInterno({ client, conexao, texto, chatId, agor
   }
 
   // Intenções escopadas: exigem fazenda definida quando há mais de uma.
+  // Guarda a pendência (mesma tabela/padrão das conversas de cadastro) para
+  // que a PRÓXIMA mensagem — "1", o nome, ou "usar fazenda NOME" — resolva a
+  // escolha e retome esta intenção original automaticamente, em vez de exigir
+  // que o comando seja reenviado.
   if (INTENCOES_ESCOPADAS.has(intent.intencao) && fazendas.length > 1 && conexao.fazenda_id == null) {
+    await salvarSelecaoFazendaPendente(client, conexao, fazendas, intent, texto, agora);
     return { texto: [
       'Você possui mais de uma fazenda. Escolha uma antes de continuar:',
       '',
       listaNumerada(fazendas),
       '',
-      'Envie: usar fazenda NOME',
+      'Envie: usar fazenda NOME, ou apenas o número da opção.',
     ].join('\n') };
   }
 
@@ -388,6 +409,121 @@ async function selecionarFazenda(client, conexao, fazendas, nome, textoOriginal)
   });
   conexao.fazenda_id = r.fazenda.id; // reflete na conexão em memória
   return `Fazenda alterada com sucesso.\n\nFazenda atual: ${r.fazenda.nome}.\nTodos os próximos comandos usarão essa fazenda.`;
+}
+
+// ── Seleção de fazenda PENDENTE (correção da seleção numérica) ──────────────
+// Guarda, na mesma linha/tabela `telegram_conversas` das conversas de
+// cadastro (nunca coexistem — uma cancela a outra), a lista EXATA mostrada ao
+// usuário e a intenção original interrompida, para retomá-la sem exigir que o
+// comando seja reenviado.
+async function buscarSelecaoFazendaPendente(client, chatId) {
+  const { data } = await client.from('telegram_conversas')
+    .select('*')
+    .eq('telegram_chat_id', String(chatId))
+    .eq('status', STATUS_CONVERSA.ATIVA)
+    .eq('intencao_atual', SELECAO_FAZENDA_SENTINELA)
+    .order('atualizado_em', { ascending: false })
+    .limit(1)
+    .maybeSingle();
+  return data || null;
+}
+
+async function salvarSelecaoFazendaPendente(client, conexao, fazendas, intentOriginal, textoOriginal, agora) {
+  await client.from('telegram_conversas').insert({
+    owner_user_id: conexao.owner_user_id,
+    user_id: conexao.user_id,
+    telegram_chat_id: conexao.telegram_chat_id,
+    fazenda_id: null,
+    intencao_atual: SELECAO_FAZENDA_SENTINELA,
+    etapa_atual: 'selecionar_fazenda',
+    dados_coletados: {
+      opcoes: fazendas.map((f, idx) => ({ indice: idx + 1, fazenda_id: f.id, nome: f.nome })),
+      intencaoOriginal: intentOriginal.intencao,
+      parametrosOriginais: intentOriginal.parametros,
+      textoOriginal,
+    },
+    status: STATUS_CONVERSA.ATIVA,
+    expira_em: calcularExpiraConversa(agora).toISOString(),
+  });
+}
+
+// Chamada no topo de `processarComandoBotInterno`, ANTES de classificar a
+// mensagem — uma resposta como "1" nunca bate em nenhuma intenção conhecida,
+// então sem isto o fallback de ajuda do webhook (fluxo legado) a interceptava
+// primeiro. Devolve `null` quando não há pendência (segue o fluxo normal).
+async function tratarSelecaoFazendaPendente(client, conexao, chatId, texto, ehSlash, cancelExplicito, agora) {
+  const pendente = await buscarSelecaoFazendaPendente(client, chatId);
+  if (!pendente) return null;
+
+  if (conversaExpirada(pendente, agora)) {
+    await encerrarConversa(client, pendente.id, STATUS_CONVERSA.EXPIRADA);
+    // Um /comando novo não precisa do aviso de expiração — só segue normal.
+    return ehSlash ? null : { texto: 'Essa seleção expirou.\n\nEnvie novamente o comando que deseja realizar.' };
+  }
+
+  if (cancelExplicito) {
+    await encerrarConversa(client, pendente.id, STATUS_CONVERSA.CANCELADA);
+    return { texto: MSG.CADASTRO_CANCELADO };
+  }
+  // Um /comando novo (não-cancelamento) interrompe a pendência, igual às
+  // conversas de cadastro, e segue para classificar esse comando normalmente.
+  if (ehSlash) {
+    await encerrarConversa(client, pendente.id, STATUS_CONVERSA.CANCELADA);
+    return null;
+  }
+
+  const { opcoes, intencaoOriginal, parametrosOriginais, textoOriginal } = pendente.dados_coletados || {};
+  const r = interpretarSelecaoFazenda(texto, opcoes);
+
+  if (r.status === 'ambiguo') {
+    return { texto: `Encontrei mais de uma fazenda parecida. Qual delas você deseja usar?\n\n${listaNumerada(r.candidatos)}` };
+  }
+  if (r.status !== 'ok') {
+    return { texto: [
+      'Não encontrei essa opção.',
+      '',
+      'Escolha uma das fazendas abaixo:',
+      '',
+      listaNumerada(opcoes || [], 'nome'),
+    ].join('\n') };
+  }
+
+  // Nunca confia cegamente no fazenda_id da pendência: revalida contra a
+  // conta no momento da resposta (a fazenda pode ter sido removida nesse
+  // meio-tempo, ou pertencer a outra conta).
+  const dbConta = await montarDbDaConta(client, conexao.owner_user_id);
+  const fazendaAtual = (dbConta.fazendas || []).find((f) => Number(f.id) === Number(r.opcao.fazenda_id));
+  if (!fazendaAtual) {
+    await encerrarConversa(client, pendente.id, STATUS_CONVERSA.CANCELADA);
+    return { texto: MSG.FAZENDA_SEM_ACESSO };
+  }
+
+  const { error } = await client.from('telegram_connections').update({ fazenda_id: fazendaAtual.id }).eq('id', conexao.id);
+  if (error) return { texto: MSG.FALHA };
+
+  await registrarAuditoria(client, conexao, {
+    acao: 'trocar_fazenda', intencao: 'SELECIONAR_FAZENDA', comando_original: texto,
+    dados_anteriores: { fazenda_id: conexao.fazenda_id }, dados_posteriores: { fazenda_id: fazendaAtual.id }, sucesso: true,
+  });
+  await encerrarConversa(client, pendente.id, STATUS_CONVERSA.CONCLUIDA);
+  // ponytail: seleção via lista pendente troca a fazenda ATIVA da conexão,
+  // igual ao "usar fazenda NOME" explícito — não existe hoje um conceito de
+  // fazenda "só para esta operação" no bot (fazenda_id é sempre da conexão);
+  // criar esse escopo temporário seria uma feature nova não pedida.
+  conexao.fazenda_id = fazendaAtual.id;
+
+  const confirmacao = `✅ Fazenda ${fazendaAtual.nome} selecionada.`;
+  if (!intencaoOriginal) return { texto: confirmacao };
+
+  // Retoma a intenção original recursivamente: com `conexao.fazenda_id` já
+  // definido, o portão de "mais de uma fazenda" mais abaixo passa direto e o
+  // switch da intenção executa normalmente — mesma função, mesmo caminho de
+  // qualquer comando novo.
+  const retomado = await processarComandoBotInterno({
+    client, conexao, texto: textoOriginal, chatId, agora,
+    intent: { intencao: intencaoOriginal, parametros: parametrosOriginais || {}, requerConfirmacao: false },
+  });
+  return { texto: retomado ? `${confirmacao}\n\n${retomado.texto}` : confirmacao };
 }
 
 // ── Preparar ação → operação pendente (Parte 15) ─────────────────────────────

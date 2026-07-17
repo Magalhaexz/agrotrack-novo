@@ -323,6 +323,111 @@ test('trocar de fazenda com uma única fazenda funciona; multi-fazenda sem sele�
   assert.match(r.texto, /mais de uma fazenda/i);
 });
 
+// ── Regressão: seleção numérica de fazenda retoma o comando original ────────
+function tablesDuasFazendas(perfil = 'operador') {
+  const tables = baseTables(perfil);
+  tables.fazendas[0].nome = 'yellowstone';
+  tables.fazendas.push({ id: 2, nome: 'Olhos D’água', owner_user_id: 'o1' });
+  tables.lotes.forEach((l) => { l.faz_id = 1; });
+  return tables;
+}
+
+test('regressão: /estoque com duas fazendas + "1" seleciona a primeira e retoma /estoque (nunca cai na ajuda)', async () => {
+  const tables = tablesDuasFazendas();
+  const client = makeClient(tables);
+  const c = { ...conexao(), fazenda_id: null };
+  const lista = await processarComandoBot({ client, conexao: c, texto: '/estoque', chatId: '123' });
+  assert.match(lista.texto, /mais de uma fazenda/i);
+  assert.match(lista.texto, /1\. yellowstone/);
+  assert.match(lista.texto, /2\. Olhos D’água/);
+
+  const r = await processarComandoBot({ client, conexao: c, texto: '1', chatId: '123' });
+  assert.match(r.texto, /Fazenda yellowstone selecionada/i);
+  assert.doesNotMatch(r.texto, /HERDON pelo Telegram/); // nunca é o fallback de ajuda
+  assert.equal(c.fazenda_id, 1);
+  assert.equal(tables.telegram_conversas[0].status, 'concluida');
+});
+
+test('resposta "2" seleciona a segunda opção da lista', async () => {
+  const tables = tablesDuasFazendas();
+  const client = makeClient(tables);
+  const c = { ...conexao(), fazenda_id: null };
+  await processarComandoBot({ client, conexao: c, texto: '/estoque', chatId: '123' });
+  const r = await processarComandoBot({ client, conexao: c, texto: '2', chatId: '123' });
+  assert.match(r.texto, /Fazenda Olhos D’água selecionada/i);
+  assert.equal(c.fazenda_id, 2);
+});
+
+test('seleção por nome, "usar fazenda NOME" e "opção 1" também retomam o comando', async () => {
+  for (const resposta of ['yellowstone', 'usar fazenda yellowstone', 'opção 1', 'fazenda 1']) {
+    const tables = tablesDuasFazendas();
+    const client = makeClient(tables);
+    const c = { ...conexao(), fazenda_id: null };
+    await processarComandoBot({ client, conexao: c, texto: '/estoque', chatId: '123' });
+    const r = await processarComandoBot({ client, conexao: c, texto: resposta, chatId: '123' });
+    assert.match(r.texto, /Fazenda yellowstone selecionada/i, `falhou para "${resposta}"`);
+    assert.equal(c.fazenda_id, 1, `falhou para "${resposta}"`);
+  }
+});
+
+test('número fora da faixa reapresenta a lista, sem escolher nada', async () => {
+  const tables = tablesDuasFazendas();
+  const client = makeClient(tables);
+  const c = { ...conexao(), fazenda_id: null };
+  await processarComandoBot({ client, conexao: c, texto: '/estoque', chatId: '123' });
+  const r = await processarComandoBot({ client, conexao: c, texto: '3', chatId: '123' });
+  assert.match(r.texto, /Não encontrei essa opção/i);
+  assert.match(r.texto, /1\. yellowstone/);
+  assert.equal(c.fazenda_id, null);
+});
+
+test('contexto expirado avisa e não seleciona', async () => {
+  const tables = tablesDuasFazendas();
+  const client = makeClient(tables);
+  const c = { ...conexao(), fazenda_id: null };
+  await processarComandoBot({ client, conexao: c, texto: '/estoque', chatId: '123' });
+  tables.telegram_conversas[0].expira_em = new Date(Date.now() - 60_000).toISOString();
+  const r = await processarComandoBot({ client, conexao: c, texto: '1', chatId: '123' });
+  assert.match(r.texto, /expirou/i);
+  assert.equal(c.fazenda_id, null);
+  assert.equal(tables.telegram_conversas[0].status, 'expirada');
+});
+
+test('fallback de ajuda não intercepta "1": /ajuda explícito interrompe a pendência e responde a ajuda normalmente', async () => {
+  const tables = tablesDuasFazendas();
+  const client = makeClient(tables);
+  const c = { ...conexao(), fazenda_id: null };
+  await processarComandoBot({ client, conexao: c, texto: '/estoque', chatId: '123' });
+  const r = await processarComandoBot({ client, conexao: c, texto: '/ajuda', chatId: '123' });
+  assert.match(r.texto, /HERDON pelo Telegram/);
+  assert.equal(tables.telegram_conversas[0].status, 'cancelada');
+});
+
+test('mesma lógica funciona para uma intenção de escrita (/tarefas): retoma o cadastro em etapas', async () => {
+  const tables = tablesDuasFazendas('gerente');
+  const client = makeClient(tables);
+  const c = { ...conexao(), fazenda_id: null };
+  await processarComandoBot({ client, conexao: c, texto: 'crie uma tarefa para pesar o lote amanha', chatId: '123' });
+  const r = await processarComandoBot({ client, conexao: c, texto: '2', chatId: '123' });
+  assert.match(r.texto, /Fazenda Olhos D’água selecionada/i);
+  assert.match(r.texto, /vinculada a algum lote/i); // retomou a conversa de cadastro da tarefa
+  assert.equal(c.fazenda_id, 2);
+});
+
+test('visualizador: consulta (permitida) fica pendente de fazenda e é retomada normalmente após a seleção', async () => {
+  // Escrita é negada ANTES do portão de fazenda (permissão é checada primeiro
+  // — ver "visualizador não cadastra despesa" acima), então só consultas
+  // chegam a criar a pendência de seleção para este perfil.
+  const tables = tablesDuasFazendas('visualizador');
+  const client = makeClient(tables);
+  const c = { ...conexao(), fazenda_id: null };
+  await processarComandoBot({ client, conexao: c, texto: '/estoque', chatId: '123' });
+  const r = await processarComandoBot({ client, conexao: c, texto: '1', chatId: '123' });
+  assert.match(r.texto, /Fazenda yellowstone selecionada/i);
+  assert.equal(c.fazenda_id, 1);
+  assert.equal(tables.telegram_conversas.filter((x) => x.status === 'ativa').length, 0);
+});
+
 // ── Sprint bot operacional determinístico: 4 novos cadastros/ações (fim a fim) ──
 test('cadastrar tarefa: título e data extraídos de uma mensagem, lote perguntado em seguida, depois confirma', async () => {
   const tables = baseTables('operador');
