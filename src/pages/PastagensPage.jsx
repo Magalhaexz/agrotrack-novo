@@ -98,10 +98,17 @@ export default function PastagensPage({ db, setDb, session, onConfirmAction }) {
 
   const indicadores = useMemo(() => {
     const animais = Array.isArray(db?.animais) ? db.animais : [];
+    const lotes = Array.isArray(db?.lotes) ? db.lotes : [];
     const areaTotalPastagem = pastagens.reduce((sum, item) => sum + toNumber(item.area_ha), 0);
     const capacidadeTotalUa = calcularCapacidadeTotalUa(pastagens);
-    const cabecasTotais = animais.reduce((sum, item) => sum + toNumber(item.qtd), 0);
-    const diagnostico = calcularDiagnosticoCapacidade({ animais, pastagens });
+    // Cabeças totais e UA seguem lote.qtd de lotes ATIVOS (teste de campo
+    // PST-2): antes somava animais[] cru, sem filtrar lote finalizado/
+    // vendido — um lote encerrado continuava contando na capacidade da
+    // fazenda para sempre.
+    const cabecasTotais = lotes
+      .filter((l) => String(l?.status || 'ativo') === 'ativo')
+      .reduce((sum, l) => sum + toNumber(l.qtd), 0);
+    const diagnostico = calcularDiagnosticoCapacidade({ animais, pastagens, lotes });
     const uaTotalFazenda = diagnostico.uaTotalFazenda;
     const taxaLotacaoUaHa = areaTotalPastagem > 0 ? uaTotalFazenda / areaTotalPastagem : 0;
     const lotacaoCabecaHa = areaTotalPastagem > 0 ? cabecasTotais / areaTotalPastagem : 0;
@@ -130,7 +137,8 @@ export default function PastagensPage({ db, setDb, session, onConfirmAction }) {
       (Array.isArray(db?.lotes) ? db.lotes : []).map((lote) => ({
         id: lote.id,
         nome: lote.nome || `Lote ${lote.id}`,
-        ua: calcularUaPorLote(Array.isArray(db?.animais) ? db.animais : [], lote.id),
+        // 3º argumento: usa lote.qtd (canônico) como contagem, não animais[] cru.
+        ua: calcularUaPorLote(Array.isArray(db?.animais) ? db.animais : [], lote.id, lote),
       }))
     ),
     [db]

@@ -71,7 +71,10 @@ export function calcularOcupacaoPasto(pasto, lotes = [], animais = []) {
   const pesoMedioEstimado = somaQtdAnimais > 0 ? somaPeso / somaQtdAnimais : 0;
   const pesoTotalEstimado = somaPeso;
 
-  const uaEstimada = lotesAtivos.reduce((soma, l) => soma + calcularUaPorLote(animais, l.id), 0);
+  // 3º argumento: usa lote.qtd (canônico) como contagem, não animais[] cru —
+  // teste de campo PST-1, mesma causa raiz do bug de venda já corrigido em
+  // src/services/movimentacoes.js.
+  const uaEstimada = lotesAtivos.reduce((soma, l) => soma + calcularUaPorLote(animais, l.id, l), 0);
 
   const areaHa = toNumber(pasto?.area_ha) || null;
   const capacidadeUaHa = toNumber(pasto?.capacidade_suporte_ua_ha) || null;

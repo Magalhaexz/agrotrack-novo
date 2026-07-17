@@ -280,6 +280,10 @@ export function computeIndicadoresEstrategicos(db, periodStart, periodEnd) {
   const capacidade = calcularDiagnosticoCapacidade({
     animais: Array.isArray(db?.animais) ? db.animais.filter(isAnimalAtivo) : [],
     pastagens: Array.isArray(db?.pastagens) ? db.pastagens : [],
+    // Filtra por lote.status (não confundir com isAnimalAtivo acima, que é o
+    // status do registro INDIVIDUAL de animal) — lote encerrado/vendido não
+    // deve continuar ocupando capacidade da fazenda (teste de campo PST-2).
+    lotes: Array.isArray(db?.lotes) ? db.lotes : [],
   });
 
   return {
