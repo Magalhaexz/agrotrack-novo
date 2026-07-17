@@ -6,6 +6,10 @@
 > **Atualização (Onda 0, mesmo dia)**: retomado a partir de `43b47d5` para fechar o P0 de Estoque
 > que ficou aberto na primeira rodada (§3.1 abaixo). Baseline desta rodada: 1550/1550 testes, lint e
 > build limpos, `HEAD == origin/main == 43b47d5`.
+>
+> **Atualização (Teste de Campo, mesmo dia)**: retomado a partir de `fd72af4` para incorporar 5
+> problemas observados em uso real do app (não achados de auditoria de código, mas relatos de
+> campo) — ver §8 abaixo. Baseline: 1556/1556 testes, lint e build limpos.
 
 ## Escopo
 
@@ -209,7 +213,47 @@ aparece) podem existir sem terem sido detectados.
 - `RetiradaAnimaisModal.jsx`, `FechamentoLoteModal.jsx`, `MoverPastoModal.jsx`: auditados via seus
   pontos de entrada em `LotesPage.jsx`, não linha a linha.
 
-## 7. Custo de IA
+## 8. Teste de Campo — 5 problemas do uso real (CAMPO-01 a CAMPO-05)
+
+Detalhe completo na matriz (§Teste de Campo). Resumo:
+
+- **CAMPO-01 (Fazendas, P1, corrigido)**: um lote **encerrado** — sem nenhuma operação ativa — ainda
+  bloqueava a exclusão da fazenda para sempre, sem nenhum caminho oferecido. Achado interessante: o
+  campo `fazendas.status` (`'ativa'`/`'inativa'`) e a tela de edição (`FazendaModal.jsx`) **já
+  suportavam inativação** — a lacuna era só a mensagem de bloqueio nunca mencionar essa saída.
+  Corrigido ajustando a mensagem para orientar `Editar fazenda → Status → Inativa`, e ampliando a
+  checagem de vínculos para também considerar `pastagens`/`tarefas` (que podem existir sem nenhum
+  lote, e antes não bloqueavam a exclusão).
+- **CAMPO-02 (Pastagens, P2, corrigido)**: os indicadores de capacidade/lotação por UA (Unidade
+  Animal) tinham a MESMA causa raiz do bug de venda já corrigido nesta auditoria (VND-01) — somavam
+  `animais[]` cru em vez de `lote.qtd` canônico, e não filtravam lotes finalizados/vendidos.
+  `calcularUaPorLote`/`calcularUaTotalFazenda` (`src/domain/unidadeAnimal.js`) ganharam um argumento
+  opcional para usar a contagem canônica quando disponível, preservando 100% de compatibilidade com
+  quem ainda não o passa.
+- **CAMPO-03 (Pastagens, cadastro de pasto)**: retestado — sem regressão das mudanças acima (só os
+  cálculos de indicador foram tocados, não o formulário de cadastro). Mobile e multi-fazenda **ainda
+  não verificados ao vivo**.
+- **CAMPO-04 (Lotes, P1, corrigido)**: o cadastro de lote em conta com múltiplas fazendas mostrava só
+  a fazenda ativa — como **texto fixo**, sem nenhum `<select>`. Confirmei que o dado em si já estava
+  correto (`db.fazendas` sempre traz todas as fazendas da conta, mesmo em telas com recorte por
+  fazenda ativa — `escopoFazenda.js::filtrarDbPorFazenda` nunca filtra essa chave); o bug era 100% de
+  apresentação. Corrigido: vira um `<select>` real com todas as fazendas ATIVAS quando o lote é novo
+  e há mais de uma; a escolha manual do produtor não é mais sobrescrita pela sincronização automática
+  com a fazenda ativa da conta.
+- **CAMPO-05 (Suplementação, cadastro de dieta)**: **não implementado nesta rodada.** Investigação
+  confirmou que "Dieta" hoje só suporta 1 produto na prática (`itens[0]`) e — mais importante — **não
+  existe uma tabela `dietas` no banco** (confirmado via `information_schema.tables`): é uma feature
+  100% local, nunca persiste na nuvem (mesmo achado de SUP-01 da rodada anterior). Implementar o
+  fluxo pedido (múltiplos itens, ações rápidas de copiar/repetir/pausar/finalizar, wizard em etapas)
+  exigiria criar uma tabela nova + migration + camada de serviço + reescrita de UI — uma feature
+  nova, não uma correção, e arriscada de fazer sem navegador para verificar visualmente. Proposta
+  detalhada registrada em `AUDITORIA_UX_ESTOQUE_SUPLEMENTACAO.md` para quando houver QA visual
+  disponível.
+
+Nenhum dos 5 itens foi validado ao vivo em navegador — mesma limitação das rodadas anteriores desta
+auditoria (ver §9).
+
+## 9. Custo de IA
 
 `grep -R` por `ANTHROPIC_API_KEY`, `@anthropic-ai/sdk`, chamadas a OpenAI/Gemini em todo o código da
 aplicação (excluindo `node_modules`/plugins do Obsidian, que não fazem parte do HERDON): **zero

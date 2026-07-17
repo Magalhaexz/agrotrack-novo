@@ -75,22 +75,34 @@
 
 ---
 
+## Teste de Campo (retomada 3, mesmo dia) — 5 achados reportados pelo uso real
+
+| ID | Módulo | Tela | Operação | Encontrável | Funciona | Persiste | Permissão | Severidade | Evidência | Status |
+|---|---|---|---|---|---|---|---|---|---|---|
+| CAMPO-01 | Fazendas | Excluir fazenda | Lote **encerrado** (sem nenhuma operação ativa) ainda bloqueava a exclusão para sempre, sem nenhum caminho oferecido ao usuário | Sim | ~~Não~~ Sim | ~~Não~~ Sim | `fazendas:editar` | **P1** | `src/pages/FazendasPage.jsx::excluirFazenda` — `hasLinkedRecords` checava qualquer lote, sem distinguir status; coluna `fazendas.status` (default `'ativa'`) e o campo "Status" no `FazendaModal.jsx` **já existiam no banco e na tela de edição**, mas a mensagem de bloqueio nunca mencionava essa saída | ✅ **corrigido** — mensagem agora orienta a inativar (`Editar fazenda → Status → Inativa`, fluxo que já existia); `pastagens`/`tarefas` (que podem existir sem nenhum lote) entraram na checagem de bloqueio, que antes só olhava `lotes/animais/financeiro/estoque/sanitário` |
+| CAMPO-02 | Pastagens | Indicadores de capacidade/lotação | `uaEstimada`/status de lotação por pasto e o KPI de UA da fazenda somavam `animais[]` cru (não `lote.qtd`) e não filtravam lotes finalizados/vendidos — mesma classe de bug já corrigida para venda (VND-01) | Sim (sempre visível) | ~~Não~~ Sim | N/A (leitura) | N/A | **P2** | `src/domain/unidadeAnimal.js` (`calcularUaPorLote`/`calcularUaTotalFazenda`, agora aceitam lote/lotes canônicos), `src/domain/ocupacaoPastos.js`, `src/pages/PastagensPage.jsx`, `src/domain/indicadoresEstrategicos.js` | ✅ **corrigido** (mesma correspondência de PST-1/PST-2 já documentada) |
+| CAMPO-03 | Pastagens | Cadastro de pasto | Retestado após as mudanças de Lotes/Fazendas/UA desta rodada — nenhuma regressão: o formulário de cadastro em si não foi tocado | Sim | Sim | Sim | Sim | OK | `src/pages/PastagensPage.jsx` (formulário "Cadastrar pasto"/"Editar pasto", inline na própria página — não alterado nesta rodada, só os cálculos de indicadores acima dele) | ✅ aprovado — mobile e multi-fazenda **ainda não verificados ao vivo** (sem navegador autenticado) |
+| CAMPO-04 | Lotes | Cadastro de lote (conta multi-fazenda) | Campo "Fazenda" era só um texto fixo mostrando a fazenda ativa da conta — **sem select**, impossível escolher outra fazenda para o novo lote sem trocar a fazenda ativa em outra tela e reabrir o formulário | Sim | ~~Não~~ Sim | ~~Não~~ Sim | `lotes:editar` | **P1** | `src/components/LoteForm.jsx` — o campo era um `<span>` somente leitura (`fazendaSelecionada?.nome`); `db.fazendas` (fonte real) já continha todas as fazendas da conta (confirmado em `src/domain/escopoFazenda.js::filtrarDbPorFazenda`, que nunca filtra a chave `fazendas`) — o problema era 100% de apresentação, não de dado | ✅ **corrigido** — vira `<select>` real quando há mais de uma fazenda ATIVA e o lote é novo (edição de lote continua com o texto fixo, por ser uma operação maior fora de escopo); escolha manual do usuário não é mais sobrescrita pelo efeito de sincronização com a fazenda ativa da conta; fazenda **inativa** não é oferecida como destino de lote novo |
+| CAMPO-05 | Suplementação | Cadastro de dieta | Fluxo difícil/pouco intuitivo — confirmado: só 1 produto por dieta na prática (`itens[0]`), sem tabela `dietas` no banco (dieta é 100% local, nunca persiste — já era SUP-01), sem ações rápidas (copiar/repetir/pausar/finalizar) | Sim | Parcial | **Não** | `estoque:editar` | **P1** (já registrado como SUP-01) | `src/pages/SuplementacaoPage.jsx` (`getDietaEditData` usa só `itens[0]`); `information_schema.tables` confirma que **não existe tabela `dietas`** no banco | 🔴 **não implementado nesta rodada** — redesenho completo (múltiplos itens, persistência real com migration nova, ações rápidas, wizard) é uma feature nova, não uma correção; exige navegador autenticado para não arriscar quebrar UI às cegas. Ver proposta detalhada em `AUDITORIA_UX_ESTOQUE_SUPLEMENTACAO.md` |
+
 ## Números desta rodada
-- **48 achados** registrados (contando os já corrigidos).
-- **4 P0** encontrados: **todos os 4 corrigidos** — venda/RPC do Telegram, Ajuste de Lotação, RLS de
-  perfil (auditoria anterior) e Estoque "Tratamento"/"Saída" falhando silenciosamente (esta rodada).
-- **2 P1 corrigidos** nesta rodada (EST-01/EST-02: Estoque); 3 P1 abertos (RLS granular por módulo,
-  planejamento de suplementação sem persistência, LOT-2 pesagem retroativa).
-- Suíte de testes: 1556/1556 passando após as correções desta rodada (1550 no baseline desta
-  rodada; 1544 antes da auditoria anterior).
+- **53 achados** registrados no total (48 da auditoria original + 5 do teste de campo).
+- **4 P0** — todos corrigidos (nenhum P0 novo neste teste de campo).
+- **3 P1 corrigidos** nesta retomada (CAMPO-01 exclusão de fazenda, CAMPO-04 seletor de fazenda no
+  lote) além dos 2 já corrigidos na retomada anterior (EST-01/EST-02); **4 P1 abertos** (RLS
+  granular, LOT-2 pesagem retroativa, CAMPO-05 redesenho de dieta — mesmo item que SUP-01 já
+  registrava, e um novo achado de dieta multi-item/ações rápidas incorporado ao mesmo item).
+- **1 P2 corrigido** nesta retomada (CAMPO-02, capacidade de pasto por UA).
+- Suíte de testes: 1559/1559 passando após as correções desta rodada (1556 antes desta retomada).
 
 ## Limitações desta auditoria
-- **Sem navegador autenticado** nesta sessão (nem na anterior): as credenciais em `.env.e2e`
-  continuam retornando `Invalid login credentials` do Supabase Auth ao tentar logar (retestado nesta
-  rodada, mesma senha, mesmo erro) — nenhuma tela foi clicada ao vivo, nenhum viewport/perfil/
-  Telegram/multi-fazenda foi validado visualmente. Recomendo o usuário rotacionar/confirmar essas
-  credenciais antes da próxima sessão de QA visual; não é seguro nem apropriado tentar adivinhar a
-  senha correta ou criar uma conta nova sem autorização explícita.
+- **Sem navegador autenticado**, confirmado em 2 rodadas anteriores desta mesma auditoria (mesma
+  senha em `.env.e2e`, mesmo erro `Invalid login credentials` do Supabase). Não repeti a tentativa
+  nesta 3ª rodada (retestar a mesma credencial inalterada não traria informação nova) — nenhuma tela
+  foi clicada ao vivo em nenhuma das três rodadas, incluindo os achados CAMPO-01/02/03/04/05 abaixo
+  (corrigidos/documentados por leitura de código e testes automatizados, não por clique real).
+  Recomendo confirmar/rotacionar essa credencial antes da próxima sessão de QA visual; não é seguro
+  nem apropriado tentar adivinhar a senha correta ou criar uma conta nova sem autorização explícita.
 - Nenhum teste em múltiplos viewports foi executado (exigiria a mesma sessão autenticada).
 - Achados marcados "não verificado ao vivo" nas seções de origem vêm de leitura de código com alta confiança (grep confirmando ausência de chamadas, lógica inequívoca), não de clique real na tela.
 - `RetiradaAnimaisModal.jsx`, `FechamentoLoteModal.jsx`, `MoverPastoModal.jsx` foram auditados só via os pontos de entrada em `LotesPage.jsx`/`LoteAcoesMenu.jsx`, não linha a linha.

@@ -117,12 +117,51 @@ algo já decidido ou implementado:
 - Empty state com CTA único: "Cadastrar primeiro produto".
 
 ### Suplementação — separação estrutural, não só textual
-- Passo a passo de planejamento (lote → produto → quantidade/cabeça → frequência → duração) com um
+- Passo a passo de planejamento (lote → produto(s) → quantidade/cabeça → frequência → duração) com um
   resumo final ("Lote Recria receberá 0,5 kg/cabeça/dia por 30 dias — consumo estimado: 450 kg") —
-  e, criticamente, **persistido de verdade** (resolve SUP-01) ou removido até estar pronto.
+  e, criticamente, **persistido de verdade** (resolve SUP-01/CAMPO-05 — hoje não existe tabela
+  `dietas` no banco) ou removido até estar pronto.
 - Registro de consumo mantendo o painel "Base do cálculo" já existente (funciona bem), só reforçando
   visualmente que esta ação (e só esta) baixa estoque.
 - Saldo nunca negativo em nenhum dos dois fluxos (unifica a regra hoje divergente com o Estoque).
+
+### Cadastro de dieta — fluxo em etapas (detalhamento do teste de campo, CAMPO-05)
+
+Requisito adicional de um teste de campo real: hoje "Dieta" só suporta 1 produto na prática
+(`SuplementacaoPage.jsx::getDietaEditData` só lê `itens[0]`) e nenhuma dieta é persistida no banco
+(tabela inexistente). Wireframe textual proposto, **para a Sprint C, não implementado agora**:
+
+1. **Para qual lote?**
+2. **Quais itens fazem parte da dieta?** (permitir adicionar mais de um — hoje só 1 é editável)
+3. **Quanto de cada item por animal?**
+4. **Qual a frequência?** (1×/2×/3× ao dia, dias específicos, personalizada)
+5. **Qual o período?**
+6. **Resumo automático**: lote, quantidade de animais, itens, consumo por cabeça, consumo diário do
+   lote, consumo total estimado, custo diário/total, estoque disponível, duração estimada do estoque.
+
+Campos principais visíveis: lote, produto, quantidade por cabeça, unidade, frequência, período.
+Movidos para "Mais informações": observação, responsável, parâmetros avançados.
+
+Ações rápidas propostas: Nova dieta · Copiar dieta de outro lote · Repetir dieta anterior ·
+Registrar trato de hoje · Pausar dieta · Finalizar dieta — todas dependem da dieta estar
+efetivamente persistida (pré-requisito: tabela `dietas` + migration + serviço de
+create/update/delete, hoje inexistentes).
+
+Mensagem de sucesso proposta:
+```
+✅ Dieta criada.
+Lote: Recria
+Animais: 30
+Consumo diário estimado: 450 kg
+Custo diário estimado: R$ ...
+Período: 30 dias
+```
+
+**Por que não implementado agora**: diferente das outras correções desta auditoria (lógica pura,
+sem mudança de schema), isto exige (a) uma migration nova criando a tabela `dietas` com RLS, (b) um
+serviço de persistência real, e (c) uma reescrita de UI para múltiplos itens — sem navegador
+autenticado para verificar visualmente cada etapa, o risco de introduzir uma regressão silenciosa é
+alto demais para fazer às cegas. Ver critério de pré-requisito no Sprint C do plano de ação.
 
 Esta proposta não substitui uma validação com produtores reais (Onda 5 do plano de ação) — é um
 ponto de partida para a próxima sprint, não uma especificação fechada.

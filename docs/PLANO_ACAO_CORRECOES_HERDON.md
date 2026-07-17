@@ -16,6 +16,9 @@
 | Entrada de estoque não gera despesa financeira (EST-02) | ✅ **Corrigido** (mesma retomada) — lógica de persistência duplicada removida |
 | RLS não reflete a matriz granular de permissões por módulo (S-02) | 🔴 Pendente — requer decisão de escopo (ver Sprint C) |
 | Planejamento de suplementação não persiste na nuvem (SUP-01) | 🔴 Pendente — feature incompleta, já avisada na UI |
+| **Fazenda com lote encerrado não podia ser excluída nem inativada pela mensagem de erro (CAMPO-01)** | ✅ **Corrigido** (teste de campo) — mensagem orienta inativação (fluxo que já existia); `pastagens`/`tarefas` entraram na checagem de vínculos |
+| **Cadastro de lote só mostrava a fazenda ativa em conta multi-fazenda (CAMPO-04)** | ✅ **Corrigido** (teste de campo) — campo virou `<select>` real com todas as fazendas ativas |
+| **UA/capacidade de pasto com a mesma causa raiz do bug de venda (CAMPO-02 = PST-1/PST-2)** | ✅ **Corrigido** (teste de campo) |
 
 **Como EST-01 foi resolvido**: em vez de mapear "Tratamento"/"Saída" para tipos já existentes, optei
 por um enum canônico explícito e escopado a Estoque (não um refactor de todo o app): "Tratamento"
@@ -38,10 +41,11 @@ regressão por perfil.
   `recalcularPesoAtualLote`; uma pesagem retroativa sobrescreve o "peso atual" com um valor mais
   antigo. Unificar os dois caminhos de "registrar pesagem" (`PesagensPage.jsx` e o modal do lote) em
   uma única implementação.
-- **PST-1/PST-2** — Cálculo de UA/status de capacidade de pasto usa `animais` cru em vez de
-  `lote.qtd`; e o KPI de UA da fazenda não filtra lotes finalizados/vendidos. Mesma classe de bug de
-  VND-01, precisa da mesma correção (seguir `lote.qtd` como fonte canônica).
+- **PST-1/PST-2** — ✅ corrigidos no teste de campo (CAMPO-02): `calcularUaPorLote`/
+  `calcularUaTotalFazenda` agora aceitam a contagem canônica (`lote.qtd`) e filtram lotes
+  finalizados/vendidos, com compatibilidade retroativa para quem ainda não passa esse argumento.
 - **EST-01/EST-02** — ✅ já corrigidos na Onda 0 (ver acima).
+- **CAMPO-01/CAMPO-04** — ✅ já corrigidos no teste de campo (ver Onda 0 acima).
 - **SAN/Tarefas/Alertas** — sem achados P0/P1 novos; manter como estão.
 
 ## Onda 2 — Simplificação da experiência (Estoque e Suplementação)
@@ -110,24 +114,33 @@ UX não foi feito** — sem navegador autenticado nesta sessão (mesma limitaç�
 pendente para quando houver navegador autenticado.
 
 ### Sprint B — Pastagens/Lotes: fonte única de contagem de animais
-**Resolve**: PST-1, PST-2, LOT-2.
-**Arquivos prováveis**: `src/domain/unidadeAnimal.js`, `src/domain/ocupacaoPastos.js`,
-`src/pages/LotesPage.jsx`, `src/domain/pesagensLote.js`.
-**Testes**: regressão garantindo que UA/status de pasto e "peso atual" seguem `lote.qtd`/pesagem
-mais recente mesmo quando `animais` diverge (mesmo padrão de teste já usado em
-`movimentacoes.test.js` para lote.qtd × animais.qtd).
-**Ordem recomendada**: agora que o Sprint A está concluído, este é o próximo candidato natural
-(mesma classe de bug, mesmo padrão de correção já validado duas vezes nesta auditoria).
+**Status: parcialmente concluído** (teste de campo, mesmo dia).
+**Resolveu**: PST-1, PST-2 (= CAMPO-02) e CAMPO-04 (seletor de fazenda no cadastro de lote), além de
+CAMPO-01 (exclusão/inativação de fazenda). **Não resolveu**: LOT-2 (pesagem retroativa pelo modal do
+detalhe do lote pode corromper "peso atual") — fica para uma sprint futura, é um achado separado,
+não fazia parte do relato de campo desta rodada.
+**Arquivos alterados**: `src/domain/unidadeAnimal.js`, `src/domain/ocupacaoPastos.js`,
+`src/pages/PastagensPage.jsx`, `src/domain/indicadoresEstrategicos.js`, `src/components/LoteForm.jsx`,
+`src/pages/FazendasPage.jsx`.
+**Testes**: 3 testes novos em `tests/unidadeAnimal.test.js` (contagem canônica via lote, filtro de
+lote finalizado, propagação em `calcularDiagnosticoCapacidade`). **Sem teste automatizado** para
+CAMPO-01/CAMPO-04 (mudanças de UI/wiring de React sem infraestrutura de teste de componente no
+projeto) — verificado por leitura de código, não por clique real.
+**Pendente**: LOT-2, e validação visual real de tudo isto (sem navegador autenticado nesta sessão).
 
 ### Sprint C — Suplementação intuitiva, redesenho de UI e RLS granular
-**Resolve**: SUP-01 (persistir ou remover Dietas), EST-04/EST-05 (unificar categorização e regra de
-saldo negativo), o redesenho funcional de Estoque/Suplementação (wizard "Registrar Uso", empty
-states, unidade como dropdown — ver `AUDITORIA_UX_ESTOQUE_SUPLEMENTACAO.md` §Proposta), e S-02 (RLS
-granular por módulo).
+**Resolve**: SUP-01 = CAMPO-05 (persistir ou remover Dietas — teste de campo confirmou que **não
+existe tabela `dietas` no banco**, é 100% local hoje), EST-04/EST-05 (unificar categorização e regra
+de saldo negativo), o redesenho funcional de Estoque/Suplementação (wizard "Registrar Uso"/"Criar
+dieta" em etapas, ações rápidas de copiar/repetir/pausar/finalizar dieta, empty states, unidade como
+dropdown — ver `AUDITORIA_UX_ESTOQUE_SUPLEMENTACAO.md` §Proposta), e S-02 (RLS granular por módulo).
+Persistir Dietas de verdade exigirá uma migration nova (tabela `dietas` + policies RLS), não é só
+lógica de aplicação como os itens já corrigidos nesta auditoria.
 **Pré-requisito explícito**: sessão de QA com navegador autenticado. Diferente das correções de
 lógica pura (Sprint A/B), um redesenho de UI implementado às cegas — sem poder ver o resultado —
 arrisca quebrar layouts, estados de loading/erro e responsividade de forma que só apareceria depois,
-em produção. As credenciais de `.env.e2e` continuam inválidas em duas tentativas.
+em produção. As credenciais de `.env.e2e` já falharam em duas tentativas ao longo desta auditoria
+(não repetidas nesta 3ª rodada, por não trazerem informação nova).
 **Dependências**: decisão de produto sobre o futuro da aba "Dietas"; sessão de QA com navegador
 autenticado antes de mexer em RLS (alto risco de regressão de permissão sem poder testar ao vivo).
 **Critério de aceite**: um `operador` autenticado, chamando a API diretamente (não só pela UI), não
