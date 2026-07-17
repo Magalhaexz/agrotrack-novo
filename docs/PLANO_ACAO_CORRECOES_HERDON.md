@@ -4,6 +4,33 @@
 > [MATRIZ_TESTES_FUNCIONAIS_HERDON.md](MATRIZ_TESTES_FUNCIONAIS_HERDON.md). IDs entre parênteses
 > referenciam a matriz.
 
+## Próxima sequência de sprints (pós Auditoria UX Completa, retomada 4)
+
+Decisão explícita: **não iniciar a persistência de Dietas (Sprint C) antes de fechar os fluxos
+críticos já existentes.** Ordem recomendada, do achado mais grave para o mais cosmético:
+
+1. **Sprint E — Sincronizar venda/morte individual com o lote** (UX-P1-1). Mesma classe de bug já
+   corrigida 3 vezes nesta auditoria (venda/ajuste/RPC de lote) — reabre por um 4º caminho de escrita
+   (`AnimaisPage.jsx::registrarOperacaoIndividual`). Reaproveitar `sincronizarAnimaisGrupoDoLote`,
+   já testado. Risco baixo, padrão validado.
+2. **Sprint F — Financeiro: editar/excluir lançamento + filtro de período no DRE** (UX-FN1, UX-FN3).
+   UX-FN1 é o achado mais grave desta rodada fora do que já foi corrigido: hoje não existe NENHUMA
+   forma de corrigir um lançamento digitado errado.
+3. **Sprint G — Sanidade: carência real + recorte por fazenda** (UX-SAN1, UX-SAN2). UX-SAN2 é
+   estruturalmente idêntico ao vazamento cross-fazenda já corrigido em Estoque/Financeiro em
+   auditorias anteriores — Sanidade nunca recebeu o mesmo tratamento. UX-SAN1 precisa de uma decisão
+   de produto (bloquear venda em carência, ou só avisar?) antes de implementar.
+4. **Sprint H — Unificação de categorias e taxonomias** (UX-FN4/FIN-01, mais os campos de
+   categorização já divergentes documentados em EST-04). Cross-cutting, toca Financeiro/Custos/
+   Suplementação/Estoque ao mesmo tempo — fazer de uma vez para não gerar uma 4ª taxonomia no meio
+   do caminho.
+5. **Sprint C (já planejada) — Suplementação/Dietas + redesenho de UI + RLS granular.** Só depois
+   dos itens acima, e só com navegador autenticado disponível.
+
+Achados P2/P3 da Auditoria UX Completa (consistência de botões, empty states, exportação
+fragmentada, campos redundantes) ficam de backlog contínuo — não bloqueiam nenhuma sprint acima,
+mas podem ser encaixados como itens pequenos dentro de qualquer uma delas.
+
 ## Onda 0 — Integridade imediata
 
 | Item | Status |
@@ -19,6 +46,10 @@
 | **Fazenda com lote encerrado não podia ser excluída nem inativada pela mensagem de erro (CAMPO-01)** | ✅ **Corrigido** (teste de campo) — mensagem orienta inativação (fluxo que já existia); `pastagens`/`tarefas` entraram na checagem de vínculos |
 | **Cadastro de lote só mostrava a fazenda ativa em conta multi-fazenda (CAMPO-04)** | ✅ **Corrigido** (teste de campo) — campo virou `<select>` real com todas as fazendas ativas |
 | **UA/capacidade de pasto com a mesma causa raiz do bug de venda (CAMPO-02 = PST-1/PST-2)** | ✅ **Corrigido** (teste de campo) |
+| **"Transferência de saída" sem campo de lote destino — falhava 100% das vezes (UX-P0-1)** | ✅ **Corrigido** (Auditoria UX Completa) — select de destino adicionado, Telegram já fazia certo |
+| **Toast de sucesso da retirada baseado no botão que abriu o modal, não no tipo salvo (UX-P1-2)** | ✅ **Corrigido** |
+| **2 modais de movimentação sem trava de duplo-envio (UX-P1-3)** | ✅ **Corrigido** — `useSubmitOnce` adicionado |
+| **Exclusão de pasto sem checar lote vinculado (UX-P1-4)** | ✅ **Corrigido** — mesma regra que o bot do Telegram já aplicava |
 
 **Como EST-01 foi resolvido**: em vez de mapear "Tratamento"/"Saída" para tipos já existentes, optei
 por um enum canônico explícito e escopado a Estoque (não um refactor de todo o app): "Tratamento"

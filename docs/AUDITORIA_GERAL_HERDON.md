@@ -10,6 +10,14 @@
 > **Atualização (Teste de Campo, mesmo dia)**: retomado a partir de `fd72af4` para incorporar 5
 > problemas observados em uso real do app (não achados de auditoria de código, mas relatos de
 > campo) — ver §8 abaixo. Baseline: 1556/1556 testes, lint e build limpos.
+>
+> **Atualização (Auditoria UX Completa, mesmo dia)**: retomado a partir de `bf81189`, por pedido
+> explícito de auditar toda a experiência do pecuarista (cliques, telas confusas, inconsistências,
+> operações repetidas) em todos os módulos ANTES de iniciar a persistência de Dietas (Sprint C).
+> ~35 achados novos, 4 corrigidos (P0/P1 evidentes), o restante consolidado em
+> [MATRIZ_TESTES_FUNCIONAIS_HERDON.md](MATRIZ_TESTES_FUNCIONAIS_HERDON.md) §Auditoria UX Completa e
+> priorizado em [PLANO_ACAO_CORRECOES_HERDON.md](PLANO_ACAO_CORRECOES_HERDON.md) (Sprints E-H antes
+> do Sprint C). Baseline: 1559/1559 testes, lint e build limpos.
 
 ## Escopo
 

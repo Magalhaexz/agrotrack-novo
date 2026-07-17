@@ -106,3 +106,103 @@
 - Nenhum teste em múltiplos viewports foi executado (exigiria a mesma sessão autenticada).
 - Achados marcados "não verificado ao vivo" nas seções de origem vêm de leitura de código com alta confiança (grep confirmando ausência de chamadas, lógica inequívoca), não de clique real na tela.
 - `RetiradaAnimaisModal.jsx`, `FechamentoLoteModal.jsx`, `MoverPastoModal.jsx` foram auditados só via os pontos de entrada em `LotesPage.jsx`/`LoteAcoesMenu.jsx`, não linha a linha.
+
+---
+
+# Auditoria UX Completa (retomada 4) — experiência do pecuarista
+
+> Objetivo: antes de criar novos módulos (Dietas persistidas), auditar todos os fluxos existentes
+> pensando em cliques, telas confusas, campos redundantes, inconsistência entre telas parecidas,
+> operações repetidas e comportamento inesperado. Método: 4 sub-auditorias paralelas + revisão
+> própria do Telegram, 100% por leitura de código (sem navegador ao vivo — mesma limitação de
+> sempre). Corrigidos nesta rodada **apenas os P0/P1 evidentes** (causa raiz clara, fix isolado,
+> baixo risco); o restante fica registrado aqui para a próxima sequência de sprints.
+
+## Corrigidos nesta rodada
+
+| ID | Módulo | Problema | Severidade | Evidência | Correção |
+|---|---|---|---|---|---|
+| UX-P0-1 | Lotes/Transferência | "Transferência de saída" no modal de retirada do lote nunca perguntava o lote de destino — `registrarSaidaAnimal` sempre exige `destinoLoteId` para esse tipo, então a operação falhava com erro **100% das vezes** | **P0** | `src/components/lotes/RetiradaAnimaisModal.jsx` (sem campo destino); `src/services/movimentacoes.js` (exige `destinoLoteId`) | ✅ Select "Lote de destino" adicionado, populado com lotes ativos da mesma fazenda (exceto o próprio); Telegram já fazia isso corretamente (resolve por nome) — web app não tinha o equivalente |
+| UX-P1-2 | Lotes/Retirada | Mensagem de sucesso era escolhida pelo botão que abriu o modal (`retiradaModo`), não pelo tipo realmente salvo — trocar de "Venda" para "Morte/perda" no dropdown antes de confirmar ainda mostrava "Venda parcial registrada com sucesso." | P1 | `src/pages/LotesPage.jsx::handleRetirada` | ✅ Mensagem agora baseada no `tipoSaida` retornado pelo formulário |
+| UX-P1-3 | Lotes/Animais | Dois modais de movimentação sem trava de duplo-envio (`PesagemModal` embutido em `LotesPage.jsx`, `AnimalMovementModal.jsx`) — duplo clique/toque podia criar 2 pesagens ou 2 movimentações | P1 | Ambos sem `useSubmitOnce`, diferente de `PesagemForm`/`RetiradaAnimaisModal`, que já usavam | ✅ `useSubmitOnce` adicionado aos dois, com botão desabilitado + "Salvando..." durante o envio |
+| UX-P1-4 | Pastagens | Excluir um pasto não checava se algum lote ativo ainda estava vinculado (`lote.pastagem_id`) — diferente de excluir fazenda, que checa 7 tabelas. O próprio bot do Telegram já bloqueava esse caso e **documentava a lacuna do app em comentário no código** (`cadastroPasto.js`) | P1 | `src/pages/PastagensPage.jsx::excluirPastagem` (sem checagem) vs `src/domain/telegram/cadastroPasto.js:115-133` (bloqueia, com o comentário do gap) | ✅ Mesma regra do bot replicada: bloqueia enquanto houver lote não encerrado vinculado |
+
+Sem teste automatizado novo para os 4 itens acima (mudança de UI/wiring de React; projeto sem
+infraestrutura de teste de componente) — verificados por leitura de código e, no caso de UX-P0-1,
+pelos testes já existentes de `registrarSaidaAnimal` em `movimentacoes.test.js` (que já cobriam a
+exigência de `destinoLoteId` no serviço; só a tela não coletava o dado).
+
+## Achados registrados para a próxima sequência de sprints (não corrigidos nesta rodada)
+
+### Fazendas, Pastos, Lotes, Ajuste de Lotação
+
+| ID | Módulo | Cenário | Severidade | Evidência | Sugestão |
+|---|---|---|---|---|---|
+| UX-F1 | Fazendas × Pastagens | "Capacidade (UA)" do cadastro de fazenda nunca é usado em nenhum cálculo — a página Pastos calcula sua própria capacidade a partir das pastagens. Dois números com o mesmo nome, sem relação, sem indicação de qual é o oficial | P1 | `src/domain/unidadeAnimal.js:59-63`; `src/components/fazendas/FazendaCard.jsx`; `src/pages/PastagensPage.jsx` | Remover o campo manual ou renomeá-lo deixando claro que não é usado no cálculo de lotação |
+| UX-F2 | Fazendas | "Ver detalhes" e "Editar" no card abrem exatamente o mesmo modal — não existe tela de detalhe real (diferente de Lote) | P2 | `src/components/fazendas/FazendaCard.jsx` | Remover um dos dois botões |
+| UX-F3 | Fazendas | Empty state promete "ou importando seus dados" sem nenhum link para a página de Importação | P2 | `src/pages/FazendasPage.jsx` (empty state) | Adicionar link/botão para `ImportacaoPage` |
+| UX-F4 | Fazendas | Mensagem de sucesso genérica ao criar ("Registro salvo") vs específica ao editar ("Fazenda atualizada") | P3 | `src/pages/FazendasPage.jsx` | Padronizar |
+| UX-PS1 | Pastagens | Clicar "Editar" na tabela não rola até o formulário no topo — só o CTA do empty state faz isso | P2 | `src/pages/PastagensPage.jsx` (`preencherForm` sem scroll) | Chamar `focarFormularioPasto()` também em `preencherForm` |
+| UX-PS2 | Pastagens | Cadastro de Pasto é card inline sempre visível; Fazenda e Lote usam modal — três padrões diferentes para "cadastrar item" no mesmo domínio | P2 | Comparar os 3 componentes de cadastro | Unificar em modal, ou justificar a exceção |
+| UX-L1 | Lotes | Cadastro exige metas zootécnicas completas (peso alvo, GMD) como obrigatórias, bem mais pesado que Fazenda/Pasto (1-2 campos) | P2 | `src/components/LoteForm.jsx::validarForm` | Avaliar tornar opcional no cadastro rápido, preenchível depois via edição |
+| UX-L2 | Lotes | Criar lote dispara 2 gravações silenciosas em segundo plano (grupo em `animais`, pesagem inicial); se falharem, só um toast de aviso indica a causa | P3 (já mitigado) | `src/pages/LotesPage.jsx` | Toast poderia linkar direto para a tela de Animais |
+
+### Pesagens, Vendas, Mortes, Transferências
+
+| ID | Módulo | Cenário | Severidade | Evidência | Sugestão |
+|---|---|---|---|---|---|
+| UX-P1-1 | Animais individuais | Venda/morte de um ANIMAL INDIVIDUAL (`AnimaisPage.jsx::registrarOperacaoIndividual`) nunca atualiza `lote.qtd`/`p_at` do lote de origem — mesma classe de bug já corrigida várias vezes para o nível de lote (venda/ajuste/RPC), agora reaberta por um 4º caminho de escrita | **P1** | `src/pages/AnimaisPage.jsx:300-398` (sem update em `lotes`) vs `src/services/movimentacoes.js` (que sim atualiza) | Reaproveitar `sincronizarAnimaisGrupoDoLote` também aqui — mesmo padrão já validado 3 vezes nesta auditoria |
+| UX-P2-1 | Pesagens | Três formulários diferentes para "Registrar pesagem" (`PesagensPage`/`PesagemForm` completo, mini-modal em `LotesPage.jsx` sem rendimento/preço, e o modal offline/Curral) — campos e regras divergentes | P2 | Comparar os 3 componentes | Unificar em um único `PesagemForm` parametrizável |
+| UX-P2-2 | Venda | Venda de lote pede "Comprador"; venda de animal individual não tem esse campo | P2 | `RetiradaAnimaisModal.jsx` vs `AnimalMovementModal.jsx` | Adicionar campo Comprador na venda individual |
+| UX-P2-3 | Morte/perda | Peso é obrigatório na morte a nível de lote, mas a nível individual usa silenciosamente o último peso conhecido, sem chance de correção | P2 | `AnimalMovementModal.jsx`; `AnimaisPage.jsx` (fallback `p_at`) | Padronizar a regra de peso entre os dois níveis |
+| UX-P2-4 | Transferência | Valor salvo para "transferência" diverge entre lote (`'transferencia_saida'`) e individual (`'transferencia'`) — quebra o filtro da aba "Retiradas" para transferências individuais | P2 | `src/components/lotes/constants.js` vs `AnimalMovementModal.jsx` | Unificar o valor do enum |
+| UX-P2-5 | Venda total | Vender 100% das cabeças de um lote não oferece finalizar o lote na mesma ação — fica "vivo" com 0 cabeças até o usuário lembrar de finalizar separadamente | P2 | `RetiradaAnimaisModal.jsx` (`qtd > maxCabecas`, não `>=`) | Ao detectar venda total, oferecer finalizar o lote na mesma confirmação |
+| UX-P3 | Retirada | Rótulos de confirmação divergem entre os dois fluxos ("Salvar retirada" vs "Confirmar venda/morte/saída") | P3 | — | Padronizar verbo |
+
+### Estoque, Suplementação, Sanidade
+
+| ID | Módulo | Cenário | Severidade | Evidência | Sugestão |
+|---|---|---|---|---|---|
+| UX-SAN1 | Sanidade | Carência sanitária (`data_fim_carencia`) é 100% decorativa — nenhuma tela de venda/movimentação lê esse campo; não bloqueia nem avisa | **P1** | `src/domain/agendaSanitaria.js`; ausência em `movimentacoes.js` | Decisão de produto necessária: bloquear venda ou só avisar com confirmação extra? |
+| UX-SAN2 | Sanidade | Em modo "Todas as fazendas", a tela mistura manejos/lotes de todas as fazendas sem filtro nem coluna de origem; o próprio seletor "Fazenda" do bloco IATF não filtra o dropdown de Lote | **P1** | `src/pages/SanitarioPage.jsx` (fora de `FULL_DB_PAGE_KEYS`, sem `fazendaSelecionada`) | Aplicar o mesmo guard de recorte por fazenda já usado em Estoque |
+| UX-EST1 | Estoque/Suplementação | Editar um item/produto já cadastrado sobrescreve o saldo diretamente pelo formulário, sem gerar nenhuma movimentação de auditoria — quebra a trilha que Ajuste/Consumo preservam | P1 | `EstoquePage.jsx` (rótulo "Quantidade inicial" na edição); `SuplementacaoPage.jsx` (mesmo padrão) | Gerar uma movimentação tipo "correção" ao mudar o saldo na edição |
+| UX-SUP1 | Suplementação | Cadastrar produto com nome repetido funde silenciosamente a quantidade e sobrescreve dados de embalagem/custo, sem avisar | **P1** | `src/pages/SuplementacaoPage.jsx` (match por nome, sem confirmação) | Confirmar explicitamente antes de fundir |
+| UX-SUP2 | Suplementação | Heurística de "produto nutricional" do modal de consumo é mais estreita que a da aba "Produtos nutricionais" — item visível na lista pode não aparecer no dropdown de consumo | P1 | `SuplementacaoConsumoModal.jsx` vs `SuplementacaoPage.jsx` | Unificar num único helper compartilhado |
+| UX-EST2 | Estoque | Entrada/Saída não têm o mesmo guard de "fazenda específica" que "Novo item" já tem em modo consolidado | P1/P2 | `EstoquePage.jsx` | Replicar o guard existente |
+| UX-SAN3-9 | Sanidade | Edição de IATF cai no formulário genérico errado; duplo-clique pode criar protocolo repetido; lembrete sem responsável falha silenciosamente; exclusão de item de manejo composto pode órfãar o lembrete do grupo; campos sem unidade; validação fraca de quantidade | P2/P3 | `SanitarioPage.jsx`, `SanitarioForm.jsx` | Ver detalhamento no relatório da sub-auditoria (arquivado nesta sessão) |
+| UX-SUP3 | Suplementação | "Realizado/dia" no planejamento por lote é a média de TODOS os lançamentos já feitos, sem filtro de data — 2 lançamentos no mesmo dia distorcem a coluna "Diferença" | P2 | `SuplementacaoPage.jsx` | Agrupar por dia antes de calcular a média |
+| UX-SUP4 | Suplementação | Aba "Consumo diário" quase vazia, redundante com o botão do cabeçalho | P3 | `SuplementacaoPage.jsx` | Remover ou dar propósito próprio |
+
+### Financeiro, Custos, Tarefas, Alertas, Relatórios
+
+| ID | Módulo | Cenário | Severidade | Evidência | Sugestão |
+|---|---|---|---|---|---|
+| UX-FN1 | Financeiro | Lançamentos (despesa/receita manual) **não podem ser editados nem excluídos** — nenhum botão de ação na aba "Lançamentos", diferente de Custos, que já tem essas ações por linha | **P0/P1** | `src/pages/FinanceiroPage.jsx` (aba `lanc`, sem ações) vs `CustosPage.jsx` (tem) | Adicionar editar/excluir por linha, mesmo padrão de Custos |
+| UX-FN2 | Financeiro | Botões "Nova receita"/"Nova despesa"/"Registrar movimentação" abrem o mesmo modal, sempre com Tipo = Despesa por padrão | P2 | `FinanceiroPage.jsx` | Passar o tipo inicial de acordo com o botão clicado |
+| UX-FN3 | Financeiro (DRE) | Sem filtro de período — só totais acumulados de sempre; período só existe em outra página (Relatório Financeiro) | P1/P2 | `financeiroDreLogic.js` vs `RelatorioFinanceiroPage.jsx` | Adicionar seletor de período na própria aba DRE |
+| UX-FN4 | Financeiro/Custos/Rateio | Três taxonomias de categoria diferentes (capitalização/acentuação/slug) convivem sem bater entre si — aprofunda o FIN-01 já documentado | P1 | `CustoForm.jsx`, `CustosCompartilhadosPage.jsx`, `FinanceiroPage.jsx` | Unificar num único enum de categorias |
+| UX-FN5 | Financeiro | "Marcar como pago" nos blocos (vencidas/hoje/próximas) não tem desfazer; só o checkbox de "Pagamento Diário" é reversível | P2 | `FinanceiroPage.jsx` | Padronizar em um mecanismo reversível |
+| UX-CU1 | Custos | Nenhuma exportação/impressão disponível na tela | P2 | `CustosPage.jsx` | Adicionar `ExportActions` |
+| UX-TF1 | Tarefas | "Adiar" usa `window.prompt()` nativo pedindo para digitar dias ou data — ruim em celular | P1/P2 | `TarefasPage.jsx` | Reaproveitar o padrão já usado em Alertas (input date inline) |
+| UX-TF2 | Tarefas | "Resolver" muda status para `em_andamento`, que não é nenhuma coluna do Kanban — tarefa reaparece em "Pendentes" sem indicação visual de mudança | P2 | `TarefasPage.jsx` | Adicionar coluna "Em andamento" ou remover o botão duplicado |
+| UX-RE1 | Relatórios | Dois padrões de exportação diferentes coexistem (`AcoesRelatorio`: PDF/Copiar/WhatsApp; `ExportActions`: CSV/Imprimir), com opções diferentes para a mesma necessidade | P2 | `AcoesRelatorio.jsx` vs `ExportActions.jsx` | Unificar num único componente |
+| UX-RE2 | Financeiro | Só a aba DRE tem exportação; "Por Lote"/"Lançamentos"/"Pagamentos" não têm nenhuma | P2 | `FinanceiroPage.jsx` | Adicionar `ExportActions` também nessas abas |
+
+### Telegram (revisão própria, sem sub-agente)
+
+Verifiquei especificamente o caso mais grave encontrado no app (UX-P0-1, transferência sem destino):
+o Bot do Telegram **já implementava corretamente** a resolução do lote de destino por nome
+(`api/_telegramBot.js::prepararConfirmacaoTransferencia`, usa `resolverLotePorNome` para achar o
+lote de destino a partir do texto do usuário) — nunca teve esse bug. O gap era exclusivo da tela do
+app web, que agora tem paridade. Nenhum achado novo de inconsistência Telegram×app nesta rodada além
+do já documentado (TG-02, ordem de fallback de contagem).
+
+## Números da Auditoria UX Completa
+- **~35 achados novos** de UX/fluxo (além dos 53 já registrados nas rodadas anteriores).
+- **4 corrigidos nesta rodada** (todos P0/P1 evidentes, isolados, baixo risco).
+- **4 P1 significativos ainda abertos que merecem prioridade alta na próxima sprint**: UX-P1-1
+  (venda/morte individual não sincroniza o lote — mesma classe de bug já corrigida 3 vezes),
+  UX-FN1 (lançamentos financeiros sem editar/excluir), UX-SAN1/UX-SAN2 (carência decorativa e
+  vazamento cross-fazenda em Sanidade).
+- Suíte de testes: 1559/1559 passando após as correções desta rodada (sem testes novos — mudanças
+  de UI sem infraestrutura de teste de componente).
