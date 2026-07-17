@@ -2,6 +2,10 @@
 
 > Sprint de auditoria funcional, técnica, visual, de usabilidade, segurança e integridade de dados.
 > Data: 2026-07-17 · Branch `main` · Hash inicial `2f323b3` (idêntico a `origin/main`) · Banco Supabase `ljpiszxicmmuefbiixui`.
+>
+> **Atualização (Onda 0, mesmo dia)**: retomado a partir de `43b47d5` para fechar o P0 de Estoque
+> que ficou aberto na primeira rodada (§3.1 abaixo). Baseline desta rodada: 1550/1550 testes, lint e
+> build limpos, `HEAD == origin/main == 43b47d5`.
 
 ## Escopo
 
@@ -79,6 +83,55 @@ transferência (origem e destino), registro individual intocado, e entrada (comp
 produção via `apply_migration` e revalidada por leitura da definição da função no próprio banco após
 aplicar, mas **não foi exercida com uma venda real pelo Telegram**.
 
+## 2.1 Onda 0 (retomada, mesmo dia) — Estoque: falha silenciosa corrigida (P0)
+
+**Causa raiz confirmada**: o formulário de saída de estoque (`EstoquePage.jsx::SaidaModal`) oferecia
+os tipos "Tratamento" e "Saída", mas `registrarSaidaEstoque` (`src/services/movimentacoes.js`) só
+reconhecia `['consumo', 'ajuste', 'perda', 'venda']`. Para um tipo fora dessa lista, a função fazia
+`console.warn(...)` e devolvia o `db` **inalterado** — e o modal, que nunca checava sucesso/falha,
+fechava incondicionalmente logo em seguida. O produtor via "sucesso" e nada era gravado. O mesmo
+padrão de falha silenciosa existia em `registrarEntradaEstoque` (item não encontrado, quantidade ou
+custo inválidos).
+
+**Enum canônico definido** (escopado a Estoque — não foi um refactor de todo o app): `tiposValidos =
+['consumo', 'tratamento', 'ajuste', 'perda', 'venda']`.
+- **"Tratamento"** virou um tipo real: gera despesa `tratamento_sanitario` quando vinculado a um
+  lote (mesma regra de `consumo` → `consumo_estoque`, categoria distinta para o financeiro).
+- **"Saída"** foi removida do formulário — era redundante com o próprio título da tela ("Saída /
+  Consumo") e não representava nenhum caso de uso não coberto por Consumo/Tratamento/Ajuste/Perda.
+
+**Nunca mais falha silenciosamente**: `registrarSaidaEstoque`/`registrarEntradaEstoque` agora
+**lançam erro** (tipo inválido, item não encontrado, quantidade/custo inválidos) em vez de
+`console.warn` + retorno mudo. `EstoquePage.jsx` (`SaidaModal`/`EntradaModal`) captura o erro, mostra
+um toast com a mensagem, e **não fecha o modal nem limpa o formulário** em caso de falha — só fecha
+e confirma sucesso quando a operação realmente persistiu.
+
+**EST-02 corrigido junto** (mesma área de código, mesma causa raiz de fundo — duplicação de lógica
+de persistência): `EntradaModal` tinha sua própria implementação de gravação que nunca chamava
+`registrarEntradaEstoque`, então uma compra de estoque nunca gerava a despesa financeira
+correspondente, mesmo com `App.jsx` já passando o handler correto (`onRegistrarEntradaEstoque`) —
+a página simplesmente não usava essa prop. Removida a lógica duplicada; agora só existe **um**
+caminho de persistência para entrada de estoque.
+
+**Testes**: 6 testes novos em `movimentacoes.test.js` (tipo "tratamento" válido e com despesa
+própria; tipo inválido lança erro; item inexistente lança erro em entrada e saída; quantidade/custo
+inválidos lançam erro). Suíte completa: 1556/1556 passando.
+
+**Validação real**: não realizada — mesmo bloqueio de credenciais desta sessão (ver Limitações). A
+correção foi verificada por leitura de código e pelos testes automatizados citados acima, não por
+clique real na tela.
+
+**Não fiz nesta rodada** (fora do escopo do que foi pedido, ou dependente de navegador ao vivo):
+- Redesenho completo das telas de Estoque/Suplementação (wizard "Registrar Uso" em etapas, empty
+  states novos, unidade como dropdown) — ver `AUDITORIA_UX_ESTOQUE_SUPLEMENTACAO.md` §Proposta.
+  Implementar UI nova sem poder verificar visualmente é arriscado; recomendo fazer isso só quando
+  houver navegador autenticado disponível.
+- Testes em 8 viewports/4 perfis — mesma limitação de navegador.
+- Validação real da correção de venda no Telegram/app, e da correção de segurança de RLS — mesma
+  limitação.
+- Endurecer o RLS granular por módulo (S-02) — mudança de schema que toca várias tabelas; alto risco
+  de regressão de permissão sem poder testar ao vivo.
+
 ## 3. Achado adicional crítico de segurança (P0) — corrigido nesta auditoria
 
 Durante a auditoria de permissões, foi encontrada e **confirmada por consulta direta ao banco de
@@ -107,16 +160,14 @@ perfil de **outro** membro da equipe não foi afetado (nesse caso `auth.uid() �
 Ver a matriz completa em [MATRIZ_TESTES_FUNCIONAIS_HERDON.md](MATRIZ_TESTES_FUNCIONAIS_HERDON.md).
 Resumo por severidade (48 linhas registradas, contando as já corrigidas):
 
-- **P0**: 4 encontrados — 3 corrigidos nesta auditoria (venda no app, RPC do Telegram, escalada de
-  privilégio); **1 aberto**: `EstoquePage.jsx` oferece os tipos de saída "Tratamento" e "Saída" no
-  formulário, mas o serviço (`movimentacoes.js`) não reconhece esses valores — a chamada falha
-  silenciosamente e o modal fecha como se tivesse dado certo. O produtor acha que registrou a saída
-  e nada foi salvo.
-- **P1**: 5 encontrados — 1 corrigido (Ajuste de Lotação reabria o bug de venda); 4 abertos: RLS não
-  reflete a matriz granular de permissões por módulo (`operador` pode gravar em Financeiro/
-  Funcionários via API direta mesmo sem acesso na UI), entrada de estoque nunca gera despesa
-  financeira, planejamento de suplementação não persiste na nuvem, pesagem lançada pelo modal do
-  detalhe do lote pode corromper o peso atual se for retroativa.
+- **P0**: 4 encontrados — **todos os 4 corrigidos**: venda no app, RPC do Telegram, escalada de
+  privilégio (auditoria anterior), e Estoque "Tratamento"/"Saída" falhando silenciosamente (esta
+  rodada, Onda 0 §2.1).
+- **P1**: 5 encontrados — 2 corrigidos nesta rodada (Ajuste de Lotação reabria o bug de venda;
+  entrada de estoque nunca gerava despesa financeira); 3 abertos: RLS não reflete a matriz granular
+  de permissões por módulo (`operador` pode gravar em Financeiro/Funcionários via API direta mesmo
+  sem acesso na UI), planejamento de suplementação não persiste na nuvem, pesagem lançada pelo modal
+  do detalhe do lote pode corromper o peso atual se for retroativa.
 - **P2**: ~14 encontrados — inconsistências de UX e de fonte de dado (cálculo de capacidade de
   pasto usando `animais` cru, categorização de "item nutricional" com 3 heurísticas divergentes,
   regra de saldo negativo diferente entre Estoque e Suplementação, filtro de categoria do Financeiro
@@ -142,11 +193,15 @@ aparece) podem existir sem terem sido detectados.
 
 ## 6. Limitações desta auditoria
 
-- **Sem navegador autenticado**: as credenciais em `.env.e2e` (conta `magalhaesh617@gmail.com`)
-  retornaram `AuthApiError: Invalid login credentials` do Supabase ao tentar logar no app local
-  (`npm run dev` + Browser pane). Não tentei senhas alternativas. Recomendo ao usuário confirmar/
-  rotacionar essa credencial antes da próxima sessão de QA visual — sem ela, nenhuma tela foi
-  clicada nesta rodada, incluindo os 8 viewports e 4 perfis pedidos no escopo original.
+- **Sem navegador autenticado**, confirmado em duas rodadas: as credenciais em `.env.e2e` (conta
+  `magalhaesh617@gmail.com`) retornaram `AuthApiError: Invalid login credentials` do Supabase ao
+  tentar logar no app local (`npm run dev` + Browser pane), tanto na auditoria original quanto
+  nesta retomada (mesmo par de credenciais, mesmo erro). Não tentei senhas alternativas nem criei
+  uma conta nova — nenhuma das duas é uma ação apropriada de tomar sem autorização explícita.
+  Recomendo ao usuário confirmar/rotacionar essa credencial antes da próxima sessão de QA visual —
+  sem ela, nenhuma tela foi clicada em nenhuma das duas rodadas, incluindo os 8 viewports e 4 perfis
+  pedidos no escopo original, a validação real da venda/Telegram/segurança, e o redesenho de
+  Estoque/Suplementação (que exigiria iteração visual para não arriscar quebrar a UI às cegas).
 - Achados de UX (Estoque/Suplementação) vêm de leitura da estrutura real dos formulários no código
   (campos, labels, condicionais), não de um cronômetro real em mãos de um produtor.
 - Segurança: auditei RLS/policies/triggers das tabelas centrais e da tabela `profiles` (onde achei o

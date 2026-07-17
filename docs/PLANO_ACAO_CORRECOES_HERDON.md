@@ -4,7 +4,7 @@
 > [MATRIZ_TESTES_FUNCIONAIS_HERDON.md](MATRIZ_TESTES_FUNCIONAIS_HERDON.md). IDs entre parênteses
 > referenciam a matriz.
 
-## Onda 0 — Integridade imediata (parte já feita nesta sprint)
+## Onda 0 — Integridade imediata
 
 | Item | Status |
 |---|---|
@@ -12,22 +12,23 @@
 | RPC `registrar_saida_lote` do Telegram com o mesmo bug (VND-02) | ✅ Corrigido |
 | Ajuste de Lotação reabria o mesmo bug (LOT-1) | ✅ Corrigido |
 | Escalada de privilégio via auto-atualização de `perfil` (S-01) | ✅ Corrigido |
-| **Estoque: tipos "Tratamento"/"Saída" falham silenciosamente (EST-01)** | 🔴 Pendente — próximo item desta onda |
-| RLS não reflete a matriz granular de permissões por módulo (S-02) | 🔴 Pendente — requer decisão de escopo (ver Sprint A) |
-| Entrada de estoque não gera despesa financeira (EST-02) | 🔴 Pendente |
+| **Estoque: tipos "Tratamento"/"Saída" falham silenciosamente (EST-01)** | ✅ **Corrigido** (retomada, mesmo dia) — enum canônico `['consumo','tratamento','ajuste','perda','venda']`, "Saída" removida do formulário, serviço nunca mais falha silenciosamente |
+| Entrada de estoque não gera despesa financeira (EST-02) | ✅ **Corrigido** (mesma retomada) — lógica de persistência duplicada removida |
+| RLS não reflete a matriz granular de permissões por módulo (S-02) | 🔴 Pendente — requer decisão de escopo (ver Sprint C) |
 | Planejamento de suplementação não persiste na nuvem (SUP-01) | 🔴 Pendente — feature incompleta, já avisada na UI |
 
-**Por que EST-01 não foi corrigido nesta rodada**: a correção correta depende de uma decisão de
-produto — os tipos "Tratamento" e "Saída" devem (a) ser mapeados para um `tipo` real já suportado
-(`consumo`/`ajuste`/`perda`), ou (b) o serviço deve ganhar esses dois tipos novos como categorias
-próprias? Escolher errado aqui reclassificaria retroativamente o significado de saídas de estoque.
-Recomendo tratar como o primeiro item do Sprint A (abaixo), com uma pergunta objetiva ao produto
-antes de implementar.
+**Como EST-01 foi resolvido**: em vez de mapear "Tratamento"/"Saída" para tipos já existentes, optei
+por um enum canônico explícito e escopado a Estoque (não um refactor de todo o app): "Tratamento"
+virou um tipo real de primeira classe (gera despesa própria `tratamento_sanitario` quando vinculado a
+um lote); "Saída" foi removida do formulário por ser redundante com o próprio título da tela e não
+cobrir nenhum caso de uso que Consumo/Tratamento/Ajuste/Perda já não cobrissem. Documentado em
+[AUDITORIA_GERAL_HERDON.md](AUDITORIA_GERAL_HERDON.md) §2.1.
 
 **Por que S-02 não foi corrigido nesta rodada**: fechar a granularidade no RLS (`operador` não pode
 gravar em Financeiro/Custos/Funcionários mesmo via API direta) é uma mudança de schema/policies que
 toca múltiplas tabelas — maior risco de regressão sem poder validar ao vivo nesta sessão (sem
-navegador autenticado). Diferente de S-01 (uma vulnerabilidade isolada e crítica, corrigida
+navegador autenticado, confirmado em duas rodadas). Diferente de S-01 (uma vulnerabilidade isolada e
+crítica, corrigida
 imediatamente), este é um endurecimento estrutural que merece sua própria sprint com testes de
 regressão por perfil.
 
@@ -40,8 +41,7 @@ regressão por perfil.
 - **PST-1/PST-2** — Cálculo de UA/status de capacidade de pasto usa `animais` cru em vez de
   `lote.qtd`; e o KPI de UA da fazenda não filtra lotes finalizados/vendidos. Mesma classe de bug de
   VND-01, precisa da mesma correção (seguir `lote.qtd` como fonte canônica).
-- **EST-01** (se ainda não decidido no fim da Onda 0) e **EST-02** — fechar as duas falhas de
-  persistência de Estoque.
+- **EST-01/EST-02** — ✅ já corrigidos na Onda 0 (ver acima).
 - **SAN/Tarefas/Alertas** — sem achados P0/P1 novos; manter como estão.
 
 ## Onda 2 — Simplificação da experiência (Estoque e Suplementação)
@@ -97,16 +97,17 @@ onda deve entregar:
 ## Proposta de sprints
 
 ### Sprint A — Estoque: fechar as duas falhas de persistência
+**Status: ✅ concluído** (Onda 0, retomada do mesmo dia).
 **Objetivo**: nenhuma ação de Estoque falha silenciosamente ou deixa de gerar o lançamento
 financeiro esperado.
-**Resolve**: EST-01, EST-02, EST-03.
-**Arquivos prováveis**: `src/pages/EstoquePage.jsx`, `src/services/movimentacoes.js`.
-**Migrations**: nenhuma esperada (é lógica de aplicação, não schema).
-**Testes**: unitários em `movimentacoes.test.js` para os tipos corrigidos; teste manual dos 5
-cenários do diagnóstico UX.
-**Riscos**: decisão de produto sobre o significado de "Tratamento"/"Saída" (ver Onda 0).
-**Critério de aceite**: nenhum tipo do dropdown de saída falha silenciosamente; toda entrada com
-custo > 0 gera despesa.
+**Resolveu**: EST-01, EST-02. **Não resolveu**: EST-03 (exclusão/estorno de movimentação geral de
+estoque) — fica para uma sprint futura, não fazia parte do P0/P1 original.
+**Arquivos alterados**: `src/pages/EstoquePage.jsx`, `src/services/movimentacoes.js`.
+**Migrations**: nenhuma (era lógica de aplicação, não schema, como previsto).
+**Testes**: 6 testes novos em `movimentacoes.test.js`. **Teste manual dos 5 cenários do diagnóstico
+UX não foi feito** — sem navegador autenticado nesta sessão (mesma limitação da rodada anterior).
+**Critério de aceite**: atingido por código/testes automatizados; validação visual real fica
+pendente para quando houver navegador autenticado.
 
 ### Sprint B — Pastagens/Lotes: fonte única de contagem de animais
 **Resolve**: PST-1, PST-2, LOT-2.
@@ -115,12 +116,18 @@ custo > 0 gera despesa.
 **Testes**: regressão garantindo que UA/status de pasto e "peso atual" seguem `lote.qtd`/pesagem
 mais recente mesmo quando `animais` diverge (mesmo padrão de teste já usado em
 `movimentacoes.test.js` para lote.qtd × animais.qtd).
-**Ordem recomendada**: depois do Sprint A (mesma classe de bug, mesmo padrão de correção já
-validado nesta auditoria).
+**Ordem recomendada**: agora que o Sprint A está concluído, este é o próximo candidato natural
+(mesma classe de bug, mesmo padrão de correção já validado duas vezes nesta auditoria).
 
-### Sprint C — Suplementação intuitiva e RLS granular
+### Sprint C — Suplementação intuitiva, redesenho de UI e RLS granular
 **Resolve**: SUP-01 (persistir ou remover Dietas), EST-04/EST-05 (unificar categorização e regra de
-saldo negativo), S-02 (RLS granular por módulo).
+saldo negativo), o redesenho funcional de Estoque/Suplementação (wizard "Registrar Uso", empty
+states, unidade como dropdown — ver `AUDITORIA_UX_ESTOQUE_SUPLEMENTACAO.md` §Proposta), e S-02 (RLS
+granular por módulo).
+**Pré-requisito explícito**: sessão de QA com navegador autenticado. Diferente das correções de
+lógica pura (Sprint A/B), um redesenho de UI implementado às cegas — sem poder ver o resultado —
+arrisca quebrar layouts, estados de loading/erro e responsividade de forma que só apareceria depois,
+em produção. As credenciais de `.env.e2e` continuam inválidas em duas tentativas.
 **Dependências**: decisão de produto sobre o futuro da aba "Dietas"; sessão de QA com navegador
 autenticado antes de mexer em RLS (alto risco de regressão de permissão sem poder testar ao vivo).
 **Critério de aceite**: um `operador` autenticado, chamando a API diretamente (não só pela UI), não

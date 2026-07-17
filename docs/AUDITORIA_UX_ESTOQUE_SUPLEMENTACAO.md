@@ -1,12 +1,20 @@
 # Auditoria UX — Estoque e Suplementação
 
-> Diagnóstico apenas — nenhuma mudança de UI foi implementada nesta auditoria (ver
-> [PLANO_ACAO_CORRECOES_HERDON.md](PLANO_ACAO_CORRECOES_HERDON.md), Onda 2/Sprint A-C).
+> **Atualização (Onda 0, retomada)**: o achado funcional crítico **EST-01** ("Tratamento"/"Saída"
+> falhando silenciosamente) e **EST-02** (entrada sem despesa) descritos abaixo **já foram
+> corrigidos no nível de serviço/validação** (ver
+> [AUDITORIA_GERAL_HERDON.md](AUDITORIA_GERAL_HERDON.md) §2.1). "Saída" foi removida do dropdown de
+> tipo; "Tratamento" agora é um tipo real. O diagnóstico de UX abaixo (número de telas/campos,
+> termos técnicos expostos, a proposta de fluxo simplificado) **continua válido e não implementado**
+> — a correção desta rodada resolveu a integridade dos dados, não o redesenho da experiência
+> (isso é o Sprint C do plano de ação, que depende de navegador autenticado).
+>
+> Diagnóstico original abaixo é ponto-em-tempo (código-lido, sem clique real).
 > Método: leitura direta da estrutura real dos formulários no código (`src/pages/EstoquePage.jsx`,
 > `src/pages/SuplementacaoPage.jsx`, `src/components/SuplementacaoConsumoModal.jsx`,
 > `src/services/movimentacoes.js`, `src/services/consumoSuplementacao.js`). **Sem navegador
-> autenticado nesta sessão** — não há cronômetro real, os "passos" abaixo vêm da contagem de
-> campos/telas no próprio código, não de uma pessoa clicando.
+> autenticado em nenhuma das duas rodadas** — não há cronômetro real, os "passos" abaixo vêm da
+> contagem de campos/telas no próprio código, não de uma pessoa clicando.
 
 ## Estoque
 

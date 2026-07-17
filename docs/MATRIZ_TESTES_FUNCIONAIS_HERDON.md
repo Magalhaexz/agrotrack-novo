@@ -42,8 +42,8 @@
 
 | ID | Módulo | Tela | Operação | Encontrável | Funciona | Persiste | Permissão | Severidade | Evidência | Status |
 |---|---|---|---|---|---|---|---|---|---|---|
-| EST-01 | Estoque | Registrar Saída | Tipos "Tratamento" e "Saída" no dropdown **não existem** em `tiposValidos` do serviço — a chamada falha silenciosamente (`console.warn`, nada muda) e o modal fecha como se tivesse dado certo | Sim (opções no menu) | **Não** | **Não** | `estoque:editar` | **P0** | `src/pages/EstoquePage.jsx:852-858` (oferece) vs `src/services/movimentacoes.js` `tiposValidos=['consumo','ajuste','perda','venda']` — **verificado por leitura direta do fluxo `submit()`** (`EstoquePage.jsx:762-775`: chama `onRegistrarSaidaEstoque` e fecha o modal incondicionalmente, sem checar sucesso) | 🔴 **aberto — falha silenciosa confirmada, não corrigida nesta rodada** (ver plano de ação) |
-| EST-02 | Estoque | Registrar Entrada | Compra de item de estoque via UI nunca gera despesa financeira (lógica duplicada em `EstoquePage.jsx` nunca é usada; `App.jsx` sempre passa `onRegistrarEntradaEstoque`, mas a página não usa essa prop na entrada) | Sim | Parcial | Parcial (estoque grava, financeiro não) | `estoque:editar` | **P1** | `src/pages/EstoquePage.jsx:614-681` vs `src/services/movimentacoes.js:530-630` (`registrarEntradaEstoque`, cria despesa `compra_estoque`, nunca chamada) | 🔴 aberto |
+| EST-01 | Estoque | Registrar Saída | Tipos "Tratamento" e "Saída" no dropdown não existiam em `tiposValidos` do serviço — a chamada falhava silenciosamente (`console.warn`, nada mudava) e o modal fechava como se tivesse dado certo | Sim (opções no menu) | ~~Não~~ Sim | ~~Não~~ Sim | `estoque:editar` | **P0** | `src/services/movimentacoes.js` (`registrarSaidaEstoque`, enum canônico `['consumo','tratamento','ajuste','perda','venda']`, agora lança erro em vez de silenciar); `src/pages/EstoquePage.jsx` (`SaidaModal`, trata erro com toast, não fecha nem limpa em falha) | ✅ **corrigido** (commit `fix: corrige movimentacoes de saida do estoque`) — "Saída" removida do dropdown (redundante com o próprio título da tela); "Tratamento" agora é tipo válido, gera despesa `tratamento_sanitario` quando vinculado a um lote |
+| EST-02 | Estoque | Registrar Entrada | Compra de item de estoque via UI nunca gerava despesa financeira (lógica duplicada em `EstoquePage.jsx` nunca usava o serviço real; `App.jsx` sempre passava `onRegistrarEntradaEstoque`, mas a página não usava essa prop) | Sim | ~~Parcial~~ Sim | ~~Parcial~~ Sim | `estoque:editar` | **P1** | `src/services/movimentacoes.js` (`registrarEntradaEstoque`, agora chamada de fato via `onRegistrarEntradaEstoque`); `src/pages/EstoquePage.jsx` (`EntradaModal`) | ✅ **corrigido** — lógica de persistência duplicada removida, entrada agora sempre passa por `registrarEntradaEstoque` (gera despesa `compra_estoque`) |
 | EST-03 | Estoque | Item/Histórico | Não existe exclusão/estorno de item ou movimentação de estoque geral | Não | N/A | N/A | N/A | P2 | grep completo sem `deleteOperationalRecord('estoque'…)`/`('movimentacoes_estoque'…)` | 🔴 aberto |
 | EST-04 | Estoque/Suplementação | Cadastro de produto | 3 heurísticas diferentes decidem se um item é "nutricional" (`estoqueLogic.js`, `SuplementacaoPage.jsx`, `SuplementacaoConsumoModal.jsx`) — item cadastrado em "Insumo geral" pode não aparecer no dropdown de Consumo | Parcial | Inconsistente | — | — | P2 | `src/pages/estoqueLogic.js:13-38`, `src/pages/SuplementacaoPage.jsx:48-60`, `src/components/SuplementacaoConsumoModal.jsx:22-27` | 🔴 aberto |
 | EST-05 | Estoque/Suplementação | Saída vs Consumo | Regra de saldo negativo diverge: Estoque bloqueia (`throw`), Suplementação usa `window.confirm` nativo e permite negativo | — | Inconsistente | Sim | — | P2 | `src/services/movimentacoes.js:667-671` vs `src/components/SuplementacaoConsumoModal.jsx:253` | 🔴 aberto |
@@ -77,12 +77,20 @@
 
 ## Números desta rodada
 - **48 achados** registrados (contando os já corrigidos).
-- **4 P0** encontrados: 2 já corrigidos nesta auditoria (venda/RPC), 1 corrigido nesta auditoria (RLS de perfil), **1 ainda aberto** (EST-01, Estoque "Tratamento"/"Saída" falha silenciosa).
-- **1 P1 corrigido** (Ajuste de Lotação); **4 P1 abertos** (RLS granular por módulo, entrada de estoque sem financeiro, planejamento de suplementação sem persistência, LOT-2 pesagem retroativa).
-- Suíte de testes: 1550/1550 passando após as correções desta rodada (era 1544 no baseline).
+- **4 P0** encontrados: **todos os 4 corrigidos** — venda/RPC do Telegram, Ajuste de Lotação, RLS de
+  perfil (auditoria anterior) e Estoque "Tratamento"/"Saída" falhando silenciosamente (esta rodada).
+- **2 P1 corrigidos** nesta rodada (EST-01/EST-02: Estoque); 3 P1 abertos (RLS granular por módulo,
+  planejamento de suplementação sem persistência, LOT-2 pesagem retroativa).
+- Suíte de testes: 1556/1556 passando após as correções desta rodada (1550 no baseline desta
+  rodada; 1544 antes da auditoria anterior).
 
 ## Limitações desta auditoria
-- **Sem navegador autenticado** nesta sessão: as credenciais em `.env.e2e` retornaram `Invalid login credentials` do Supabase Auth ao tentar logar (senha/usuário desatualizados, ou conta removida) — nenhuma tela foi clicada ao vivo; recomendo o usuário rotacionar/confirmar essas credenciais para a próxima sessão de QA visual.
+- **Sem navegador autenticado** nesta sessão (nem na anterior): as credenciais em `.env.e2e`
+  continuam retornando `Invalid login credentials` do Supabase Auth ao tentar logar (retestado nesta
+  rodada, mesma senha, mesmo erro) — nenhuma tela foi clicada ao vivo, nenhum viewport/perfil/
+  Telegram/multi-fazenda foi validado visualmente. Recomendo o usuário rotacionar/confirmar essas
+  credenciais antes da próxima sessão de QA visual; não é seguro nem apropriado tentar adivinhar a
+  senha correta ou criar uma conta nova sem autorização explícita.
 - Nenhum teste em múltiplos viewports foi executado (exigiria a mesma sessão autenticada).
 - Achados marcados "não verificado ao vivo" nas seções de origem vêm de leitura de código com alta confiança (grep confirmando ausência de chamadas, lógica inequívoca), não de clique real na tela.
 - `RetiradaAnimaisModal.jsx`, `FechamentoLoteModal.jsx`, `MoverPastoModal.jsx` foram auditados só via os pontos de entrada em `LotesPage.jsx`/`LoteAcoesMenu.jsx`, não linha a linha.
