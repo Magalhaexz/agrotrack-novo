@@ -32,44 +32,42 @@ import {
   User,
 } from 'lucide-react';
 
+// Sprint de reorganização estratégica da sidebar — grupos seguem o fluxo real
+// de trabalho do produtor (ver o que está acontecendo → operar a fazenda →
+// organizar a rotina → controlar custos → analisar e decidir → administrar a
+// conta), não a ordem em que os módulos foram construídos historicamente.
+// Detalhes e critérios em docs/SPRINT_REORGANIZACAO_SIDEBAR_HERDON.md.
 export const navSections = [
   {
-    id: 'painel',
-    title: 'Painel',
+    id: 'inicio',
+    title: 'Início',
     items: [
       { id: 'dashboard', label: 'Painel Geral', icon: LayoutDashboard },
-      // Sprint 11 — Central de Alertas própria (pageId distinto de
-      // "Decisões da Fazenda", que fica no grupo Decisão abaixo).
       { id: 'alertas', label: 'Central de Alertas', icon: BellRing },
     ],
   },
   {
-    id: 'campoRebanho',
-    title: 'Campo e Rebanho',
+    id: 'rebanhoCampo',
+    title: 'Rebanho e Campo',
     items: [
-      { id: 'lotes', label: 'Lotes e Rebanho', icon: Beef },
-      { id: 'pesagens', label: 'Pesagens', icon: Scale },
       { id: 'pastagens', label: 'Pastos', icon: Tractor },
+      { id: 'lotes', label: 'Lotes e Rebanho', icon: Beef },
+      { id: 'animais', label: 'Animais', icon: ClipboardList },
+      { id: 'pesagens', label: 'Pesagens', icon: Scale },
       { id: 'suplementacao', label: 'Nutrição e Suplementação', icon: Leaf },
       { id: 'sanitario', label: 'Sanidade', icon: Syringe },
-      { id: 'tarefas', label: 'Tarefas', icon: CheckSquare },
-      // Sprint 18 — órfã: gestão de rotinas recorrentes por funcionário/lote;
-      // o Calendário já lista esses eventos em modo leitura, mas faltava o
-      // ponto de entrada para criar/editar.
-      { id: 'rotina', label: 'Rotinas da Equipe', icon: Repeat },
-      { id: 'animais', label: 'Animais', icon: ClipboardList },
-      { id: 'calendarioOperacional', label: 'Calendário', icon: CalendarDays },
-      // Sprint 18 — órfã: comparação lado a lado de lotes ativos.
-      { id: 'comparativo', label: 'Comparativo de Lotes', icon: GitCompare },
-      // Sprint 18 — órfã: série histórica de entradas/saídas do rebanho.
-      { id: 'evolucaoRebanho', label: 'Evolução do Rebanho', icon: LineChart },
+      // Antes era o único item do grupo isolado "Estoque" — nenhum grupo
+      // deve ter um item só, e Produtos e Insumos é parte do fluxo de campo.
+      { id: 'estoque', label: 'Produtos e Insumos', icon: Package },
     ],
   },
   {
-    id: 'estoque',
-    title: 'Estoque',
+    id: 'rotina',
+    title: 'Rotina',
     items: [
-      { id: 'estoque', label: 'Produtos e Insumos', icon: Package },
+      { id: 'tarefas', label: 'Tarefas', icon: CheckSquare },
+      { id: 'calendarioOperacional', label: 'Calendário', icon: CalendarDays },
+      { id: 'rotina', label: 'Rotinas da Equipe', icon: Repeat },
     ],
   },
   {
@@ -77,24 +75,35 @@ export const navSections = [
     title: 'Finanças',
     items: [
       { id: 'financeiro', label: 'Visão Financeira', icon: Receipt },
-      // Sprint 18 — órfã: lançamento de custo por lote (espelha em
-      // movimentacoes_financeiras automaticamente, ver CustosPage.jsx).
-      { id: 'custos', label: 'Custos por Lote', icon: DollarSign },
       { id: 'fluxoCaixa', label: 'Fluxo de Caixa', icon: TrendingUp },
+      { id: 'custos', label: 'Custos por Lote', icon: DollarSign },
       { id: 'custosCompartilhados', label: 'Rateio de Custos', icon: Layers },
-      { id: 'relatorioFinanceiro', label: 'Relatórios Financeiros', icon: FileBarChart },
+      // "Relatórios Financeiros" saiu daqui: já é um card de acesso claro
+      // dentro do hub "Relatórios" (RelatoriosPage.jsx) — dois pontos de
+      // entrada para o mesmo relatório só duplicavam o menu. A rota
+      // /relatorio-financeiro continua funcionando normalmente.
     ],
   },
   {
-    id: 'decisao',
-    title: 'Decisão',
+    id: 'analisesDecisao',
+    title: 'Análises e Decisão',
     items: [
-      { id: 'cenarios', label: 'Simulador de Decisão', icon: Calculator },
       { id: 'resultados', label: 'Resultado dos Lotes', icon: BarChart3 },
-      { id: 'decisoesFazenda', label: 'Decisões da Fazenda', icon: ListChecks },
+      { id: 'comparativo', label: 'Comparativo de Lotes', icon: GitCompare },
+      { id: 'evolucaoRebanho', label: 'Evolução do Rebanho', icon: LineChart },
       { id: 'indicadores', label: 'Indicadores', icon: Activity },
+      { id: 'cenarios', label: 'Simulador de Decisão', icon: Calculator },
+      // Mantida: agrupa lotes abaixo da meta, estoque crítico e sanidade
+      // próxima por categoria, com ranking de saúde de lote e assistente
+      // HERDON embutido — conteúdo que a Central de Alertas não replica.
+      { id: 'decisoesFazenda', label: 'Decisões da Fazenda', icon: ListChecks },
       { id: 'relatorios', label: 'Relatórios', icon: FileBarChart },
-      { id: 'relatoriosGerenciais', label: 'Painel Gerencial', icon: FileBarChart },
+      // "Painel Gerencial" (relatoriosGerenciais) saiu daqui: auditoria de
+      // código mostrou que RelatoriosGerenciaisPage.jsx duplica quase
+      // literalmente DashboardPremiumPage.jsx (mesmos helpers de formatação,
+      // mesmo computeIndicadoresEstrategicos/calcularProjecaoCenario) — e
+      // DashboardPremiumPage já tinha sido excluída da sidebar no Sprint 18
+      // pelo mesmo motivo. A rota /relatorios-gerenciais continua funcionando.
     ],
   },
   {
@@ -105,18 +114,24 @@ export const navSections = [
       // Ponto de entrada único para Equipe — FuncionariosPage segue registrada (não apagada), ver backlog.
       { id: 'equipeAcessos', label: 'Equipe e Acessos', icon: ShieldPlus },
       { id: 'importacao', label: 'Importação', icon: FileUp },
-      { id: 'minhaAssinatura', label: 'Planos e Assinatura', icon: CreditCard },
-      { id: 'configuracoes', label: 'Configurações', icon: Settings },
-      { id: 'sincronizacao', label: 'Sincronização', icon: RefreshCw },
-      { id: 'perfil', label: 'Perfil', icon: User },
     ],
   },
   {
-    id: 'ajuda',
-    title: 'Ajuda',
+    id: 'contaSistema',
+    title: 'Conta e Sistema',
     items: [
+      { id: 'perfil', label: 'Perfil', icon: User },
+      { id: 'configuracoes', label: 'Configurações', icon: Settings },
+      { id: 'minhaAssinatura', label: 'Planos e Assinatura', icon: CreditCard },
+      // "Sincronização" saiu do meio dos itens operacionais de Gestão e veio
+      // para o rodapé de conta/sistema (é uma função técnica, não do dia a
+      // dia). Continua como item de sidebar (não só dentro de Configurações)
+      // porque a permissão de configuracoes:ver não cobre visualizador, que
+      // hoje acessa sincronização por ter dashboard:ver — escondê-la só
+      // dentro de Configurações tiraria esse acesso. ConfiguracoesPage.jsx
+      // também ganhou uma seção "Sincronização e dados" com atalho.
+      { id: 'sincronizacao', label: 'Sincronização', icon: RefreshCw },
       { id: 'guiaCriador', label: 'Guia do Criador', icon: HelpCircle },
-      // "Suporte" removido da sidebar (decisão aprovada) — rota /suporte e SuportePage seguem intactas.
     ],
   },
 ];

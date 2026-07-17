@@ -617,6 +617,16 @@ export default function ConfiguracoesPage({ db, setDb, onConfirmAction, onNaviga
           <div className="config-data-stack">
             <div className="config-actions-wrap config-actions-wrap--data">
               <div className="config-panel-intro">
+                <span className="config-panel-kicker">Sincronização e dados</span>
+                <p>Veja o status da sincronização com a nuvem e force uma sincronização manual quando precisar.</p>
+              </div>
+              <div className="config-action-cluster">
+                <Button variant="outline" onClick={() => onNavigate?.('sincronizacao')}>Abrir sincronização</Button>
+              </div>
+            </div>
+
+            <div className="config-actions-wrap config-actions-wrap--data">
+              <div className="config-panel-intro">
                 <span className="config-panel-kicker">Backup e manutenção</span>
                 <p>Exporte, importe e limpe dados operacionais com uma hierarquia visual mais clara e segura.</p>
               </div>

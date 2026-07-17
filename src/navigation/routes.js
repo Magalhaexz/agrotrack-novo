@@ -50,6 +50,16 @@ const routePageMap = Object.entries(pageRouteMap).reduce((acc, [page, route]) =>
   return acc;
 }, {});
 
+// Rotas antigas de páginas que saíram da sidebar ou foram unificadas em
+// outra — não têm mais uma página própria, mas continuar existindo é
+// obrigatório (favoritos, links salvos, histórico do navegador). Cada uma
+// resolve para o pageId que assumiu a função.
+export const legacyRouteAliases = {
+  // AcompanhamentoPesoPage foi unificada em Pesagens (aba "Nova pesagem" /
+  // "Evolução" cobrem tudo que a página separada fazia).
+  '/acompanhamento-peso': 'pesagens',
+};
+
 export { pageRouteMap };
 
 export function getRouteForPage(pageId) {
@@ -61,5 +71,7 @@ export function getRouteForPage(pageId) {
 
 export function getPageFromPathname(pathname) {
   const normalizedPath = String(pathname || '/').trim() || '/';
-  return routePageMap[normalizedPath] || 'dashboard';
+  if (routePageMap[normalizedPath]) return routePageMap[normalizedPath];
+  if (legacyRouteAliases[normalizedPath]) return legacyRouteAliases[normalizedPath];
+  return 'dashboard';
 }

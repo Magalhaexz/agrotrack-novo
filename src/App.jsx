@@ -22,7 +22,7 @@ import {
   signOutLocalSafely,
 } from './lib/supabase';
 import { secondaryNavItems, navSections } from './navigation/navConfig';
-import { getPageFromPathname, getRouteForPage } from './navigation/routes';
+import { getPageFromPathname, getRouteForPage, legacyRouteAliases } from './navigation/routes';
 import {
   registrarEntradaAnimal,
   registrarEntradaEstoque,
@@ -299,6 +299,26 @@ export default function App() {
     window.addEventListener('popstate', handlePopState);
     return () => window.removeEventListener('popstate', handlePopState);
   }, []);
+
+  // Rotas antigas de páginas que saíram da sidebar (ex.: /acompanhamento-peso)
+  // normalizam a URL para o destino atual com replaceState — não pushState,
+  // para não empilhar a rota antiga no histórico (Voltar não reabre o alias
+  // nem entra em loop) e não deixar a barra de endereço presa na rota morta.
+  /* eslint-disable react-hooks/set-state-in-effect */
+  useEffect(() => {
+    const aliasPage = legacyRouteAliases[window.location.pathname];
+    if (!aliasPage) return;
+
+    const canonicalRoute = getRouteForPage(aliasPage);
+    if (canonicalRoute && canonicalRoute !== window.location.pathname) {
+      window.history.replaceState({}, '', canonicalRoute);
+    }
+    setCurrentPage(aliasPage);
+    if (aliasPage === 'pesagens') {
+      setNavigationIntent({ page: 'pesagens', action: 'novo', at: Date.now() });
+    }
+  }, []);
+  /* eslint-enable react-hooks/set-state-in-effect */
 
   if (import.meta.env.DEV) {
     console.debug('[HERDON_AUTH_BOOT]', {
