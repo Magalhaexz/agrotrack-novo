@@ -64,7 +64,6 @@ const ResultadosPage = lazy(() => import('./pages/ResultadosPage'));
 const FinanceiroPage = lazy(() => import('./pages/FinanceiroPage'));
 const EstoquePage = lazy(() => import('./pages/EstoquePage'));
 const PesagensPage = lazy(() => import('./pages/PesagensPage'));
-const AcompanhamentoPesoPage = lazy(() => import('./pages/AcompanhamentoPesoPage'));
 const RotinaPage = lazy(() => import('./pages/RotinaPage'));
 const FuncionariosPage = lazy(() => import('./pages/FuncionariosPage'));
 const TarefasPage = lazy(() => import('./pages/TarefasPage'));
@@ -165,7 +164,6 @@ const pageMap = {
   sanitario: SanitarioPage,
   estoque: EstoquePage,
   pesagens: PesagensPage,
-  acompanhamentoPeso: AcompanhamentoPesoPage,
   custos: CustosPage,
   fluxoCaixa: FluxoCaixaPage,
   custosCompartilhados: CustosCompartilhadosPage,

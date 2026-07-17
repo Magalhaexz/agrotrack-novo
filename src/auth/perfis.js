@@ -165,7 +165,6 @@ export const permissoesPorPagina = {
   sanitario: 'sanitario:ver',
   estoque: 'estoque:ver',
   pesagens: 'pesagens:ver',
-  acompanhamentoPeso: 'animais:ver',
   custos: 'financeiro:ver',
   fluxoCaixa: 'financeiro:ver',
   custosCompartilhados: 'financeiro:ver',

@@ -18,7 +18,6 @@ const pageRouteMap = {
   sanitario: '/sanitario',
   estoque: '/estoque',
   pesagens: '/pesagens',
-  acompanhamentoPeso: '/acompanhamento-peso',
   custos: '/custos',
   fluxoCaixa: '/fluxo-caixa',
   custosCompartilhados: '/custos-compartilhados',

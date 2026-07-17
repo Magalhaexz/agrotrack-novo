@@ -30,7 +30,6 @@ import {
   Tractor,
   TrendingUp,
   User,
-  Weight,
 } from 'lucide-react';
 
 export const navSections = [
@@ -50,9 +49,6 @@ export const navSections = [
     items: [
       { id: 'lotes', label: 'Lotes e Rebanho', icon: Beef },
       { id: 'pesagens', label: 'Pesagens', icon: Scale },
-      // Sprint 18 — órfã (existia no código, sem entrada de menu): peso
-      // individual por animal, complementar à pesagem em lote acima.
-      { id: 'acompanhamentoPeso', label: 'Acompanhamento de Peso', icon: Weight },
       { id: 'pastagens', label: 'Pastos', icon: Tractor },
       { id: 'suplementacao', label: 'Nutrição e Suplementação', icon: Leaf },
       { id: 'sanitario', label: 'Sanidade', icon: Syringe },

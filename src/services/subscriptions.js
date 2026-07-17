@@ -33,7 +33,6 @@ const MODULES_BASIC = [
   // navegar até uma página que o próprio menu mostra como disponível).
   'alertas',
   'suplementacao',
-  'acompanhamentoPeso',
   'custos',
   'fluxoCaixa',
   'custosCompartilhados',

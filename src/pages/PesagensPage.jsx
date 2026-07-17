@@ -1,5 +1,6 @@
 import { useMemo, useState } from 'react';
 import PesagemForm from '../components/PesagemForm';
+import PesoChart from '../components/PesoChart';
 import Card from '../components/ui/Card';
 import Button from '../components/ui/Button';
 import EmptyState from '../components/EmptyState';
@@ -150,6 +151,8 @@ export default function PesagensPage({ db, setDb, onConfirmAction, navigationInt
   const [abrirForm, setAbrirForm] = useState(shouldStartWithNewPesagem);
   const [pesagemEditando, setPesagemEditando] = useState(null);
   const [ultimoResumoBatch, setUltimoResumoBatch] = useState(null);
+  const [resumoPesagem, setResumoPesagem] = useState(null);
+  const [loteEvolucaoId, setLoteEvolucaoId] = useState('');
 
   const lotes = db?.lotes;
   const animais = db?.animais;
@@ -258,6 +261,31 @@ export default function PesagensPage({ db, setDb, onConfirmAction, navigationInt
       gmdMedioDisponivel: Number.isFinite(gmdMedio),
     };
   }, [pesagens]);
+
+  // Evolução: gráfico + KPIs por lote (Sprint de unificação com
+  // Acompanhamento de Peso — antes vivia numa página separada).
+  const pesagensLoteEvolucao = useMemo(() => {
+    if (!loteEvolucaoId) return [];
+    return (pesagens || [])
+      .filter((item) => resolveTipoPesagem(item) === 'lote' && Number(item?.lote_id) === Number(loteEvolucaoId))
+      .map((item) => ({ ...item, data: toDateKey(item?.data) }))
+      .filter((item) => item.data)
+      .sort((a, b) => a.data.localeCompare(b.data));
+  }, [pesagens, loteEvolucaoId]);
+
+  const resumoEvolucaoLote = useMemo(() => {
+    if (pesagensLoteEvolucao.length < 2) return { primeira: null, ultima: null, ganho: 0, dias: 0, gmd: 0 };
+    const primeira = pesagensLoteEvolucao[0];
+    const ultima = pesagensLoteEvolucao[pesagensLoteEvolucao.length - 1];
+    const ganho = Number(ultima?.peso_medio || 0) - Number(primeira?.peso_medio || 0);
+    const dias = Math.max(0, daysBetween(primeira.data, ultima.data));
+    return { primeira, ultima, ganho, dias, gmd: dias > 0 ? ganho / dias : 0 };
+  }, [pesagensLoteEvolucao]);
+
+  const loteEvolucaoSelecionado = useMemo(
+    () => (lotes || []).find((item) => Number(item.id) === Number(loteEvolucaoId)) || null,
+    [lotes, loteEvolucaoId]
+  );
 
   function abrirNovaPesagem() {
     if (!hasPermission('pesagens:editar')) {
@@ -646,6 +674,19 @@ export default function PesagensPage({ db, setDb, onConfirmAction, navigationInt
         pesagens: nextPesagens,
       }));
 
+      const pesosSalvos = normalizedRegistros
+        .map((registro) => Number(registro?.peso_medio))
+        .filter((valor) => Number.isFinite(valor) && valor > 0);
+      setResumoPesagem(pesosSalvos.length ? {
+        loteNome: lote?.nome || '—',
+        data: normalizedRegistros[0]?.data || null,
+        totalPesados: pesosSalvos.length,
+        media: pesosSalvos.reduce((soma, valor) => soma + valor, 0) / pesosSalvos.length,
+        maior: Math.max(...pesosSalvos),
+        menor: Math.min(...pesosSalvos),
+        variacao: Math.max(...pesosSalvos) - Math.min(...pesosSalvos),
+      } : null);
+
       setUltimoResumoBatch(null);
       showToast({ type: 'success', message: 'Pesagem salva com sucesso.' });
 
@@ -818,6 +859,18 @@ export default function PesagensPage({ db, setDb, onConfirmAction, navigationInt
         </Card>
       ) : null}
 
+      {resumoPesagem ? (
+        <Card title="Resumo da pesagem" subtitle={`${resumoPesagem.loteNome} · ${formatarData(resumoPesagem.data)}`}>
+          <div className="peso-summary-grid">
+            <div className="peso-summary-card"><div className="peso-summary-value">{resumoPesagem.totalPesados}</div><div className="peso-summary-label">Animais pesados</div></div>
+            <div className="peso-summary-card"><div className="peso-summary-value">{formatarNumero(resumoPesagem.media)}</div><div className="peso-summary-label">Peso médio</div></div>
+            <div className="peso-summary-card"><div className="peso-summary-value">{formatarNumero(resumoPesagem.maior)}</div><div className="peso-summary-label">Maior peso</div></div>
+            <div className="peso-summary-card"><div className="peso-summary-value">{formatarNumero(resumoPesagem.menor)}</div><div className="peso-summary-label">Menor peso</div></div>
+            <div className="peso-summary-card"><div className="peso-summary-value">{formatarNumero(resumoPesagem.variacao)}</div><div className="peso-summary-label">Variação entre maior e menor peso</div></div>
+          </div>
+        </Card>
+      ) : null}
+
       {abaAtiva === 'nova' && (lotes || []).length === 0 && (
         <EmptyState
           title="Nenhum lote disponível para pesagem."
@@ -874,13 +927,47 @@ export default function PesagensPage({ db, setDb, onConfirmAction, navigationInt
 
       {abaAtiva === 'evolucao' && (
         <div className="fazendas-card">
-          {dadosTabela.length < 2 ? (
+          <div className="form-grid two" style={{ marginBottom: 16 }}>
+            <label className="ui-input-wrap">
+              <span className="ui-input-label">Lote</span>
+              <select className="ui-input" value={loteEvolucaoId} onChange={(e) => setLoteEvolucaoId(e.target.value)}>
+                <option value="">Selecione um lote</option>
+                {(lotes || []).map((lote) => <option key={lote.id} value={lote.id}>{lote.nome}</option>)}
+              </select>
+            </label>
+          </div>
+
+          {!loteEvolucaoId ? (
+            <EmptyState
+              title="Selecione um lote para ver a evolução de peso."
+              subtitle="O gráfico compara o peso real com a meta de GMD do lote."
+            />
+          ) : pesagensLoteEvolucao.length < 2 ? (
             <EmptyState
               title="Sem dados suficientes para evolução."
-              subtitle="Registre pelo menos duas pesagens do mesmo lote para ver a evolução de peso e o GMD."
+              subtitle="Registre pelo menos duas pesagens deste lote para ver o gráfico e o GMD."
             />
           ) : (
-            <p>Peso médio por lote e GMD disponíveis no histórico de pesagens.</p>
+            <>
+              <div className="kpi-grid-3 kpi-grid-3--compact" style={{ marginBottom: 16 }}>
+                <div className="kpi-card kpi-card--compact">
+                  <div className="kpi-label">Primeira pesagem</div>
+                  <div className="kpi-value">{formatarNumero(resumoEvolucaoLote.primeira?.peso_medio)} kg</div>
+                  <div className="kpi-sub">{formatarData(resumoEvolucaoLote.primeira?.data)}</div>
+                </div>
+                <div className="kpi-card kpi-card--compact">
+                  <div className="kpi-label">Última pesagem</div>
+                  <div className="kpi-value">{formatarNumero(resumoEvolucaoLote.ultima?.peso_medio)} kg</div>
+                  <div className="kpi-sub">{formatarData(resumoEvolucaoLote.ultima?.data)}</div>
+                </div>
+                <div className="kpi-card kpi-card--compact">
+                  <div className="kpi-label">Ganho total</div>
+                  <div className="kpi-value">{formatarNumero(resumoEvolucaoLote.ganho)} kg</div>
+                  <div className="kpi-sub">{resumoEvolucaoLote.dias} dias · GMD {formatarNumero(resumoEvolucaoLote.gmd, 3)} kg/dia</div>
+                </div>
+              </div>
+              <PesoChart data={pesagensLoteEvolucao} metaGmd={loteEvolucaoSelecionado?.gmd_meta || 0} />
+            </>
           )}
         </div>
       )}
