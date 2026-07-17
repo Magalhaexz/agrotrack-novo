@@ -242,6 +242,18 @@ export default function PastagensPage({ db, setDb, session, onConfirmAction }) {
       showToast({ type: 'error', message: mensagemSemPermissao });
       return;
     }
+    // P1 (teste de campo): o app excluía um pasto mesmo com lote ativo
+    // vinculado, deixando `lote.pastagem_id` órfão — o próprio bot do
+    // Telegram já bloqueava esse caso (`cadastroPasto.js::prepararExclusaoPasto`)
+    // e documentava a lacuna aqui como um gap real do app; agora fechada,
+    // com a mesma regra (bloqueia enquanto houver lote não encerrado).
+    const loteOcupando = (Array.isArray(db?.lotes) ? db.lotes : []).find((l) => (
+      String(l.pastagem_id) === String(item.id) && String(l?.status || 'ativo').toLowerCase() !== 'encerrado'
+    ));
+    if (loteOcupando) {
+      showToast({ type: 'warning', message: `O lote "${loteOcupando.nome}" ainda está vinculado a este pasto. Retire-o antes de excluir.` });
+      return;
+    }
     const confirmado = typeof onConfirmAction === 'function'
       ? await onConfirmAction({
           title: 'Excluir pasto?',

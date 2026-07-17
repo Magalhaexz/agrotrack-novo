@@ -35,7 +35,7 @@ const TIPOS_REDIRECIONAMENTO = new Set(REDIRECIONAMENTO_TIPOS.map((t) => t.value
  * `onRedirecionar(tipo)` para o pai abrir o fluxo próprio (nunca tratadas
  * como simples redução de quantidade).
  */
-export default function RetiradaAnimaisModal({ open, lote, onClose, onSubmit, onRedirecionar, maxCabecas, modo = 'sale_partial' }) {
+export default function RetiradaAnimaisModal({ open, lote, lotes = [], onClose, onSubmit, onRedirecionar, maxCabecas, modo = 'sale_partial' }) {
   const { executar, isSubmitting } = useSubmitOnce();
   const [form, setForm] = useState({
     tipo: TIPO_POR_MODO[modo] || 'venda',
@@ -44,11 +44,20 @@ export default function RetiradaAnimaisModal({ open, lote, onClose, onSubmit, on
     pesoMedio: '',
     valorTotal: '',
     destino: '',
+    destinoLoteId: '',
   });
   const [error, setError] = useState('');
 
   const ehRedirecionamento = TIPOS_REDIRECIONAMENTO.has(form.tipo);
   const ehVenda = form.tipo === 'venda';
+  // P0 (teste de campo): "Transferência de saída" nunca perguntava o lote de
+  // destino — o formulário só tinha Quantidade/Peso, e `registrarSaidaAnimal`
+  // sempre exige `destinoLoteId` para esse tipo, então a operação falhava
+  // 100% das vezes com "Transferência de saída exige lote de destino válido."
+  const ehTransferencia = form.tipo === 'transferencia_saida';
+  const lotesDestino = lotes.filter((l) => (
+    Number(l.id) !== Number(lote?.id) && String(l?.status || 'ativo') === 'ativo'
+  ));
 
   function updateField(field, value) {
     setForm((prev) => ({ ...prev, [field]: value }));
@@ -73,6 +82,7 @@ export default function RetiradaAnimaisModal({ open, lote, onClose, onSubmit, on
     if (qtd > Number(maxCabecas || 0)) return setError('A retirada não pode superar o total do lote.');
     if (!peso || peso <= 0) return setError('Informe o peso médio.');
     if (ehVenda && Number(form.valorTotal || 0) <= 0) return setError('Informe o valor total da venda.');
+    if (ehTransferencia && !form.destinoLoteId) return setError('Selecione o lote de destino.');
 
     try {
       await executar(() => onSubmit({
@@ -83,6 +93,7 @@ export default function RetiradaAnimaisModal({ open, lote, onClose, onSubmit, on
         pesoMedio: peso,
         valorTotal: ehVenda ? Number(form.valorTotal || 0) : 0,
         comprador: ehVenda ? form.destino : '',
+        destinoLoteId: ehTransferencia ? Number(form.destinoLoteId) : undefined,
       }));
     } catch (err) {
       setError(err?.message || 'Não foi possível salvar agora. Tente novamente.');
@@ -132,7 +143,17 @@ export default function RetiradaAnimaisModal({ open, lote, onClose, onSubmit, on
             <Input className="full" label="Comprador" value={form.destino} onChange={(e) => updateField('destino', e.target.value)} />
           </>
         ) : null}
+
+        {ehTransferencia ? (
+          <Input as="select" className="full" label="Lote de destino" value={form.destinoLoteId} onChange={(e) => updateField('destinoLoteId', e.target.value)}>
+            <option value="">Selecione</option>
+            {lotesDestino.map((l) => <option key={l.id} value={l.id}>{l.nome}</option>)}
+          </Input>
+        ) : null}
       </div>
+      {ehTransferencia && lotesDestino.length === 0 ? (
+        <p className="ui-input-hint">Não há outro lote ativo nesta fazenda para receber a transferência.</p>
+      ) : null}
       {ehRedirecionamento ? (
         <p className="ui-input-hint">
           Esta ação abre o fluxo próprio — não reduz a quantidade do lote como uma retirada.

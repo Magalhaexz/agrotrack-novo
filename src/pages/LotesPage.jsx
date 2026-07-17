@@ -16,6 +16,7 @@ import { gerarNovoId } from '../utils/id';
 import { createOperationalRecord, updateOperationalRecord } from '../services/operationalPersistence';
 import { excluirEEstornarConsumoSuplementacao } from '../services/consumoSuplementacao';
 import { sincronizarAnimaisGrupoDoLote, mutationsAnimaisDoLote } from '../services/movimentacoes';
+import { useSubmitOnce } from '../hooks/useSubmitOnce.js';
 import LoteCard from '../components/lotes/LoteCard';
 import LoteDetailsPanel from '../components/lotes/LoteDetailsPanel';
 import LotesFilters from '../components/lotes/LotesFilters';
@@ -428,12 +429,17 @@ export default function LotesPage({ db, setDb, onRegistrarSaidaAnimal, session, 
       onRegistrarSaidaAnimal(payload);
       setOpenRetirada(false);
       setRetiradaModo('sale_partial');
+      // P1 (teste de campo): a mensagem era escolhida pelo botão que abriu o
+      // modal (`retiradaModo`), não pelo tipo realmente selecionado no
+      // dropdown — trocar para "Morte/perda" antes de salvar mostrava
+      // "Venda parcial registrada com sucesso." mesmo assim. Agora usa o
+      // `tipoSaida` de fato enviado ao serviço.
       const mensagens = {
-        sale_partial: 'Venda parcial registrada com sucesso.',
-        death_loss: 'Morte/perda registrada com sucesso.',
-        exit: 'Saída do lote registrada com sucesso.',
+        venda: 'Venda parcial registrada com sucesso.',
+        morte: 'Morte/perda registrada com sucesso.',
+        transferencia_saida: 'Transferência registrada com sucesso.',
       };
-      showToast({ type: 'success', message: mensagens[retiradaModo] || 'Retirada registrada com sucesso.' });
+      showToast({ type: 'success', message: mensagens[payload.tipoSaida] || 'Retirada registrada com sucesso.' });
     } catch (error) {
       showToast({ type: 'error', message: error?.message || 'Falha ao registrar movimentação do lote.' });
     }
@@ -779,6 +785,7 @@ export default function LotesPage({ db, setDb, onRegistrarSaidaAnimal, session, 
           key={`${selectedLote?.id ?? 'lote'}-${retiradaModo}`}
           open={openRetirada}
           lote={selectedLote}
+          lotes={lotes}
           maxCabecas={selectedLote.heads}
           modo={retiradaModo}
           onClose={() => {
@@ -975,12 +982,15 @@ function PesagemModal({ open, lote, onClose, onSubmit }) {
   const [pesoMedio, setPesoMedio] = useState('');
   const [observacao, setObservacao] = useState('');
   const [error, setError] = useState('');
+  // P1 (teste de campo): sem trava de duplo-envio — duplo clique/toque
+  // (comum em celular com rede lenta) podia criar 2 pesagens.
+  const { executar, isSubmitting } = useSubmitOnce();
 
-  function handleSave() {
+  async function handleSave() {
     setError('');
     if (!data) return setError('Informe a data da pesagem.');
     if (!Number(pesoMedio)) return setError('Informe o peso médio.');
-    onSubmit({ data, pesoMedio, observacao });
+    await executar(() => onSubmit({ data, pesoMedio, observacao }));
   }
 
   return (
@@ -991,8 +1001,8 @@ function PesagemModal({ open, lote, onClose, onSubmit }) {
       subtitle={`Lote ${lote?.nome || ''}`}
       footer={(
         <>
-          <Button variant="ghost" onClick={onClose}>Cancelar</Button>
-          <Button onClick={handleSave}>Salvar pesagem</Button>
+          <Button variant="ghost" onClick={onClose} disabled={isSubmitting}>Cancelar</Button>
+          <Button onClick={handleSave} loading={isSubmitting} loadingLabel="Salvando...">Salvar pesagem</Button>
         </>
       )}
     >

@@ -1,6 +1,7 @@
 import { useMemo, useState } from 'react';
 import Modal from './ui/Modal';
 import Button from './ui/Button';
+import { useSubmitOnce } from '../hooks/useSubmitOnce.js';
 
 import { hojeLocalISO } from '../domain/dataCivil.js';
 const EXIT_REASONS = [
@@ -85,6 +86,9 @@ export default function AnimalMovementModal({
 }) {
   const [form, setForm] = useState(() => getInitialForm(mode));
   const [error, setError] = useState('');
+  // P1 (teste de campo): sem trava de duplo-envio — duplo clique/toque podia
+  // criar 2 movimentações/2 lançamentos financeiros para a mesma venda/morte.
+  const { executar, isSubmitting } = useSubmitOnce();
 
   const config = MODE_CONFIG[mode] || MODE_CONFIG.exit;
   const subtitle = useMemo(() => {
@@ -96,7 +100,7 @@ export default function AnimalMovementModal({
     setForm((prev) => ({ ...prev, [field]: value }));
   }
 
-  function handleSubmit(event) {
+  async function handleSubmit(event) {
     event?.preventDefault?.();
     const validationError = validateForm(mode, form);
     if (validationError) {
@@ -105,19 +109,19 @@ export default function AnimalMovementModal({
     }
 
     setError('');
-    onSubmit?.({
+    await executar(() => onSubmit?.({
       data: form.data,
       valor: mode === 'sale' ? (form.valor === '' ? null : Number(form.valor)) : null,
       peso: mode === 'sale' ? (form.peso === '' ? null : Number(form.peso)) : null,
       observacao: String(form.observacao || '').trim(),
       motivo: mode === 'sale' ? 'venda' : String(form.motivo || '').trim(),
-    });
+    }));
   }
 
   const footer = (
     <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8 }}>
-      <Button variant="ghost" onClick={onClose}>Cancelar</Button>
-      <Button onClick={handleSubmit}>{config.submitLabel}</Button>
+      <Button variant="ghost" onClick={onClose} disabled={isSubmitting}>Cancelar</Button>
+      <Button onClick={handleSubmit} loading={isSubmitting} loadingLabel="Salvando...">{config.submitLabel}</Button>
     </div>
   );
 
