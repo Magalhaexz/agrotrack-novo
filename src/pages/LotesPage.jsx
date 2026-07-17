@@ -15,6 +15,7 @@ import { calcLote } from '../utils/calculations';
 import { gerarNovoId } from '../utils/id';
 import { createOperationalRecord, updateOperationalRecord } from '../services/operationalPersistence';
 import { excluirEEstornarConsumoSuplementacao } from '../services/consumoSuplementacao';
+import { sincronizarAnimaisGrupoDoLote, mutationsAnimaisDoLote } from '../services/movimentacoes';
 import LoteCard from '../components/lotes/LoteCard';
 import LoteDetailsPanel from '../components/lotes/LoteDetailsPanel';
 import LotesFilters from '../components/lotes/LotesFilters';
@@ -538,12 +539,21 @@ export default function LotesPage({ db, setDb, onRegistrarSaidaAnimal, session, 
       return;
     }
 
+    // Sincroniza a linha "grupo" de `animais` com a nova contagem (mesmo bug
+    // corrigido em venda/morte/transferência — a página Animais lê
+    // `animais.qtd` diretamente e ficava com o valor antigo após um ajuste).
+    // Peso médio não muda aqui (regra do Ajuste de Lotação), por isso sem
+    // 4º argumento.
+    const animaisSincronizados = sincronizarAnimaisGrupoDoLote(db?.animais, loteId, plano.writes.loteUpdate.qtd);
+    await Promise.all(mutationsAnimaisDoLote(animaisSincronizados, loteId, session));
+
     const novaMovimentacao = movPersistida.data || { id: gerarNovoId(movAnimais), ...plano.writes.movimentacao };
     setDb((prev) => ({
       ...prev,
       lotes: (prev.lotes || []).map((l) => (
         Number(l.id) === Number(loteId) ? { ...l, qtd: plano.writes.loteUpdate.qtd } : l
       )),
+      animais: animaisSincronizados,
       movimentacoes_animais: [...(Array.isArray(prev?.movimentacoes_animais) ? prev.movimentacoes_animais : []), novaMovimentacao],
     }));
     showToast({ type: 'success', message: 'Lotação ajustada com sucesso.' });

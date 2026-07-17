@@ -178,8 +178,12 @@ function ehRegistroIndividual(animal) {
  * Registros `tipo_registro: 'individual'` (rastreio cabeça a cabeça, com seu
  * próprio ciclo de vida em `AnimaisPage`/`AnimalMovementModal`) nunca são
  * tocados aqui — só a(s) linha(s) "grupo" do lote.
+ *
+ * `novoPesoMedio` é opcional: omitido/`null` preserva o `p_at` de cada linha
+ * (usado pelo Ajuste de Lotação em `LotesPage.jsx`, que corrige só a
+ * contagem — "não altera peso médio", ver `lotesLogic.js::buildAjusteLotacaoPatch`).
  */
-function sincronizarAnimaisGrupoDoLote(animais, loteId, novaQtd, novoPesoMedio) {
+export function sincronizarAnimaisGrupoDoLote(animais, loteId, novaQtd, novoPesoMedio = null) {
   const lista = Array.isArray(animais) ? animais : [];
   const grupoDoLote = lista.filter((a) => Number(a.lote_id) === Number(loteId) && !ehRegistroIndividual(a));
   if (grupoDoLote.length === 0) return lista;
@@ -190,12 +194,12 @@ function sincronizarAnimaisGrupoDoLote(animais, loteId, novaQtd, novoPesoMedio) 
     // Caso comum: uma única linha "grupo" por lote → recebe o valor exato.
     // Múltiplas linhas (raro): distribui proporcionalmente à participação atual.
     const parte = totalAtual > 0 ? toNumber(a.qtd) / totalAtual : 1 / grupoDoLote.length;
-    return { ...a, qtd: Math.max(Math.round(novaQtd * parte), 0), p_at: novoPesoMedio };
+    return { ...a, qtd: Math.max(Math.round(novaQtd * parte), 0), p_at: novoPesoMedio == null ? a.p_at : novoPesoMedio };
   });
 }
 
 /** Mutações de persistência para as linhas "grupo" de `animais` de um lote (após sincronizadas). */
-function mutationsAnimaisDoLote(animaisSincronizados, loteId, session) {
+export function mutationsAnimaisDoLote(animaisSincronizados, loteId, session) {
   return (Array.isArray(animaisSincronizados) ? animaisSincronizados : [])
     .filter((a) => Number(a.lote_id) === Number(loteId) && !ehRegistroIndividual(a))
     .map((a) => updateOperationalRecord('animais', a.id, { qtd: a.qtd, p_at: a.p_at }, session));
