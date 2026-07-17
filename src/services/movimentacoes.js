@@ -159,6 +159,48 @@ function atualizarLoteComResumo(lote, qtdAtual, pesoMedioAtual) {
   };
 }
 
+function ehRegistroIndividual(animal) {
+  return String(animal?.tipo_registro || '').toLowerCase() === 'individual';
+}
+
+/**
+ * Sincroniza os registros "grupo" de `animais` (a linha agregada por lote, com
+ * seu próprio `qtd`/`p_at`) com o novo saldo/peso do LOTE após uma venda,
+ * morte, transferência ou entrada.
+ *
+ * Bug corrigido (P0): venda/morte/transferência só atualizavam `lote.qtd`
+ * (fonte canônica para o SALDO, usada por `calcLote`/`LotesPage`). A própria
+ * linha de `animais` (lida diretamente por `AnimaisPage` — resumo "Total de
+ * cabeças" e a aba "Grupos") nunca era tocada, então animais vendidos
+ * continuavam aparecendo ali com a quantidade antiga, inclusive após reload
+ * (o valor problemático estava persistido, não só desatualizado em memória).
+ *
+ * Registros `tipo_registro: 'individual'` (rastreio cabeça a cabeça, com seu
+ * próprio ciclo de vida em `AnimaisPage`/`AnimalMovementModal`) nunca são
+ * tocados aqui — só a(s) linha(s) "grupo" do lote.
+ */
+function sincronizarAnimaisGrupoDoLote(animais, loteId, novaQtd, novoPesoMedio) {
+  const lista = Array.isArray(animais) ? animais : [];
+  const grupoDoLote = lista.filter((a) => Number(a.lote_id) === Number(loteId) && !ehRegistroIndividual(a));
+  if (grupoDoLote.length === 0) return lista;
+
+  const totalAtual = grupoDoLote.reduce((acc, a) => acc + toNumber(a.qtd), 0);
+  return lista.map((a) => {
+    if (Number(a.lote_id) !== Number(loteId) || ehRegistroIndividual(a)) return a;
+    // Caso comum: uma única linha "grupo" por lote → recebe o valor exato.
+    // Múltiplas linhas (raro): distribui proporcionalmente à participação atual.
+    const parte = totalAtual > 0 ? toNumber(a.qtd) / totalAtual : 1 / grupoDoLote.length;
+    return { ...a, qtd: Math.max(Math.round(novaQtd * parte), 0), p_at: novoPesoMedio };
+  });
+}
+
+/** Mutações de persistência para as linhas "grupo" de `animais` de um lote (após sincronizadas). */
+function mutationsAnimaisDoLote(animaisSincronizados, loteId, session) {
+  return (Array.isArray(animaisSincronizados) ? animaisSincronizados : [])
+    .filter((a) => Number(a.lote_id) === Number(loteId) && !ehRegistroIndividual(a))
+    .map((a) => updateOperationalRecord('animais', a.id, { qtd: a.qtd, p_at: a.p_at }, session));
+}
+
 /**
  * Registra a entrada de animais em um lote.
  *
@@ -213,6 +255,7 @@ export function registrarEntradaAnimal(
 
   const novoMovAnimalId = gerarNovoId(movimentosAnimais);
   const novoMovFinanceiroId = gerarNovoId(movimentosFinanceiros);
+  const animaisSincronizados = sincronizarAnimaisGrupoDoLote(db?.animais, loteId, novaQtd, novoPesoMedio);
 
   const baseAtualizada = {
     ...db,
@@ -236,6 +279,7 @@ export function registrarEntradaAnimal(
         ? atualizarLoteComResumo(lote, novaQtd, novoPesoMedio)
         : lote
     ),
+    animais: animaisSincronizados,
     movimentacoes_financeiras: [
       ...movimentosFinanceiros,
       ...(tipoMovimentoEntrada === 'compra' && valor > 0
@@ -270,6 +314,7 @@ export function registrarEntradaAnimal(
       qtd: loteAtualizado?.qtd || 0,
       p_at: loteAtualizado?.p_at || 0,
     }, persistContext.session),
+    ...mutationsAnimaisDoLote(animaisSincronizados, loteId, persistContext.session),
   ];
   if (movFinanceiraCriada?.tipo === 'despesa') {
     mutations.push(createOperationalRecord('movimentacoes_financeiras', {
@@ -367,6 +412,7 @@ export function registrarSaidaAnimal(
       ? atualizarLoteComResumo(l, novaQtd, novoPesoMedio)
       : l
   );
+  let animaisSincronizados = sincronizarAnimaisGrupoDoLote(db?.animais, loteId, novaQtd, novoPesoMedio);
   if (tipoSaida === 'transferencia_saida' && destinoLoteId) {
     const { qtdAtual: qtdDestinoAtual, pesoMedioAtual: pesoDestinoAtual } = obterResumoLote(db, destinoLoteId);
     const novaQtdDestino = qtdDestinoAtual + quantidade;
@@ -378,6 +424,7 @@ export function registrarSaidaAnimal(
         ? atualizarLoteComResumo(l, novaQtdDestino, novoPesoDestino)
         : l
     );
+    animaisSincronizados = sincronizarAnimaisGrupoDoLote(animaisSincronizados, destinoLoteId, novaQtdDestino, novoPesoDestino);
   }
 
   const baseAtualizada = {
@@ -399,6 +446,7 @@ export function registrarSaidaAnimal(
       },
     ],
     lotes: lotesAtualizados,
+    animais: animaisSincronizados,
     movimentacoes_financeiras: [
       ...movimentosFinanceiros,
       // Adiciona movimentação financeira para venda ou abate com valor
@@ -433,6 +481,7 @@ export function registrarSaidaAnimal(
       qtd: loteAtualizado?.qtd || 0,
       p_at: loteAtualizado?.p_at || 0,
     }, persistContext.session),
+    ...mutationsAnimaisDoLote(animaisSincronizados, loteId, persistContext.session),
   ];
   if ((tipoSaida === 'venda' || tipoSaida === 'abate') && valor > 0) {
     const movFinanceiraCriada = baseAtualizada.movimentacoes_financeiras[baseAtualizada.movimentacoes_financeiras.length - 1];
@@ -450,6 +499,7 @@ export function registrarSaidaAnimal(
         qtd: loteDestino?.qtd || 0,
         p_at: loteDestino?.p_at || 0,
       }, persistContext.session));
+      mutations.push(...mutationsAnimaisDoLote(animaisSincronizados, destinoLoteId, persistContext.session));
     }
   }
   persistirComAviso(mutations, { ...persistContext, source: 'saida_animal' });

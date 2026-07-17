@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { registrarSaidaAnimal, registrarSaidaEstoque, registrarEntradaEstoque } from './movimentacoes.js';
+import { registrarSaidaAnimal, registrarEntradaAnimal, registrarSaidaEstoque, registrarEntradaEstoque } from './movimentacoes.js';
 
 // Seção 4 do sprint de fechamento — venda, morte/perda e transferência de
 // saída. O saldo de validação (obterResumoLote) segue lote.qtd quando
@@ -35,6 +35,76 @@ test('venda: reduz o saldo do lote e cria histórico de movimentação', () => {
   assert.equal(r.movimentacoes_animais.length, 1);
   assert.equal(r.movimentacoes_animais[0].tipo, 'venda');
   assert.equal(r.movimentacoes_animais[0].qtd, 10);
+});
+
+// ── Regressão P0: venda/morte/transferência não sincronizavam `animais[].qtd`
+// (só `lote.qtd`) — a linha "grupo" de `animais`, lida diretamente pela
+// página Animais (resumo "Total de cabeças" e aba "Grupos"), ficava com a
+// quantidade antiga mesmo após a venda, inclusive após reload (persistido). ──
+
+test('venda: sincroniza também a linha "grupo" de animais (não só lote.qtd) — regressão do bug relatado', () => {
+  const db = makeDb({ lotes: [makeLote()], animais: [makeAnimal()] });
+  const r = registrarSaidaAnimal(db, {
+    loteId: 1, qtd: 10, pesoMedio: 420, valorTotal: 15000, data: hoje, tipoSaida: 'venda', comprador: 'Frigorífico X',
+  }, {}, { persist: false });
+
+  const animal = r.animais.find((a) => a.id === 1);
+  assert.equal(animal.qtd, 40, 'a linha de animais precisa refletir a venda, não só o lote');
+});
+
+test('venda total: lote e animais chegam a zero', () => {
+  const db = makeDb({ lotes: [makeLote({ qtd: 20 })], animais: [makeAnimal({ qtd: 20 })] });
+  const r = registrarSaidaAnimal(db, {
+    loteId: 1, qtd: 20, pesoMedio: 420, valorTotal: 30000, data: hoje, tipoSaida: 'venda',
+  }, {}, { persist: false });
+  assert.equal(r.lotes.find((l) => l.id === 1).qtd, 0);
+  assert.equal(r.animais.find((a) => a.id === 1).qtd, 0);
+});
+
+test('morte/perda: também sincroniza a linha "grupo" de animais', () => {
+  const db = makeDb({ lotes: [makeLote()], animais: [makeAnimal()] });
+  const r = registrarSaidaAnimal(db, {
+    loteId: 1, qtd: 3, pesoMedio: 400, valorTotal: 0, data: hoje, tipoSaida: 'morte',
+  }, {}, { persist: false });
+  assert.equal(r.animais.find((a) => a.id === 1).qtd, 47);
+});
+
+test('transferência: sincroniza a linha "grupo" de animais na origem E no destino', () => {
+  const db = makeDb({
+    lotes: [makeLote({ id: 1, qtd: 50, p_at: 400 }), makeLote({ id: 2, nome: 'Lote B', qtd: 20, p_at: 350 })],
+    animais: [makeAnimal({ id: 1, lote_id: 1, qtd: 50, p_at: 400 }), makeAnimal({ id: 2, lote_id: 2, qtd: 20, p_at: 350 })],
+  });
+  const r = registrarSaidaAnimal(db, {
+    loteId: 1, destinoLoteId: 2, qtd: 10, pesoMedio: 400, valorTotal: 0, data: hoje, tipoSaida: 'transferencia_saida',
+  }, {}, { persist: false });
+  assert.equal(r.animais.find((a) => a.id === 1).qtd, 40);
+  assert.equal(r.animais.find((a) => a.id === 2).qtd, 30);
+});
+
+test('registro individual (tipo_registro: individual) nunca é tocado pela sincronização de grupo', () => {
+  const db = makeDb({
+    lotes: [makeLote({ qtd: 51 })],
+    animais: [
+      makeAnimal({ id: 1, qtd: 50 }),
+      { id: 2, lote_id: 1, qtd: 1, p_at: 410, tipo_registro: 'individual', identificacao: 'Brinco 42' },
+    ],
+  });
+  const r = registrarSaidaAnimal(db, {
+    loteId: 1, qtd: 10, pesoMedio: 400, valorTotal: 15000, data: hoje, tipoSaida: 'venda',
+  }, {}, { persist: false });
+  // Saldo canônico é lote.qtd (51: 50 do grupo + 1 individual) → 51-10=41;
+  // só a linha "grupo" absorve a redução, a individual fica intocada.
+  assert.equal(r.animais.find((a) => a.id === 1).qtd, 41, 'a linha grupo absorve a venda');
+  const individual = r.animais.find((a) => a.id === 2);
+  assert.equal(individual.qtd, 1, 'o registro individual não é decrementado pela venda do grupo');
+});
+
+test('compra (entrada): também sincroniza a linha "grupo" de animais', () => {
+  const db = makeDb({ lotes: [makeLote()], animais: [makeAnimal()] });
+  const r = registrarEntradaAnimal(db, {
+    loteId: 1, qtd: 5, pesoMedio: 300, valorTotal: 5000, data: hoje, tipoEntrada: 'compra',
+  }, {}, { persist: false });
+  assert.equal(r.animais.find((a) => a.id === 1).qtd, 55);
 });
 
 test('venda: gera receita no financeiro (não vira morte, não finaliza automaticamente)', () => {
