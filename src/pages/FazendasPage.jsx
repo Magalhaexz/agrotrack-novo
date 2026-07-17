@@ -212,16 +212,27 @@ export default function FazendasPage({ db, setDb, onConfirmAction, session: sess
       ];
       return refs.some((ref) => fazendaKeys.has(String(ref ?? '')));
     });
+    // Teste de campo: um lote ENCERRADO também bloqueava a exclusão para
+    // sempre, sem nenhum caminho — a fazenda ficava "presa" mesmo sem
+    // operação ativa. Continua bloqueando (não apaga histórico
+    // silenciosamente), mas agora a mensagem oferece o caminho real:
+    // inativar a fazenda (campo Status já existe em Editar fazenda).
+    // `pastagens`/`tarefas` também podem existir sem nenhum lote vinculado
+    // (fazenda_id direto), por isso entram na checagem — pesagens/custos/
+    // sanitário/consumo de suplementação sempre dependem de um lote, então já
+    // ficam cobertos transitivamente pela checagem de `lotes`.
     if (
       hasLinkedRecords(db?.lotes)
       || hasLinkedRecords(db?.animais)
       || hasLinkedRecords(db?.movimentacoes_financeiras)
       || hasLinkedRecords(db?.estoque)
       || hasLinkedRecords(db?.sanitario)
+      || hasLinkedRecords(db?.pastagens)
+      || hasLinkedRecords(db?.tarefas)
     ) {
       showToast({
         type: 'warning',
-        message: 'Esta fazenda possui registros vinculados. Remova ou transfira os registros antes de excluir.',
+        message: 'Esta fazenda possui dados históricos e não pode ser excluída definitivamente. Você pode inativá-la (Editar fazenda → Status → Inativa) para impedir novos registros, mantendo o histórico da operação.',
       });
       return;
     }

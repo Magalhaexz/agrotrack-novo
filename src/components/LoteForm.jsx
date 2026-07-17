@@ -128,6 +128,15 @@ function findPastagemLabel(pastagens, pastagemId) {
   return pastagens.find((item) => String(item.id) === String(pastagemId))?.nome || '';
 }
 
+/** O pasto selecionado ainda pertence à fazenda (nova ou trocada)? */
+function pastagemAindaValidaParaFazenda(pastagens, pastagemId, fazId) {
+  if (!pastagemId) return false;
+  return pastagens.some((p) => {
+    const pastoFazId = p?.fazenda_id ?? p?.faz_id ?? null;
+    return String(p.id) === String(pastagemId) && (!pastoFazId || String(pastoFazId) === String(fazId));
+  });
+}
+
 function normalizarInitialData(data, pastagens = [], fazendaAtiva = null) {
   if (!data) {
     return {
@@ -224,6 +233,12 @@ export default function LoteForm({ initialData, fazendas = [], pastagens = [], e
   const { executar, isSubmitting } = useSubmitOnce();
   const [form, setForm] = useState(() => normalizarInitialData(initialData, pastagens, fazendaAtiva));
   const [erro, setErro] = useState('');
+  // P1 (teste de campo): em conta com mais de uma fazenda, o cadastro de lote
+  // só mostrava a fazenda ativa (texto fixo, sem select) — impossível
+  // cadastrar em outra fazenda sem trocar a fazenda ativa da conta primeiro e
+  // fechar/reabrir o formulário. Uma vez que o produtor escolhe manualmente,
+  // o efeito de sincronização com `fazendaAtiva` abaixo para de sobrescrever.
+  const [fazendaEscolhidaManualmente, setFazendaEscolhidaManualmente] = useState(false);
 
   const planejamento = useMemo(() => calcularPlanejamento(form), [form]);
   const pastagensCompativeis = useMemo(() => {
@@ -238,6 +253,15 @@ export default function LoteForm({ initialData, fazendas = [], pastagens = [], e
     () => fazendas.find((item) => String(item.id) === String(form.faz_id)) || fazendaAtiva || null,
     [fazendas, form.faz_id, fazendaAtiva]
   );
+
+  // Fazenda inativa não deve ser oferecida como destino de um lote NOVO
+  // (continua disponível para visualização/relatórios em outras telas — só
+  // não é sugerida aqui). Se nenhuma estiver ativa (conta toda inativa, caso
+  // extremo), mostra todas para não travar o formulário sem opção nenhuma.
+  const fazendasParaNovoLote = useMemo(() => {
+    const ativas = fazendas.filter((f) => String(f?.status || 'ativa').toLowerCase() !== 'inativa');
+    return ativas.length > 0 ? ativas : fazendas;
+  }, [fazendas]);
 
   // Sugestões de "Dieta / produto" a partir dos itens cadastrados no estoque,
   // para não depender só de digitação manual (mantém o campo livre como fallback).
@@ -254,22 +278,30 @@ export default function LoteForm({ initialData, fazendas = [], pastagens = [], e
         setForm(normalizarInitialData(initialData, pastagens, fazendaAtiva));
         return;
       }
+      // Não sobrescreve uma fazenda já escolhida manualmente no select abaixo.
+      if (fazendaEscolhidaManualmente) return;
 
       if (fazendaAtiva?.id) {
         setForm((prev) => {
           if (String(prev.faz_id) === String(fazendaAtiva.id)) return prev;
           const novaFazId = String(fazendaAtiva.id);
-          const pastoAindaValido = prev.pastagem_id && pastagens.some((p) => {
-            const fazId = p?.fazenda_id ?? p?.faz_id ?? null;
-            return String(p.id) === String(prev.pastagem_id) && (!fazId || String(fazId) === novaFazId);
-          });
+          const pastoAindaValido = pastagemAindaValidaParaFazenda(pastagens, prev.pastagem_id, novaFazId);
           return { ...prev, faz_id: novaFazId, pastagem_id: pastoAindaValido ? prev.pastagem_id : '' };
         });
       }
     }, 0);
 
     return () => window.clearTimeout(timer);
-  }, [initialData, pastagens, fazendaAtiva]);
+  }, [initialData, pastagens, fazendaAtiva, fazendaEscolhidaManualmente]);
+
+  function handleFazendaChange(event) {
+    const novoFazId = event.target.value;
+    setFazendaEscolhidaManualmente(true);
+    setForm((prev) => {
+      const pastoAindaValido = pastagemAindaValidaParaFazenda(pastagens, prev.pastagem_id, novoFazId);
+      return { ...prev, faz_id: novoFazId, pastagem_id: pastoAindaValido ? prev.pastagem_id : '' };
+    });
+  }
 
   function handleChange(event) {
     const { name, value } = event.target;
@@ -390,9 +422,16 @@ export default function LoteForm({ initialData, fazendas = [], pastagens = [], e
           <div className="grid-2">
             <div className="ui-input-wrap">
               <label className="ui-input-label">{modoFazenda}</label>
-              <div className="ui-input-shell" style={{ minHeight: 48 }}>
-                <span className="ui-input-affix">{fazendaSelecionada?.nome || 'Selecione uma fazenda ativa antes de cadastrar o lote.'}</span>
-              </div>
+              {!initialData && fazendasParaNovoLote.length > 1 ? (
+                <select className="ui-input" name="faz_id" value={form.faz_id} onChange={handleFazendaChange}>
+                  <option value="">Selecione</option>
+                  {fazendasParaNovoLote.map((f) => <option key={f.id} value={f.id}>{f.nome}</option>)}
+                </select>
+              ) : (
+                <div className="ui-input-shell" style={{ minHeight: 48 }}>
+                  <span className="ui-input-affix">{fazendaSelecionada?.nome || 'Selecione uma fazenda ativa antes de cadastrar o lote.'}</span>
+                </div>
+              )}
             </div>
 
             <label>
