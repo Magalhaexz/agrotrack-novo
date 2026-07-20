@@ -8,8 +8,10 @@ import {
   BellRing,
   CheckCircle2,
   CheckSquare,
+  ClipboardList,
   DollarSign,
   FileUp,
+  Lock,
   MapPin,
   MapPinned,
   Package,
@@ -19,6 +21,7 @@ import {
   Syringe,
   Tractor,
   TrendingUp,
+  Truck,
   Users,
 } from 'lucide-react';
 import Badge from '../components/ui/Badge';
@@ -221,6 +224,37 @@ export default function DashboardPage({
   const pesagensPendentes = hojeNaFazenda.detalhes.lotesSemPesagem;
   const totalAlertasCriticos = hojeNaFazenda.detalhes.alertasCriticosTotal.length;
 
+  const pastagensMap = useMemo(() => new Map((db.pastagens || []).map((item) => [String(item.id), item.nome])), [db.pastagens]);
+  const lotesSemPesagemIds = useMemo(() => new Set(pesagensPendentes.map((lote) => lote.id)), [pesagensPendentes]);
+
+  // "Lotes em Destaque": maiores lotes ativos por cabeças, mesma fonte de dados
+  // já calculada acima (lotesStats) — sem recálculo, só reordenação/slice.
+  const lotesDestaque = useMemo(
+    () =>
+      [...lotesStats]
+        .sort((a, b) => b.indicators.totalAnimais - a.indicators.totalAnimais)
+        .slice(0, 5)
+        .map(({ lote, indicators }) => ({
+          id: lote.id,
+          nome: lote.nome || `Lote ${lote.id}`,
+          pastoNome: pastagensMap.get(String(lote.pastagem_id)) || 'Sem pasto',
+          cabecas: indicators.totalAnimais,
+          pesoMedio: indicators.pesoAtualMedio,
+          gmd: indicators.gmdMedio,
+          // GMD calculado exige dias decorridos + peso atual registrado —
+          // sem isso, gmdMedio é só um 0 de "sem dados" (não um GMD real).
+          temGmd: indicators.dias > 0 && indicators.pesoAtualMedio > 0,
+          emDia: !lotesSemPesagemIds.has(lote.id),
+        })),
+    [lotesStats, pastagensMap, lotesSemPesagemIds]
+  );
+
+  const nomeFazendaContexto = fazendaSelecionada?.todas ? 'Todas as Fazendas' : (fazendaSelecionada?.nome || 'Fazenda');
+  const isConsolidado = Boolean(fazendaSelecionada?.todas);
+  // Visualizador é o único perfil sem lotes:editar (auth/perfis.js) — sinal
+  // real de permissão, não um estado inventado só para a UI.
+  const isSomenteLeitura = !hasPermission('lotes:editar');
+
   const kpisMain = [
     {
       title: 'Fazendas',
@@ -370,6 +404,25 @@ export default function DashboardPage({
         </div>
       </header>
 
+      {totalFazendas > 0 ? (
+        <section className="dashboard-farm-context">
+          <div className="dashboard-farm-context-item">
+            <MapPin size={16} />
+            <strong>{nomeFazendaContexto}</strong>
+          </div>
+          <span>{formatNumber(totalCabecasAtivas, 0)} cabeças · {formatNumber(hojeNaFazenda.pastos.totalPastos, 0)} pastos</span>
+          {isSomenteLeitura ? (
+            <span className="dashboard-farm-context-badge">
+              <Lock size={12} /> Somente leitura
+            </span>
+          ) : isConsolidado ? (
+            <span className="dashboard-farm-context-badge">
+              <Lock size={12} /> Selecione uma fazenda para registrar ações
+            </span>
+          ) : null}
+        </section>
+      ) : null}
+
       {totalFazendas === 0 ? (
         <section className="dashboard-onboarding-banner">
           <div className="dashboard-onboarding-content">
@@ -435,9 +488,13 @@ export default function DashboardPage({
             <div className="dashboard-action-grid dashboard-action-grid--quick">
               <Button variant="primary" icon={<Scale size={14} />} onClick={() => onNavigate?.('pesagens', { action: 'novo' })}>Nova pesagem</Button>
               <Button variant="primary" icon={<Beef size={14} />} onClick={() => onNavigate?.('lotes', { action: 'novo' })}>Novo lote</Button>
-              <Button variant="outline" icon={<MapPin size={14} />} onClick={() => onNavigate?.('pastagens')}>Novo pasto</Button>
-              <Button variant="outline" icon={<MapPinned size={14} />} onClick={() => onNavigate?.('lotes')}>Trocar lote de pasto</Button>
-              <Button variant="outline" icon={<Receipt size={14} />} onClick={() => onNavigate?.('financeiro', { action: 'novo' })}>Novo custo</Button>
+              <Button variant="outline" icon={<MapPin size={14} />} onClick={() => onNavigate?.('pastagens', { action: 'novo' })}>Novo pasto</Button>
+              <Button variant="outline" icon={<MapPinned size={14} />} onClick={() => onNavigate?.('lotes', { action: 'trocar-pasto' })}>Trocar lote de pasto</Button>
+              <Button variant="outline" icon={<DollarSign size={14} />} onClick={() => onNavigate?.('lotes', { action: 'venda' })}>Registrar venda</Button>
+              <Button variant="outline" icon={<AlertTriangle size={14} />} onClick={() => onNavigate?.('lotes', { action: 'morte' })}>Registrar morte/perda</Button>
+              <Button variant="outline" icon={<Truck size={14} />} onClick={() => onNavigate?.('lotes', { action: 'transferir' })}>Transferir entre lotes</Button>
+              <Button variant="outline" icon={<ClipboardList size={14} />} onClick={() => onNavigate?.('lotes', { action: 'ajustar-lotacao' })}>Ajustar lotação</Button>
+              <Button variant="outline" icon={<Receipt size={14} />} onClick={() => onNavigate?.('financeiro', { action: 'novo' })}>Novo lançamento financeiro</Button>
               <Button variant="outline" icon={<Package size={14} />} onClick={() => onNavigate?.('estoque', { action: 'novo' })}>Novo produto/estoque</Button>
               <Button variant="outline" icon={<ArrowDown size={14} />} onClick={() => onNavigate?.('estoque')}>Saída de estoque</Button>
               <Button variant="outline" icon={<Syringe size={14} />} onClick={() => onNavigate?.('sanitario', { action: 'novo' })}>Novo manejo/sanidade</Button>
@@ -496,6 +553,57 @@ export default function DashboardPage({
             )}
           </section>
 
+          {lotesDestaque.length > 0 ? (
+            <Card
+              className="section-card"
+              title="Lotes em destaque"
+              subtitle="Desempenho dos maiores lotes ativos."
+              action={
+                <Button size="sm" variant="ghost" onClick={() => onNavigate?.('lotes')}>
+                  Ver todos os lotes →
+                </Button>
+              }
+            >
+              <div className="table-responsive">
+                <table className="dashboard-table">
+                  <thead>
+                    <tr>
+                      <th>Lote</th>
+                      <th>Pasto</th>
+                      <th>Cabeças</th>
+                      <th>Peso médio</th>
+                      <th>GMD</th>
+                      <th>Status</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {lotesDestaque.map((item) => (
+                      <tr
+                        key={item.id}
+                        tabIndex={0}
+                        role="button"
+                        aria-label={`Abrir lote ${item.nome}`}
+                        onClick={() => onNavigate?.('lotes', { loteId: item.id })}
+                        onKeyDown={(event) => {
+                          if (event.key === 'Enter' || event.key === ' ') {
+                            event.preventDefault();
+                            onNavigate?.('lotes', { loteId: item.id });
+                          }
+                        }}
+                      >
+                        <td>{item.nome}</td>
+                        <td>{item.pastoNome}</td>
+                        <td>{formatNumber(item.cabecas, 0)}</td>
+                        <td>{item.pesoMedio > 0 ? `${formatNumber(item.pesoMedio, 1)} kg` : '—'}</td>
+                        <td>{item.temGmd ? `${formatNumber(item.gmd, 2)} kg/dia` : '—'}</td>
+                        <td><Badge variant={item.emDia ? 'success' : 'warning'}>{item.emDia ? 'Em dia' : 'Atenção'}</Badge></td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </Card>
+          ) : null}
 
           <section className="dashboard-grid dashboard-grid--kpi-main">
             {kpisMain.map((item) => (

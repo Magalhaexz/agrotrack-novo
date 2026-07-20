@@ -1,4 +1,4 @@
-import { useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { Plus } from 'lucide-react';
 import Button from '../components/ui/Button';
 import Card from '../components/ui/Card';
@@ -72,7 +72,7 @@ function getLotacaoBadgeClass(status) {
   return LOTACAO_BADGE_CLASS[status] || LOTACAO_BADGE_CLASS.sem_dados;
 }
 
-export default function PastagensPage({ db, setDb, session, onConfirmAction }) {
+export default function PastagensPage({ db, setDb, session, onConfirmAction, navigationIntent = null }) {
   const { hasPermission } = useAuth();
   const { showToast } = useToast();
   const [form, setForm] = useState(emptyForm());
@@ -87,6 +87,15 @@ export default function PastagensPage({ db, setDb, session, onConfirmAction }) {
     card.scrollIntoView({ behavior: 'smooth', block: 'start' });
     card.querySelector('input, select, textarea')?.focus();
   }
+
+  // "Novo pasto" nas Ações rápidas do Dashboard: não é modal (o cadastro já é
+  // inline, sempre visível), então "abrir" aqui é rolar até ele e focar.
+  useEffect(() => {
+    if (navigationIntent?.page === 'pastagens' && navigationIntent?.action === 'novo') {
+      focarFormularioPasto();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [navigationIntent?.at]);
 
   const mensagemSemPermissao = 'Você não tem permissão para executar esta ação.';
   const pastagens = useMemo(() => (Array.isArray(db?.pastagens) ? db.pastagens : []), [db]);

@@ -770,58 +770,81 @@ export default function FinanceiroPage({ db, setDb, navigationIntent = null, faz
           </Card>
 
           <Card title="Lançamentos">
-            <div className="alerts-list">
-              {lancamentos.length === 0 ? (
-                <EmptyState
-                  title="Você ainda não lançou nenhuma movimentação financeira."
-                  subtitle="Registre receitas e despesas para acompanhar o resultado da operação."
-                  action={
-                    <Button
-                      size="sm"
-                      onClick={() => {
-                        if (!podeEditarFinanceiro()) return;
-                        setOpenLanc(true);
-                      }}
-                    >
-                      Registrar movimentação
-                    </Button>
-                  }
-                />
-              ) : (
-                lancamentos.map((item) => {
-                  const manual = isLancamentoManual(item);
-                  const origemLabel = getOrigemLabel(item);
-                  const estornado = Boolean(item.estornado_em);
-                  return (
-                    <div key={item.id} className="alert-item">
-                      <Badge variant={item.tipo === 'receita' ? 'success' : 'danger'}>{item.tipo}</Badge>
-                      <div>
-                        <strong>{item.categoria}</strong>
-                        <p>{formatDate(item.data)} · {formatCurrency(item.valor)} · {item.fornecedor || item.comprador || '-'}</p>
-                        <p>
-                          <Badge variant={manual ? 'info' : 'neutral'}>{manual ? 'Manual' : `Automático${origemLabel ? ` · ${origemLabel}` : ''}`}</Badge>
-                          {estornado ? <Badge variant="warning">Estornado</Badge> : null}
-                        </p>
-                      </div>
-                      {podeEditarFinanceiroUi ? (
-                        <div className="row-actions">
-                          {manual ? (
-                            <>
-                              <button className="action-btn" onClick={() => { setLancamentoEditando(item); setOpenLanc(true); }}>Editar</button>
-                              <button className="action-btn action-btn-danger" onClick={() => excluirLancamento(item)}>Excluir</button>
-                            </>
-                          ) : (
-                            <button className="action-btn action-btn-danger" disabled={estornado} onClick={() => { if (!podeEditarFinanceiro()) return; setEstornoAlvo(item); }}>
-                              {estornado ? 'Já estornado' : 'Estornar'}
-                            </button>
-                          )}
-                        </div>
-                      ) : null}
-                    </div>
-                  );
-                })
-              )}
-            </div>
+            {lancamentos.length === 0 ? (
+              <EmptyState
+                title="Você ainda não lançou nenhuma movimentação financeira."
+                subtitle="Registre receitas e despesas para acompanhar o resultado da operação."
+                action={
+                  <Button
+                    size="sm"
+                    onClick={() => {
+                      if (!podeEditarFinanceiro()) return;
+                      setOpenLanc(true);
+                    }}
+                  >
+                    Registrar movimentação
+                  </Button>
+                }
+              />
+            ) : (
+              <div className="table-responsive">
+                <table className="data-table">
+                  <thead>
+                    <tr>
+                      <th>Data</th>
+                      <th>Tipo</th>
+                      <th>Categoria</th>
+                      <th>Lote</th>
+                      <th>Descrição</th>
+                      <th className="is-number">Valor</th>
+                      {podeEditarFinanceiroUi ? <th>Ações</th> : null}
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {lancamentos.map((item) => {
+                      const manual = isLancamentoManual(item);
+                      const origemLabel = getOrigemLabel(item);
+                      const estornado = Boolean(item.estornado_em);
+                      const receita = item.tipo === 'receita';
+                      return (
+                        <tr key={item.id}>
+                          <td>{formatDate(item.data)}</td>
+                          <td><Badge variant={receita ? 'success' : 'danger'}>{item.tipo}</Badge></td>
+                          <td>{item.categoria}</td>
+                          <td>{item.lote_id ? (loteNomeById.get(Number(item.lote_id)) || `Lote ${item.lote_id}`) : '—'}</td>
+                          <td>
+                            {item.fornecedor || item.comprador || item.descricao || '—'}
+                            <div className="financeiro-lancamento-badges">
+                              <Badge variant={manual ? 'info' : 'neutral'}>{manual ? 'Manual' : `Automático${origemLabel ? ` · ${origemLabel}` : ''}`}</Badge>
+                              {estornado ? <Badge variant="warning">Estornado</Badge> : null}
+                            </div>
+                          </td>
+                          <td className={`is-number financeiro-valor ${receita ? 'is-receita' : 'is-despesa'}`}>
+                            {receita ? '+ ' : '− '}{formatCurrency(item.valor)}
+                          </td>
+                          {podeEditarFinanceiroUi ? (
+                            <td>
+                              <div className="row-actions">
+                                {manual ? (
+                                  <>
+                                    <button className="action-btn" onClick={() => { setLancamentoEditando(item); setOpenLanc(true); }}>Editar</button>
+                                    <button className="action-btn action-btn-danger" onClick={() => excluirLancamento(item)}>Excluir</button>
+                                  </>
+                                ) : (
+                                  <button className="action-btn action-btn-danger" disabled={estornado} onClick={() => { if (!podeEditarFinanceiro()) return; setEstornoAlvo(item); }}>
+                                    {estornado ? 'Já estornado' : 'Estornar'}
+                                  </button>
+                                )}
+                              </div>
+                            </td>
+                          ) : null}
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            )}
           </Card>
         </>
       ) : null}

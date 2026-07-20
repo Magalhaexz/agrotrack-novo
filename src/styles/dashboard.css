@@ -26,10 +26,11 @@
 .dashboard-toolbar-copy h1 {
   margin: 0;
   color: var(--dash-title);
-  font-family: "Inter Tight", "Segoe UI", sans-serif;
-  font-size: clamp(2rem, 2.4vw, 2.8rem);
-  line-height: 1;
-  letter-spacing: -0.05em;
+  font-family: var(--font-heading);
+  font-weight: 600;
+  font-size: clamp(1.7rem, 2vw, 2rem);
+  line-height: 1.15;
+  letter-spacing: -0.01em;
 }
 
 .dashboard-toolbar-copy p {
@@ -149,8 +150,9 @@
 
 .dashboard-section-title {
   margin: 0;
+  font-family: var(--font-heading);
   font-size: 1.08rem;
-  color: #ecf3ef;
+  color: var(--color-text);
 }
 
 .dashboard-section-subtitle {
@@ -228,26 +230,26 @@
 }
 
 .kpi-panel-icon {
-  width: 42px;
-  height: 42px;
+  width: 36px;
+  height: 36px;
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  border-radius: 12px;
-  border: 1px solid rgba(255, 255, 255, 0.06);
-  background: #182126;
-  color: #dce6e1;
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.04);
+  border-radius: 50%;
+  border: 1px solid var(--color-border);
+  background: var(--color-surface-2);
+  color: var(--color-primary-light);
 }
 
 .kpi-panel strong {
   display: block;
   margin-bottom: 10px;
-  color: #f2f7f4;
-  font-family: "Inter Tight", "Segoe UI", sans-serif;
-  font-size: clamp(1.5rem, 1.7vw, 2.2rem);
-  line-height: 0.95;
-  letter-spacing: -0.05em;
+  color: var(--color-text);
+  font-family: var(--font-mono);
+  font-weight: 600;
+  font-size: clamp(1.4rem, 1.5vw, 1.75rem);
+  line-height: 1.2;
+  letter-spacing: -0.01em;
 }
 
 .kpi-variation {
@@ -262,8 +264,8 @@
   white-space: nowrap;
   padding: 0 10px;
   border-radius: 999px;
-  border: 1px solid rgba(255, 255, 255, 0.08);
-  background: #151d21;
+  border: 1px solid var(--color-border);
+  background: var(--color-surface-2);
   font-size: 0.76rem;
   font-weight: 700;
   letter-spacing: 0.04em;
@@ -398,10 +400,11 @@
 }
 
 .dashboard-executive-chip strong {
-  color: #f5f8f6;
-  font-family: "Inter Tight", "Segoe UI", sans-serif;
-  font-size: 1.35rem;
-  letter-spacing: -0.04em;
+  color: var(--color-text);
+  font-family: var(--font-mono);
+  font-weight: 600;
+  font-size: 1.2rem;
+  letter-spacing: -0.01em;
 }
 
 .dashboard-executive-chip small {
@@ -524,45 +527,19 @@
   overflow: hidden;
   border-radius: 14px;
   background: var(--dash-card-bg-soft);
-  border: 1px solid color-mix(in srgb, var(--color-primary) 22%, rgba(255, 255, 255, 0.08));
-  box-shadow:
-    inset 0 1px 0 rgba(255, 255, 255, 0.03),
-    0 8px 20px rgba(0, 0, 0, 0.22),
-    0 0 0 1px color-mix(in srgb, var(--color-primary) 10%, transparent);
+  border: 1px solid var(--color-border);
 }
 
+/* Cartões sóbrios: sem tingimento verde nem gradiente de glow em cada card —
+   verde fica reservado para ação/seleção/destaque, não fundo dominante. */
 .dashboard-grid--kpi-main .kpi-panel {
-  border-color: color-mix(in srgb, var(--color-primary) 22%, rgba(255, 255, 255, 0.08));
-  box-shadow:
-    inset 0 1px 0 rgba(255, 255, 255, 0.03),
-    0 8px 20px rgba(0, 0, 0, 0.22),
-    0 0 0 1px color-mix(in srgb, var(--color-primary) 10%, transparent);
-}
-
-.dashboard-grid--kpi-main .kpi-panel::before,
-.dashboard-summary-card::before,
-.dashboard-stock-card::before,
-.dashboard-alerts-card::before,
-.dashboard-tab-content .kpi-card::before {
-  content: '';
-  position: absolute;
-  inset: 0;
-  border-radius: inherit;
-  pointer-events: none;
-  background: linear-gradient(145deg, color-mix(in srgb, var(--color-primary) 9%, transparent), transparent 45%);
-  opacity: 0.55;
+  border-color: var(--color-border);
 }
 
 .kpi-panel--danger,
 .kpi-card--danger,
 .text-danger {
-  box-shadow: 0 0 0 1px color-mix(in srgb, var(--color-danger) 24%, transparent), 0 8px 20px rgba(0, 0, 0, 0.22);
-}
-
-.kpi-panel--danger::before,
-.kpi-card--danger::before {
-  background: linear-gradient(145deg, color-mix(in srgb, var(--color-danger) 10%, transparent), transparent 50%);
-  opacity: 0.5;
+  border-color: color-mix(in srgb, var(--color-danger) 30%, var(--color-border));
 }
 
 .dashboard-action-grid .ui-button {
@@ -624,16 +601,18 @@
 }
 
 .dashboard-summary-metric strong {
-  font-family: "Inter Tight", "Segoe UI", sans-serif;
-  font-size: 1.25rem;
-  letter-spacing: -0.04em;
+  font-family: var(--font-mono);
+  font-weight: 600;
+  font-size: 1.15rem;
+  letter-spacing: -0.01em;
 }
 
 .dashboard-summary-line strong {
-  color: #f5f8f6;
-  font-family: "Inter Tight", "Segoe UI", sans-serif;
-  font-size: 1.25rem;
-  letter-spacing: -0.04em;
+  color: var(--color-text);
+  font-family: var(--font-mono);
+  font-weight: 600;
+  font-size: 1.15rem;
+  letter-spacing: -0.01em;
 }
 
 .dashboard-summary-divider {
@@ -702,6 +681,11 @@
 
 .dashboard-table tbody tr:hover td {
   background: rgba(255, 255, 255, 0.03);
+}
+
+.dashboard-table tbody tr[role='button']:focus-visible {
+  outline: 2px solid var(--color-primary);
+  outline-offset: -2px;
 }
 
 .positive {
@@ -818,6 +802,48 @@
 .dashboard-task-list { display: grid; gap: 8px; }
 .dashboard-task-card { display: grid; gap: 4px; border: 1px solid rgba(255,255,255,.06); border-radius: 12px; padding: 10px; background: rgba(255,255,255,.015); }
 .dashboard-task-card span, .dashboard-task-card small, .dashboard-task-card p { color: var(--color-text-secondary); margin: 0; }
+
+.dashboard-farm-context {
+  display: flex;
+  align-items: center;
+  gap: 22px;
+  flex-wrap: wrap;
+  padding: 12px 18px;
+  border-radius: 14px;
+  border: 1px solid var(--dash-card-border);
+  background: var(--dash-card-bg);
+}
+
+.dashboard-farm-context-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--color-primary-light);
+}
+
+.dashboard-farm-context-item strong {
+  color: #edf4f1;
+  font-size: 0.92rem;
+}
+
+.dashboard-farm-context > span {
+  color: var(--dash-helper);
+  font-size: 0.84rem;
+}
+
+.dashboard-farm-context-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin-left: auto;
+  padding: 5px 12px;
+  border-radius: 999px;
+  border: 1px solid rgba(245, 158, 11, 0.3);
+  background: rgba(245, 158, 11, 0.12);
+  color: var(--color-warning);
+  font-size: 0.76rem;
+  font-weight: 600;
+}
 
 .dashboard-onboarding-banner {
   display: flex;

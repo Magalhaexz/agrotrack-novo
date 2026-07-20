@@ -2,6 +2,7 @@
 import Input from '../components/ui/Input';
 import Modal from '../components/ui/Modal';
 import Button from '../components/ui/Button';
+import Badge from '../components/ui/Badge';
 import EmptyState from '../components/EmptyState';
 import LoteForm from '../components/LoteForm';
 import { useAuth } from '../auth/useAuth';
@@ -11,13 +12,13 @@ import { isModoConsolidado } from '../domain/escopoFazenda';
 import { calcularSaudeLote } from '../domain/saudeLote';
 import { gerarResumoRelatorioLote } from '../domain/relatorioLote';
 import { gerarResumoLoteTexto } from '../domain/whatsappResumo';
-import { calcLote } from '../utils/calculations';
+import { calcLote, formatCurrency, formatDate, formatNumber } from '../utils/calculations';
 import { gerarNovoId } from '../utils/id';
 import { createOperationalRecord, updateOperationalRecord } from '../services/operationalPersistence';
 import { excluirEEstornarConsumoSuplementacao } from '../services/consumoSuplementacao';
 import { sincronizarAnimaisGrupoDoLote, mutationsAnimaisDoLote } from '../services/movimentacoes';
 import { useSubmitOnce } from '../hooks/useSubmitOnce.js';
-import LoteCard from '../components/lotes/LoteCard';
+import LoteAcoesMenu from '../components/lotes/LoteAcoesMenu';
 import LoteDetailsPanel from '../components/lotes/LoteDetailsPanel';
 import LotesFilters from '../components/lotes/LotesFilters';
 import LotesPageHeader from '../components/lotes/LotesPageHeader';
@@ -66,6 +67,15 @@ function calculateGmd30(pesagens = []) {
   const gain = toNumber(last.peso_medio) - toNumber(start.peso_medio);
   const days = Math.max(1, daysBetween(start.data, last.data));
   return gain / days;
+}
+
+// Mesma regra de cor que LoteCard.jsx usava (removida de lá — a lista agora
+// é tabela, não cards).
+function statusVariantLote(status) {
+  if (status === 'ativo') return 'success';
+  if (status === 'vendido') return 'info';
+  if (status === 'encerrado') return 'warning';
+  return 'neutral';
 }
 
 function getActiveFarmId(fazendaSelecionada) {
@@ -216,10 +226,23 @@ function resolvePastagemNome(pastagensMap, lote) {
   return byId?.nome || lote?.pastagem_nome || lote?.pastagemAtualNome || LABEL_OR_DASH;
 }
 
+// Ações rápidas do Dashboard que exigem selecionar um lote primeiro (Registrar
+// venda/morte/transferência/ajuste de lotação/trocar de pasto): mesmos handlers
+// já usados pelo card do lote (LoteAcoesMenu) — nenhum fluxo novo, só disparado
+// via `navigationIntent` em vez de clique direto no card.
+const ACTION_LABELS = {
+  venda: 'Registrar venda',
+  morte: 'Registrar morte/perda',
+  transferir: 'Transferir entre lotes',
+  'ajustar-lotacao': 'Ajustar lotação',
+  'trocar-pasto': 'Trocar lote de pasto',
+};
+
 export default function LotesPage({ db, setDb, onRegistrarSaidaAnimal, session, fazendaSelecionada = null, navigationIntent = null }) {
   const abrirNovoLotePorIntent = navigationIntent?.page === 'lotes' && navigationIntent?.action === 'novo';
   const { hasPermission } = useAuth();
   const { showToast } = useToast();
+  const [avisoAcaoRapida, setAvisoAcaoRapida] = useState(null);
   const [filters, setFilters] = useState({ status: 'todos', fazenda: 'todas', periodo: 'todos', busca: '' });
   // Seção 9/10 do sprint de fechamento: lote selecionado e aba ativa vivem na
   // URL (query string), não só em useState local — sem isso, entrar no
@@ -245,6 +268,11 @@ export default function LotesPage({ db, setDb, onRegistrarSaidaAnimal, session, 
   const [openMoverPasto, setOpenMoverPasto] = useState(false);
   const [openAjusteLotacao, setOpenAjusteLotacao] = useState(false);
   const [openRelatorio, setOpenRelatorio] = useState(false);
+  // Redesign: lista virou tabela + painel lateral compacto (preview). Estado
+  // separado de `selectedLoteId` de propósito — o preview NÃO abre a área de
+  // detalhe rica (isso só acontece em "Ver Lote Completo", que só então seta
+  // `selectedLoteId`, entrando no fluxo existente sem alterá-lo).
+  const [previewLoteId, setPreviewLoteId] = useState(null);
   const relatorioContainerRef = useRef(null);
   const [historicoPastos, setHistoricoPastos] = useState(EMPTY_LIST);
   const [loadingHistoricoPastos, setLoadingHistoricoPastos] = useState(false);
@@ -342,6 +370,20 @@ export default function LotesPage({ db, setDb, onRegistrarSaidaAnimal, session, 
     [lotesEnriquecidos, selectedLoteId]
   );
 
+  const previewLote = useMemo(
+    () => lotesEnriquecidos.find((lote) => Number(lote.id) === Number(previewLoteId)) || null,
+    [lotesEnriquecidos, previewLoteId]
+  );
+  const previewLotePesagens = useMemo(() => {
+    if (!previewLoteId) return EMPTY_LIST;
+    return pesagens
+      .filter((item) => Number(item.lote_id) === Number(previewLoteId))
+      .map((item) => ({ ...item, dataKey: toDateKey(item?.data) }))
+      .filter((item) => item.dataKey)
+      .sort((a, b) => b.dataKey.localeCompare(a.dataKey))
+      .slice(0, 2);
+  }, [pesagens, previewLoteId]);
+
   const selectedLoteConsumos = useMemo(() => buildLoteConsumptionHistoryRows(consumoHistorico, selectedLote?.id), [consumoHistorico, selectedLote?.id]);
   const consumoAlerta = useMemo(() => buildLoteConsumptionAlert({ lote: selectedLote, consumoRows: selectedLoteConsumos }), [selectedLote, selectedLoteConsumos]);
 
@@ -369,6 +411,35 @@ export default function LotesPage({ db, setDb, onRegistrarSaidaAnimal, session, 
     return () => window.clearTimeout(timer);
   }, [activeFarmId, selectedLote, setSelectedLoteId, setActiveTab]);
 
+  // navigationIntent do Dashboard: "Lotes em destaque" manda `loteId` (abre o
+  // detalhe direto); as ações rápidas (venda/morte/transferir/ajustar
+  // lotação/trocar pasto) mandam `action` — com 1 único lote ativo na fazenda,
+  // a ação já abre sozinha; com mais de um, mostra o aviso e o clique no card
+  // certo (dispararAcaoRapida, mesmos handlers de sempre) resolve em 1 clique.
+  useEffect(() => {
+    if (!navigationIntent || navigationIntent.page !== 'lotes') return;
+
+    if (navigationIntent.loteId) {
+      setSelectedLoteId(Number(navigationIntent.loteId));
+      return;
+    }
+
+    const action = navigationIntent.action;
+    if (!action || !ACTION_LABELS[action]) return;
+
+    if (consolidado) {
+      showToast({ type: 'warning', message: 'Selecione uma fazenda ativa para continuar.' });
+      return;
+    }
+
+    if (lotesFiltrados.length === 1) {
+      dispararAcaoRapida(action, lotesFiltrados[0].id);
+    } else if (lotesFiltrados.length > 1) {
+      setAvisoAcaoRapida(action);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [navigationIntent?.at]);
+
   function updateFilter(field, value) {
     setFilters((prev) => ({ ...prev, [field]: value }));
   }
@@ -379,9 +450,44 @@ export default function LotesPage({ db, setDb, onRegistrarSaidaAnimal, session, 
     return false;
   }
 
+  // "Todas as fazendas" mostra lotes de várias fazendas juntos — mesma trava
+  // que já existia só para criar lote (canCreateLoteInCurrentFarm), estendida
+  // às outras ações que escrevem em um lote específico.
+  function ensureFarmAtiva() {
+    if (activeFarmId) return true;
+    showToast({ type: 'warning', message: 'Selecione uma fazenda ativa para continuar.' });
+    return false;
+  }
+
   function abrirRetirada(modo) {
     setRetiradaModo(modo);
     setOpenRetirada(true);
+  }
+
+  // Disparado tanto pelo clique direto no card (handlers abaixo) quanto pelo
+  // navigationIntent vindo do Dashboard — mesmo caminho, sem fluxo duplicado.
+  function dispararAcaoRapida(action, loteId) {
+    setAvisoAcaoRapida(null);
+    if (action === 'venda') {
+      setActiveTab('retiradas');
+      setSelectedLoteId(loteId);
+      abrirRetirada('sale_partial');
+    } else if (action === 'morte') {
+      setActiveTab('retiradas');
+      setSelectedLoteId(loteId);
+      abrirRetirada('death_loss');
+    } else if (action === 'transferir') {
+      setActiveTab('retiradas');
+      setSelectedLoteId(loteId);
+      abrirRetirada('exit');
+    } else if (action === 'ajustar-lotacao') {
+      setSelectedLoteId(loteId);
+      setOpenAjusteLotacao(true);
+    } else if (action === 'trocar-pasto') {
+      setActiveTab('pastagem');
+      setSelectedLoteId(loteId);
+      setOpenMoverPasto(true);
+    }
   }
 
   async function handleExcluirHistoricoConsumo(item) {
@@ -419,6 +525,7 @@ export default function LotesPage({ db, setDb, onRegistrarSaidaAnimal, session, 
 
   function handleRetirada(payload) {
     if (!ensurePermission('animais:movimentar')) return;
+    if (!ensureFarmAtiva()) return;
     if (!selectedLote) return;
     if (selectedLote.bloqueado) {
       showToast({ type: 'warning', message: 'Lote encerrado ou vendido não aceita novas retiradas.' });
@@ -475,6 +582,7 @@ export default function LotesPage({ db, setDb, onRegistrarSaidaAnimal, session, 
 
   async function handleMoverPasto({ loteId, pastagemDestinoId, dataMovimentacao, quantidadeCabecas, motivo, observacoes }) {
     if (!ensurePermission('lotes:editar')) return;
+    if (!ensureFarmAtiva()) return;
     if (!selectedLote) return;
     if (selectedLote.bloqueado) {
       showToast({ type: 'warning', message: 'Lote encerrado ou vendido não aceita movimentação de pasto.' });
@@ -525,6 +633,7 @@ export default function LotesPage({ db, setDb, onRegistrarSaidaAnimal, session, 
   // morte ou transferência — sem efeito financeiro, sem alterar peso médio).
   async function handleAjusteLotacao({ loteId, novaQtd, motivo, data }) {
     if (!ensurePermission('lotes:editar')) return;
+    if (!ensureFarmAtiva()) return;
     if (!selectedLote) return;
     if (selectedLote.bloqueado) {
       showToast({ type: 'warning', message: 'Lote encerrado ou vendido não aceita ajuste de lotação.' });
@@ -885,78 +994,178 @@ export default function LotesPage({ db, setDb, onRegistrarSaidaAnimal, session, 
         onChange={updateFilter}
       />
 
-      <div className="lote-cards-grid">
-        {lotesFiltrados.length === 0 ? (
-          <EmptyState
-            title={activeFarmId ? 'Você ainda não cadastrou nenhum lote.' : 'Selecione uma fazenda ativa.'}
-            subtitle={
-              activeFarmId
-                ? 'Crie seu primeiro lote para acompanhar pesagens, GMD, custos e resultado financeiro.'
-                : 'Os lotes são exibidos por fazenda ativa.'
-            }
-            action={
-              activeFarmId ? (
+      {avisoAcaoRapida ? (
+        <div className="lote-acao-intent-banner">
+          <span>Selecione o lote para: <strong>{ACTION_LABELS[avisoAcaoRapida]}</strong></span>
+          <Button size="sm" variant="ghost" onClick={() => setAvisoAcaoRapida(null)}>Cancelar</Button>
+        </div>
+      ) : null}
+
+      {lotesFiltrados.length === 0 ? (
+        <EmptyState
+          title={activeFarmId ? 'Você ainda não cadastrou nenhum lote.' : 'Selecione uma fazenda ativa.'}
+          subtitle={
+            activeFarmId
+              ? 'Crie seu primeiro lote para acompanhar pesagens, GMD, custos e resultado financeiro.'
+              : 'Os lotes são exibidos por fazenda ativa.'
+          }
+          action={
+            activeFarmId ? (
+              <Button
+                variant="primary"
+                onClick={() => {
+                  if (!canCreateLoteInCurrentFarm(activeFarmId, null)) {
+                    showToast({ type: 'warning', message: 'Selecione uma fazenda ativa para cadastrar um lote.' });
+                    return;
+                  }
+                  setLoteEmEdicao(null);
+                  setOpenNovoLote(true);
+                }}
+              >
+                Criar lote
+              </Button>
+            ) : null
+          }
+        />
+      ) : (
+        <div className="lotes-table-shell">
+          <div className="lotes-table-card table-responsive">
+            <table className="data-table lotes-table">
+              <thead>
+                <tr>
+                  <th>Lote</th>
+                  <th>Categoria</th>
+                  <th>Cabeças</th>
+                  <th>Peso médio</th>
+                  <th>GMD (30d)</th>
+                  <th>Resultado</th>
+                  <th>Status</th>
+                </tr>
+              </thead>
+              <tbody>
+                {lotesFiltrados.map((lote) => (
+                  <tr
+                    key={lote.id}
+                    tabIndex={0}
+                    role="button"
+                    aria-label={`Ver resumo do lote ${lote.nome}`}
+                    className={Number(previewLoteId) === Number(lote.id) ? 'is-selected' : ''}
+                    onClick={() => setPreviewLoteId(lote.id)}
+                    onKeyDown={(event) => {
+                      if (event.key === 'Enter' || event.key === ' ') {
+                        event.preventDefault();
+                        setPreviewLoteId(lote.id);
+                      }
+                    }}
+                  >
+                    <td>{lote.nome}</td>
+                    <td>{lote.categoriaAnimal}</td>
+                    <td>{formatNumber(lote.heads, 0)}</td>
+                    <td>{lote.pesoAtual > 0 ? `${formatNumber(lote.pesoAtual, 1)} kg` : '—'}</td>
+                    <td>{lote.qtdPesagens > 0 ? `${formatNumber(lote.gmd30, 2)} kg/dia` : '—'}</td>
+                    <td>{formatCurrency(lote.resumo?.lucroTotal || 0)}</td>
+                    <td><Badge variant={statusVariantLote(lote.status)}>{lote.status}</Badge></td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+
+          {previewLote ? (
+            <aside className="lote-preview-panel">
+              <div className="lote-preview-panel-head">
+                <div>
+                  <h3>{previewLote.nome}</h3>
+                  <p>{previewLote.categoriaAnimal} · {previewLote.pastagemNome}</p>
+                </div>
+                <button
+                  type="button"
+                  className="lote-preview-panel-close"
+                  onClick={() => setPreviewLoteId(null)}
+                  aria-label="Fechar resumo do lote"
+                >
+                  ×
+                </button>
+              </div>
+
+              <div className="lote-preview-panel-body">
+                <div className="lote-preview-metrics">
+                  <div>
+                    <span>Cabeças</span>
+                    <strong>{formatNumber(previewLote.heads, 0)}</strong>
+                  </div>
+                  <div>
+                    <span>Peso médio</span>
+                    <strong>{previewLote.pesoAtual > 0 ? `${formatNumber(previewLote.pesoAtual, 1)} kg` : '—'}</strong>
+                  </div>
+                  <div>
+                    <span>GMD (30d)</span>
+                    <strong>{previewLote.qtdPesagens > 0 ? `${formatNumber(previewLote.gmd30, 2)} kg/dia` : '—'}</strong>
+                  </div>
+                  <div>
+                    <span>Resultado</span>
+                    <strong>{formatCurrency(previewLote.resumo?.lucroTotal || 0)}</strong>
+                  </div>
+                </div>
+
+                <div className="lote-preview-section-label">Últimas pesagens</div>
+                {previewLotePesagens.length === 0 ? (
+                  <p className="lote-preview-empty">Sem pesagens registradas.</p>
+                ) : (
+                  <div className="lote-preview-pesagens">
+                    {previewLotePesagens.map((item) => (
+                      <div key={item.id} className="lote-preview-pesagem-row">
+                        <span>{formatDate(item.dataKey)}</span>
+                        <strong>{formatNumber(item.peso_medio, 1)} kg</strong>
+                      </div>
+                    ))}
+                  </div>
+                )}
+
+                <div className="lote-preview-section-label">Sanidade e financeiro</div>
+                <p className="lote-preview-empty">
+                  Resumo detalhado disponível em "Ver lote completo" (abas Financeiro e Sanidade).
+                </p>
+
+                <LoteAcoesMenu
+                  lote={previewLote}
+                  size="sm"
+                  hasPermission={(permissao) => (
+                    permissao === 'lotes:editar' ? hasPermission('lotes:editar') : hasPermission('animais:movimentar')
+                  )}
+                  handlers={{
+                    onEditar: () => {
+                      setLoteEmEdicao(previewLote);
+                      setOpenNovoLote(true);
+                    },
+                    onAjusteLotacao: () => dispararAcaoRapida('ajustar-lotacao', previewLote.id),
+                    onVenda: () => dispararAcaoRapida('venda', previewLote.id),
+                    onMortePerda: () => dispararAcaoRapida('morte', previewLote.id),
+                    onTransferenciaSaida: () => dispararAcaoRapida('transferir', previewLote.id),
+                    onTrocarPasto: () => dispararAcaoRapida('trocar-pasto', previewLote.id),
+                    onFinalizar: () => {
+                      setSelectedLoteId(previewLote.id);
+                      setOpenFechamento(true);
+                    },
+                  }}
+                />
+
                 <Button
-                  variant="primary"
+                  size="sm"
+                  fullWidth
                   onClick={() => {
-                    if (!canCreateLoteInCurrentFarm(activeFarmId, null)) {
-                      showToast({ type: 'warning', message: 'Selecione uma fazenda ativa para cadastrar um lote.' });
-                      return;
-                    }
-                    setLoteEmEdicao(null);
-                    setOpenNovoLote(true);
+                    setActiveTab('visao_geral');
+                    setSelectedLoteId(previewLote.id);
+                    setPreviewLoteId(null);
                   }}
                 >
-                  Criar lote
+                  Ver lote completo
                 </Button>
-              ) : null
-            }
-          />
-        ) : lotesFiltrados.map((lote) => (
-          <LoteCard
-            key={lote.id}
-            lote={lote}
-            canMove={hasPermission('animais:movimentar')}
-            canEdit={hasPermission('lotes:editar')}
-            onOpen={() => {
-              setActiveTab('visao_geral');
-              setSelectedLoteId(lote.id);
-            }}
-            onEditar={() => {
-              setLoteEmEdicao(lote);
-              setOpenNovoLote(true);
-            }}
-            onAjusteLotacao={() => {
-              setSelectedLoteId(lote.id);
-              setOpenAjusteLotacao(true);
-            }}
-            onVenda={() => {
-              setActiveTab('retiradas');
-              setSelectedLoteId(lote.id);
-              abrirRetirada('sale_partial');
-            }}
-            onMortePerda={() => {
-              setActiveTab('retiradas');
-              setSelectedLoteId(lote.id);
-              abrirRetirada('death_loss');
-            }}
-            onTransferenciaSaida={() => {
-              setActiveTab('retiradas');
-              setSelectedLoteId(lote.id);
-              abrirRetirada('exit');
-            }}
-            onTrocarPasto={() => {
-              setActiveTab('pastagem');
-              setSelectedLoteId(lote.id);
-              setOpenMoverPasto(true);
-            }}
-            onFinalizar={() => {
-              setSelectedLoteId(lote.id);
-              setOpenFechamento(true);
-            }}
-          />
-        ))}
-      </div>
+              </div>
+            </aside>
+          ) : null}
+        </div>
+      )}
 
       {openNovoLote ? (
         <LoteForm

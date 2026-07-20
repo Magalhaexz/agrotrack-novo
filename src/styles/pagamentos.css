@@ -47,3 +47,24 @@
     align-items: flex-start;
   }
 }
+
+/* Tabela de Lançamentos (redesign) — sinal +/− já deixa o tipo inequívoco
+   mesmo sem cor (acessibilidade), a cor só reforça. */
+.financeiro-valor {
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.financeiro-valor.is-receita {
+  color: var(--color-success);
+}
+
+.financeiro-valor.is-despesa {
+  color: var(--color-danger);
+}
+
+.financeiro-lancamento-badges {
+  display: flex;
+  gap: 6px;
+  margin-top: 6px;
+}
