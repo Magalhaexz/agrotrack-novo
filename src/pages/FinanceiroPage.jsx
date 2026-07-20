@@ -16,9 +16,9 @@ import { formatCurrency, formatDate, formatNumber } from '../utils/calculations'
 import { gerarNovoId } from '../utils/id';
 import { useAuth } from '../auth/useAuth';
 import { useToast } from '../hooks/useToast';
-import { createOperationalRecord, updateOperationalRecord } from '../services/operationalPersistence';
+import { createOperationalRecord, deleteOperationalRecord, updateOperationalRecord } from '../services/operationalPersistence';
 import { formatarMoedaExportacao, montarNomeArquivo } from '../domain/exportacaoRelatorios';
-import { resolverFazendaIdLancamento } from './financeiroLancamentoLogic.js';
+import { resolverFazendaIdLancamento, isLancamentoManual, getOrigemLabel, podeEstornar, possuiEstornoRegistrado, construirLancamentoEstorno } from './financeiroLancamentoLogic.js';
 import { computeDRE } from './financeiroDreLogic.js';
 import { useSubmitOnce } from '../hooks/useSubmitOnce.js';
 import { baixarCsv, abrirRelatorioParaImpressao } from '../utils/exportacaoArquivos';
@@ -58,13 +58,15 @@ function buildPagamentosVisaoGeral(db, hoje) {
   return { vencidas, vencendoHoje, proximosSeteDias, previstas, pagas };
 }
 
-export default function FinanceiroPage({ db, setDb, navigationIntent = null, fazendaSelecionada = null }) {
+export default function FinanceiroPage({ db, setDb, navigationIntent = null, fazendaSelecionada = null, onConfirmAction = null }) {
   const { hasPermission, session } = useAuth();
   const { showToast } = useToast();
   const abrirLancamentoPorIntent = navigationIntent?.page === 'financeiro' && navigationIntent?.action === 'novo';
   const [tab, setTab] = useState('dre');
   const [detailLoteId, setDetailLoteId] = useState(null);
   const [openLanc, setOpenLanc] = useState(abrirLancamentoPorIntent);
+  const [lancamentoEditando, setLancamentoEditando] = useState(null);
+  const [estornoAlvo, setEstornoAlvo] = useState(null);
   const [filters, setFilters] = useState({ tipo: 'todos', cat: 'todas', lote: 'todos' });
   const [novoPagamento, setNovoPagamento] = useState({ descricao: '', valor: '', data_vencimento: getTodayIso(), metodo: 'Pix', pago: false, observacao: '' });
 
@@ -308,6 +310,96 @@ export default function FinanceiroPage({ db, setDb, navigationIntent = null, faz
       movimentacoes_financeiras: (prev.movimentacoes_financeiras || []).map((row) => row.id === item.id ? { ...row, ...(persisted.data || patch) } : row),
     }));
     showToast({ type: 'success', message: 'Pagamento confirmado.' });
+  }
+
+  // Onda A (UX-FN1): exclusão só para lançamento manual — automático quebra a
+  // rastreabilidade com a operação de origem, então só pode ser estornado.
+  async function excluirLancamento(item) {
+    if (!podeEditarFinanceiro()) return;
+    if (!isLancamentoManual(item)) {
+      showToast({ type: 'error', message: 'Lançamentos automáticos não podem ser excluídos — use "Estornar".' });
+      return;
+    }
+    const confirmado = typeof onConfirmAction === 'function'
+      ? await onConfirmAction({ title: 'Excluir lançamento', message: 'Deseja excluir este lançamento?', tone: 'danger' })
+      : window.confirm('Deseja excluir este lançamento?');
+    if (!confirmado) return;
+
+    const persisted = await deleteOperationalRecord('movimentacoes_financeiras', item.id, session);
+    if (!persisted.persisted) {
+      showToast({ type: 'warning', message: persisted.error || 'Não foi possível confirmar a exclusão agora.' });
+      return;
+    }
+    setDb((prev) => ({
+      ...prev,
+      movimentacoes_financeiras: (prev.movimentacoes_financeiras || []).filter((row) => row.id !== item.id),
+    }));
+    showToast({ type: 'success', message: 'Lançamento excluído.' });
+  }
+
+  // Onda A (UX-FN1): estorno preserva o lançamento original (só marca
+  // `estornado_em`, nunca sobrescreve/apaga) e cria um NOVO lançamento com
+  // tipo invertido, vinculado via origem_tipo/origem_id — mesmo padrão de
+  // origem_tipo já usado por movimentacoes.js/consumoSuplementacao. O DRE não
+  // precisa de nenhuma regra nova: a inversão de tipo já neutraliza o valor
+  // no cálculo de receita/despesa existente. Motivo é obrigatório (coletado
+  // pelo EstornoModal, que também é a própria confirmação) e fica registrado
+  // na `observacao` do lançamento reverso, junto do vínculo com o original.
+  //
+  // Ordem das duas gravações é deliberada: cria o lançamento REVERSO primeiro
+  // e só then marca `estornado_em` no original. Não há RPC transacional aqui
+  // (decisão de escopo — ver docs), então uma falha no meio do caminho é
+  // possível; a ordem escolhida garante que, se algo falhar, o pior caso é um
+  // lançamento reverso "órfão" (visível e rastreável via origem_id) — nunca
+  // um estorno que a UI já esconde como concluído sem o valor ter sido
+  // revertido em lugar nenhum. Some proteção extra contra duplicar o estorno
+  // numa nova tentativa: também checa se já existe uma linha
+  // origem_tipo='estorno' apontando para este id, não só a flag.
+  async function estornarLancamento(item, motivo) {
+    if (!podeEditarFinanceiro()) return { ok: false };
+    if (!podeEstornar(item)) {
+      showToast({ type: 'error', message: 'Este lançamento já foi estornado.' });
+      return { ok: false };
+    }
+    if (possuiEstornoRegistrado(movimentacoes, item.id)) {
+      showToast({ type: 'error', message: 'Já existe um lançamento de estorno para este registro.' });
+      return { ok: false };
+    }
+
+    let estornoPayload;
+    try {
+      estornoPayload = construirLancamentoEstorno(item, motivo, { dataHoje: getTodayIso() });
+    } catch (error) {
+      showToast({ type: 'warning', message: error.message });
+      return { ok: false };
+    }
+
+    const estornoPersist = await createOperationalRecord('movimentacoes_financeiras', estornoPayload, session);
+    if (!estornoPersist.persisted) {
+      showToast({ type: 'warning', message: estornoPersist.error || 'Não foi possível confirmar o estorno agora.' });
+      return { ok: false };
+    }
+
+    const agora = new Date().toISOString();
+    const origemPersist = await updateOperationalRecord('movimentacoes_financeiras', item.id, { estornado_em: agora }, session);
+    if (!origemPersist.persisted) {
+      setDb((prev) => ({
+        ...prev,
+        movimentacoes_financeiras: [...(prev.movimentacoes_financeiras || []), estornoPersist.data || { id: gerarNovoId(prev.movimentacoes_financeiras || []), ...estornoPayload }],
+      }));
+      showToast({ type: 'error', message: 'O estorno foi criado, mas não foi possível marcar o lançamento original. Atualize a página e confira antes de tentar de novo.' });
+      return { ok: true };
+    }
+
+    setDb((prev) => ({
+      ...prev,
+      movimentacoes_financeiras: [
+        ...(prev.movimentacoes_financeiras || []).map((row) => (row.id === item.id ? { ...row, estornado_em: agora } : row)),
+        estornoPersist.data || { id: gerarNovoId(prev.movimentacoes_financeiras || []), ...estornoPayload },
+      ],
+    }));
+    showToast({ type: 'success', message: 'Lançamento estornado com sucesso.' });
+    return { ok: true };
   }
 
   if (detalhe) {
@@ -696,28 +788,130 @@ export default function FinanceiroPage({ db, setDb, navigationIntent = null, faz
                   }
                 />
               ) : (
-                lancamentos.map((item) => (
-                  <div key={item.id} className="alert-item">
-                    <Badge variant={item.tipo === 'receita' ? 'success' : 'danger'}>{item.tipo}</Badge>
-                    <div>
-                      <strong>{item.categoria}</strong>
-                      <p>{formatDate(item.data)} · {formatCurrency(item.valor)} · {item.fornecedor || item.comprador || '-'}</p>
+                lancamentos.map((item) => {
+                  const manual = isLancamentoManual(item);
+                  const origemLabel = getOrigemLabel(item);
+                  const estornado = Boolean(item.estornado_em);
+                  return (
+                    <div key={item.id} className="alert-item">
+                      <Badge variant={item.tipo === 'receita' ? 'success' : 'danger'}>{item.tipo}</Badge>
+                      <div>
+                        <strong>{item.categoria}</strong>
+                        <p>{formatDate(item.data)} · {formatCurrency(item.valor)} · {item.fornecedor || item.comprador || '-'}</p>
+                        <p>
+                          <Badge variant={manual ? 'info' : 'neutral'}>{manual ? 'Manual' : `Automático${origemLabel ? ` · ${origemLabel}` : ''}`}</Badge>
+                          {estornado ? <Badge variant="warning">Estornado</Badge> : null}
+                        </p>
+                      </div>
+                      {podeEditarFinanceiroUi ? (
+                        <div className="row-actions">
+                          {manual ? (
+                            <>
+                              <button className="action-btn" onClick={() => { setLancamentoEditando(item); setOpenLanc(true); }}>Editar</button>
+                              <button className="action-btn action-btn-danger" onClick={() => excluirLancamento(item)}>Excluir</button>
+                            </>
+                          ) : (
+                            <button className="action-btn action-btn-danger" disabled={estornado} onClick={() => { if (!podeEditarFinanceiro()) return; setEstornoAlvo(item); }}>
+                              {estornado ? 'Já estornado' : 'Estornar'}
+                            </button>
+                          )}
+                        </div>
+                      ) : null}
                     </div>
-                  </div>
-                ))
+                  );
+                })
               )}
             </div>
           </Card>
         </>
       ) : null}
 
-      {openLanc ? <NovoLancamentoModal db={db} setDb={setDb} onClose={() => setOpenLanc(false)} hasPermission={hasPermission} showToast={showToast} session={session} fazendaSelecionada={fazendaSelecionada} /> : null}
+      {openLanc ? (
+        <NovoLancamentoModal
+          db={db}
+          setDb={setDb}
+          editingItem={lancamentoEditando}
+          onClose={() => { setOpenLanc(false); setLancamentoEditando(null); }}
+          hasPermission={hasPermission}
+          showToast={showToast}
+          session={session}
+          fazendaSelecionada={fazendaSelecionada}
+        />
+      ) : null}
+
+      {estornoAlvo ? (
+        <EstornoModal
+          item={estornoAlvo}
+          onClose={() => setEstornoAlvo(null)}
+          onConfirm={async (motivo) => {
+            const resultado = await estornarLancamento(estornoAlvo, motivo);
+            if (resultado.ok) setEstornoAlvo(null);
+          }}
+        />
+      ) : null}
     </div>
   );
 }
 
-function NovoLancamentoModal({ db, setDb, onClose, hasPermission, showToast, session, fazendaSelecionada = null }) {
-  const [form, setForm] = useState({
+// Onda A (UX-FN1): motivo do estorno é obrigatório — este modal É a
+// confirmação (substitui o onConfirmAction genérico, que não tem campo de
+// texto), bloqueando o botão "Confirmar estorno" enquanto o motivo estiver
+// vazio.
+function EstornoModal({ item, onClose, onConfirm }) {
+  const [motivo, setMotivo] = useState('');
+  const { executar, isSubmitting } = useSubmitOnce();
+
+  return (
+    <Modal
+      open
+      onClose={onClose}
+      title="Estornar lançamento"
+      footer={(
+        <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8 }}>
+          <Button variant="ghost" onClick={onClose} disabled={isSubmitting}>Cancelar</Button>
+          <Button
+            variant="danger"
+            disabled={!motivo.trim()}
+            loading={isSubmitting}
+            loadingLabel="Estornando..."
+            onClick={() => executar(() => onConfirm(motivo))}
+          >
+            Confirmar estorno
+          </Button>
+        </div>
+      )}
+    >
+      <p>
+        Confirma o estorno de <strong>{formatCurrency(item.valor)}</strong> ({item.categoria}, {formatDate(item.data)})?
+        O lançamento original é preservado e um lançamento reverso é criado.
+      </p>
+      <label className="ui-input-wrap">
+        <span className="ui-input-label">Motivo do estorno (obrigatório)</span>
+        <textarea
+          className="ui-input"
+          style={{ minHeight: 90, resize: 'vertical' }}
+          placeholder="Ex.: venda cancelada pelo comprador"
+          value={motivo}
+          onChange={(event) => setMotivo(event.target.value)}
+        />
+      </label>
+    </Modal>
+  );
+}
+
+function NovoLancamentoModal({ db, setDb, onClose, hasPermission, showToast, session, fazendaSelecionada = null, editingItem = null }) {
+  const [form, setForm] = useState(() => (editingItem ? {
+    tipo: editingItem.tipo || 'despesa',
+    categoria: editingItem.categoria || despCats[0],
+    valor: editingItem.valor ?? '',
+    data: editingItem.data || getTodayIso(),
+    lote_id: editingItem.lote_id ? String(editingItem.lote_id) : '',
+    pessoa: editingItem.tipo === 'receita' ? (editingItem.comprador || '') : (editingItem.fornecedor || ''),
+    nf: '',
+    obs: editingItem.observacao || '',
+    parcelado: false,
+    parcelas: 1,
+  } : {
     tipo: 'despesa',
     categoria: despCats[0],
     valor: '',
@@ -728,7 +922,7 @@ function NovoLancamentoModal({ db, setDb, onClose, hasPermission, showToast, ses
     obs: '',
     parcelado: false,
     parcelas: 1,
-  });
+  }));
   const { executar, isSubmitting } = useSubmitOnce();
 
   const categorias = form.tipo === 'despesa' ? despCats : recCats;
@@ -749,6 +943,36 @@ function NovoLancamentoModal({ db, setDb, onClose, hasPermission, showToast, ses
     const fazendaIdLancamento = resolverFazendaIdLancamento({ loteEscolhido, fazendaSelecionada });
     if (!fazendaIdLancamento) {
       showToast({ type: 'warning', message: 'Selecione um lote ou uma fazenda específica para lançar sem lote.' });
+      return;
+    }
+
+    if (editingItem) {
+      await executar(async () => {
+        const payload = {
+          tipo: form.tipo,
+          categoria: form.categoria,
+          valor: Number(form.valor),
+          data: form.data,
+          lote_id: form.lote_id ? Number(form.lote_id) : null,
+          fazenda_id: fazendaIdLancamento,
+          fornecedor: form.tipo === 'despesa' ? form.pessoa : '',
+          comprador: form.tipo === 'receita' ? form.pessoa : '',
+          observacao: form.obs || '',
+        };
+        const persisted = await updateOperationalRecord('movimentacoes_financeiras', editingItem.id, payload, session);
+        if (!persisted.persisted) {
+          showToast({ type: 'warning', message: persisted.error || 'Não foi possível confirmar a alteração agora.' });
+          return;
+        }
+        setDb((prev) => ({
+          ...prev,
+          movimentacoes_financeiras: (prev.movimentacoes_financeiras || []).map((row) => (
+            row.id === editingItem.id ? { ...row, ...(persisted.data || payload) } : row
+          )),
+        }));
+        showToast({ type: 'success', message: 'Lançamento atualizado.' });
+        onClose();
+      });
       return;
     }
 
@@ -798,7 +1022,13 @@ function NovoLancamentoModal({ db, setDb, onClose, hasPermission, showToast, ses
   }
 
   return (
-    <Modal open onClose={onClose} title="Novo lançamento financeiro" size="lg" footer={<Button onClick={submit} loading={isSubmitting} loadingLabel="Salvando...">Salvar lançamento</Button>}>
+    <Modal
+      open
+      onClose={onClose}
+      title={editingItem ? 'Editar lançamento financeiro' : 'Novo lançamento financeiro'}
+      size="lg"
+      footer={<Button onClick={submit} loading={isSubmitting} loadingLabel="Salvando...">{editingItem ? 'Salvar alteração' : 'Salvar lançamento'}</Button>}
+    >
       <div className="form-grid two">
         <label className="ui-input-wrap">
           <span className="ui-input-label">Tipo</span>
@@ -842,15 +1072,17 @@ function NovoLancamentoModal({ db, setDb, onClose, hasPermission, showToast, ses
         <Input label="Nota fiscal" value={form.nf} onChange={(event) => setForm((prev) => ({ ...prev, nf: event.target.value }))} />
         <Input label="Observações" value={form.obs} onChange={(event) => setForm((prev) => ({ ...prev, obs: event.target.value }))} />
 
-        <label className="ui-input-wrap">
-          <span className="ui-input-label">Parcelado?</span>
-          <select className="ui-input" value={form.parcelado ? 'sim' : 'nao'} onChange={(event) => setForm((prev) => ({ ...prev, parcelado: event.target.value === 'sim' }))}>
-            <option value="nao">Não</option>
-            <option value="sim">Sim</option>
-          </select>
-        </label>
+        {!editingItem ? (
+          <label className="ui-input-wrap">
+            <span className="ui-input-label">Parcelado?</span>
+            <select className="ui-input" value={form.parcelado ? 'sim' : 'nao'} onChange={(event) => setForm((prev) => ({ ...prev, parcelado: event.target.value === 'sim' }))}>
+              <option value="nao">Não</option>
+              <option value="sim">Sim</option>
+            </select>
+          </label>
+        ) : null}
 
-        {form.parcelado ? (
+        {!editingItem && form.parcelado ? (
           <Input label="Número de parcelas" type="number" value={form.parcelas} onChange={(event) => setForm((prev) => ({ ...prev, parcelas: event.target.value }))} />
         ) : null}
       </div>
