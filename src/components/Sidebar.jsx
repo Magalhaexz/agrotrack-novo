@@ -16,13 +16,6 @@ export default function Sidebar({
   onToggleCollapse = null,
 }) {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
-  const [openSections, setOpenSections] = useState(() => {
-    const initialOpenState = {};
-    navSections.forEach((section) => {
-      initialOpenState[section.id] = true;
-    });
-    return initialOpenState;
-  });
   const [dropdownAberto, setDropdownAberto] = useState(false);
   const dropdownRef = useRef(null);
 
@@ -36,6 +29,8 @@ export default function Sidebar({
   const perfilExibicao = obterLabelPerfil(usuarioLogado?.perfil);
   const isDesktopCollapsed = Boolean(isCollapsed);
 
+  // Seções sempre abertas (fiel ao redesign — só a sidebar inteira colapsa,
+  // 272↔84px; não existe mais o recolher por seção individual).
   const sections = useMemo(
     () =>
       navSections
@@ -46,12 +41,8 @@ export default function Sidebar({
             return !permissao || hasPermission(permissao);
           }),
         }))
-        .filter((section) => section.items.length > 0)
-        .map((section) => ({
-          ...section,
-          isOpen: isDesktopCollapsed ? true : (openSections[section.id] ?? true),
-        })),
-    [hasPermission, openSections, isDesktopCollapsed]
+        .filter((section) => section.items.length > 0),
+    [hasPermission]
   );
 
   useEffect(() => {
@@ -177,55 +168,44 @@ export default function Sidebar({
           {sections.map((section) => (
             <div key={section.id} className="sidebar-section">
               {!isDesktopCollapsed && section.title ? (
-                <button
-                  type="button"
-                  className="sidebar-group-label sidebar-section-title nav-group-toggle"
-                  onClick={() => setOpenSections((prev) => ({ ...prev, [section.id]: !prev[section.id] }))}
-                  aria-expanded={section.isOpen}
-                  aria-controls={`nav-section-${section.id}`}
-                  title={section.title}
-                >
+                <div className="sidebar-group-label sidebar-section-title">
                   <div className="sidebar-group-copy">
                     <span>{section.title}</span>
                   </div>
-                  <ChevronDown size={14} className={`nav-group-arrow ${section.isOpen ? 'open' : ''}`} aria-hidden="true" />
-                </button>
-              ) : null}
-
-              {section.isOpen ? (
-                <div
-                  id={`nav-section-${section.id}`}
-                  className={`nav-sublist ${isDesktopCollapsed ? 'is-collapsed' : ''}`}
-                  style={{ borderTop: section.title ? undefined : 'none', marginTop: 0, paddingTop: 0 }}
-                >
-                  {section.items.map((item) => {
-                    const ItemIcon = item.icon;
-                    const isActive = currentPage === item.id;
-
-                    return (
-                      <button
-                        key={item.id}
-                        type="button"
-                        className={`sidebar-item sidebar-link nav subnav ${isActive ? 'active on' : ''}`}
-                        onClick={() => {
-                          onNavigate(item.id);
-                          setIsMobileMenuOpen(false);
-                        }}
-                        aria-current={isActive ? 'page' : undefined}
-                        aria-label={item.label}
-                        title={item.label}
-                      >
-                        <ItemIcon size={16} className="nav-icon" aria-hidden="true" />
-                        <div className="sidebar-item-copy">
-                          <span className="sidebar-item-label sidebar-link-label">{item.label}</span>
-                        </div>
-                        {item.id === 'dashboard' && alertCount > 0 ? <span className="sidebar-badge nav-badge">{alertCount}</span> : null}
-                        <span className="sidebar-item-glow" aria-hidden="true" />
-                      </button>
-                    );
-                  })}
                 </div>
               ) : null}
+
+              <div
+                className={`nav-sublist ${isDesktopCollapsed ? 'is-collapsed' : ''}`}
+                style={{ borderTop: section.title ? undefined : 'none', marginTop: 0, paddingTop: 0 }}
+              >
+                {section.items.map((item) => {
+                  const ItemIcon = item.icon;
+                  const isActive = currentPage === item.id;
+
+                  return (
+                    <button
+                      key={item.id}
+                      type="button"
+                      className={`sidebar-item sidebar-link nav subnav ${isActive ? 'active on' : ''}`}
+                      onClick={() => {
+                        onNavigate(item.id);
+                        setIsMobileMenuOpen(false);
+                      }}
+                      aria-current={isActive ? 'page' : undefined}
+                      aria-label={item.label}
+                      title={item.label}
+                    >
+                      <ItemIcon size={16} className="nav-icon" aria-hidden="true" />
+                      <div className="sidebar-item-copy">
+                        <span className="sidebar-item-label sidebar-link-label">{item.label}</span>
+                      </div>
+                      {item.id === 'dashboard' && alertCount > 0 ? <span className="sidebar-badge nav-badge">{alertCount}</span> : null}
+                      <span className="sidebar-item-glow" aria-hidden="true" />
+                    </button>
+                  );
+                })}
+              </div>
             </div>
           ))}
         </div>

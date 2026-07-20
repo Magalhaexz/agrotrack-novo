@@ -1116,6 +1116,14 @@ a:hover {
   color: var(--color-text);
 }
 
+/* Números alinhados à direita — usado por Dashboard/Lotes/Financeiro, uma
+   única definição para não duplicar a mesma regra em cada página. */
+.data-table .is-number,
+.history-table .is-number {
+  text-align: right;
+  font-family: var(--font-mono);
+}
+
 .table-empty {
   text-align: center;
   padding: 48px 24px;
@@ -3451,14 +3459,19 @@ a:hover {
 }
 
 .sidebar-badge {
-  min-width: 24px;
-  height: 24px;
-  padding: 0 7px;
+  min-width: 20px;
+  height: 20px;
+  padding: 0 6px;
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  background: linear-gradient(135deg, #b8ffcc, var(--color-primary));
-  box-shadow: 0 10px 18px rgba(34, 197, 94, 0.24);
+  /* Contagem de alertas — vermelho (não verde: verde já significa
+     positivo/sucesso em todo o resto da UI). Sem gradiente/glow. */
+  background: var(--color-danger);
+  color: #fff;
+  font-size: 10.5px;
+  font-weight: 700;
+  border-radius: var(--radius-full);
 }
 
 .sidebar-user-wrap {
@@ -6550,16 +6563,17 @@ body,
   }
 }
 
-/* Sprint 7C.1 — Sidebar Black Exclusive Refinement (visual-only) */
+/* Redesign HERDON: sidebar sóbria, sem preto puro (substitui o antigo
+   "Sidebar Black Exclusive Refinement" — direção de produto mudou). */
 :root {
-  --sidebar-bg: #000000;
-  --sidebar-border: #11161a;
-  --sidebar-item-hover: #0d1216;
-  --sidebar-item-active-bg: #101914;
+  --sidebar-bg: #121815;
+  --sidebar-border: #24322a;
+  --sidebar-item-hover: #182019;
+  --sidebar-item-active-bg: rgba(34, 197, 94, 0.13);
 }
 
 .sidebar {
-  background: #000000;
+  background: var(--sidebar-bg);
   border-right: 1px solid var(--sidebar-border);
 }
 
@@ -6635,7 +6649,7 @@ body,
 
 @media (max-width: 900px) {
   .sidebar {
-    background: #000000;
+    background: var(--sidebar-bg);
     overflow-x: hidden;
   }
 
@@ -6645,7 +6659,8 @@ body,
   }
 }
 
-/* Micro Sprint 7C.1A — force true black sidebar surfaces */
+/* Redesign HERDON: superfícies da sidebar usam o tom de painel do design
+   novo (substitui o antigo "force true black sidebar surfaces"). */
 .sidebar,
 .sidebar.sb,
 .app-shell .sidebar,
@@ -6658,11 +6673,11 @@ body,
 .sidebar-user,
 .mobile-topbar,
 .mobile-overlay + .sidebar {
-  background: #000000 !important;
+  background: var(--sidebar-bg) !important;
 }
 
 .sidebar {
-  background-color: #000000 !important;
+  background-color: var(--sidebar-bg) !important;
 }
 
 /* Micro Sprint 7C.1B — remove sidebar logo frame/moldura only */
@@ -6846,11 +6861,8 @@ body,
   }
 }
 
-/* Sprint 7C.3C — unify main shell background with sidebar black */
-:root {
-  --color-bg: #000000;
-}
-
+/* Redesign HERDON: fundo sólido #0B0F0C (nunca preto puro) em vez do antigo
+   "unify main shell background with sidebar black". */
 html,
 body,
 #root,
@@ -6861,11 +6873,11 @@ body,
 .page-wrapper,
 .page-shell,
 .dashboard-page {
-  background: #000000 !important;
+  background: var(--color-bg) !important;
 }
 
 .main {
-  background-color: #000000 !important;
+  background-color: var(--color-bg) !important;
 }
 
 .content-card,
@@ -10720,9 +10732,12 @@ html, body, #root, .app, .main, .main-content, .page { max-width: 100%; }
 
 /* Financeiro-page tabs — labels mais legíveis */
 .financeiro-header h1,
-.rebanho-header h1 {
-  font-weight: 800;
-  letter-spacing: -0.03em;
+.rebanho-header h1,
+.dashboard-toolbar-copy h1,
+.page-header h1 {
+  font-family: var(--font-heading);
+  font-weight: 600;
+  letter-spacing: -0.01em;
 }
 
 /* Empty state — subtítulo de orientação */

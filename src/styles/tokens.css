@@ -2,71 +2,72 @@
   /* ── BRAND ── */
   --color-primary: #22c55e;
   --color-primary-light: #4ade80;
-  --color-primary-dark: #16a34a;
+  --color-primary-dark: #15803d;
   --color-primary-subtle: rgba(34, 197, 94, 0.12);
   --color-primary-glow: rgba(34, 197, 94, 0.25);
 
   /* ── BACKGROUNDS ── */
-  --color-bg: #0a0a0a;
-  --color-surface: #111111;
-  --color-surface-2: #1a1a1a;
-  --color-surface-3: #222222;
-  --color-surface-hover: #1f1f1f;
+  --color-bg: #0b0f0c;
+  --color-surface: #121815;
+  --color-surface-2: #17201a;
+  --color-surface-3: #1c2620;
+  --color-surface-hover: #182019;
 
   /* ── BORDAS ── */
-  --color-border: #2a2a2a;
-  --color-border-subtle: #1f1f1f;
+  --color-border: #1f2a22;
+  --color-border-subtle: #182019;
+  --color-border-strong: #2f4034;
   --color-border-focus: #22c55e;
 
   /* ── TEXTOS ── */
-  --color-text: #f0f0f0;
-  --color-text-secondary: #a0a0a0;
-  --color-text-muted: #555555;
+  --color-text: #e5e7eb;
+  --color-text-secondary: #9ca3af;
+  --color-text-muted: #6b7280;
 
   /* ── SEMÂNTICAS ── */
   --color-success: #22c55e;
-  --color-success-bg: rgba(34, 197, 94, 0.1);
+  --color-success-bg: rgba(34, 197, 94, 0.13);
   --color-warning: #f59e0b;
-  --color-warning-bg: rgba(245, 158, 11, 0.1);
+  --color-warning-bg: rgba(245, 158, 11, 0.14);
   --color-danger: #ef4444;
-  --color-danger-bg: rgba(239, 68, 68, 0.1);
+  --color-danger-bg: rgba(239, 68, 68, 0.13);
   --color-info: #3b82f6;
   --color-info-bg: rgba(59, 130, 246, 0.1);
 
   /* ── INPUTS ── */
-  --input-bg: #1a1a1a;
-  --input-border: #2a2a2a;
+  --input-bg: #17201a;
+  --input-border: #24322a;
   --input-focus-border: #22c55e;
-  --input-text: #f0f0f0;
-  --input-placeholder: #555555;
+  --input-text: #e5e7eb;
+  --input-placeholder: #6b7280;
 
   /* ── SIDEBAR ── */
-  --sidebar-bg: #0d0d0d;
+  --sidebar-bg: #121815;
   --sidebar-width: 260px;
-  --sidebar-border: #1a1a1a;
-  --sidebar-item-hover: #1a1a1a;
-  --sidebar-item-active-bg: rgba(34, 197, 94, 0.12);
-  --sidebar-item-active-text: #22c55e;
+  --sidebar-border: #24322a;
+  --sidebar-item-hover: #182019;
+  --sidebar-item-active-bg: rgba(34, 197, 94, 0.13);
+  --sidebar-item-active-text: #4ade80;
   --sidebar-item-active-border: #22c55e;
 
   /* ── HEADER ── */
-  --header-bg: #0d0d0d;
-  --header-border: #1a1a1a;
+  --header-bg: #121815;
+  --header-border: #1f2a22;
   --header-height: 64px;
 
   /* ── MODAL ── */
-  --modal-bg: #111111;
-  --modal-overlay: rgba(0, 0, 0, 0.85);
+  --modal-bg: #121815;
+  --modal-overlay: rgba(5, 7, 6, 0.85);
 
   /* ── CARDS ── */
-  --card-bg: #111111;
-  --card-border: #1e1e1e;
-  --card-hover-border: #2a2a2a;
+  --card-bg: #121815;
+  --card-border: #1f2a22;
+  --card-hover-border: #2f4034;
 
   /* ── LAYOUT ── */
   --layout-sidebar-width: 272px;
-  --layout-sidebar-collapsed-width: 92px;
-  --layout-topbar-height: 68px;
+  --layout-sidebar-collapsed-width: 84px;
+  --layout-topbar-height: 74px;
   --layout-mobile-topbar-height: 60px;
   --layout-mobile-bottom-nav-height: 78px;
   --layout-content-max-width: 1480px;
@@ -85,13 +86,17 @@
   --breakpoint-desktop-min: 1441px;
 
   /* ── TABELA ── */
-  --table-header-bg: #0d0d0d;
-  --table-row-hover: #161616;
-  --table-row-alt: #0f0f0f;
-  --table-border: #1e1e1e;
+  --table-header-bg: #0e1310;
+  --table-row-hover: #17201a;
+  --table-row-alt: #101512;
+  --table-border: #1f2a22;
 
   /* ── TIPOGRAFIA ── */
   --font-sans: 'Inter', system-ui, -apple-system, sans-serif;
+  /* Sora = títulos (h1/h2/section headers) — nunca corpo/labels/números. */
+  --font-heading: 'Sora', 'Inter', system-ui, -apple-system, sans-serif;
+  /* IBM Plex Mono = só números/valores monetários/pesos/%/indicadores. */
+  --font-mono: 'IBM Plex Mono', 'Consolas', 'SFMono-Regular', ui-monospace, monospace;
   --text-xs: 0.75rem;
   --text-sm: 0.875rem;
   --text-base: 1rem;

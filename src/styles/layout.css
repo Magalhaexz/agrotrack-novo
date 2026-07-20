@@ -11,10 +11,9 @@ body,
 }
 
 body {
-  background:
-    radial-gradient(circle at top left, rgba(34, 197, 94, 0.08), transparent 30%),
-    radial-gradient(circle at bottom right, rgba(59, 130, 246, 0.06), transparent 26%),
-    var(--color-bg);
+  /* Fundo sólido — sem glow decorativo, para ler como software operacional
+     sério, não "dashboard gerado por IA". */
+  background: var(--color-bg);
 }
 
 .app,
@@ -37,21 +36,18 @@ body {
   max-width: var(--layout-sidebar-width);
   height: 100dvh;
   overflow: hidden;
-  background:
-    radial-gradient(circle at top, rgba(34, 197, 94, 0.05), transparent 34%),
-    linear-gradient(180deg, rgba(13, 16, 17, 0.98), rgba(8, 10, 11, 0.99));
-  border-right: 1px solid rgba(255, 255, 255, 0.06);
-  box-shadow: inset -1px 0 0 rgba(255, 255, 255, 0.02);
+  background: var(--color-surface);
+  border-right: 1px solid var(--sidebar-border);
 }
 
 .app-shell .sidebar-header {
-  min-height: 92px;
+  min-height: 88px;
   padding: 16px 16px 14px;
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: 12px;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+  border-bottom: 1px solid var(--color-border);
 }
 
 .app-shell .sidebar-logo {
@@ -63,20 +59,17 @@ body {
 
 .app-shell .sidebar-brand {
   display: grid;
-  grid-template-columns: 52px minmax(0, 1fr);
+  grid-template-columns: 44px minmax(0, 1fr);
   align-items: center;
   gap: 12px;
   min-width: 0;
 }
 
 .app-shell .sidebar-logo-mark {
-  width: 52px;
-  height: 52px;
-  border-radius: 16px;
+  width: 44px;
+  height: 44px;
+  border-radius: 12px;
   overflow: hidden;
-  box-shadow:
-    0 14px 28px rgba(0, 0, 0, 0.32),
-    0 0 0 1px rgba(255, 255, 255, 0.05);
 }
 
 .app-shell .sidebar-logo-copy,
@@ -94,19 +87,19 @@ body {
 
 .app-shell .sidebar-toggle,
 .app-shell .sidebar-collapse-btn {
-  width: 36px;
-  height: 36px;
-  min-height: 36px;
+  width: 28px;
+  height: 28px;
+  min-height: 28px;
   padding: 0;
-  border-radius: 12px;
-  border: 1px solid rgba(255, 255, 255, 0.08);
-  background: rgba(255, 255, 255, 0.03);
+  border-radius: 8px;
+  border: 1px solid var(--color-border);
+  background: var(--color-surface-2);
   color: var(--color-text-secondary);
 }
 
 .app-shell .sidebar-toggle:hover,
 .app-shell .sidebar-collapse-btn:hover {
-  border-color: color-mix(in srgb, var(--color-primary) 36%, rgba(255, 255, 255, 0.08));
+  border-color: var(--color-border-strong);
   color: var(--color-text);
 }
 
@@ -151,23 +144,19 @@ body {
   min-width: 0;
 }
 
-.app-shell .sidebar-section-title,
-.app-shell .nav-group-toggle {
-  min-height: 38px;
-  padding: 0 10px;
-  border-radius: 12px;
-  color: rgba(214, 223, 219, 0.68);
-}
-
-.app-shell .sidebar-section-title:hover,
-.app-shell .nav-group-toggle:hover {
-  background: rgba(255, 255, 255, 0.03);
-  color: var(--color-text);
+.app-shell .sidebar-section-title {
+  min-height: 30px;
+  padding: 0 10px 4px;
+  font-size: 10.5px;
+  font-weight: 600;
+  letter-spacing: 0.09em;
+  text-transform: uppercase;
+  color: var(--color-text-muted);
 }
 
 .app-shell .nav-sublist {
   display: grid;
-  gap: 6px;
+  gap: 3px;
   min-width: 0;
 }
 
@@ -175,15 +164,17 @@ body {
 .app-shell .sidebar-item.nav.subnav {
   min-height: var(--layout-sidebar-item-height);
   justify-content: flex-start;
-  gap: 10px;
-  padding: 0 12px;
-  border-radius: 14px;
-  color: rgba(219, 227, 223, 0.76);
+  gap: 11px;
+  padding: 0 11px;
+  border-radius: 10px;
+  color: var(--color-text-secondary);
+  font-weight: 500;
 }
 
 .app-shell .sidebar-link:hover,
 .app-shell .sidebar-item.nav.subnav:hover {
-  background: rgba(255, 255, 255, 0.04);
+  background: var(--sidebar-item-hover);
+  color: var(--color-text);
 }
 
 .app-shell .sidebar-link.active,
@@ -191,13 +182,9 @@ body {
 .app-shell .sidebar-item.nav.subnav.active,
 .app-shell .sidebar-item.nav.subnav.on,
 .app-shell .sidebar-link[aria-current='page'] {
-  background:
-    linear-gradient(180deg, rgba(34, 197, 94, 0.14), rgba(34, 197, 94, 0.08)),
-    rgba(255, 255, 255, 0.03);
-  border-color: rgba(34, 197, 94, 0.22);
-  box-shadow:
-    inset 0 0 0 1px rgba(34, 197, 94, 0.08),
-    0 8px 18px rgba(0, 0, 0, 0.18);
+  background: var(--sidebar-item-active-bg);
+  color: var(--sidebar-item-active-text);
+  font-weight: 600;
 }
 
 .app-shell .sidebar-link .nav-icon {
@@ -230,18 +217,14 @@ body {
 
 .app-shell .sidebar-user-card {
   min-height: var(--layout-sidebar-footer-height);
-  padding: 14px;
-  border-radius: 20px;
-  border: 1px solid rgba(255, 255, 255, 0.06);
-  background:
-    linear-gradient(180deg, rgba(255, 255, 255, 0.025), rgba(255, 255, 255, 0.01)),
-    rgba(11, 14, 13, 0.9);
+  padding: 12px;
+  border-radius: 12px;
+  border: 1px solid var(--color-border);
+  background: var(--color-surface-2);
 }
 
 .app-shell .sidebar-user-card:hover {
-  background:
-    linear-gradient(180deg, rgba(255, 255, 255, 0.035), rgba(255, 255, 255, 0.012)),
-    rgba(11, 14, 13, 0.94);
+  border-color: var(--color-border-strong);
 }
 
 .app-shell .sidebar-user-info {
