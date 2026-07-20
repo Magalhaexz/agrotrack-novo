@@ -8,7 +8,7 @@ import { supabase } from '../lib/supabase'; // Assumindo que supabase está conf
 import { useAuth } from '../auth/useAuth';
 import { useToast } from '../hooks/useToast'; // Importa o hook de toast
 import { normalizeBackupPayload } from '../utils/backupValidation';
-import { resumirProblemasIntegridade } from '../domain/integridadeDados';
+import { resumirDivergenciasOperacionais, resumirProblemasIntegridade } from '../domain/integridadeDados';
 import {
   createAuditEvent,
   deleteOwnerScopedCollection,
@@ -469,6 +469,30 @@ export default function ConfiguracoesPage({ db, setDb, onConfirmAction, onNaviga
             <div>
               <strong>{integridade.mensagem}</strong>
               <span>{partes.join(' · ')}. Use o seletor “Todas as fazendas” para localizá-los e reatribuir a fazenda correta.</span>
+            </div>
+          </div>
+        );
+      })()}
+
+      {(() => {
+        const divergencias = resumirDivergenciasOperacionais(db);
+        if (!divergencias.temProblemas) return null;
+        const rotulos = {
+          lotes_qtd_divergente: 'lote(s) com quantidade divergente dos animais',
+          animais_em_lote_encerrado: 'animal(is) ativo(s) em lote já encerrado',
+          animais_sem_lote: 'animal(is) individual(is) ativo(s) sem lote',
+          vendas_sem_receita: 'venda(s) sem lançamento financeiro',
+          mortes_com_receita: 'morte(s)/perda(s) com receita indevida',
+        };
+        const partes = Object.entries(divergencias.porTipo)
+          .filter(([, n]) => n > 0)
+          .map(([tipo, n]) => `${n} ${rotulos[tipo] || tipo}`);
+        return (
+          <div className="config-integridade-aviso" role="status">
+            <AlertTriangle size={18} aria-hidden="true" />
+            <div>
+              <strong>{divergencias.mensagem}</strong>
+              <span>{partes.join(' · ')}.</span>
             </div>
           </div>
         );
