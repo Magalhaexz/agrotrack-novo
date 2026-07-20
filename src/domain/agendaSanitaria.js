@@ -89,3 +89,32 @@ export function construirAgendaSanitaria(db = {}, opcoes = {}) {
     emCarencia: ordenarPorData(emCarencia),
   };
 }
+
+/**
+ * Verifica se um LOTE tem carência sanitária ativa numa data de referência —
+ * mesma condição do bucket `emCarencia` acima, extraída para ser reaproveitada
+ * por quem precisa BLOQUEAR uma venda (não só exibir um aviso informativo):
+ * `src/services/movimentacoes.js` (venda de lote e venda individual) e o bot
+ * do Telegram, antes de confirmar a operação.
+ *
+ * Quando há mais de um manejo com carência ativa no lote, usa o de data-fim
+ * mais distante (o mais restritivo).
+ */
+export function verificarCarenciaAtivaLote(sanitarioRegistros, loteId, dataReferencia) {
+  if (loteId == null) return { ativa: false, produto: null, dataFim: null };
+  const registros = Array.isArray(sanitarioRegistros) ? sanitarioRegistros : [];
+  const hoje = toDateKey(dataReferencia) || toDateKey(new Date());
+
+  const ativos = registros
+    .filter((registro) => Number(registro?.lote_id) === Number(loteId) && registro?.data_fim_carencia)
+    .map((registro) => ({
+      produto: registro.desc || 'tratamento sanitário',
+      fimCarencia: toDateKey(registro.data_fim_carencia),
+    }))
+    .filter((item) => item.fimCarencia && daysBetween(hoje, item.fimCarencia) >= 0)
+    .sort((a, b) => (b.fimCarencia || '').localeCompare(a.fimCarencia || ''));
+
+  if (!ativos.length) return { ativa: false, produto: null, dataFim: null };
+  const maisRestritivo = ativos[0];
+  return { ativa: true, produto: maisRestritivo.produto, dataFim: maisRestritivo.fimCarencia };
+}

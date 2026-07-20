@@ -14,18 +14,17 @@ import { useToast } from '../hooks/useToast';
 import {
   createOperationalRecord,
   deleteOperationalRecord,
-  persistCollectionMutation,
   updateOperationalRecord,
 } from '../services/operationalPersistence';
 import { canCreateAnimal, getSubscriptionLimitMessage } from '../services/subscriptions';
+import { isAnimalIndividualAtivo, registrarSaidaAnimalIndividual } from '../services/movimentacoes';
 
-const INDIVIDUAL_INACTIVE_STATUSES = new Set(['vendido', 'morte', 'descarte', 'transferencia', 'perda', 'inativo']);
 const MOVEMENT_LABELS = {
   criacao: 'Criação',
   venda: 'Venda',
   morte: 'Saída por morte',
   descarte: 'Saída por descarte',
-  transferencia: 'Saída por transferência',
+  transferencia_saida: 'Saída por transferência',
   perda: 'Saída por perda',
   outro: 'Saída por outro motivo',
 };
@@ -49,8 +48,7 @@ function isIndividualAnimalRecord(animal) {
 }
 
 function isAnimalActive(animal) {
-  const status = String(animal?.status || 'ativo').toLowerCase();
-  return !INDIVIDUAL_INACTIVE_STATUSES.has(status);
+  return isAnimalIndividualAtivo(animal);
 }
 
 function getIndividualMovementRows(individuais, movimentacoes, lotesMap) {
@@ -102,13 +100,6 @@ function getMovementLabel(tipo) {
   return MOVEMENT_LABELS[tipo] || TIPOS_SAIDA_ANIMAL[tipo] || tipo || '-';
 }
 
-function getMovementStatusPatch(reason) {
-  const normalized = String(reason || '').toLowerCase();
-  if (normalized === 'venda') return 'vendido';
-  if (INDIVIDUAL_INACTIVE_STATUSES.has(normalized)) return normalized;
-  return 'inativo';
-}
-
 function prepareAnimalForForm(animal, lotesMap) {
   const lote = lotesMap.get(Number(animal?.lote_id)) || null;
   const metadata = animal?.metadata || {};
@@ -157,7 +148,6 @@ export default function AnimaisPage({ db, setDb, onConfirmAction, subscription =
   const fazendas = useMemo(() => (Array.isArray(db?.fazendas) ? db.fazendas : []), [db]);
   const animais = useMemo(() => (Array.isArray(db?.animais) ? db.animais : []), [db]);
   const movimentacoes = useMemo(() => (Array.isArray(db?.movimentacoes_animais) ? db.movimentacoes_animais : []), [db]);
-  const movimentacoesFinanceiras = useMemo(() => (Array.isArray(db?.movimentacoes_financeiras) ? db.movimentacoes_financeiras : []), [db]);
   const lotesMap = useMemo(() => new Map(lotes.map((lote) => [Number(lote.id), lote])), [lotes]);
   const fazendasMap = useMemo(() => new Map(fazendas.map((item) => [Number(item.id), item])), [fazendas]);
 
@@ -297,103 +287,38 @@ export default function AnimaisPage({ db, setDb, onConfirmAction, subscription =
     setAnimalEditando(null);
   }
 
-  async function registrarOperacaoIndividual(payload) {
+  function registrarOperacaoIndividual(payload) {
     const operation = animalOperacao;
     if (!operation?.animal) return;
 
     const animal = operation.animal;
     const mode = operation.mode;
-    const status = getMovementStatusPatch(payload.motivo);
-    const animalKey = normalizeIdKey(animal.id);
-    const localAnimalId = normalizeIdKey(animal?.metadata?.local_id ?? animal.id);
-    const movementId = gerarNovoId(movimentacoes);
-    const financeId = gerarNovoId(movimentacoesFinanceiras);
-    const movementType = mode === 'sale' ? 'venda' : payload.motivo;
-    const loteId = Number(animal.lote_id) || null;
-    const saleValue = mode === 'sale' ? Number(payload.valor || 0) : 0;
-
-    const movementPayload = {
-      id: movementId,
-      lote_id: loteId,
-      tipo: movementType,
-      qtd: 1,
-      peso_medio: payload.peso ?? (Number(animal.p_at || animal.p_ini || 0) || 0),
-      valor_total: saleValue,
-      custo_por_cabeca: saleValue > 0 ? saleValue : 0,
-      data: payload.data,
-      comprador_fornecedor: mode === 'sale' ? 'Venda individual' : '',
-      obs: payload.observacao || '',
-      metadata: {
-        animal_id: animalKey,
-        animal_local_id: localAnimalId,
-        animal_identificacao: animal.identificacao,
-        movement_scope: 'individual',
-        motivo: movementType,
-      },
+    const tipo = mode === 'sale' ? 'venda' : String(payload.motivo || '').trim();
+    const userContext = { id: session?.user?.id || null, email: session?.user?.email || '' };
+    const persistContext = {
+      session,
+      persist: true,
+      onWarning: (message) => showToast({ type: 'warning', message }),
     };
 
-    const financePayload = mode === 'sale' && saleValue > 0
-      ? {
-          id: financeId,
-          tipo: 'receita',
-          categoria: 'Venda Animal',
-          lote_id: loteId,
-          valor: saleValue,
-          data: payload.data,
-          descricao: `Venda do animal ${animal.identificacao}`,
-          origem_tipo: 'movimentacao_animal',
-          origem_id: movementId,
-          observacao: payload.observacao || null,
-        }
-      : null;
-
-    const animalPatch = {
-      status,
-      p_at: payload.peso ?? animal.p_at,
-      data_saida: payload.data,
-      data_venda: mode === 'sale' ? payload.data : (animal.data_venda || null),
-      observacao: [animal.observacao, payload.observacao].filter(Boolean).join(' • '),
-      metadata: {
-        ...(animal.metadata || {}),
-        local_id: localAnimalId,
-        ultimo_movimento_individual: movementType,
-        ultima_data_movimento_individual: payload.data,
-      },
-    };
-
-    const mutations = [
-      updateOperationalRecord('animais', animal.id, animalPatch, session),
-      createOperationalRecord('movimentacoes_animais', { ...movementPayload, id: undefined }, session),
-    ];
-    if (financePayload) {
-      mutations.push(createOperationalRecord('movimentacoes_financeiras', { ...financePayload, id: undefined }, session));
-    }
-
-    const persisted = await persistCollectionMutation(mutations);
-    const successMessage = mode === 'sale' ? 'Venda registrada com sucesso.' : 'Saída registrada com sucesso.';
-    const errorMessage = mode === 'sale' ? 'Não foi possível registrar a venda.' : 'Não foi possível registrar a saída.';
-
-    if (!persisted.persisted) {
-      showToast({ type: 'warning', message: errorMessage });
-      setAnimalOperacao(null);
+    try {
+      setDb((prev) => registrarSaidaAnimalIndividual(prev, {
+        animalId: animal.id,
+        tipo,
+        data: payload.data,
+        valor: payload.valor,
+        peso: payload.peso,
+        observacao: payload.observacao,
+      }, userContext, persistContext));
+    } catch (error) {
+      showToast({ type: 'error', message: error?.message || 'Não foi possível registrar a operação.' });
       return;
     }
 
-    setDb((prev) => ({
-      ...prev,
-      animais: (prev.animais || []).map((item) => (
-        idsMatch(item.id, animal.id) ? { ...item, ...animalPatch } : item
-      )),
-      movimentacoes_animais: [
-        ...(prev.movimentacoes_animais || []),
-        movementPayload,
-      ],
-      movimentacoes_financeiras: financePayload
-        ? [...(prev.movimentacoes_financeiras || []), financePayload]
-        : (prev.movimentacoes_financeiras || []),
-    }));
-    showToast({ type: 'success', message: successMessage });
-
+    showToast({
+      type: 'success',
+      message: mode === 'sale' ? 'Venda registrada com sucesso.' : 'Saída registrada com sucesso.',
+    });
     setAnimalOperacao(null);
   }
 

@@ -1,5 +1,10 @@
 import { gerarNovoId } from '../utils/id.js';
 import { registrarAuditoria } from './auditoria.js';
+import { verificarCarenciaAtivaLote } from '../domain/agendaSanitaria.js';
+import { ANIMAL_INDIVIDUAL_INACTIVE_STATUSES, isAnimalIndividualAtivo } from '../domain/statusAnimal.js';
+import { formatarData } from '../utils/formatters.js';
+
+export { isAnimalIndividualAtivo } from '../domain/statusAnimal.js';
 import {
   createOperationalRecord,
   persistCollectionMutation,
@@ -161,6 +166,27 @@ function atualizarLoteComResumo(lote, qtdAtual, pesoMedioAtual) {
 
 function ehRegistroIndividual(animal) {
   return String(animal?.tipo_registro || '').toLowerCase() === 'individual';
+}
+
+/**
+ * Bloqueia venda de um lote em carência sanitária ativa (Onda A, UX-SAN1).
+ * Toda venda registrada no HERDON é tratada como destino abate — decisão de
+ * produto confirmada para esta sprint, sem campo de finalidade separado.
+ */
+function bloquearSeCarenciaAtiva(db, loteId, data) {
+  if (loteId == null) return;
+  const { ativa, produto, dataFim } = verificarCarenciaAtivaLote(db?.sanitario, loteId, data);
+  if (!ativa) return;
+  throw new Error(
+    `Este animal está em período de carência para abate até ${formatarData(dataFim)}, devido ao tratamento com ${produto}. A venda para abate não pode ser concluída antes do término da carência.`
+  );
+}
+
+function getIndividualAnimalStatusPatch(tipo) {
+  const normalized = String(tipo || '').toLowerCase();
+  if (normalized === 'venda') return 'vendido';
+  if (ANIMAL_INDIVIDUAL_INACTIVE_STATUSES.includes(normalized)) return normalized;
+  return 'inativo';
 }
 
 /**
@@ -383,6 +409,9 @@ export function registrarSaidaAnimal(
       throw new Error(`Lote de destino ${destinoLoteId} não encontrado para transferência.`);
     }
   }
+  if (tipoSaida === 'venda') {
+    bloquearSeCarenciaAtiva(db, loteId, data);
+  }
 
   const quantidade = qtd;
   const peso = pesoMedio;
@@ -520,6 +549,179 @@ export function registrarSaidaAnimal(
       tipoSaida === 'descarte'
         ? 'alta'
         : 'media',
+  }, persistContext);
+}
+
+const TIPOS_SAIDA_ANIMAL_INDIVIDUAL = ['venda', 'morte', 'descarte', 'transferencia_saida', 'perda', 'outro'];
+
+/**
+ * Registra a saída (venda, morte, perda, descarte...) de UM animal rastreado
+ * individualmente (`animais.tipo_registro === 'individual'`).
+ *
+ * Onda A (UX-P1-1): antes disso, `AnimaisPage.jsx::registrarOperacaoIndividual`
+ * escrevia direto em `animais`/`movimentacoes_animais`/`movimentacoes_financeiras`
+ * sem nunca tocar `lotes.qtd` nem a linha "grupo" do lote — o 4º caminho de
+ * escrita com o mesmo bug já corrigido em `registrarSaidaAnimal` (venda/morte
+ * de lote), na RPC do Telegram e no Ajuste de Lotação. Esta função reaproveita
+ * exatamente o mesmo mecanismo (`sincronizarAnimaisGrupoDoLote`) para que o
+ * lote do animal individual saia com a contagem certa também.
+ *
+ * Mesma disciplina de erro do restante do arquivo: validação lança `Error`
+ * síncrono (quem chama decide como mostrar); persistência na nuvem é
+ * fire-and-forget via `persistirComAviso` (mesmo contrato de
+ * `registrarSaidaAnimal`/`registrarEntradaAnimal`).
+ *
+ * @param {object} db
+ * @param {object} dados - { animalId, tipo, data, valor, peso, observacao }.
+ * @throws {Error} animal inexistente, já inativo, ou (venda) carência ativa.
+ */
+export function registrarSaidaAnimalIndividual(db, dados = {}, userContext = {}, persistContext = {}) {
+  const animalIdRaw = pickFirstDefined(dados.animalId, dados.animal_id);
+  const tipo = String(pickFirstDefined(dados.tipo, dados.motivo) || '').trim().toLowerCase();
+  const data = String(dados.data || '').trim();
+
+  if (!data) {
+    throw new Error('Data é obrigatória.');
+  }
+  if (!TIPOS_SAIDA_ANIMAL_INDIVIDUAL.includes(tipo)) {
+    throw new Error(`Tipo de saída individual inválido: ${tipo}.`);
+  }
+
+  const animais = Array.isArray(db?.animais) ? db.animais : [];
+  const animal = animais.find((a) => String(a.id) === String(animalIdRaw));
+  if (!animal) {
+    throw new Error('Animal não encontrado.');
+  }
+  // Bloqueia repetição — animal já vendido/morto/inativo não pode receber nova operação.
+  if (!isAnimalIndividualAtivo(animal)) {
+    throw new Error('Este animal já está inativo e não pode receber nova operação.');
+  }
+
+  const loteId = animal.lote_id != null && animal.lote_id !== '' ? Number(animal.lote_id) : null;
+  const lotes = Array.isArray(db?.lotes) ? db.lotes : [];
+  const lote = loteId != null ? lotes.find((l) => Number(l.id) === loteId) : null;
+
+  if (tipo === 'venda') {
+    bloquearSeCarenciaAtiva(db, loteId, data);
+  }
+
+  const pesoInformado = dados.peso !== undefined && dados.peso !== null && dados.peso !== ''
+    ? ensureFiniteNumber(dados.peso, 'peso', { min: 0.0000001, required: false })
+    : null;
+  const valorVenda = tipo === 'venda'
+    ? (ensureFiniteNumber(dados.valor, 'valor da venda', { min: 0, required: false }) || 0)
+    : 0;
+
+  const movimentosAnimais = Array.isArray(db?.movimentacoes_animais) ? db.movimentacoes_animais : [];
+  const movimentosFinanceiros = Array.isArray(db?.movimentacoes_financeiras) ? db.movimentacoes_financeiras : [];
+  const novoMovAnimalId = gerarNovoId(movimentosAnimais);
+  const novoMovFinanceiroId = gerarNovoId(movimentosFinanceiros);
+
+  // Sincroniza lote.qtd/grupo só quando o animal individual está vinculado a
+  // um lote existente. `sincronizarAnimaisGrupoDoLote` ignora explicitamente
+  // linhas `tipo_registro: 'individual'` — por isso a própria linha do animal
+  // é patchada separadamente logo abaixo, com o mesmo `novaQtd` só afetando a
+  // linha "grupo" do lote (se houver uma; lotes 100% individuais não têm).
+  let lotesAtualizados = lotes;
+  let animaisSincronizados = animais;
+  if (loteId != null && lote) {
+    const { qtdAtual, pesoMedioAtual } = obterResumoLote(db, loteId);
+    const novaQtd = Math.max(qtdAtual - 1, 0);
+    const pesoSaida = pesoInformado ?? pesoMedioAtual;
+    const novoPesoMedio = novaQtd ? (qtdAtual * pesoMedioAtual - pesoSaida) / novaQtd : 0;
+    lotesAtualizados = lotes.map((l) => (
+      Number(l.id) === loteId ? atualizarLoteComResumo(l, novaQtd, novoPesoMedio) : l
+    ));
+    animaisSincronizados = sincronizarAnimaisGrupoDoLote(animais, loteId, novaQtd, null);
+  }
+
+  const animalPatch = {
+    status: getIndividualAnimalStatusPatch(tipo),
+    p_at: pesoInformado ?? animal.p_at,
+    data_saida: data,
+    data_venda: tipo === 'venda' ? data : (animal.data_venda || null),
+    observacao: [animal.observacao, dados.observacao].filter(Boolean).join(' • '),
+    metadata: {
+      ...(animal.metadata || {}),
+      ultimo_movimento_individual: tipo,
+      ultima_data_movimento_individual: data,
+    },
+  };
+  animaisSincronizados = animaisSincronizados.map((a) => (
+    String(a.id) === String(animal.id) ? { ...a, ...animalPatch } : a
+  ));
+
+  const movementPayload = {
+    id: novoMovAnimalId,
+    lote_id: loteId,
+    tipo,
+    qtd: 1,
+    peso_medio: pesoInformado ?? (Number(animal.p_at || animal.p_ini || 0) || 0),
+    valor_total: valorVenda,
+    custo_por_cabeca: valorVenda > 0 ? valorVenda : 0,
+    data,
+    comprador_fornecedor: tipo === 'venda' ? 'Venda individual' : '',
+    obs: dados.observacao || '',
+    metadata: {
+      animal_id: animal.id,
+      animal_identificacao: animal.identificacao,
+      movement_scope: 'individual',
+      motivo: tipo,
+    },
+  };
+
+  const financePayload = tipo === 'venda' && valorVenda > 0
+    ? {
+        id: novoMovFinanceiroId,
+        tipo: 'receita',
+        categoria: 'venda_animal',
+        lote_id: loteId,
+        valor: valorVenda,
+        data,
+        data_competencia: data,
+        status: 'realizado',
+        descricao: `Venda do animal ${animal.identificacao || animal.id}`,
+        origem_tipo: 'movimentacao_animal',
+        origem_id: novoMovAnimalId,
+        observacao: dados.observacao || null,
+      }
+    : null;
+
+  const baseAtualizada = {
+    ...db,
+    animais: animaisSincronizados,
+    lotes: lotesAtualizados,
+    movimentacoes_animais: [...movimentosAnimais, movementPayload],
+    movimentacoes_financeiras: financePayload
+      ? [...movimentosFinanceiros, financePayload]
+      : movimentosFinanceiros,
+  };
+
+  const mutations = [
+    updateOperationalRecord('animais', animal.id, animalPatch, persistContext.session),
+    createOperationalRecord('movimentacoes_animais', { ...movementPayload, id: undefined }, persistContext.session),
+  ];
+  if (loteId != null && lote) {
+    const loteAtualizado = lotesAtualizados.find((l) => Number(l.id) === loteId);
+    mutations.push(updateOperationalRecord('lotes', loteId, {
+      qtd: loteAtualizado?.qtd || 0,
+      p_at: loteAtualizado?.p_at || 0,
+    }, persistContext.session));
+    mutations.push(...mutationsAnimaisDoLote(animaisSincronizados, loteId, persistContext.session));
+  }
+  if (financePayload) {
+    mutations.push(createOperationalRecord('movimentacoes_financeiras', { ...financePayload, id: undefined }, persistContext.session));
+  }
+  persistirComAviso(mutations, { ...persistContext, source: 'saida_animal_individual' });
+
+  return registrarAuditoria(baseAtualizada, {
+    acao: 'saida_animal_individual',
+    entidade: 'movimentacoes_animais',
+    entidade_id: novoMovAnimalId,
+    descricao: `Saída individual (${tipo}) do animal ${animal.identificacao || animal.id}`,
+    ator_id: userContext?.id || null,
+    ator_email: userContext?.email || '',
+    criticidade: tipo === 'morte' || tipo === 'descarte' ? 'alta' : 'media',
   }, persistContext);
 }
 

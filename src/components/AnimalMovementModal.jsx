@@ -7,7 +7,7 @@ import { hojeLocalISO } from '../domain/dataCivil.js';
 const EXIT_REASONS = [
   { value: 'morte', label: 'Morte' },
   { value: 'descarte', label: 'Descarte' },
-  { value: 'transferencia', label: 'Transferência' },
+  { value: 'transferencia_saida', label: 'Transferência' },
   { value: 'perda', label: 'Perda' },
   { value: 'outro', label: 'Outro' },
 ];
