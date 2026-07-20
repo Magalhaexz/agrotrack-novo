@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { construirAgendaSanitaria } from './agendaSanitaria.js';
+import { construirAgendaSanitaria, verificarCarenciaAtivaLote } from './agendaSanitaria.js';
 
 const AGORA = new Date('2026-07-10T12:00:00Z');
 const db = {
@@ -56,4 +56,50 @@ test('construirAgendaSanitaria não quebra com db vazio', () => {
     realizados: [],
     emCarencia: [],
   });
+});
+
+// ── verificarCarenciaAtivaLote (Onda A — UX-SAN1: venda bloqueada em carência) ──
+
+test('verificarCarenciaAtivaLote: lote com carência ativa bloqueia', () => {
+  const resultado = verificarCarenciaAtivaLote(db.sanitario, 2, '2026-07-10');
+  assert.equal(resultado.ativa, true);
+  assert.equal(resultado.produto, 'Antibiótico com carência');
+  assert.equal(resultado.dataFim, '2026-07-15');
+});
+
+test('verificarCarenciaAtivaLote: carência já vencida não bloqueia', () => {
+  const resultado = verificarCarenciaAtivaLote(db.sanitario, 1, '2026-07-10');
+  assert.equal(resultado.ativa, false);
+});
+
+test('verificarCarenciaAtivaLote: lote sem nenhum registro sanitário não bloqueia', () => {
+  const resultado = verificarCarenciaAtivaLote(db.sanitario, 99, '2026-07-10');
+  assert.equal(resultado.ativa, false);
+});
+
+test('verificarCarenciaAtivaLote: no dia exato do fim da carência ainda bloqueia (>= 0)', () => {
+  const resultado = verificarCarenciaAtivaLote(db.sanitario, 2, '2026-07-15');
+  assert.equal(resultado.ativa, true);
+});
+
+test('verificarCarenciaAtivaLote: um dia após o fim da carência libera', () => {
+  const resultado = verificarCarenciaAtivaLote(db.sanitario, 2, '2026-07-16');
+  assert.equal(resultado.ativa, false);
+});
+
+test('verificarCarenciaAtivaLote: usa o fim de carência mais restritivo quando há mais de um', () => {
+  const registros = [
+    { id: 1, desc: 'Vacina A', lote_id: 5, data_fim_carencia: '2026-07-12' },
+    { id: 2, desc: 'Vacina B (mais restritiva)', lote_id: 5, data_fim_carencia: '2026-07-20' },
+  ];
+  const resultado = verificarCarenciaAtivaLote(registros, 5, '2026-07-10');
+  assert.equal(resultado.ativa, true);
+  assert.equal(resultado.produto, 'Vacina B (mais restritiva)');
+  assert.equal(resultado.dataFim, '2026-07-20');
+});
+
+test('verificarCarenciaAtivaLote: tolerante a loteId nulo e lista vazia/nula', () => {
+  assert.equal(verificarCarenciaAtivaLote(db.sanitario, null, '2026-07-10').ativa, false);
+  assert.equal(verificarCarenciaAtivaLote(null, 2, '2026-07-10').ativa, false);
+  assert.equal(verificarCarenciaAtivaLote([], 2, '2026-07-10').ativa, false);
 });

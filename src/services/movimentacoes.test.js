@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { registrarSaidaAnimal, registrarEntradaAnimal, registrarSaidaEstoque, registrarEntradaEstoque } from './movimentacoes.js';
+import { registrarSaidaAnimal, registrarEntradaAnimal, registrarSaidaEstoque, registrarEntradaEstoque, registrarSaidaAnimalIndividual, isAnimalIndividualAtivo } from './movimentacoes.js';
 
 // Seção 4 do sprint de fechamento — venda, morte/perda e transferência de
 // saída. O saldo de validação (obterResumoLote) segue lote.qtd quando
@@ -242,6 +242,137 @@ test('registrarSaidaAnimal: lote sem lote.qtd definido (legado) cai para animais
   const db = makeDb({ lotes: [makeLote({ qtd: undefined })], animais: [makeAnimal({ qtd: 50 })] });
   const r = registrarSaidaAnimal(db, { loteId: 1, qtd: 10, pesoMedio: 400, valorTotal: 0, data: hoje, tipoSaida: 'morte' }, {}, { persist: false });
   assert.equal(r.lotes.find((l) => l.id === 1).qtd, 40);
+});
+
+// ── Carência sanitária (Onda A — UX-SAN1): venda bloqueada com carência ativa,
+// mesma checagem usada pela venda de lote e pela venda individual. Toda venda
+// é tratada como destino abate (decisão de produto da sprint). ──
+
+test('registrarSaidaAnimal: venda bloqueada quando o lote está em carência ativa', () => {
+  const db = { ...makeDb({ lotes: [makeLote()], animais: [makeAnimal()] }), sanitario: [
+    { id: 1, lote_id: 1, desc: 'Ivermectina', data_fim_carencia: '2026-08-01' },
+  ] };
+  assert.throws(
+    () => registrarSaidaAnimal(db, { loteId: 1, qtd: 1, pesoMedio: 400, valorTotal: 1000, data: hoje, tipoSaida: 'venda' }, {}, { persist: false }),
+    /carência.*abate.*01\/08\/2026/is
+  );
+});
+
+test('registrarSaidaAnimal: morte não é bloqueada por carência (carência só impede venda)', () => {
+  const db = { ...makeDb({ lotes: [makeLote()], animais: [makeAnimal()] }), sanitario: [
+    { id: 1, lote_id: 1, desc: 'Ivermectina', data_fim_carencia: '2026-08-01' },
+  ] };
+  const r = registrarSaidaAnimal(db, { loteId: 1, qtd: 1, pesoMedio: 400, valorTotal: 0, data: hoje, tipoSaida: 'morte' }, {}, { persist: false });
+  assert.equal(r.lotes.find((l) => l.id === 1).qtd, 49);
+});
+
+test('registrarSaidaAnimal: venda liberada quando a carência já terminou', () => {
+  const db = { ...makeDb({ lotes: [makeLote()], animais: [makeAnimal()] }), sanitario: [
+    { id: 1, lote_id: 1, desc: 'Ivermectina', data_fim_carencia: '2026-07-01' },
+  ] };
+  const r = registrarSaidaAnimal(db, { loteId: 1, qtd: 1, pesoMedio: 400, valorTotal: 1000, data: hoje, tipoSaida: 'venda' }, {}, { persist: false });
+  assert.equal(r.lotes.find((l) => l.id === 1).qtd, 49);
+});
+
+// ── registrarSaidaAnimalIndividual (Onda A — UX-P1-1): venda/morte de UM
+// animal rastreado individualmente agora sincroniza lote.qtd e a linha
+// "grupo" do lote, do mesmo jeito que a venda/morte de lote já fazia. ──
+
+function makeAnimalIndividual(overrides = {}) {
+  return { id: 501, lote_id: 1, tipo_registro: 'individual', qtd: 1, p_at: 420, identificacao: 'Brinco 501', status: 'ativo', ...overrides };
+}
+
+function makeDbIndividual({ lotes = [makeLote()], animais = [makeAnimalIndividual()], sanitario = [] } = {}) {
+  return { lotes, animais, movimentacoes_animais: [], movimentacoes_financeiras: [], sanitario };
+}
+
+test('venda individual: reduz lote.qtd em 1, cria movimentação e receita, marca animal como vendido', () => {
+  const db = makeDbIndividual();
+  const r = registrarSaidaAnimalIndividual(db, { animalId: 501, tipo: 'venda', data: hoje, valor: 3200, peso: 430 }, {}, { persist: false });
+
+  assert.equal(r.lotes.find((l) => l.id === 1).qtd, 49);
+  const animal = r.animais.find((a) => a.id === 501);
+  assert.equal(animal.status, 'vendido');
+  assert.equal(animal.p_at, 430);
+  assert.equal(r.movimentacoes_animais.length, 1);
+  assert.equal(r.movimentacoes_animais[0].tipo, 'venda');
+  assert.equal(r.movimentacoes_animais[0].metadata.movement_scope, 'individual');
+  assert.equal(r.movimentacoes_financeiras.length, 1);
+  assert.equal(r.movimentacoes_financeiras[0].tipo, 'receita');
+  assert.equal(r.movimentacoes_financeiras[0].valor, 3200);
+});
+
+test('morte individual: reduz lote.qtd em 1, sem gerar receita', () => {
+  const db = makeDbIndividual();
+  const r = registrarSaidaAnimalIndividual(db, { animalId: 501, tipo: 'morte', data: hoje }, {}, { persist: false });
+
+  assert.equal(r.lotes.find((l) => l.id === 1).qtd, 49);
+  assert.equal(r.animais.find((a) => a.id === 501).status, 'morte');
+  assert.equal(r.movimentacoes_financeiras.length, 0);
+});
+
+test('venda/morte individual: também sincroniza a linha "grupo" do mesmo lote quando existir', () => {
+  const db = makeDbIndividual({
+    animais: [
+      makeAnimalIndividual(),
+      { id: 2, lote_id: 1, tipo_registro: 'grupo', qtd: 49, p_at: 400 },
+    ],
+  });
+  const r = registrarSaidaAnimalIndividual(db, { animalId: 501, tipo: 'venda', data: hoje, valor: 3200 }, {}, { persist: false });
+  assert.equal(r.lotes.find((l) => l.id === 1).qtd, 49);
+  // A linha "grupo" continua com sua própria contagem — quem saiu foi o individual, não o grupo.
+  assert.equal(r.animais.find((a) => a.id === 2).qtd, 49);
+});
+
+test('operação individual repetida é bloqueada (animal já inativo)', () => {
+  const db = makeDbIndividual({ animais: [makeAnimalIndividual({ status: 'vendido' })] });
+  assert.throws(
+    () => registrarSaidaAnimalIndividual(db, { animalId: 501, tipo: 'venda', data: hoje, valor: 100 }, {}, { persist: false }),
+    /já está inativo/
+  );
+});
+
+test('animal individual inexistente lança erro', () => {
+  const db = makeDbIndividual();
+  assert.throws(
+    () => registrarSaidaAnimalIndividual(db, { animalId: 9999, tipo: 'venda', data: hoje, valor: 100 }, {}, { persist: false }),
+    /não encontrado/
+  );
+});
+
+test('venda individual bloqueada quando o lote do animal está em carência ativa', () => {
+  const db = makeDbIndividual({ sanitario: [{ id: 1, lote_id: 1, desc: 'Ivermectina', data_fim_carencia: '2026-08-01' }] });
+  assert.throws(
+    () => registrarSaidaAnimalIndividual(db, { animalId: 501, tipo: 'venda', data: hoje, valor: 100 }, {}, { persist: false }),
+    /carência/i
+  );
+});
+
+test('morte individual não é bloqueada por carência', () => {
+  const db = makeDbIndividual({ sanitario: [{ id: 1, lote_id: 1, desc: 'Ivermectina', data_fim_carencia: '2026-08-01' }] });
+  const r = registrarSaidaAnimalIndividual(db, { animalId: 501, tipo: 'morte', data: hoje }, {}, { persist: false });
+  assert.equal(r.lotes.find((l) => l.id === 1).qtd, 49);
+});
+
+test('tipo de saída individual inválido lança erro', () => {
+  const db = makeDbIndividual();
+  assert.throws(
+    () => registrarSaidaAnimalIndividual(db, { animalId: 501, tipo: 'saída-esquisita', data: hoje }, {}, { persist: false }),
+    /Tipo de saída individual inválido/
+  );
+});
+
+test('animal individual sem lote vinculado ainda registra a saída (sem tocar lotes)', () => {
+  const db = makeDbIndividual({ animais: [makeAnimalIndividual({ lote_id: null })], lotes: [] });
+  const r = registrarSaidaAnimalIndividual(db, { animalId: 501, tipo: 'morte', data: hoje }, {}, { persist: false });
+  assert.equal(r.animais.find((a) => a.id === 501).status, 'morte');
+});
+
+test('isAnimalIndividualAtivo reconhece os status inativos canônicos', () => {
+  assert.equal(isAnimalIndividualAtivo({ status: 'ativo' }), true);
+  assert.equal(isAnimalIndividualAtivo({ status: 'vendido' }), false);
+  assert.equal(isAnimalIndividualAtivo({ status: 'transferencia_saida' }), false);
+  assert.equal(isAnimalIndividualAtivo({}), true);
 });
 
 // ── Estoque (auditoria funcional: saída/entrada não persistiam no Supabase,
