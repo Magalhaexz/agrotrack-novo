@@ -9,21 +9,25 @@
 Decisão explícita: **não iniciar a persistência de Dietas (Sprint C) antes de fechar os fluxos
 críticos já existentes.** Ordem recomendada, do achado mais grave para o mais cosmético:
 
-1. **Sprint E — Sincronizar venda/morte individual com o lote** (UX-P1-1). Mesma classe de bug já
-   corrigida 3 vezes nesta auditoria (venda/ajuste/RPC de lote) — reabre por um 4º caminho de escrita
-   (`AnimaisPage.jsx::registrarOperacaoIndividual`). Reaproveitar `sincronizarAnimaisGrupoDoLote`,
-   já testado. Risco baixo, padrão validado.
+1. **Sprint E — Sincronizar venda/morte individual com o lote** (UX-P1-1). ✅ **Concluído** (Onda A —
+   sprint de integridade, ver detalhes abaixo). Mesma classe de bug já corrigida 3 vezes nesta
+   auditoria (venda/ajuste/RPC de lote) — reabria por um 4º caminho de escrita
+   (`AnimaisPage.jsx::registrarOperacaoIndividual`), fechado reaproveitando
+   `sincronizarAnimaisGrupoDoLote`, já testado.
 2. **Sprint F — Financeiro: editar/excluir lançamento + filtro de período no DRE** (UX-FN1, UX-FN3).
-   UX-FN1 é o achado mais grave desta rodada fora do que já foi corrigido: hoje não existe NENHUMA
-   forma de corrigir um lançamento digitado errado.
-3. **Sprint G — Sanidade: carência real + recorte por fazenda** (UX-SAN1, UX-SAN2). UX-SAN2 é
-   estruturalmente idêntico ao vazamento cross-fazenda já corrigido em Estoque/Financeiro em
-   auditorias anteriores — Sanidade nunca recebeu o mesmo tratamento. UX-SAN1 precisa de uma decisão
-   de produto (bloquear venda em carência, ou só avisar?) antes de implementar.
+   ✅ **UX-FN1 concluído** (editar/excluir manual + estorno rastreável de lançamento automático, ver
+   detalhes abaixo). 🔴 **UX-FN3 (filtro de período no DRE) segue pendente** — não fazia parte do
+   fechamento desta retomada.
+3. **Sprint G — Sanidade: carência real + recorte por fazenda** (UX-SAN1, UX-SAN2). ✅ **UX-SAN1
+   concluído** — decisão de produto confirmada com a usuária (bloquear toda venda durante carência
+   ativa, tratando toda venda como destino abate, sem novo campo de finalidade) e implementada em
+   `registrarSaidaAnimal`/`registrarSaidaAnimalIndividual`. 🔴 **UX-SAN2 (recorte por fazenda em
+   `SanitarioPage.jsx`) e o alinhamento do Telegram com a mesma checagem de carência seguem
+   pendentes** — ficam para a próxima rodada.
 4. **Sprint H — Unificação de categorias e taxonomias** (UX-FN4/FIN-01, mais os campos de
    categorização já divergentes documentados em EST-04). Cross-cutting, toca Financeiro/Custos/
    Suplementação/Estoque ao mesmo tempo — fazer de uma vez para não gerar uma 4ª taxonomia no meio
-   do caminho.
+   do caminho. Não iniciado.
 5. **Sprint C (já planejada) — Suplementação/Dietas + redesenho de UI + RLS granular.** Só depois
    dos itens acima, e só com navegador autenticado disponível.
 
@@ -183,3 +187,107 @@ TG-02 (ordem de fallback).
 **Risco**: baixo — mudanças isoladas e bem localizadas.
 
 Nenhuma dessas sprints foi iniciada nesta rodada além do que está listado na Onda 0 como já corrigido.
+
+### Sprint E — Sincronizar venda/morte individual com o lote
+**Status: ✅ concluído** (Onda A — sprint de integridade).
+**Resolve**: UX-P1-1. `AnimaisPage.jsx::registrarOperacaoIndividual` escrevia direto em
+`animais`/`movimentacoes_animais`/`movimentacoes_financeiras` via CRUD genérico e nunca tocava
+`lotes.qtd` nem a linha "grupo" do lote — o 4º caminho de escrita com o mesmo bug já corrigido em
+`registrarSaidaAnimal` (lote), na RPC do Telegram e no Ajuste de Lotação.
+**Solução**: nova função canônica `registrarSaidaAnimalIndividual` em `src/services/movimentacoes.js`,
+reaproveitando `sincronizarAnimaisGrupoDoLote`/`mutationsAnimaisDoLote` já testados. Valida animal
+existente, pertencimento ao lote, status ativo (bloqueia repetição), carência (venda), decrementa
+`lotes.qtd`, sincroniza a linha "grupo" quando existir, cria `movimentacoes_animais` e — só para
+venda com valor > 0 — `movimentacoes_financeiras` (receita). `AnimaisPage.jsx` foi reescrito para
+chamar essa função com `try/catch` (mesmo padrão de `LotesPage.jsx::handleRetirada`), em vez da lógica
+manual antiga — o que também corrigiu de brinde o toast de erro genérico (agora mostra a mensagem real
+da validação, ex.: "Este animal já está inativo...").
+**Decisão de escopo**: transferência individual (`'transferencia'` → renomeado para `'transferencia_saida'`
+no `AnimalMovementModal.jsx`, alinhando o enum com o resto do domínio) continua sem mover o animal
+para outro lote de fato — mesmo comportamento de antes (só muda status/lote_id permanece o mesmo),
+apenas com a tag correta agora. Implementar a movimentação real entre lotes para o fluxo individual
+fica para uma sprint futura (não fazia parte de UX-P1-1).
+**Arquivos alterados**: `src/services/movimentacoes.js`, `src/pages/AnimaisPage.jsx`,
+`src/components/AnimalMovementModal.jsx`, `src/domain/statusAnimal.js` (novo — `isAnimalIndividualAtivo`
+extraído para ser reaproveitado também por `integridadeDados.js`, sem duplicar a lista de status).
+**Migrations**: nenhuma.
+**Testes**: 11 testes novos em `movimentacoes.test.js` (venda/morte individual, repetição bloqueada,
+animal inexistente, sincronização da linha grupo, animal sem lote, tipo inválido, carência).
+**Pendente**: validação visual real (sem navegador autenticado nesta sessão).
+
+### Sprint F — Financeiro: editar/excluir lançamento manual + estornar automático
+**Status: ✅ concluído** (Onda A — sprint de integridade). Filtro de período no DRE (UX-FN3) **não**
+foi feito nesta rodada — ficou fora do escopo fechado desta retomada.
+**Resolve**: UX-FN1. A aba "Lançamentos" de `FinanceiroPage.jsx` não tinha nenhuma ação — não dava
+para corrigir nem apagar um lançamento digitado errado.
+**Solução**: lançamento **manual** (sem `origem_tipo`/`origem`) ganhou Editar/Excluir, replicando o
+padrão já existente em `CustosPage.jsx` (`updateOperationalRecord`/`deleteOperationalRecord`,
+confirmação via `onConfirmAction`). Lançamento **automático** (`movimentacao_animal`,
+`movimentacao_estoque`, `consumo_suplementacao`, `custo`) não pode ser editado/excluído — só
+**estornado**: o original nunca é sobrescrito nem apagado (só ganha `estornado_em`), e um NOVO
+lançamento é criado com o **tipo invertido** (receita↔despesa, mesmo valor), vinculado via
+`origem_tipo: 'estorno'` / `origem_id: <original>`. Como o DRE já soma receita e subtrai despesa sem
+nenhuma regra nova, a inversão de tipo neutraliza o efeito automaticamente — nenhuma mudança em
+`financeiroDreLogic.js` foi necessária. Motivo do estorno é **obrigatório**, coletado por um modal
+dedicado (`EstornoModal`, que é a própria confirmação — o `onConfirmAction` genérico não tem campo de
+texto) e gravado na `observacao` do lançamento reverso. Segundo estorno é bloqueado checando
+`estornado_em` já preenchido (`podeEstornar`). "Responsável" do estorno fica registrado via
+`owner_user_id`, que `createOperationalRecord` já preenche automaticamente a partir da sessão — não
+precisou de coluna nova para isso.
+**Arquivos alterados**: `src/pages/FinanceiroPage.jsx`, `src/pages/financeiroLancamentoLogic.js`.
+**Migration**: `supabase/migrations/20260720202758_add_estorno_financeiro_field.sql` — aditiva, uma
+coluna nullable (`movimentacoes_financeiras.estornado_em timestamptz`), aplicada no projeto Supabase
+remoto e confirmada via `list_tables`.
+**Testes**: 14 testes novos em `financeiroLancamentoLogic.test.js` (`isLancamentoManual`,
+`getOrigemLabel`, `podeEstornar`, `construirLancamentoEstorno` — motivo obrigatório, inversão de tipo,
+vínculo com o original, herança de lote_id/fazenda_id, segundo estorno bloqueado). A lógica de I/O em
+si (`estornarLancamento`/`excluirLancamento`/edição no `NovoLancamentoModal`) roteia inteiramente por
+`createOperationalRecord`/`updateOperationalRecord`/`deleteOperationalRecord`, então herda a mesma
+cobertura de permissão/paywall/multi-conta que essas funções já têm nos testes de `writeGuard`/matriz
+view-write — não foi duplicada uma suíte de papéis específica para Financeiro (mesmo critério já usado
+por `CustosPage.jsx`, que também não tem uma).
+**Pendente**: filtro de período no DRE (UX-FN3), navegação "Ver origem" (mostra só o rótulo da origem,
+não linka de volta para a tela de origem — decisão de escopo para manter o diff pequeno), validação
+visual real (sem navegador autenticado nesta sessão).
+
+### Carência sanitária (parte de UX-SAN1, dentro da Onda A)
+**Status: ✅ concluído** — a parte de bloqueio de venda. **Recorte por fazenda do Sanidade (UX-SAN2) e
+alinhamento com o Telegram ficam para a próxima rodada** (não fechados nesta retomada).
+**Decisão de produto confirmada com a usuária**: bloquear **toda** venda durante carência ativa,
+tratando toda venda registrada no HERDON como destino abate — sem novo campo de "finalidade da venda".
+**Solução**: `verificarCarenciaAtivaLote(sanitarioRegistros, loteId, dataReferencia)` em
+`src/domain/agendaSanitaria.js`, extraída da mesma condição que já monta o bucket `emCarencia` da
+Agenda Sanitária (não é uma regra nova — é a mesma regra, só reaproveitável por quem precisa
+*bloquear*, não só avisar). Usada por `registrarSaidaAnimal` (venda a nível de lote) e por
+`registrarSaidaAnimalIndividual` (venda individual) — mesma função, mesma mensagem de erro no formato
+"Este animal está em período de carência para abate até DD/MM/AAAA, devido ao tratamento com
+PRODUTO.". Morte/perda/descarte não são bloqueados (carência só afeta venda).
+**Arquivos alterados**: `src/domain/agendaSanitaria.js`, `src/services/movimentacoes.js`.
+**Migrations**: nenhuma (a coluna `sanitario.data_fim_carencia` já existia desde o Sprint 10).
+**Testes**: 7 testes novos em `agendaSanitaria.test.js` (`verificarCarenciaAtivaLote` — carência ativa,
+vencida, sem registro, data limite exata, mais restritiva entre vários registros, nulos) + 4 testes em
+`movimentacoes.test.js` (venda bloqueada, morte não bloqueada, venda liberada após carência,
+venda individual bloqueada/morte individual liberada).
+**Pendente**: recorte por fazenda em `SanitarioPage.jsx` (UX-SAN2), pré-checagem de carência no bot do
+Telegram antes da RPC (`api/_telegramBot.js`) — ambos ficam para a próxima rodada, não fazem parte do
+fechamento desta retomada.
+
+### Diagnóstico de integridade — reconciliação lote.qtd × animais (Onda A)
+**Status: ✅ concluído.**
+**Resolve**: parte 4 da spec da Onda A (não tinha um ID de achado próprio na auditoria anterior —
+achado durante a implementação do Sprint E, ao constatar que mesmo depois de sincronizar venda/morte
+individual, nada detectava uma divergência residual se ela ocorresse por outro motivo, ex.: edição
+direta no banco).
+**Solução**: `src/domain/integridadeDados.js` (módulo já existente do Sprint 28, só verificava vínculo
+com fazenda) ganhou 4 novos detectores puros — `detectarDivergenciaQuantidadeLote`,
+`detectarAnimalEmLoteEncerrado`, `detectarAnimalSemLote`, `detectarVendaSemReceita`/
+`detectarMorteComReceita` — agregados em `resumirDivergenciasOperacionais` (função nova, separada de
+`resumirProblemasIntegridade` para não alterar o contrato/mensagem já testado daquela). **Não corrige
+nada automaticamente** — só diagnostica e mostra um aviso em Configurações (mesmo padrão visual do
+aviso de fazenda órfã já existente), para revisão manual do usuário.
+**Arquivos alterados**: `src/domain/integridadeDados.js`, `src/pages/ConfiguracoesPage.jsx`,
+`src/domain/statusAnimal.js` (novo).
+**Migrations**: nenhuma.
+**Testes**: 12 testes novos em `integridadeDados.test.js`.
+**Pendente**: nenhuma correção automática foi implementada de propósito (decisão de produto: correção
+de divergência histórica exige revisão humana, não é um "clique e conserta").

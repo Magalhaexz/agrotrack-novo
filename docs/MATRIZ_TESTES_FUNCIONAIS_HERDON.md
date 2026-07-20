@@ -197,12 +197,27 @@ lote de destino a partir do texto do usuário) — nunca teve esse bug. O gap er
 app web, que agora tem paridade. Nenhum achado novo de inconsistência Telegram×app nesta rodada além
 do já documentado (TG-02, ordem de fallback de contagem).
 
+## Fechamento — Onda A (sprint de integridade, pós Auditoria UX Completa)
+
+Dos 4 P1 significativos listados abaixo como "ainda abertos", esta rodada fechou 3 por completo e 1
+parcialmente:
+
+| ID | Status após a Onda A |
+|---|---|
+| UX-P1-1 | ✅ **Corrigido** — `registrarSaidaAnimalIndividual` em `src/services/movimentacoes.js`, reaproveitando `sincronizarAnimaisGrupoDoLote`. Ver Sprint E em [PLANO_ACAO_CORRECOES_HERDON.md](PLANO_ACAO_CORRECOES_HERDON.md). |
+| UX-P2-4 | ✅ **Corrigido** de brinde — `'transferencia'` (individual) renomeado para `'transferencia_saida'`, alinhado com o enum do resto do domínio. Não implementa a movimentação real entre lotes no fluxo individual (fora do escopo de UX-P1-1). |
+| UX-FN1 | ✅ **Corrigido** — editar/excluir lançamento manual + estorno rastreável (motivo obrigatório, vínculo com o original, bloqueio de segundo estorno) para lançamento automático. Ver Sprint F. |
+| UX-SAN1 | ✅ **Corrigido** — decisão de produto confirmada (bloquear toda venda durante carência ativa, tratando toda venda como destino abate). `verificarCarenciaAtivaLote` em `src/domain/agendaSanitaria.js`, usada por `registrarSaidaAnimal` e `registrarSaidaAnimalIndividual`. |
+| UX-SAN2 | 🔴 **Ainda pendente** — recorte por fazenda em `SanitarioPage.jsx` não foi feito nesta retomada (escopo fechado explicitamente sem essa parte). Fica para a próxima rodada, junto do alinhamento do bot do Telegram com a mesma checagem de carência. |
+
 ## Números da Auditoria UX Completa
 - **~35 achados novos** de UX/fluxo (além dos 53 já registrados nas rodadas anteriores).
 - **4 corrigidos nesta rodada** (todos P0/P1 evidentes, isolados, baixo risco).
 - **4 P1 significativos ainda abertos que merecem prioridade alta na próxima sprint**: UX-P1-1
   (venda/morte individual não sincroniza o lote — mesma classe de bug já corrigida 3 vezes),
   UX-FN1 (lançamentos financeiros sem editar/excluir), UX-SAN1/UX-SAN2 (carência decorativa e
-  vazamento cross-fazenda em Sanidade).
+  vazamento cross-fazenda em Sanidade). **Atualização (Onda A): 3 desses 4 já foram corrigidos — ver
+  tabela de fechamento acima.**
 - Suíte de testes: 1559/1559 passando após as correções desta rodada (sem testes novos — mudanças
-  de UI sem infraestrutura de teste de componente).
+  de UI sem infraestrutura de teste de componente). **Atualização (Onda A): 1605/1605 passando**
+  (46 testes novos: venda/morte individual, carência, reconciliação de integridade, financeiro).

@@ -18,6 +18,23 @@
 > [MATRIZ_TESTES_FUNCIONAIS_HERDON.md](MATRIZ_TESTES_FUNCIONAIS_HERDON.md) §Auditoria UX Completa e
 > priorizado em [PLANO_ACAO_CORRECOES_HERDON.md](PLANO_ACAO_CORRECOES_HERDON.md) (Sprints E-H antes
 > do Sprint C). Baseline: 1559/1559 testes, lint e build limpos.
+>
+> **Atualização (Onda A — sprint de integridade, retomada a partir de `3667da7`)**: fechou os
+> Sprints E, F e a parte de carência do Sprint G do plano de ação acima — venda/morte individual
+> agora sincroniza `lote.qtd` (`registrarSaidaAnimalIndividual`), venda é bloqueada durante carência
+> sanitária ativa (decisão de produto: toda venda tratada como destino abate, sem novo campo de
+> finalidade), o Financeiro ganhou editar/excluir de lançamento manual e estorno rastreável
+> (motivo obrigatório, vínculo com o original, bloqueio de segundo estorno) para lançamento
+> automático, e o módulo de integridade (`integridadeDados.js`) ganhou 4 detectores novos de
+> divergência lote×animais×financeiro. **Não fechado nesta retomada** (fica para a próxima rodada):
+> recorte por fazenda em Sanidade (UX-SAN2), alinhamento do bot do Telegram com a checagem de
+> carência, e todo o restante das Ondas B/H do plano (pesagens, estoque, suplementação, unificação
+> de categorias/enums). Duas migrations aditivas confirmadas divergentes entre local e remoto
+> (`20260717120000_sincroniza_animais_grupo_registrar_saida_lote.sql` só existe localmente — condição
+> pré-existente, não introduzida nesta retomada, documentada aqui para não ser confundida com uma
+> regressão). Nenhuma validação visual com navegador autenticado foi feita (mesma limitação de
+> sessões anteriores). Baseline final: 1605/1605 testes, lint e build limpos,
+> `HEAD` a confirmar após os commits desta retomada.
 
 ## Escopo
 
