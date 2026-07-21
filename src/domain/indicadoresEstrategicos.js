@@ -1,11 +1,11 @@
 import {
   calcularCapacidadeTotalUa,
   calcularDiagnosticoCapacidade,
-  calcularUaPorAnimal,
 } from './unidadeAnimal.js';
 import { computeEvolucaoRebanho } from './evolucaoRebanho.js';
 import { calcularRendimentoCarcaca } from './indicadores.js';
 import { safeDivide, toDateKey, toNonNegativeNumber, toNumber } from './calcHelpers.js';
+import { loteEstaAtivo, qtdCabecasDoLote, uaDoLote, uaTotalAtiva } from './rebanho.js';
 
 import { hojeLocalISO } from './dataCivil.js';
 function isDateInPeriod(value, start, end) {
@@ -27,82 +27,40 @@ function normalizeTipo(tipo) {
   return value;
 }
 
-function getLatestLotePesoMap(db) {
-  const map = new Map();
-  const pesagens = Array.isArray(db?.pesagens) ? db.pesagens : [];
-  pesagens
-    .map((item) => ({ ...item, data: toDateKey(item?.data) }))
-    .filter((item) => (item?.tipo || 'lote') !== 'animal' && item.data)
-    .sort((a, b) => b.data.localeCompare(a.data))
-    .forEach((item) => {
-      const loteId = Number(item?.lote_id);
-      if (!loteId || map.has(loteId)) return;
-      map.set(loteId, toNumber(item?.peso_medio));
-    });
-  const lotes = Array.isArray(db?.lotes) ? db.lotes : [];
-  lotes.forEach((lote) => {
-    const loteId = Number(lote?.id);
-    if (!loteId || map.has(loteId)) return;
-    map.set(loteId, toNumber(lote?.p_at || lote?.peso_medio_atual));
-  });
-  return map;
-}
 
-function getLatestAnimalPesoMap(db) {
-  const map = new Map();
-  const pesagens = Array.isArray(db?.pesagens) ? db.pesagens : [];
-  pesagens
-    .map((item) => ({ ...item, data: toDateKey(item?.data) }))
-    .filter((item) => String(item?.tipo || '').toLowerCase() === 'animal' && item.data)
-    .sort((a, b) => b.data.localeCompare(a.data))
-    .forEach((item) => {
-      const animalId = String(item?.animal_id || '').trim();
-      if (!animalId || map.has(animalId)) return;
-      map.set(animalId, toNumber(item?.peso_medio));
-    });
-  return map;
-}
 
 function calculateUaLayer(db) {
-  const animais = (Array.isArray(db?.animais) ? db.animais : []).filter(isAnimalAtivo);
+  // Fonte única: domain/rebanho.js. Antes esta camada reimplementava a UA
+  // inline e, nessa cópia, (1) somava `animais[]` — defasado, porque venda/
+  // morte/transferência atualizam `lote.qtd` e não os registros de animais —,
+  // (2) usava `animal.qtd || 1`, transformando lote esvaziado em 1 cabeça, e
+  // (3) não filtrava lote por status, então lote vendido continuava ocupando
+  // pasto. Num cenário com um lote ativo de 8 cabeças e um lote vendido de 20,
+  // devolvia 25,333 UA contra 5,333 reais (4,75x) e declarava superlotação
+  // numa fazenda com 73% de capacidade livre.
   const lotes = Array.isArray(db?.lotes) ? db.lotes : [];
-  const lotesMap = new Map(lotes.map((l) => [Number(l.id), l]));
-  const lotePesoMap = getLatestLotePesoMap(db);
-  const animalPesoMap = getLatestAnimalPesoMap(db);
-
-  const uaPorLoteMap = new Map();
-  let uaTotalFazenda = 0;
-  let semDadosPesoCount = 0;
-
-  animais.forEach((animal) => {
-    const loteId = Number(animal?.lote_id);
-    const qtd = toNonNegativeNumber(animal?.qtd || 1);
-    const animalId = String(animal?.id || '').trim();
-
-    const pesoPesagemAnimal = animalId ? animalPesoMap.get(animalId) : null;
-    const pesoAtualAnimal = toNumber(animal?.p_at || animal?.peso_vivo_kg);
-    const pesoLote = lotePesoMap.get(loteId) || toNumber(lotesMap.get(loteId)?.p_at);
-    const pesoEscolhido = pesoPesagemAnimal || pesoAtualAnimal || pesoLote || null;
-
-    if (!pesoEscolhido) {
-      semDadosPesoCount += qtd;
-      return;
-    }
-
-    const uaAnimal = calcularUaPorAnimal(pesoEscolhido);
-    const uaTotalAnimalRegistro = uaAnimal * qtd;
-    uaTotalFazenda += uaTotalAnimalRegistro;
-    uaPorLoteMap.set(loteId, (uaPorLoteMap.get(loteId) || 0) + uaTotalAnimalRegistro);
-  });
+  const animais = Array.isArray(db?.animais) ? db.animais : [];
 
   const uaPorLote = lotes.map((lote) => ({
     lote_id: Number(lote.id),
     lote_nome: lote.nome || `Lote ${lote.id}`,
-    ua_total_lote: toNumber(uaPorLoteMap.get(Number(lote.id))),
+    // Lote inativo aparece na lista com 0 — some do total sem sumir do relatório.
+    ua_total_lote: loteEstaAtivo(lote) ? uaDoLote(lote, animais) : 0,
   }));
 
+  // Cabeças de lote ativo sem NENHUMA referência de peso (nem no lote, nem nos
+  // animais) — o indicador precisa dizer que a UA está subestimada.
+  const semDadosPesoCount = lotes
+    .filter(loteEstaAtivo)
+    .filter((lote) => {
+      const doLote = animais.filter((a) => Number(a?.lote_id) === Number(lote.id));
+      const temPesoAnimal = doLote.some((a) => toNumber(a?.p_at || a?.peso_vivo_kg || a?.p_ini) > 0);
+      return !temPesoAnimal && toNumber(lote?.p_at || lote?.p_ini) <= 0;
+    })
+    .reduce((soma, lote) => soma + qtdCabecasDoLote(lote, animais), 0);
+
   return {
-    uaTotalFazenda,
+    uaTotalFazenda: uaTotalAtiva(db),
     uaPorLote,
     semDadosPesoCount,
   };

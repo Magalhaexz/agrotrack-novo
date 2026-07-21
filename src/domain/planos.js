@@ -1,4 +1,5 @@
 import { getPlanLimits, getModuleBlockedMessage, getSubscriptionLimitMessage } from '../services/subscriptions.js';
+import { rebanhoAtivo } from './rebanho.js';
 
 function arr(value) {
   return Array.isArray(value) ? value : [];
@@ -78,7 +79,10 @@ export function verificarAcessoModulo(plano, modulo) {
  */
 export function obterResumoUso(db = {}, assinatura = null, opcoes = {}) {
   const fazendas = arr(db?.fazendas).length;
-  const cabecas = arr(db?.animais).reduce((acc, animal) => acc + Number(animal?.qtd || 1), 0);
+  // Fonte única (domain/rebanho.js). Antes somava `animais[].qtd || 1`, o que
+  // contava lote já vendido/encerrado e transformava registro com qtd=0 em 1
+  // cabeça — inflando o uso que define limite de plano e cobrança.
+  const cabecas = rebanhoAtivo(db);
   const usuariosFallback = arr(db?.usuarios).filter((item) => String(item?.status || 'ativo') === 'ativo').length;
   const usuarios = Number.isFinite(opcoes?.usuariosAtivos) ? opcoes.usuariosAtivos : usuariosFallback;
 
