@@ -70,6 +70,7 @@ const DADOS_GRUPO = {
   tipo_registro: 'grupo',
   lote_id: 14,
   identificacao: 'Grupo Teste',
+  sexo: 'macho',
   gen: 'Nelore',
   qtd: 30,
   p_ini: 280,
@@ -77,7 +78,10 @@ const DADOS_GRUPO = {
   dias: 70,
   consumo: 9,
   status: 'ativo',
+  observacao: 'Lote de verificação',
+  data_referencia: '2026-07-01',
   rendimento_carcaca: 52,
+  preco_arroba: 295,
 };
 
 test('cadastro online: animal criado com sessão válida persiste na nuvem e retorna o registro real', async () => {
@@ -93,6 +97,14 @@ test('cadastro online: animal criado com sessão válida persiste na nuvem e ret
   assert.equal(result.syncStatus, 'cloud_success');
   assert.equal(result.data.id, 501);
   assert.equal(capture.payload.identificacao, 'Grupo Teste');
+  assert.equal(capture.payload.sexo, 'macho');
+  assert.equal(capture.payload.gen, 'Nelore');
+  assert.equal(capture.payload.dias, 70);
+  assert.equal(capture.payload.consumo, 9);
+  assert.equal(capture.payload.observacao, 'Lote de verificação');
+  assert.equal(capture.payload.data_referencia, '2026-07-01');
+  assert.equal(capture.payload.rendimento_carcaca, 52);
+  assert.equal(capture.payload.preco_arroba, 295);
   assert.equal(getPendingSyncQueueSnapshot().pendingCount, 0);
 });
 
