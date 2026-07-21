@@ -35,7 +35,9 @@ test('computeEvolucaoRebanho calcula estoque inicial/final e variacao sem NaN', 
 
 test('computeEvolucaoRebanho ignora datas invalidas sem quebrar os acumulados', () => {
   const db = {
-    animais: [{ qtd: 50, status: 'ativo' }],
+    // Estoque atual vem de `lote.qtd` dos lotes ativos (domain/rebanho.js).
+    lotes: [{ id: 1, faz_id: 1, status: 'ativo', qtd: 50 }],
+    animais: [],
     movimentacoes_animais: [{ id: 1, data: 'not-a-date', tipo: 'compra', qtd: 10 }],
   };
 

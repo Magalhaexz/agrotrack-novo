@@ -80,3 +80,203 @@ Domínios que a Sprint 2 ainda não cobriu:
 | Estoque e consumo | entradas/saídas/ajustes, custo médio, dias de estoque, baixa automática, estoque negativo |
 | Indicadores e dashboards | consistência Painel × Resultados × Comparativos × Relatórios × Telegram × exportações |
 | Simulador e decisões | preço da arroba, peso projetado, GMD usado, custos futuros, cenários — e separação clara entre dado real e projeção |
+
+---
+
+## 🟢 Rebanho e Lotação — auditado e unificado
+
+> Sprint 2 parte 2/7. Regra aprovada e **implementada** em `src/domain/rebanho.js`.
+
+### Fontes concorrentes de "quantidade de animais"
+
+| # | Fonte | Onde é usada |
+|---|---|---|
+| A | `lote.qtd` (campo agregado) | Lotes, Pastos, Financeiro, Custos, Comparativo, Relatório Resumo Geral |
+| B | `soma(animais[].qtd)` | `calculos.js`, `unidadeAnimal` (sem `lotes`), Telegram |
+| C | `soma(animais[].qtd \|\| 1)` | `indicadoresEstrategicos`, `simuladorCenarios`, `planos`, `evolucaoRebanho` |
+| D | derivado de `movimentacoes_animais` | `evolucaoRebanho.estoque_final` |
+
+A fonte **A** já é tratada como canônica no código (`calculations.js`, `calcularUaPorLote`):
+é ela que vendas, mortes, transferências e ajuste de lotação atualizam.
+**`animais[].qtd` não é sincronizado por esses eventos** — comentário explícito
+em `calculations.js:151`.
+
+O `|| 1` da fonte **C** faz um registro com `qtd = 0` contar como **1 cabeça**.
+
+### Divergências medidas
+
+**Cenário 1 — venda parcial** (lote de 10, vendeu 2 ⇒ `lote.qtd = 8`, `animais[].qtd = 10`):
+
+| Valor | Consumidores |
+|---|---|
+| **8** | Financeiro, Custos por Lote, Comparativo, Pastos, Relatório Resumo Geral |
+| **10** | Evolução do Rebanho, Painel Gerencial |
+
+**Cenário 2 — lote finalizado** (lote ativo com 8 cab + lote vendido com 20 cab):
+
+| Cálculo | UA | Correto? |
+|---|---|---|
+| esperado (só lote ativo) | 5,333 | — |
+| `unidadeAnimal.calcularUaTotalFazenda(animais, lotes)` | 5,333 | ✅ filtra `status === 'ativo'` |
+| `ocupacaoPastos.cabecasEstimadas` | 8 cab | ✅ |
+| **`computeIndicadoresEstrategicos.uaTotalFazenda`** | **25,333** | ❌ **4,75x inflado** |
+
+### Causa raiz
+
+`indicadoresEstrategicos.js:77-96` **reimplementa o cálculo de UA inline** em vez
+de usar o módulo `unidadeAnimal`, e nessa cópia:
+
+1. usa `animais[]` (defasado) em vez de `lote.qtd` (canônico);
+2. usa `animal?.qtd || 1` — registro com `qtd = 0` vira 1 cabeça;
+3. **não filtra por status do lote** — lote vendido/encerrado segue somando UA.
+
+### Impacto no negócio
+
+A taxa de lotação é o que dispara "superlotado" e a sugestão de **arrendar pasto**.
+Com capacidade de 20 UA, o cenário 2 mostra 25,3 (superlotado) quando a realidade
+é 5,3 — **73% de capacidade livre**. O produtor é levado a arrendar área ou vender
+animais sem necessidade.
+
+### Regra recomendada
+
+> **Quantidade oficial de cabeças de um lote = `lote.qtd`**, com fallback para
+> `soma(animais[].qtd)` só quando `lote.qtd == null` (lote legado).
+> **Rebanho ativo da fazenda = soma de `lote.qtd` dos lotes com `status === 'ativo'`.**
+> Nunca `|| 1`: `qtd = 0` significa zero.
+
+Implementação: `indicadoresEstrategicos` passa a usar `unidadeAnimal.calcularUaPorLote`
+/`calcularUaTotalFazenda(animais, lotes)`, que já implementam essa regra corretamente.
+Não é criar regra nova — é parar de contornar a que já existe.
+
+### Impacto da mudança
+
+- Indicadores, Painel Gerencial e Evolução passam a exibir números **menores**
+  (os corretos) onde havia lote finalizado ou venda registrada.
+- Alertas de superlotação deixam de disparar falsamente.
+- Nenhuma tela que já usa `lote.qtd` muda.
+
+### Ainda não verificado neste ciclo
+
+Transferência entre fazendas · dupla contagem em "Todas as fazendas" ·
+estorno/cancelamento de movimentação · quantidade negativa ·
+entrada e saída de pasto no mesmo dia · pasto inativo · animal sem lote.
+
+### ✅ Regra oficial implementada
+
+| Campo | Definição |
+|---|---|
+| **Cabeças do lote** | `lote.qtd`; fallback para `soma(animais[].qtd)` **só** se `lote.qtd` for `null`/`undefined` |
+| **Zero** | `qtd = 0` é válido e nunca vira 1 — o padrão `qtd \|\| 1` foi eliminado |
+| **Rebanho ativo** | soma de `lote.qtd` dos lotes com status ativo |
+| **Status inativos** | `vendido`, `encerrado`, `finalizado`, `inativo`, `cancelado` — fora do rebanho e da UA |
+| **Negativo** | normalizado para 0 na leitura; mutações validam saldo antes de gravar |
+| **UA do lote** | `UA(peso médio) × cabeças canônicas`, só de lote ativo |
+| **Consolidado** | cada lote contado uma vez; lote sem fazenda vai para `SEM_FAZENDA`, separado |
+| **Invariante** | `total == soma(porFazenda) + semFazenda` |
+| **Código** | `src/domain/rebanho.js` |
+| **Testes** | `src/domain/rebanho.test.js` — 31 casos |
+
+### Consumidores migrados
+
+| Módulo | Antes | Agora |
+|---|---|---|
+| `indicadoresEstrategicos` | UA inline: `animais[]`, `qtd \|\| 1`, sem filtro de status | `uaTotalAtiva` / `uaDoLote` |
+| `evolucaoRebanho` | `soma(animais[].qtd \|\| 1)` | `rebanhoAtivo(db)` |
+| `planos` (limite/cobrança) | `soma(animais[].qtd \|\| 1)` | `rebanhoAtivo(db)` |
+
+### Comportamento corrigido — medido
+
+| Cenário | Antes | Agora |
+|---|---|---|
+| Lote finalizado (8 ativas + 20 vendidas) | UA **25,333**, "superlotado" | UA **5,333**, "dentro da capacidade" |
+| Venda parcial (`lote.qtd=8`, `animais[]=10`) | 8 ou 10 conforme a tela | **8** em todas |
+| **Conta real** (`animais` vazio, rebanho em `lote.qtd`) | **0 cabeças** em Evolução/Painel Gerencial/cobrança | valor correto |
+
+O último é o mais grave: a tabela `animais` está **vazia em produção** — todo o rebanho vive em `lote.qtd`. Quem lia de `animais[]` mostrava zero.
+
+### Validado no navegador
+
+Cenário montado e revertido: lote 14 ativo (20 cab), lotes 9 e 10 encerrados (30 e 50 cab), lote 9 **sem fazenda**.
+
+| Tela | Resultado |
+|---|---|
+| Painel Geral (Todas as fazendas) | 20 ✅ (exclui as 80 dos encerrados) |
+| Painel Geral (fazenda com lote encerrado) | 0 ✅ |
+| Pastos | 8,00 UA ✅ (`180 × 20 ÷ 450`) |
+| Painel Gerencial | Rebanho 20 · UA 8,00 · "Dentro da capacidade" ✅ |
+| Venda parcial (20 → 15) | todas as telas para 15 ✅ |
+
+Dados temporários revertidos: `qtd` voltou a `null` nos três lotes.
+
+### Escrita: validação, atomicidade e concorrência
+
+#### Validação (feito)
+
+`registrarSaidaAnimal` (venda, morte, transferência de saída) agora chama
+`validarBaixaRebanho` — fonte única. Antes tinha cópia local da regra.
+Cobre: quantidade ≤ 0, saldo insuficiente, resultado negativo, e devolve a
+mesma mensagem em todos os fluxos.
+
+#### Atomicidade e concorrência — **assimetria grave entre Telegram e web**
+
+O projeto **já tem** RPCs transacionais no Supabase, e elas são bem construídas:
+
+| RPC | Garantias |
+|---|---|
+| `registrar_saida_lote` | `app_assert_owner_write` · `SELECT … FOR UPDATE` (lock de linha) · rejeita `qtd ≤ 0` · rejeita `qtd > saldo` · rejeita lote encerrado/vendido · valida e trava o lote de destino · movimentação + baixa + financeiro + entrada no destino **na mesma transação** |
+| `ajustar_lotacao_lote` | ajuste de lotação transacional |
+| `finalizar_lote` | encerramento transacional |
+| `mover_lote_para_pasto` | troca de pasto transacional |
+
+**Só o bot do Telegram usa essas RPCs.** O app web grava por chamadas
+sequenciais e valida contra o `db` carregado no navegador. Consequência:
+
+- **Concorrência não protegida no web**: duas abas veem `qtd = 10`, ambas passam
+  na validação local e ambas gravam — o banco pode terminar negativo. Pelo
+  Telegram, o `FOR UPDATE` impede.
+- **Sem atomicidade no web**: se a movimentação grava e o lançamento financeiro
+  falha, o estado fica pela metade.
+
+> **Pendência aberta (não resolvida nesta sprint):** migrar o fluxo web de
+> venda/morte/transferência para `registrar_saida_lote`, e o ajuste de lotação
+> para `ajustar_lotacao_lote`. Não exige RPC nova — as funções já existem,
+> testadas e em uso pelo bot. É uma troca do caminho de gravação em
+> `services/movimentacoes.js` + `LotesPage`, de risco alto o suficiente para
+> merecer sprint própria com validação de campo.
+
+#### Estorno e cancelamento
+
+Busca completa em código, migrations, endpoints, Telegram e componentes:
+
+- **Financeiro:** existe estorno (`FinanceiroPage::estornarLancamento`) — preserva
+  o original e cria lançamento espelho. O próprio código registra que **não há
+  RPC transacional** nesse fluxo: são duas escritas sequenciais.
+- **Rebanho:** **o HERDON não possui atualmente fluxo dedicado de
+  estorno/cancelamento para venda, morte, transferência ou ajuste de lotação.**
+  Uma baixa equivocada só pode ser compensada com um lançamento manual em
+  sentido contrário, sem vínculo de rastreabilidade com a operação original.
+
+  *Risco:* não há trilha que ligue a correção ao erro, e o ajuste manual pode
+  ser feito com quantidade diferente da original, sem o sistema perceber.
+  *Recomendação (fora do escopo desta sprint):* estorno vinculado por
+  `origem_id`, espelhando o padrão já usado no Financeiro, dentro da mesma
+  transação da RPC.
+
+### Revisão de consumidores — padrões paralelos
+
+| Ocorrência | Classificação |
+|---|---|
+| `indicadoresEstrategicos` — UA inline com `qtd \|\| 1`, sem filtro de status | **defeito corrigido** |
+| `evolucaoRebanho` — `soma(animais[].qtd \|\| 1)` | **defeito corrigido** |
+| `planos` — `soma(animais[].qtd \|\| 1)` em limite/cobrança | **defeito corrigido** |
+| `movimentacoes` — cópia local da validação de saldo | **defeito corrigido** |
+| `unidadeAnimal`, `calculos`, `calculations` — `reduce` sobre `animais[]` | **uso legítimo**: numerador de média ponderada de **peso**, não contagem |
+| `telegram/acoesLote` — `reduce` sobre `animais[]` | **uso legítimo**: peso médio para a RPC |
+| `simuladorCenarios:16,20` — `qtd \|\| 1` | **pendência da parte 7/7**: usado para **peso médio projetado**, não para contagem de rebanho |
+
+### Pendências reais
+
+1. Migrar a escrita do web para as RPCs transacionais (acima) — **maior risco em aberto**.
+2. Estorno de rebanho não existe — documentado, não implementado (evitando criar processo de negócio novo nesta sprint).
+3. `simuladorCenarios` com `qtd || 1` no peso médio — parte 7/7.
+4. Transferência entre **fazendas** não tem fluxo na interface web hoje; a RPC cobre transferência entre **lotes**.

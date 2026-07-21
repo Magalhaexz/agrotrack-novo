@@ -126,7 +126,7 @@ test('venda: impede saldo negativo (quantidade maior que o disponível)', () => 
   const db = makeDb({ lotes: [makeLote({ qtd: 5 })], animais: [makeAnimal({ qtd: 5 })] });
   assert.throws(
     () => registrarSaidaAnimal(db, { loteId: 1, qtd: 10, pesoMedio: 400, valorTotal: 5000, data: hoje, tipoSaida: 'venda' }, {}, { persist: false }),
-    /excede a quantidade atual/
+    /Quantidade indispon[íi]vel/
   );
 });
 
@@ -156,7 +156,7 @@ test('morte/perda: impede quantidade superior ao saldo', () => {
   const db = makeDb({ lotes: [makeLote({ qtd: 2 })], animais: [makeAnimal({ qtd: 2 })] });
   assert.throws(
     () => registrarSaidaAnimal(db, { loteId: 1, qtd: 5, pesoMedio: 400, valorTotal: 0, data: hoje, tipoSaida: 'morte' }, {}, { persist: false }),
-    /excede a quantidade atual/
+    /Quantidade indispon[íi]vel/
   );
 });
 
@@ -230,7 +230,7 @@ test('registrarSaidaAnimal: saldo de validação segue lote.qtd (canônico), nã
   // Vender 45 deveria falhar (só há 40 cabeças reais), mesmo animais.qtd dizendo 50:
   assert.throws(
     () => registrarSaidaAnimal(db, { loteId: 1, qtd: 45, pesoMedio: 400, valorTotal: 0, data: hoje, tipoSaida: 'venda' }, {}, { persist: false }),
-    /excede a quantidade atual/
+    /Quantidade indispon[íi]vel/
   );
 
   // Vender 40 (o saldo real canônico) deve funcionar e zerar o lote:

@@ -1,9 +1,6 @@
 import { toDateKey, toNonNegativeNumber, toNumber } from './calcHelpers.js';
+import { rebanhoAtivo } from './rebanho.js';
 
-function isAtivo(animal) {
-  const status = String(animal?.status || 'ativo').toLowerCase();
-  return !['vendido', 'morte', 'descarte', 'transferencia', 'perda', 'inativo'].includes(status);
-}
 
 function normalizeTipo(rawTipo) {
   const tipo = String(rawTipo || '').trim().toLowerCase();
@@ -34,14 +31,16 @@ function getDeltaEstoque(tipo, qtd) {
 }
 
 export function computeEvolucaoRebanho(db, periodStart, periodEnd) {
-  const animais = Array.isArray(db?.animais) ? db.animais : [];
   const movimentos = Array.isArray(db?.movimentacoes_animais) ? db.movimentacoes_animais : [];
   const startKey = toDateKey(periodStart) || '0000-01-01';
   const endKey = toDateKey(periodEnd) || '9999-12-31';
   const start = startKey <= endKey ? startKey : endKey;
   const end = startKey <= endKey ? endKey : startKey;
 
-  const estoqueAtual = animais.reduce((sum, animal) => sum + (isAtivo(animal) ? toNonNegativeNumber(animal?.qtd || 1) : 0), 0);
+  // Fonte única (domain/rebanho.js): soma `lote.qtd` dos lotes ativos. Antes
+  // somava `animais[].qtd || 1`, que ignorava o status do lote e contava
+  // registro com qtd=0 como 1 — divergindo de Lotes, Pastos e Financeiro.
+  const estoqueAtual = rebanhoAtivo(db);
 
   const resumo = {
     estoque_inicial: 0,

@@ -111,7 +111,9 @@ test('verificarAcessoModulo: plano não reconhecido não bloqueia (protege conta
 });
 
 test('obterResumoUso: conta sem assinatura retorna status "none" e não bloqueia', () => {
-  const db = { fazendas: [{ id: 1 }], animais: [{ id: 1, qtd: 5 }] };
+  // Cabeças vêm de `lote.qtd` (fonte canônica, domain/rebanho.js) — em
+  // produção a tabela `animais` está vazia e todo o rebanho vive nos lotes.
+  const db = { fazendas: [{ id: 1 }], lotes: [{ id: 1, faz_id: 1, status: 'ativo', qtd: 5 }], animais: [] };
   const resumo = obterResumoUso(db, null);
   assert.equal(resumo.status, 'none');
   assert.equal(resumo.planoCode, null);
@@ -122,7 +124,11 @@ test('obterResumoUso: conta sem assinatura retorna status "none" e não bloqueia
 test('obterResumoUso: conta com assinatura ativa calcula uso e limites do plano', () => {
   const db = {
     fazendas: [{ id: 1 }],
-    animais: [{ id: 1, qtd: 100 }, { id: 2, qtd: 150 }],
+    lotes: [
+      { id: 1, faz_id: 1, status: 'ativo', qtd: 100 },
+      { id: 2, faz_id: 1, status: 'ativo', qtd: 150 },
+    ],
+    animais: [],
     usuarios: [{ id: 1, status: 'ativo' }, { id: 2, status: 'inativo' }],
   };
   const assinatura = { plan_code: 'essencial', status: 'active' };
