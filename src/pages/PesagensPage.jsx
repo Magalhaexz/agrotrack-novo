@@ -6,13 +6,13 @@ import Button from '../components/ui/Button';
 import EmptyState from '../components/EmptyState';
 import { formatarNumero, formatarData } from '../utils/formatters';
 import { gerarNovoId } from '../utils/id';
+import { calcularGmdLote, gmdMedioDosLotes } from '../domain/gmd.js';
 import { useToast } from '../hooks/useToast';
 import { useAuth } from '../auth/useAuth';
 import { daysBetween, toDateKey } from '../domain/calcHelpers.js';
 import {
   resolveTipoPesagem,
   recalcularPesoAtualLote,
-  calculateAverageGmdByLote,
 } from '../domain/pesagensLote.js';
 import {
   createOperationalRecord,
@@ -248,7 +248,10 @@ export default function PesagensPage({ db, setDb, onConfirmAction, navigationInt
       }
     });
 
-    const gmdMedio = calculateAverageGmdByLote(basePesagens);
+    // Fonte única (domain/gmd.js): GMD de vida por lote, média dos lotes com
+    // dado suficiente. Lotes sem GMD calculável ficam de fora da média em vez
+    // de entrar como 0 (o que puxava o indicador para baixo sem motivo real).
+    const gmdMedio = gmdMedioDosLotes(lotes, basePesagens);
 
     return {
       totalPesagens,
@@ -260,7 +263,7 @@ export default function PesagensPage({ db, setDb, onConfirmAction, navigationInt
       gmdMedio,
       gmdMedioDisponivel: Number.isFinite(gmdMedio),
     };
-  }, [pesagens]);
+  }, [pesagens, lotes]);
 
   // Evolução: gráfico + KPIs por lote (Sprint de unificação com
   // Acompanhamento de Peso — antes vivia numa página separada).
@@ -274,13 +277,27 @@ export default function PesagensPage({ db, setDb, onConfirmAction, navigationInt
   }, [pesagens, loteEvolucaoId]);
 
   const resumoEvolucaoLote = useMemo(() => {
-    if (pesagensLoteEvolucao.length < 2) return { primeira: null, ultima: null, ganho: 0, dias: 0, gmd: 0 };
-    const primeira = pesagensLoteEvolucao[0];
-    const ultima = pesagensLoteEvolucao[pesagensLoteEvolucao.length - 1];
-    const ganho = Number(ultima?.peso_medio || 0) - Number(primeira?.peso_medio || 0);
-    const dias = Math.max(0, daysBetween(primeira.data, ultima.data));
-    return { primeira, ultima, ganho, dias, gmd: dias > 0 ? ganho / dias : 0 };
-  }, [pesagensLoteEvolucao]);
+    const primeira = pesagensLoteEvolucao[0] || null;
+    const ultima = pesagensLoteEvolucao.length > 1
+      ? pesagensLoteEvolucao[pesagensLoteEvolucao.length - 1]
+      : null;
+    // Ganho/dias/GMD vêm da fonte única (domain/gmd.js) para bater com Lotes,
+    // Resultados e Relatórios. A base é a ENTRADA do lote, então pode ser
+    // anterior à primeira pesagem — por isso `baseOrigem` é exposto e a UI diz
+    // de onde o cálculo partiu, em vez de deixar o número parecer inconsistente
+    // com o card "Primeira pesagem" ao lado.
+    const loteSelecionado = (lotes || []).find((item) => Number(item.id) === Number(loteEvolucaoId)) || null;
+    const r = calcularGmdLote(loteSelecionado, pesagens || []);
+    return {
+      primeira,
+      ultima,
+      ganho: r.ganho,
+      dias: r.dias,
+      gmd: r.gmd,
+      baseOrigem: r.base?.origem || null,
+      baseData: r.base?.data || null,
+    };
+  }, [pesagensLoteEvolucao, lotes, loteEvolucaoId, pesagens]);
 
   const loteEvolucaoSelecionado = useMemo(
     () => (lotes || []).find((item) => Number(item.id) === Number(loteEvolucaoId)) || null,
@@ -962,8 +979,16 @@ export default function PesagensPage({ db, setDb, onConfirmAction, navigationInt
                 </div>
                 <div className="kpi-card kpi-card--compact">
                   <div className="kpi-label">Ganho total</div>
-                  <div className="kpi-value">{formatarNumero(resumoEvolucaoLote.ganho)} kg</div>
-                  <div className="kpi-sub">{resumoEvolucaoLote.dias} dias · GMD {formatarNumero(resumoEvolucaoLote.gmd, 3)} kg/dia</div>
+                  <div className="kpi-value">
+                    {resumoEvolucaoLote.ganho === null ? '—' : `${formatarNumero(resumoEvolucaoLote.ganho)} kg`}
+                  </div>
+                  <div className="kpi-sub">
+                    {resumoEvolucaoLote.gmd === null
+                      ? 'Sem dado suficiente para calcular o GMD'
+                      : `${resumoEvolucaoLote.dias} dias · GMD ${formatarNumero(resumoEvolucaoLote.gmd, 3)} kg/dia · desde ${
+                        resumoEvolucaoLote.baseOrigem === 'entrada_lote' ? 'a entrada do lote' : 'a 1ª pesagem'
+                      }`}
+                  </div>
                 </div>
               </div>
               <PesoChart data={pesagensLoteEvolucao} metaGmd={loteEvolucaoSelecionado?.gmd_meta || 0} />
