@@ -4,7 +4,7 @@
 // inline naquela página; agora é a única fórmula, reaproveitada também
 // pelo bot do Telegram (`cadastroPesagem.js`) para editar/excluir pesagem
 // sem duplicar a regra.
-import { toDateKey, daysBetween } from './calcHelpers.js';
+import { toDateKey } from './calcHelpers.js';
 
 function toFiniteNumber(value, fallback = 0) {
   const normalized = Number(value);
@@ -59,33 +59,7 @@ export function recalcularPesoAtualLote(db, loteId, pesagensRestantes) {
   return { pesoAtual, ultimaPesagem: ultima?.data || null };
 }
 
-/** GMD médio (kg/dia) entre a primeira e a última pesagem de LOTE de cada lote, agregado. */
-export function calculateAverageGmdByLote(pesagens = []) {
-  const pesagensPorLote = new Map();
-  (pesagens || []).forEach((pesagem) => {
-    if (resolveTipoPesagem(pesagem) !== 'lote') return;
-    const loteId = Number(pesagem?.lote_id);
-    if (!Number.isFinite(loteId) || loteId <= 0) return;
-    if (!pesagensPorLote.has(loteId)) pesagensPorLote.set(loteId, []);
-    pesagensPorLote.get(loteId).push(pesagem);
-  });
-
-  const gmdValues = [];
-  pesagensPorLote.forEach((lotePesagens) => {
-    const sorted = [...lotePesagens]
-      .map((item) => ({ ...item, data: toDateKey(item?.data) }))
-      .filter((item) => item?.data && Number.isFinite(Number(item?.peso_medio)))
-      .sort((a, b) => a.data.localeCompare(b.data));
-    if (sorted.length < 2) return;
-    const primeira = sorted[0];
-    const ultima = sorted[sorted.length - 1];
-    const dias = daysBetween(primeira.data, ultima.data);
-    if (!Number.isFinite(dias) || dias <= 0) return;
-    const gmd = (Number(ultima.peso_medio) - Number(primeira.peso_medio)) / dias;
-    if (Number.isFinite(gmd)) gmdValues.push(gmd);
-  });
-
-  if (!gmdValues.length) return null;
-  const media = gmdValues.reduce((total, value) => total + value, 0) / gmdValues.length;
-  return Number.isFinite(media) ? media : null;
-}
+// GMD saiu daqui: a fórmula agora vive em domain/gmd.js (fonte única).
+// `calculateAverageGmdByLote` usava primeira→última pesagem, enquanto outras
+// telas usavam janela de 30 dias ou a tabela `animais` — divergência de até
+// 8x no mesmo lote. Ver gmd.js para a semântica oficial e os casos-limite.

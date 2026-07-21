@@ -9,6 +9,7 @@ import {
 } from '../domain/calcHelpers.js';
 import { calcularCustoLote } from '../domain/calculos.js';
 import { calcularArrobasProduzidas } from '../domain/indicadores.js';
+import { gmdDoLote } from '../domain/gmd.js';
 
 import { hojeLocalISO } from '../domain/dataCivil.js';
 /**
@@ -228,7 +229,13 @@ export const calcLote = (db, loteId, referenceDate = hojeLocalISO()) => {
   const consumoSuplementoDia = totalAnimais * (pesoAtualMedio * percentualPv / 100);
   const diasEstoque = consumoSuplementoDia > 0 ? toNumber(lote.supl_estoque_kg || 0) / consumoSuplementoDia : 999;
   const custoSuplementoCabDia = (toNumber(lote.supl_rkg || 0) * (pesoAtualMedio * percentualPv / 100)) / 100;
-  const gmdMedio = calcGmd(animaisDoLote);
+  // GMD do lote vem da fonte única (domain/gmd.js), baseada nas PESAGENS —
+  // registro autoritativo do peso. `calcGmd` (tabela `animais`, p_ini→p_at) só
+  // entra como fallback quando o lote ainda não tem pesagem suficiente, e
+  // segue sendo a única opção para gmdMacho/gmdFemea, já que pesagem de lote
+  // não é segregada por sexo.
+  const gmdPorPesagens = gmdDoLote(lote, db?.pesagens);
+  const gmdMedio = gmdPorPesagens !== null ? gmdPorPesagens : calcGmd(animaisDoLote);
 
   return {
     lote,
