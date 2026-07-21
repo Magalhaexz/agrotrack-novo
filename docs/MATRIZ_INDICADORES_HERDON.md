@@ -83,10 +83,9 @@ Domínios que a Sprint 2 ainda não cobriu:
 
 ---
 
-## 🟡 Rebanho e Lotação — auditado, **pendente de decisão**
+## 🟢 Rebanho e Lotação — auditado e unificado
 
-> Auditoria da Sprint 2 parte 2. Divergências **documentadas, não corrigidas** —
-> a mudança altera números exibidos e precisa de aprovação de produto.
+> Sprint 2 parte 2/7. Regra aprovada e **implementada** em `src/domain/rebanho.js`.
 
 ### Fontes concorrentes de "quantidade de animais"
 
@@ -161,3 +160,57 @@ Não é criar regra nova — é parar de contornar a que já existe.
 Transferência entre fazendas · dupla contagem em "Todas as fazendas" ·
 estorno/cancelamento de movimentação · quantidade negativa ·
 entrada e saída de pasto no mesmo dia · pasto inativo · animal sem lote.
+
+### ✅ Regra oficial implementada
+
+| Campo | Definição |
+|---|---|
+| **Cabeças do lote** | `lote.qtd`; fallback para `soma(animais[].qtd)` **só** se `lote.qtd` for `null`/`undefined` |
+| **Zero** | `qtd = 0` é válido e nunca vira 1 — o padrão `qtd \|\| 1` foi eliminado |
+| **Rebanho ativo** | soma de `lote.qtd` dos lotes com status ativo |
+| **Status inativos** | `vendido`, `encerrado`, `finalizado`, `inativo`, `cancelado` — fora do rebanho e da UA |
+| **Negativo** | normalizado para 0 na leitura; mutações validam saldo antes de gravar |
+| **UA do lote** | `UA(peso médio) × cabeças canônicas`, só de lote ativo |
+| **Consolidado** | cada lote contado uma vez; lote sem fazenda vai para `SEM_FAZENDA`, separado |
+| **Invariante** | `total == soma(porFazenda) + semFazenda` |
+| **Código** | `src/domain/rebanho.js` |
+| **Testes** | `src/domain/rebanho.test.js` — 31 casos |
+
+### Consumidores migrados
+
+| Módulo | Antes | Agora |
+|---|---|---|
+| `indicadoresEstrategicos` | UA inline: `animais[]`, `qtd \|\| 1`, sem filtro de status | `uaTotalAtiva` / `uaDoLote` |
+| `evolucaoRebanho` | `soma(animais[].qtd \|\| 1)` | `rebanhoAtivo(db)` |
+| `planos` (limite/cobrança) | `soma(animais[].qtd \|\| 1)` | `rebanhoAtivo(db)` |
+
+### Comportamento corrigido — medido
+
+| Cenário | Antes | Agora |
+|---|---|---|
+| Lote finalizado (8 ativas + 20 vendidas) | UA **25,333**, "superlotado" | UA **5,333**, "dentro da capacidade" |
+| Venda parcial (`lote.qtd=8`, `animais[]=10`) | 8 ou 10 conforme a tela | **8** em todas |
+| **Conta real** (`animais` vazio, rebanho em `lote.qtd`) | **0 cabeças** em Evolução/Painel Gerencial/cobrança | valor correto |
+
+O último é o mais grave: a tabela `animais` está **vazia em produção** — todo o rebanho vive em `lote.qtd`. Quem lia de `animais[]` mostrava zero.
+
+### Validado no navegador
+
+Cenário montado e revertido: lote 14 ativo (20 cab), lotes 9 e 10 encerrados (30 e 50 cab), lote 9 **sem fazenda**.
+
+| Tela | Resultado |
+|---|---|
+| Painel Geral (Todas as fazendas) | 20 ✅ (exclui as 80 dos encerrados) |
+| Painel Geral (fazenda com lote encerrado) | 0 ✅ |
+| Pastos | 8,00 UA ✅ (`180 × 20 ÷ 450`) |
+| Painel Gerencial | Rebanho 20 · UA 8,00 · "Dentro da capacidade" ✅ |
+| Venda parcial (20 → 15) | todas as telas para 15 ✅ |
+
+Dados temporários revertidos: `qtd` voltou a `null` nos três lotes.
+
+### Pendências reais
+
+- **`validarBaixaRebanho` ainda não está ligado aos fluxos de escrita.** A regra existe e está testada no domínio, mas venda/morte/transferência ainda não a chamam antes de gravar — a proteção contra `qtd < 0` é hoje de leitura, não de gravação.
+- **Atomicidade de transferência entre fazendas** não foi implementada (exige transação no backend/RPC); os testes cobrem a aritmética, não a falha parcial.
+- **Estorno/cancelamento de movimentação** não auditado — não localizei fluxo dedicado.
+- `simuladorCenarios` ainda usa `qtd || 1` para **peso médio** (não para contagem); fica para a parte 7/7.
