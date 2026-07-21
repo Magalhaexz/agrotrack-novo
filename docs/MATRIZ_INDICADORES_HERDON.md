@@ -208,9 +208,75 @@ Cenário montado e revertido: lote 14 ativo (20 cab), lotes 9 e 10 encerrados (3
 
 Dados temporários revertidos: `qtd` voltou a `null` nos três lotes.
 
+### Escrita: validação, atomicidade e concorrência
+
+#### Validação (feito)
+
+`registrarSaidaAnimal` (venda, morte, transferência de saída) agora chama
+`validarBaixaRebanho` — fonte única. Antes tinha cópia local da regra.
+Cobre: quantidade ≤ 0, saldo insuficiente, resultado negativo, e devolve a
+mesma mensagem em todos os fluxos.
+
+#### Atomicidade e concorrência — **assimetria grave entre Telegram e web**
+
+O projeto **já tem** RPCs transacionais no Supabase, e elas são bem construídas:
+
+| RPC | Garantias |
+|---|---|
+| `registrar_saida_lote` | `app_assert_owner_write` · `SELECT … FOR UPDATE` (lock de linha) · rejeita `qtd ≤ 0` · rejeita `qtd > saldo` · rejeita lote encerrado/vendido · valida e trava o lote de destino · movimentação + baixa + financeiro + entrada no destino **na mesma transação** |
+| `ajustar_lotacao_lote` | ajuste de lotação transacional |
+| `finalizar_lote` | encerramento transacional |
+| `mover_lote_para_pasto` | troca de pasto transacional |
+
+**Só o bot do Telegram usa essas RPCs.** O app web grava por chamadas
+sequenciais e valida contra o `db` carregado no navegador. Consequência:
+
+- **Concorrência não protegida no web**: duas abas veem `qtd = 10`, ambas passam
+  na validação local e ambas gravam — o banco pode terminar negativo. Pelo
+  Telegram, o `FOR UPDATE` impede.
+- **Sem atomicidade no web**: se a movimentação grava e o lançamento financeiro
+  falha, o estado fica pela metade.
+
+> **Pendência aberta (não resolvida nesta sprint):** migrar o fluxo web de
+> venda/morte/transferência para `registrar_saida_lote`, e o ajuste de lotação
+> para `ajustar_lotacao_lote`. Não exige RPC nova — as funções já existem,
+> testadas e em uso pelo bot. É uma troca do caminho de gravação em
+> `services/movimentacoes.js` + `LotesPage`, de risco alto o suficiente para
+> merecer sprint própria com validação de campo.
+
+#### Estorno e cancelamento
+
+Busca completa em código, migrations, endpoints, Telegram e componentes:
+
+- **Financeiro:** existe estorno (`FinanceiroPage::estornarLancamento`) — preserva
+  o original e cria lançamento espelho. O próprio código registra que **não há
+  RPC transacional** nesse fluxo: são duas escritas sequenciais.
+- **Rebanho:** **o HERDON não possui atualmente fluxo dedicado de
+  estorno/cancelamento para venda, morte, transferência ou ajuste de lotação.**
+  Uma baixa equivocada só pode ser compensada com um lançamento manual em
+  sentido contrário, sem vínculo de rastreabilidade com a operação original.
+
+  *Risco:* não há trilha que ligue a correção ao erro, e o ajuste manual pode
+  ser feito com quantidade diferente da original, sem o sistema perceber.
+  *Recomendação (fora do escopo desta sprint):* estorno vinculado por
+  `origem_id`, espelhando o padrão já usado no Financeiro, dentro da mesma
+  transação da RPC.
+
+### Revisão de consumidores — padrões paralelos
+
+| Ocorrência | Classificação |
+|---|---|
+| `indicadoresEstrategicos` — UA inline com `qtd \|\| 1`, sem filtro de status | **defeito corrigido** |
+| `evolucaoRebanho` — `soma(animais[].qtd \|\| 1)` | **defeito corrigido** |
+| `planos` — `soma(animais[].qtd \|\| 1)` em limite/cobrança | **defeito corrigido** |
+| `movimentacoes` — cópia local da validação de saldo | **defeito corrigido** |
+| `unidadeAnimal`, `calculos`, `calculations` — `reduce` sobre `animais[]` | **uso legítimo**: numerador de média ponderada de **peso**, não contagem |
+| `telegram/acoesLote` — `reduce` sobre `animais[]` | **uso legítimo**: peso médio para a RPC |
+| `simuladorCenarios:16,20` — `qtd \|\| 1` | **pendência da parte 7/7**: usado para **peso médio projetado**, não para contagem de rebanho |
+
 ### Pendências reais
 
-- **`validarBaixaRebanho` ainda não está ligado aos fluxos de escrita.** A regra existe e está testada no domínio, mas venda/morte/transferência ainda não a chamam antes de gravar — a proteção contra `qtd < 0` é hoje de leitura, não de gravação.
-- **Atomicidade de transferência entre fazendas** não foi implementada (exige transação no backend/RPC); os testes cobrem a aritmética, não a falha parcial.
-- **Estorno/cancelamento de movimentação** não auditado — não localizei fluxo dedicado.
-- `simuladorCenarios` ainda usa `qtd || 1` para **peso médio** (não para contagem); fica para a parte 7/7.
+1. Migrar a escrita do web para as RPCs transacionais (acima) — **maior risco em aberto**.
+2. Estorno de rebanho não existe — documentado, não implementado (evitando criar processo de negócio novo nesta sprint).
+3. `simuladorCenarios` com `qtd || 1` no peso médio — parte 7/7.
+4. Transferência entre **fazendas** não tem fluxo na interface web hoje; a RPC cobre transferência entre **lotes**.

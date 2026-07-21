@@ -3,6 +3,7 @@ import { registrarAuditoria } from './auditoria.js';
 import { verificarCarenciaAtivaLote } from '../domain/agendaSanitaria.js';
 import { ANIMAL_INDIVIDUAL_INACTIVE_STATUSES, isAnimalIndividualAtivo } from '../domain/statusAnimal.js';
 import { formatarData } from '../utils/formatters.js';
+import { validarBaixaRebanho } from '../domain/rebanho.js';
 
 export { isAnimalIndividualAtivo } from '../domain/statusAnimal.js';
 import {
@@ -425,10 +426,20 @@ export function registrarSaidaAnimal(
     : [];
 
   const { qtdAtual, pesoMedioAtual } = obterResumoLote(db, loteId);
-  if (quantidade > qtdAtual) {
-    throw new Error(
-      `Quantidade de saída (${quantidade}) excede a quantidade atual no lote (${qtdAtual}).`
-    );
+
+  // Validação única do domínio (domain/rebanho.js) — antes esta checagem era
+  // uma cópia local da regra. Cobre quantidade <= 0, saldo insuficiente e
+  // impede resultado negativo, com a mesma mensagem em todos os fluxos.
+  //
+  // ATENÇÃO: esta validação roda sobre o `db` carregado no navegador. Ela
+  // impede o erro do usuário, mas NÃO protege concorrência — duas abas veem o
+  // mesmo saldo e ambas passam. A garantia real está na RPC
+  // `registrar_saida_lote` (SELECT ... FOR UPDATE + revalidação no servidor),
+  // hoje usada só pelo bot do Telegram. Migrar este fluxo para ela é a
+  // pendência registrada em docs/MATRIZ_INDICADORES_HERDON.md.
+  const validacao = validarBaixaRebanho(lote, quantidade, db?.animais);
+  if (!validacao.ok) {
+    throw new Error(validacao.erro);
   }
 
   const novaQtd = qtdAtual - quantidade;
