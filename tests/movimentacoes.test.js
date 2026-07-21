@@ -59,29 +59,21 @@ test('nascimento/transferencia_entrada não criam despesa', () => {
   assert.equal(out2.movimentacoes_financeiras.length, 0);
 });
 
-test('registrarSaidaAnimal aceita snake_case e venda cria receita', () => {
+// Sprint 3: venda e morte saíram deste caminho e passaram para a RPC
+// transacional (services/saidaLoteTransacional.js, com testes próprios).
+// `descarte` continua aqui — não tem entrada na UI web e não gera receita.
+test('registrarSaidaAnimal recusa venda e morte, que migraram para a RPC transacional', () => {
   const db = baseMovDb();
-  const out = registrarSaidaAnimal(db, {
-    lote_id: 10,
-    quantidade: 2,
-    peso_medio: 300,
-    valor_total: 900,
-    data: '2026-03-04',
-    tipo: 'venda',
-  });
+  assert.throws(() => registrarSaidaAnimal(db, {
+    lote_id: 10, quantidade: 2, peso_medio: 300, valor_total: 900, data: '2026-03-04', tipo: 'venda',
+  }), /registrarSaidaLoteTransacional/);
 
-  assert.equal(out.movimentacoes_animais.at(-1).tipo, 'venda');
-  assert.equal(out.movimentacoes_financeiras.length, 1);
-  assert.equal(out.movimentacoes_financeiras[0].tipo, 'receita');
+  assert.throws(() => registrarSaidaAnimal(db, {
+    loteId: 10, qtd: 1, pesoMedio: 280, valorTotal: 200, data: '2026-03-05', tipoSaida: 'morte',
+  }), /registrarSaidaLoteTransacional/);
 });
 
-test('morte/descarte não criam receita', () => {
-  const dbMorte = baseMovDb();
-  const outMorte = registrarSaidaAnimal(dbMorte, {
-    loteId: 10, qtd: 1, pesoMedio: 280, valorTotal: 200, data: '2026-03-05', tipoSaida: 'morte',
-  });
-  assert.equal(outMorte.movimentacoes_financeiras.length, 0);
-
+test('descarte não cria receita', () => {
   const dbDescarte = baseMovDb();
   const outDescarte = registrarSaidaAnimal(dbDescarte, {
     loteId: 10, qtd: 1, pesoMedio: 280, valorTotal: 200, data: '2026-03-05', tipoSaida: 'descarte',
@@ -101,6 +93,6 @@ test('validação segura de quantidade/peso/lote inválidos', () => {
   }), /Valor inválido para quantidade/);
 
   assert.throws(() => registrarSaidaAnimal(db, {
-    loteId: 10, qtd: 1, pesoMedio: 0, valorTotal: 0, data: '2026-03-06', tipoSaida: 'venda',
+    loteId: 10, qtd: 1, pesoMedio: 0, valorTotal: 0, data: '2026-03-06', tipoSaida: 'descarte',
   }), /Valor inválido para peso médio/);
 });

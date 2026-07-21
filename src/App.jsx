@@ -30,6 +30,10 @@ import {
   registrarSaidaEstoque,
 } from './services/movimentacoes';
 import {
+  registrarSaidaLoteTransacional,
+  usaSaidaTransacional,
+} from './services/saidaLoteTransacional';
+import {
   getPendingSyncQueueSnapshot,
   processPendingSyncQueue,
 } from './services/operationalPersistence';
@@ -723,9 +727,26 @@ export default function App() {
     if (!ensureCanWriteOrRedirect('animais.create')) return;
     setDb((prev) => registrarEntradaAnimal(prev, dados, userContext, persistContext));
   };
-  const handleRegistrarSaidaAnimal = (dados) => {
-    if (!ensureCanWriteOrRedirect('animais.saida')) return;
+  // Sprint 3: venda e morte/perda gravam pela RPC transacional
+  // `registrar_saida_lote` e só então atualizam a tela. Falha da RPC (rede,
+  // RLS, saldo revalidado no servidor, lote finalizado) lança — o estado local
+  // NÃO é tocado e quem chama mantém o formulário aberto com a mensagem.
+  // `transferencia_saida` segue no caminho antigo até sua própria sprint.
+  // Devolve `false` quando a gravação foi barrada pelo paywall — sem isso,
+  // quem chama fechava o modal e mostrava "registrada com sucesso" para uma
+  // operação que nunca aconteceu.
+  const handleRegistrarSaidaAnimal = async (dados) => {
+    if (!ensureCanWriteOrRedirect('animais.saida')) return false;
+    if (usaSaidaTransacional(dados?.tipoSaida)) {
+      const resultado = await registrarSaidaLoteTransacional(db, dados, { session, userContext });
+      if (!resultado.ok) {
+        throw new Error(resultado.erro);
+      }
+      setDb((prev) => resultado.aplicar(prev));
+      return true;
+    }
     setDb((prev) => registrarSaidaAnimal(prev, dados, userContext, persistContext));
+    return true;
   };
   const handleRegistrarEntradaEstoque = (dados) => {
     if (!ensureCanWriteOrRedirect('estoque.create')) return;

@@ -244,6 +244,55 @@ sequenciais e valida contra o `db` carregado no navegador. Consequência:
 > `services/movimentacoes.js` + `LotesPage`, de risco alto o suficiente para
 > merecer sprint própria com validação de campo.
 
+> **Status na Sprint 3:** ✅ **venda e morte/perda migradas.** Ambas gravam por
+> `registrar_saida_lote` em `services/saidaLoteTransacional.js`, com o guard de
+> `registrarSaidaAnimal` impedindo que reapareça um segundo caminho de escrita
+> para esses tipos. **Continuam pendentes:** `transferencia_saida` (envolve o
+> lote de destino) e o ajuste de lotação.
+
+## 🟢 Impacto financeiro de venda e morte/perda — auditado na Sprint 3
+
+Escopo estrito: só os cálculos financeiros que **venda** e **morte/perda** de
+lote disparam. Estorno, rateio, DRE e a auditoria financeira geral seguem
+pendentes de sprints próprias.
+
+### Cálculos fechados
+
+| Cálculo | Regra oficial | Onde vive | Estado |
+|---|---|---|---|
+| Receita da venda | `movimentacoes_financeiras` com `tipo: 'receita'`, `categoria: 'venda_animal'`, `valor = p_valor_total`, `status: 'realizado'`, na **mesma transação** da baixa | `registrar_saida_lote` (SQL) | ✅ auditado |
+| Vínculo receita ↔ movimentação | `origem_tipo: 'movimentacao_animal'` + `origem_id = movimentacao_id` devolvido pela RPC | idem | ✅ auditado |
+| Custo por cabeça da saída | `valor_total ÷ qtd` (0 quando não há valor) | `saidaLoteTransacional.js` → `p_custo_por_cabeca` | ✅ auditado |
+| Receita da morte/perda | **não existe** — a RPC só lança financeiro para `venda`/`abate`, e o serviço zera o valor antes de enviar | SQL + `planejarSaidaLoteTransacional` | ✅ auditado |
+| Venda com valor 0 | não gera lançamento (`coalesce(p_valor_total,0) > 0`) | SQL | ✅ auditado |
+| Saldo do lote após a saída | `lotes.qtd − p_qtd`, sob `SELECT … FOR UPDATE`, nunca negativo | SQL | ✅ auditado |
+| Não duplicação do resultado | o estado local adota os **ids devolvidos pela RPC**, então recarregar a página relê as mesmas linhas em vez de somar cópias | `aplicarSaidaLoteNoEstadoLocal` | ✅ auditado |
+
+### Divergência aceita e medida: peso médio da origem
+
+O caminho web antigo recalculava `lotes.p_at` após venda/morte
+(`(qtdAtual×pesoAtual − qtdSaída×pesoSaída) ÷ qtdRestante`). A RPC **não toca**
+em `p_at` da origem — comportamento já em produção pelo bot do Telegram e
+documentado em `acoesLote.js` ("remover à média não muda a média da origem").
+
+**Decisão da Sprint 3:** adotar o comportamento da RPC. A alternativa seria um
+`UPDATE` extra em `lotes.p_at` depois da transação, reintroduzindo exatamente a
+gravação sequencial que esta sprint removeu — e deixando o saldo certo com o
+peso médio errado se ela falhasse.
+
+*Efeito prático:* vender as cabeças mais pesadas não baixa mais a média do lote
+no ato; a correção passa a vir da próxima pesagem. Como `p_at` alimenta GMD,
+@ e UA, esses indicadores ficam levemente otimistas entre a venda e a pesagem
+seguinte em lotes com forte dispersão de peso. Web e Telegram passam a devolver
+o mesmo número — antes divergiam.
+
+### Descrição do lançamento
+
+A RPC grava `movimentacoes_financeiras.descricao` a partir de `p_obs`. Quando o
+usuário não escreve observação, o serviço envia a frase padrão do fluxo
+(`Venda de N animal(is) do lote X`), preservando o extrato legível que o
+caminho antigo produzia.
+
 #### Estorno e cancelamento
 
 Busca completa em código, migrations, endpoints, Telegram e componentes:
@@ -276,7 +325,9 @@ Busca completa em código, migrations, endpoints, Telegram e componentes:
 
 ### Pendências reais
 
-1. Migrar a escrita do web para as RPCs transacionais (acima) — **maior risco em aberto**.
+1. Migrar a escrita do web para as RPCs transacionais (acima). Venda e
+   morte/perda foram migradas na Sprint 3; **restam `transferencia_saida` e o
+   ajuste de lotação** — o maior risco ainda em aberto.
 2. Estorno de rebanho não existe — documentado, não implementado (evitando criar processo de negócio novo nesta sprint).
 3. `simuladorCenarios` com `qtd || 1` no peso médio — parte 7/7.
 4. Transferência entre **fazendas** não tem fluxo na interface web hoje; a RPC cobre transferência entre **lotes**.
