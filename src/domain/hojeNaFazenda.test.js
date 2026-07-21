@@ -272,6 +272,15 @@ test('listarLotesPorStatusDecisaoVenda classifica lote pronto para avaliar venda
   const db = {
     lotes: [{ id: 1, status: 'ativo', preco_arroba: 270, gmd_meta: 1 }],
     animais: [{ id: 1, lote_id: 1, qtd: 10, p_ini: 300, p_at: 480, data_entrada: diasAtras(45), status: 'ativo' }],
+    // P1-05: GMD (gmdAtual/resumo.gmdMedio) vem exclusivamente da fonte
+    // canônica por PESAGENS (domain/gmd.js) — sem elas o lote é classificado
+    // como "dados insuficientes"/"abaixo da meta" em vez de "pronto para
+    // avaliar". Mesmo ganho do fixture de `animais` acima (300→480 em 45
+    // dias), agora como pesagem de lote real.
+    pesagens: [
+      { id: 1, lote_id: 1, data: diasAtras(45), peso_medio: 300 },
+      { id: 2, lote_id: 1, data: diasAtras(1), peso_medio: 480 },
+    ],
     movimentacoes_financeiras: [
       { id: 1, tipo: 'despesa', categoria: 'compra_animal', lote_id: 1, valor: 10000 },
       { id: 2, tipo: 'receita', categoria: 'venda_animal', lote_id: 1, valor: 40000 },
@@ -299,6 +308,12 @@ test('construirHojeNaFazenda gera prioridade de avaliação de venda quando há 
   const db = {
     lotes: [{ id: 1, status: 'ativo', preco_arroba: 270, gmd_meta: 1 }],
     animais: [{ id: 1, lote_id: 1, qtd: 10, p_ini: 300, p_at: 480, data_entrada: diasAtras(45), status: 'ativo' }],
+    // P1-05: GMD vem exclusivamente da fonte canônica por pesagens — ver nota
+    // equivalente no teste de `listarLotesPorStatusDecisaoVenda` acima.
+    pesagens: [
+      { id: 1, lote_id: 1, data: diasAtras(45), peso_medio: 300 },
+      { id: 2, lote_id: 1, data: diasAtras(1), peso_medio: 480 },
+    ],
     movimentacoes_financeiras: [
       { id: 1, tipo: 'despesa', categoria: 'compra_animal', lote_id: 1, valor: 10000 },
       { id: 2, tipo: 'receita', categoria: 'venda_animal', lote_id: 1, valor: 40000 },
