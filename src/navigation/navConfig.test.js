@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { navSections, secondaryNavItems, navLabelMap, getNavLabel } from './navConfig.js';
-import { pageRouteMap } from './routes.js';
+import { pageRouteMap, getPageFromPathname } from './routes.js';
 import { permissoesPorPagina, perfilTemPermissao } from '../auth/perfis.js';
 import { NAV_ITEMS as MOBILE_BOTTOM_NAV_ITEMS } from '../components/mobileBottomNavItems.js';
 
@@ -65,11 +65,40 @@ test('hub "Relatórios" continua na sidebar; relatórios específicos continuam 
   }
 });
 
-test('"Relatórios Financeiros" e "Painel Gerencial" saíram da sidebar mas mantêm rota funcionando', () => {
+test('"Relatórios Financeiros" segue fora da sidebar mas mantém rota funcionando', () => {
   assert.ok(!todosItens.some((item) => item.id === 'relatorioFinanceiro'), 'relatorioFinanceiro não deveria mais estar na sidebar (acessível via hub Relatórios)');
-  assert.ok(!todosItens.some((item) => item.id === 'relatoriosGerenciais'), 'relatoriosGerenciais não deveria mais estar na sidebar (duplica DashboardPremiumPage)');
   assert.ok(pageRouteMap.relatorioFinanceiro, 'rota /relatorio-financeiro precisa continuar existindo');
+});
+
+test('"Painel Gerencial" está na sidebar — é recurso vendido no plano PRO', () => {
+  // A dedup anterior tirou este item do menu por duplicar DashboardPremiumPage,
+  // mas DashboardPremium também não tinha entrada: as duas ficaram órfãs e o
+  // recurso "Relatórios avançados" (plano PRO) não tinha caminho na interface.
+  assert.ok(
+    todosItens.some((item) => item.id === 'relatoriosGerenciais'),
+    'relatoriosGerenciais precisa estar na sidebar: é vendido como "Relatórios avançados" no plano PRO'
+  );
   assert.ok(pageRouteMap.relatoriosGerenciais, 'rota /relatorios-gerenciais precisa continuar existindo');
+});
+
+test('DashboardPremiumPage foi removida e sua rota antiga redireciona sem quebrar link salvo', () => {
+  assert.ok(!pageRouteMap.dashboardPremium, 'dashboardPremium não deveria ter rota própria (página removida)');
+  assert.equal(
+    getPageFromPathname('/dashboard-premium'),
+    'relatoriosGerenciais',
+    '/dashboard-premium precisa redirecionar para o Painel Gerencial (superconjunto)'
+  );
+});
+
+test('"Funcionários" está na sidebar — é o único ponto de cadastro de responsáveis', () => {
+  // Sem esta entrada, o seletor de responsável em Tarefas/Sanidade/Rotinas
+  // fica permanentemente vazio: FuncionariosPage é o único lugar que executa
+  // createOperationalRecord('funcionarios').
+  assert.ok(
+    todosItens.some((item) => item.id === 'funcionarios'),
+    'funcionarios precisa estar na sidebar (único cadastro de funcionário do app)'
+  );
+  assert.ok(pageRouteMap.funcionarios, 'rota de funcionários precisa existir');
 });
 
 test('toda página da sidebar tem rota registrada (nenhum item leva a rota inexistente)', () => {

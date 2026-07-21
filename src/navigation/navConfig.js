@@ -30,6 +30,7 @@ import {
   Tractor,
   TrendingUp,
   User,
+  Users,
 } from 'lucide-react';
 
 // Sprint de reorganização estratégica da sidebar — grupos seguem o fluxo real
@@ -98,12 +99,16 @@ export const navSections = [
       // HERDON embutido — conteúdo que a Central de Alertas não replica.
       { id: 'decisoesFazenda', label: 'Decisões da Fazenda', icon: ListChecks },
       { id: 'relatorios', label: 'Relatórios', icon: FileBarChart },
-      // "Painel Gerencial" (relatoriosGerenciais) saiu daqui: auditoria de
-      // código mostrou que RelatoriosGerenciaisPage.jsx duplica quase
-      // literalmente DashboardPremiumPage.jsx (mesmos helpers de formatação,
-      // mesmo computeIndicadoresEstrategicos/calcularProjecaoCenario) — e
-      // DashboardPremiumPage já tinha sido excluída da sidebar no Sprint 18
-      // pelo mesmo motivo. A rota /relatorios-gerenciais continua funcionando.
+      // "Painel Gerencial" (relatoriosGerenciais) VOLTA para a sidebar.
+      // A deduplicação anterior ficou pela metade: tirou a entrada de menu
+      // desta página por duplicar DashboardPremiumPage, mas DashboardPremium
+      // também não tinha entrada — resultado: as duas ficaram inacessíveis,
+      // e "Relatórios avançados" é vendido no plano PRO (domain/planos.js),
+      // ou seja, o cliente pagava por uma tela sem caminho até ela.
+      // Agora DashboardPremiumPage foi removida (era subconjunto estrito:
+      // mesmos 12 campos, enquanto esta tem 17 — inclui margem/cabeça,
+      // margem/ha, arrobas vendidas, kg vivo/ha e área total de pastagem).
+      { id: 'relatoriosGerenciais', label: 'Painel Gerencial', icon: FileBarChart },
     ],
   },
   {
@@ -111,8 +116,15 @@ export const navSections = [
     title: 'Gestão',
     items: [
       { id: 'fazendas', label: 'Fazendas', icon: MapPin },
-      // Ponto de entrada único para Equipe — FuncionariosPage segue registrada (não apagada), ver backlog.
+      // "Equipe e Acessos" (profiles/invites) = quem tem LOGIN na conta.
+      // "Funcionários" (tabela funcionarios) = peões/vaqueiros SEM login,
+      // atribuíveis a tarefas. São entidades distintas, não duplicadas.
       { id: 'equipeAcessos', label: 'Equipe e Acessos', icon: ShieldPlus },
+      // FuncionariosPage é o ÚNICO lugar que cria funcionário
+      // (createOperationalRecord('funcionarios')). Sem entrada no menu, o
+      // seletor de responsável de Tarefas, Sanidade e Rotinas ficava sempre
+      // vazio — não havia como cadastrar ninguém.
+      { id: 'funcionarios', label: 'Funcionários', icon: Users },
       { id: 'importacao', label: 'Importação', icon: FileUp },
     ],
   },
