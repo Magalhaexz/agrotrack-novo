@@ -20,7 +20,7 @@
 // registrado com `secret_token` (ver docs/SPRINT7_TELEGRAM_MULTIUSUARIO_RESULTADO.md).
 import { getSupabaseAdminClient } from './_supabaseAdmin.js';
 import { enviarMensagemTelegramParaChat as enviarMensagemTelegramParaChatBase } from './_telegram.js';
-import { extractHerdonCodeFromText, isCodeUsable } from './_telegramConnections.js';
+import { extractHerdonCodeFromText } from './_telegramConnections.js';
 import { montarDbDaConta } from './_herdonDb.js';
 import { prepararAlertasEscopados, enriquecerAlertasComFazenda } from '../src/domain/telegramFazenda.js';
 import { gerarAlertasUnificados } from '../src/domain/alertasUnificados.js';
@@ -173,41 +173,28 @@ export default async function handler(req, res, deps = {}) {
   if (codigo) {
     try {
       const client = getClient();
-      const now = new Date();
 
-      const { data: codeRow } = await client
-        .from('telegram_connection_codes')
-        .select('*')
-        .eq('code', codigo)
-        .maybeSingle();
+      // RPC transacional (migration 20260721160000): trava a linha do código
+      // com FOR UPDATE, valida uso/expiração, grava telegram_connections e
+      // marca used_at na mesma transação — duas requisições concorrentes para
+      // o mesmo código nunca resultam em duas conexões válidas, e a mensagem
+      // de sucesso só é enviada depois que a transação já commitou.
+      const { data, error } = await client.rpc('parear_telegram_por_codigo', {
+        p_code: codigo,
+        p_chat_id: String(chatId),
+        p_username: message?.from?.username || null,
+        p_first_name: message?.from?.first_name || null,
+        p_last_name: message?.from?.last_name || null,
+      });
 
-      if (!isCodeUsable(codeRow, now)) {
+      const resultado = Array.isArray(data) ? data[0] : data;
+      if (error || !resultado?.sucesso) {
+        if (error) console.error('[telegram-webhook] falha ao parear código', error);
         await enviar(chatId, MSG_INVALIDO).catch(() => null);
         return res.status(200).json({ ok: true, connected: false });
       }
 
-      const { error: upsertError } = await client.from('telegram_connections').upsert({
-        owner_user_id: codeRow.owner_user_id,
-        user_id: codeRow.user_id,
-        fazenda_id: codeRow.fazenda_id,
-        telegram_chat_id: String(chatId),
-        telegram_username: message?.from?.username || null,
-        telegram_first_name: message?.from?.first_name || null,
-        telegram_last_name: message?.from?.last_name || null,
-        is_active: true,
-      }, { onConflict: 'user_id' });
-
-      if (upsertError) {
-        console.error('[telegram-webhook] falha ao salvar conexão', upsertError);
-        await enviar(chatId, MSG_INVALIDO).catch(() => null);
-        return res.status(200).json({ ok: true, connected: false });
-      }
-
-      // A conexão já foi salva: avisa o usuário antes de tentar marcar o
-      // código como usado, para uma falha nesse passo não virar uma mensagem
-      // de "código inválido" incorreta.
       await enviar(chatId, MSG_SUCESSO).catch(() => null);
-      await client.from('telegram_connection_codes').update({ used_at: now.toISOString() }).eq('id', codeRow.id).then(() => null, () => null);
       return res.status(200).json({ ok: true, connected: true });
     } catch (error) {
       console.error('[telegram-webhook] erro inesperado', error);

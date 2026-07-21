@@ -30,6 +30,20 @@ function tabelasComConexao(perfil, fazendaId, chatId) {
   return t;
 }
 
+const CODIGO_PAREAMENTO = 'HERDON-482913';
+
+/** Conta sem conexão ainda, com um código de pareamento pronto para uso. */
+function tabelasComCodigo(overrides = {}) {
+  const t = baseTables('operador');
+  t.telegram_connections = [];
+  t.telegram_connection_codes = [{
+    id: 'code-1', code: CODIGO_PAREAMENTO, owner_user_id: 'o1', user_id: 'u1', fazenda_id: 1,
+    expires_at: new Date(Date.now() + 15 * 60 * 1000).toISOString(), used_at: null,
+    ...overrides,
+  }];
+  return t;
+}
+
 /** Roda UM update pelo handler real e devolve o texto que o bot enviaria. */
 async function enviarWebhook(client, texto, chatId, options = {}) {
   const {
@@ -234,4 +248,88 @@ test('harness: sem conexão (chat desconhecido) orienta a enviar o código', asy
   const client = makeClient(t);
   const r = await enviarWebhook(client, 'resumo', chat);
   assert.match(r.resposta, /código/i);
+});
+
+// Pareamento atômico e idempotente (P1-01, RPC parear_telegram_por_codigo /
+// migration 20260721160000): antes, o webhook validava o código em JS,
+// gravava a conexão e só depois marcava used_at em passos separados — duas
+// requisições concorrentes podiam validar o mesmo código antes de qualquer
+// uma marcar used_at. Os testes abaixo cobrem os critérios de aceite do
+// ticket usando o fake `parear_telegram_por_codigo` de _fakeTelegramClient.js,
+// que espelha a RPC real (trava lógica equivalente ao FOR UPDATE: cada
+// chamada muta as tabelas em memória de forma síncrona, sem gap de I/O real,
+// então duas chamadas "concorrentes" via Promise.all continuam serializadas
+// exatamente como a transação real seria).
+
+test('harness: pareamento com código válido cria a conexão e marca o código como usado', async () => {
+  const chat = novoChat();
+  const t = tabelasComCodigo();
+  const client = makeClient(t);
+  const r = await enviarWebhook(client, CODIGO_PAREAMENTO, chat);
+  assert.equal(r.status, 200);
+  assert.equal(r.json.connected, true);
+  assert.match(r.resposta, /sucesso/i);
+  assert.equal(t.telegram_connections.length, 1);
+  assert.equal(t.telegram_connections[0].telegram_chat_id, String(chat));
+  assert.ok(t.telegram_connection_codes[0].used_at);
+});
+
+test('harness: código inexistente não cria conexão', async () => {
+  const chat = novoChat();
+  const t = tabelasComCodigo();
+  const client = makeClient(t);
+  const r = await enviarWebhook(client, 'HERDON-000001', chat);
+  assert.equal(r.json.connected, false);
+  assert.match(r.resposta, /inválido|expirado/i);
+  assert.equal(t.telegram_connections.length, 0);
+});
+
+test('harness: código expirado não cria conexão', async () => {
+  const chat = novoChat();
+  const t = tabelasComCodigo({ expires_at: new Date(Date.now() - 1000).toISOString() });
+  const client = makeClient(t);
+  const r = await enviarWebhook(client, CODIGO_PAREAMENTO, chat);
+  assert.equal(r.json.connected, false);
+  assert.match(r.resposta, /inválido|expirado/i);
+  assert.equal(t.telegram_connections.length, 0);
+});
+
+test('harness: código já usado não cria conexão', async () => {
+  const chat = novoChat();
+  const t = tabelasComCodigo({ used_at: new Date().toISOString() });
+  const client = makeClient(t);
+  const r = await enviarWebhook(client, CODIGO_PAREAMENTO, chat);
+  assert.equal(r.json.connected, false);
+  assert.match(r.resposta, /inválido|expirado/i);
+  assert.equal(t.telegram_connections.length, 0);
+});
+
+test('harness: duas tentativas simultâneas com o mesmo código só consomem uma vez', async () => {
+  const chat1 = novoChat();
+  const chat2 = novoChat();
+  const t = tabelasComCodigo();
+  const client = makeClient(t);
+  const [r1, r2] = await Promise.all([
+    enviarWebhook(client, CODIGO_PAREAMENTO, chat1),
+    enviarWebhook(client, CODIGO_PAREAMENTO, chat2),
+  ]);
+  const sucessos = [r1, r2].filter((r) => r.json.connected);
+  const falhas = [r1, r2].filter((r) => !r.json.connected);
+  assert.equal(sucessos.length, 1);
+  assert.equal(falhas.length, 1);
+  assert.match(sucessos[0].resposta, /sucesso/i);
+  assert.match(falhas[0].resposta, /inválido|expirado/i);
+  assert.equal(t.telegram_connections.length, 1);
+  assert.ok(t.telegram_connection_codes[0].used_at);
+});
+
+test('harness: falha na gravação da conexão não envia sucesso e não deixa conexão parcial', async () => {
+  const chat = novoChat();
+  const t = tabelasComCodigo();
+  const errorClient = { rpc: async () => ({ data: null, error: { message: 'falha simulada ao gravar conexão' } }) };
+  const r = await enviarWebhook(errorClient, CODIGO_PAREAMENTO, chat);
+  assert.equal(r.json.connected, false);
+  assert.match(r.resposta, /inválido|expirado/i);
+  assert.equal(t.telegram_connections.length, 0);
+  assert.equal(t.telegram_connection_codes[0].used_at, null);
 });

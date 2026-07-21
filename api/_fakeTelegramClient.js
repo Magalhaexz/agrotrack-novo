@@ -147,6 +147,32 @@ export function makeClient(tables) {
       }
       return { data: loteId };
     },
+    parear_telegram_por_codigo(p) {
+      const codigos = tables.telegram_connection_codes || (tables.telegram_connection_codes = []);
+      const codeRow = codigos.find((c) => c.code === p.p_code);
+      const usavel = codeRow && !codeRow.used_at && new Date(codeRow.expires_at).getTime() > Date.now();
+      if (!usavel) {
+        return { data: [{ sucesso: false, connection_id: null, owner_user_id: null, fazenda_id: null }] };
+      }
+      const conexoes = tables.telegram_connections || (tables.telegram_connections = []);
+      let conexao = conexoes.find((c) => String(c.user_id) === String(codeRow.user_id));
+      if (conexao) {
+        Object.assign(conexao, {
+          owner_user_id: codeRow.owner_user_id, fazenda_id: codeRow.fazenda_id,
+          telegram_chat_id: p.p_chat_id, telegram_username: p.p_username,
+          telegram_first_name: p.p_first_name, telegram_last_name: p.p_last_name, is_active: true,
+        });
+      } else {
+        conexao = {
+          id: nextId('telegram_connections'), owner_user_id: codeRow.owner_user_id, user_id: codeRow.user_id,
+          fazenda_id: codeRow.fazenda_id, telegram_chat_id: p.p_chat_id, telegram_username: p.p_username,
+          telegram_first_name: p.p_first_name, telegram_last_name: p.p_last_name, is_active: true,
+        };
+        conexoes.push(conexao);
+      }
+      codeRow.used_at = new Date().toISOString();
+      return { data: [{ sucesso: true, connection_id: conexao.id, owner_user_id: codeRow.owner_user_id, fazenda_id: codeRow.fazenda_id }] };
+    },
   };
 
   return {
