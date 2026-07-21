@@ -1,6 +1,7 @@
 import { isAnimalAtivo, safeDivide, toNonNegativeNumber, toNumber } from './calcHelpers.js';
 import { deveEntrarNoResultadoLote } from './financeiroStatus.js';
-import { calcularArrobasCarcaca, calcularArrobasPesoVivo, calcularCustoPorArrobaCarcaca, calcularLucroPorArrobaCarcaca } from './arroba.js';
+import { calcularArrobasPesoVivo, calcularCustoPorArrobaCarcaca, calcularLucroPorArrobaCarcaca } from './arroba.js';
+import { calcularBaseResultadoLote, calcularVendasDoLote, deduplicarLancamentos } from './vendaLote.js';
 
 /**
  * Verifica se um item pertence a um lote específico.
@@ -31,7 +32,9 @@ export function calcularCustoLote(db, loteId) {
     : [];
   const custos = Array.isArray(db?.custos) ? db.custos : [];
 
-  const despesasLote = movimentosFinanceiros.filter(
+  // Mesmo dedup por `id` da receita: despesa duplicada por reload/sync inflava
+  // o custo acumulado e, por tabela, derrubava lucro, margem e custo/@.
+  const despesasLote = deduplicarLancamentos(movimentosFinanceiros).filter(
     (mov) => mov.tipo === 'despesa' && pertenceAoLote(mov, loteId) && deveEntrarNoResultadoLote(mov)
   );
 
@@ -87,7 +90,10 @@ export function calcularReceitaLote(db, loteId) {
     ? db.movimentacoes_financeiras
     : [];
 
-  const receitasLote = movimentosFinanceiros.filter(
+  // Sprint 4: dedup por `id` antes de somar. Um reload ou uma sincronização que
+  // reanexe uma linha já presente em memória dobrava a receita do lote — e a
+  // receita dobrada aparecia em Resultados, Financeiro e Relatórios de uma vez.
+  const receitasLote = deduplicarLancamentos(movimentosFinanceiros).filter(
     (mov) => mov.tipo === 'receita' && pertenceAoLote(mov, loteId) && deveEntrarNoResultadoLote(mov)
   );
 
@@ -133,18 +139,26 @@ export function calcularResultadoLote(db, loteId) {
 
   const animais = Array.isArray(db?.animais) ? db.animais : [];
   const animaisLote = animais.filter((item) => pertenceAoLote(item, loteId) && isAnimalAtivo(item));
-  const qtdCabecas = animaisLote.reduce((acc, item) => acc + toNonNegativeNumber(item.qtd), 0);
-  const pesoMedioAtual = qtdCabecas
+  const qtdRegistrada = animaisLote.reduce((acc, item) => acc + toNonNegativeNumber(item.qtd), 0);
+  const pesoMedioAtual = qtdRegistrada
     ? safeDivide(
         animaisLote.reduce((acc, item) => acc + toNumber(item.p_at) * toNonNegativeNumber(item.qtd), 0),
-        qtdCabecas
+        qtdRegistrada
       )
     : 0;
-  const pesoTotalKg = qtdCabecas * pesoMedioAtual;
+
+  // Sprint 4: a base "por cabeça"/"por arroba" passa a ser o que o lote
+  // carregou (remanescente + vendido), e não só o rebanho que sobrou. Num lote
+  // 100% vendido o remanescente é zero, e custo/@, lucro/@ e lucro/cabeça
+  // viravam 0 mesmo com lucro real. Ver domain/vendaLote.js.
+  const base = calcularBaseResultadoLote(db, loteId);
+  const vendas = calcularVendasDoLote(db, loteId);
+  const qtdCabecas = base.cabecasBase;
+  const pesoTotalKg = base.pesoVivoRemanescenteKg + base.pesoVivoVendidoKg;
 
   const arrobaViva = calcularArrobasPesoVivo(pesoMedioAtual);
   // F-04: arrobas pelo peso de carcaça = peso vivo total × rendimento / 15
-  const arrobasCarcaca = calcularArrobasCarcaca(pesoTotalKg, rendimentoCarcaca);
+  const arrobasCarcaca = base.arrobasCarcacaBase;
 
   const lucroPorCabeca = safeDivide(lucroTotal, qtdCabecas);
   // Sprint 14: custo/@ e lucro/@ usam a MESMA base (arroba de carcaça) — antes
@@ -166,5 +180,17 @@ export function calcularResultadoLote(db, loteId) {
     arrobasCarcaca,
     custoPorArroba,
     lucroPorArroba,
+
+    // Venda realizada — fonte única (domain/vendaLote.js). Exposta aqui para
+    // que Resultados, Financeiro e Relatórios leiam os MESMOS números.
+    cabecasRemanescentes: base.cabecasRemanescentes,
+    cabecasVendidas: base.cabecasVendidas,
+    vendaTotal: base.vendaTotal,
+    pesoVivoVendidoKg: vendas.pesoVivoVendidoKg,
+    arrobasCarcacaVendidas: vendas.arrobasCarcacaVendidas,
+    valorBrutoVendas: vendas.valorBruto,
+    deducoesVendas: vendas.deducoes,
+    valorLiquidoVendas: vendas.valorLiquido,
+    precoPorArrobaCarcaca: vendas.precoPorArrobaCarcaca,
   };
 }

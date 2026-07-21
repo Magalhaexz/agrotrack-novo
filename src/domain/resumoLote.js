@@ -49,17 +49,17 @@ export function getResumoLote(db, loteId) {
   const lucroTotal = toNumber(financeiro?.lucroTotal);
   const margemPct = toNumber(financeiro?.margemPct);
 
-  const custoPorCabeca = safeDivide(custoTotal, totalAnimais);
-  // Sprint 14: custoPorArroba usa @ carcaça (mesma base de lucroPorArroba),
-  // não @ de ganho (arrobasProduzidas) — ver docs/DECISAO_CALCULO_ARROBA_HERDON.md.
-  const custoPorArroba = toNumber(financeiro?.custoPorArroba) || safeDivide(custoTotal, arrobasCarcaca);
-  // Seção 8 (auditoria lote.qtd): antes preferia financeiro?.lucroPorCabeca —
-  // calculado em calculos.js::calcularResultadoLote a partir de animais.qtd,
-  // que pode divergir de lote.qtd (fonte canônica, Parte 1.3). custoPorCabeca
-  // acima já sempre dividia por totalAnimais (calcLote, corrigido); alinhado
-  // aqui para não haver duas divisões diferentes dentro do mesmo resumo.
-  const lucroPorCabeca = safeDivide(lucroTotal, totalAnimais);
-  const lucroPorArroba = toNumber(financeiro?.lucroPorArroba) || safeDivide(lucroTotal, arrobasCarcaca);
+  // Sprint 4: custo/cabeça, custo/@, lucro/cabeça e lucro/@ passam a vir todos
+  // de `calcularResultadoLote`, que usa a base única (remanescente + vendido —
+  // ver domain/vendaLote.js). Antes este resumo dividia por `totalAnimais`
+  // (rebanho remanescente, de calcLote) enquanto o financeiro dividia pela sua
+  // própria contagem: dois "lucro por cabeça" diferentes para o mesmo lote, e
+  // ambos zerando num lote 100% vendido.
+  const cabecasBase = toNumber(financeiro?.qtdCabecas);
+  const custoPorCabeca = safeDivide(custoTotal, cabecasBase);
+  const custoPorArroba = toNumber(financeiro?.custoPorArroba);
+  const lucroPorCabeca = toNumber(financeiro?.lucroPorCabeca);
+  const lucroPorArroba = toNumber(financeiro?.lucroPorArroba);
 
   const classificacao = lucroTotal > 0 ? 'lucro' : lucroTotal < 0 ? 'prejuizo' : 'empate';
 
