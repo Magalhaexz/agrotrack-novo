@@ -4,6 +4,12 @@ import { verificarCarenciaAtivaLote } from '../domain/agendaSanitaria.js';
 import { ANIMAL_INDIVIDUAL_INACTIVE_STATUSES, isAnimalIndividualAtivo } from '../domain/statusAnimal.js';
 import { formatarData } from '../utils/formatters.js';
 import { validarBaixaRebanho } from '../domain/rebanho.js';
+import {
+  calcularCustoMedioPonderado,
+  obterCustoUnitarioItem,
+  obterSaldoItemEstoque,
+  validarSaidaEstoque,
+} from '../domain/estoque.js';
 
 export { isAnimalIndividualAtivo } from '../domain/statusAnimal.js';
 import {
@@ -819,10 +825,19 @@ export function registrarEntradaEstoque(
       Number(entry.id) === Number(itemId)
         ? {
             ...entry,
-            quantidade_atual: toNumber(entry.quantidade_atual) + quantidade,
-            // Atualiza o valor unitário com o custo da última entrada.
-            // Para um sistema mais robusto, considerar custo médio ponderado.
-            valor_unitario: custoUnitario,
+            quantidade_atual: obterSaldoItemEstoque(entry) + quantidade,
+            quantidade: obterSaldoItemEstoque(entry) + quantidade,
+            // Sprint 5: MÉDIA MÓVEL PONDERADA. Antes gravava o custo da ÚLTIMA
+            // compra aqui, e o campo se chamava "custo médio" em toda a UI.
+            // Medido: 100 kg a R$ 2,00 + 100 kg a R$ 4,00 avaliavam o estoque
+            // em R$ 800,00 contra R$ 600,00 gastos (+33,3%), e o consumo
+            // lançado no lote herdava o preço inflado.
+            valor_unitario: calcularCustoMedioPonderado({
+              saldoAtual: obterSaldoItemEstoque(entry),
+              custoMedioAtual: obterCustoUnitarioItem(entry),
+              qtdEntrada: quantidade,
+              custoEntrada: custoUnitario,
+            }),
           }
         : entry
     ),
@@ -896,21 +911,16 @@ export function registrarSaidaEstoque(
 
   const estoque = Array.isArray(db?.estoque) ? db.estoque : [];
   const item = estoque.find((entry) => Number(entry.id) === Number(itemId));
-  if (!item) {
-    throw new Error('Item de estoque não encontrado.');
-  }
 
+  // Sprint 5: validação única (domain/estoque.js). Antes esta era uma cópia
+  // local da regra, e o consumo pela Nutrição tinha a sua própria — que
+  // PERMITIA saldo negativo mediante confirmação. Agora os dois caminhos usam
+  // a mesma checagem e a mesma mensagem.
+  const validacao = validarSaidaEstoque(item, quantidade);
+  if (!validacao.ok) {
+    throw new Error(validacao.erro);
+  }
   const qtd = toNumber(quantidade);
-  if (qtd <= 0) {
-    throw new Error('Informe uma quantidade válida.');
-  }
-
-  const saldoAtual = toNumber(item.quantidade_atual);
-  if (qtd > saldoAtual) {
-    throw new Error(
-      `Saldo insuficiente. Disponível: ${saldoAtual} ${item?.unidade || ''}`.trim()
-    );
-  }
 
   const movimentosEstoque = Array.isArray(db?.movimentacoes_estoque)
     ? db.movimentacoes_estoque
@@ -920,7 +930,7 @@ export function registrarSaidaEstoque(
     : [];
 
   const novoMovEstoqueId = gerarNovoId(movimentosEstoque);
-  const custoUnit = toNumber(item.valor_unitario); // Custo unitário do item no estoque
+  const custoUnit = obterCustoUnitarioItem(item); // Média móvel ponderada do item
   const valorTotalSaida = qtd * custoUnit;
 
   const baseAtualizada = {
@@ -941,7 +951,10 @@ export function registrarSaidaEstoque(
     ],
     estoque: estoque.map((entry) =>
       Number(entry.id) === Number(itemId)
-        ? { ...entry, quantidade_atual: saldoAtual - qtd }
+        // Mantém `quantidade` (espelho legado) em sincronia com
+        // `quantidade_atual`, senão as duas colunas divergem e cada tela lê
+        // uma. O custo médio NÃO muda numa saída — só entradas o reponderam.
+        ? { ...entry, quantidade_atual: validacao.saldoFinal, quantidade: validacao.saldoFinal }
         : entry
     ),
     movimentacoes_financeiras: [

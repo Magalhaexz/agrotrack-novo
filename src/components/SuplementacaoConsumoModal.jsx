@@ -7,6 +7,7 @@ import { gerarNovoId } from '../utils/id';
 import { formatNumber } from '../utils/calculations';
 import { toNumber } from '../domain/calcHelpers.js';
 import { calcularCustoConsumo } from '../domain/custoProdutoNutricional';
+import { validarSaidaEstoque } from '../domain/estoque.js';
 import { createOperationalRecord, updateOperationalRecord } from '../services/operationalPersistence';
 
 import { hojeLocalISO } from '../domain/dataCivil.js';
@@ -250,7 +251,13 @@ export default function SuplementacaoConsumoModal({ db, setDb, session, activeFa
       return;
     }
 
-    if (preview.warningInsufficient && !window.confirm('Consumo maior que estoque disponível. Deseja continuar com saldo negativo?')) {
+    // Sprint 5: este era o único caminho de saída que aceitava deixar o estoque
+    // negativo — bastava confirmar. A tela de Estoque já bloqueava. Agora os
+    // dois usam a mesma validação (domain/estoque.js::validarSaidaEstoque) e a
+    // mesma mensagem; um saldo negativo nunca é registrado por este fluxo.
+    const validacaoSaida = validarSaidaEstoque(preview.selectedProduct, preview.total);
+    if (!validacaoSaida.ok) {
+      setErro(validacaoSaida.erro);
       return;
     }
 
