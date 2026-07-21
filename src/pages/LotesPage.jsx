@@ -10,6 +10,7 @@ import { useToast } from '../hooks/useToast';
 import { getResumoLote } from '../domain/resumoLote';
 import { isModoConsolidado } from '../domain/escopoFazenda';
 import { calcularSaudeLote } from '../domain/saudeLote';
+import { gmdDoLote } from '../domain/gmd.js';
 import { gerarResumoRelatorioLote } from '../domain/relatorioLote';
 import { gerarResumoLoteTexto } from '../domain/whatsappResumo';
 import { calcLote, formatCurrency, formatDate, formatNumber } from '../utils/calculations';
@@ -32,7 +33,6 @@ import { moverLoteParaPasto, listarHistoricoPastos } from '../services/movimenta
 import { buildGrupoAnimaisAutoPatch, buildPesagemInicialPatch, buildAjusteLotacaoPatch, loteEstaBloqueado } from './lotesLogic';
 import { useUrlState } from '../navigation/useUrlState.js';
 import {
-  addDaysToDate,
   calculateDailyConsumptionKg,
   daysBetween,
   toDateKey,
@@ -47,27 +47,6 @@ function daysFrom(dateValue) {
   return Math.max(0, daysBetween(key, hojeLocalISO()));
 }
 
-function calculateGmd30(pesagens = []) {
-  const sorted = [...pesagens]
-    .map((item) => ({ ...item, data: toDateKey(item?.data) }))
-    .filter((item) => item.data)
-    .sort((a, b) => a.data.localeCompare(b.data));
-  if (sorted.length < 2) return 0;
-  const last = sorted[sorted.length - 1];
-  const targetDate = addDaysToDate(last.data, -30);
-
-  let start = sorted[0];
-  for (let i = sorted.length - 1; i >= 0; i -= 1) {
-    if (sorted[i].data <= targetDate) {
-      start = sorted[i];
-      break;
-    }
-  }
-
-  const gain = toNumber(last.peso_medio) - toNumber(start.peso_medio);
-  const days = Math.max(1, daysBetween(start.data, last.data));
-  return gain / days;
-}
 
 // Mesma regra de cor que LoteCard.jsx usava (removida de lá — a lista agora
 // é tabela, não cards).
@@ -339,7 +318,11 @@ export default function LotesPage({ db, setDb, onRegistrarSaidaAnimal, session, 
       saude,
       progressoPeso,
       ultimaPesagem: latestPesagem?.data || null,
-      gmd30: calculateGmd30(lotePesagens),
+      // GMD de vida (entrada → última pesagem), fonte única em domain/gmd.js.
+      // Antes esta coluna usava uma janela de 30 dias com o mesmo rótulo "GMD"
+      // que as outras telas usavam para o GMD acumulado — divergência de até
+      // 8x no mesmo lote. `null` = sem dado (a coluna já exibe "—").
+      gmd: gmdDoLote(lote, lotePesagens),
       gmdMeta: toNumber(lote.gmd_meta),
       qtdPesagens: lotePesagens.length,
       fazendaNome,
@@ -1037,7 +1020,7 @@ export default function LotesPage({ db, setDb, onRegistrarSaidaAnimal, session, 
                   <th>Categoria</th>
                   <th>Cabeças</th>
                   <th>Peso médio</th>
-                  <th>GMD (30d)</th>
+                  <th>GMD</th>
                   <th>Resultado</th>
                   <th>Status</th>
                 </tr>
@@ -1062,7 +1045,7 @@ export default function LotesPage({ db, setDb, onRegistrarSaidaAnimal, session, 
                     <td>{lote.categoriaAnimal}</td>
                     <td>{formatNumber(lote.heads, 0)}</td>
                     <td>{lote.pesoAtual > 0 ? `${formatNumber(lote.pesoAtual, 1)} kg` : '—'}</td>
-                    <td>{lote.qtdPesagens > 0 ? `${formatNumber(lote.gmd30, 2)} kg/dia` : '—'}</td>
+                    <td>{lote.gmd !== null ? `${formatNumber(lote.gmd, 2)} kg/dia` : '—'}</td>
                     <td>{formatCurrency(lote.resumo?.lucroTotal || 0)}</td>
                     <td><Badge variant={statusVariantLote(lote.status)}>{lote.status}</Badge></td>
                   </tr>
@@ -1099,8 +1082,8 @@ export default function LotesPage({ db, setDb, onRegistrarSaidaAnimal, session, 
                     <strong>{previewLote.pesoAtual > 0 ? `${formatNumber(previewLote.pesoAtual, 1)} kg` : '—'}</strong>
                   </div>
                   <div>
-                    <span>GMD (30d)</span>
-                    <strong>{previewLote.qtdPesagens > 0 ? `${formatNumber(previewLote.gmd30, 2)} kg/dia` : '—'}</strong>
+                    <span>GMD</span>
+                    <strong>{previewLote.gmd !== null ? `${formatNumber(previewLote.gmd, 2)} kg/dia` : '—'}</strong>
                   </div>
                   <div>
                     <span>Resultado</span>

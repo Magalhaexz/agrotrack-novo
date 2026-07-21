@@ -4,7 +4,6 @@ import {
   resolveTipoPesagem,
   resolverUltimaPesagemLote,
   recalcularPesoAtualLote,
-  calculateAverageGmdByLote,
 } from './pesagensLote.js';
 
 test('resolveTipoPesagem distingue lote de animal', () => {
@@ -55,18 +54,4 @@ test('recalcularPesoAtualLote ignora pesagens de outros lotes e de animal indivi
   ];
   const r = recalcularPesoAtualLote(db, 10, pesagens);
   assert.equal(r.pesoAtual, 300);
-});
-
-test('calculateAverageGmdByLote calcula ganho médio diário entre primeira e última pesagem', () => {
-  const pesagens = [
-    { lote_id: 1, data: '2026-07-01', peso_medio: 300 },
-    { lote_id: 1, data: '2026-07-11', peso_medio: 310 },
-  ];
-  const gmd = calculateAverageGmdByLote(pesagens);
-  assert.equal(gmd, 1);
-});
-
-test('calculateAverageGmdByLote retorna null sem pesagens suficientes', () => {
-  assert.equal(calculateAverageGmdByLote([]), null);
-  assert.equal(calculateAverageGmdByLote([{ lote_id: 1, data: '2026-07-01', peso_medio: 300 }]), null);
 });
