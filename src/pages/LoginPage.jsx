@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react';
-import { Eye, EyeOff } from 'lucide-react';
+import { Activity, BarChart3, Beef, ClipboardList, Eye, EyeOff } from 'lucide-react';
 import logoAgrotrack from '../assets/logo_app1.png';
 import loginBg from '../assets/login-cattle-bg.png';
 import { useAuth } from '../auth/useAuth';
@@ -468,19 +468,37 @@ export default function LoginPage() {
   }
 
   return (
-    <div className="login-page">
-      <section className="login-form-panel">
-        <div className="login-page-frame">
-          <header className="login-brand-header">
-            <div className="login-brand-mark">
-              <img src={logoAgrotrack} alt="HERDON" loading="lazy" />
-            </div>
-            <div className="login-brand-logo">HERDON</div>
-          </header>
+    <div className="login-page" style={{ '--login-bg-image': `url(${loginBg})` }}>
+      <div className="login-page-rings" aria-hidden="true" />
+      <div className="login-page-frame">
+        <header className="login-brand-header">
+          <div className="login-brand-mark">
+            <img src={logoAgrotrack} alt="HERDON" loading="lazy" />
+          </div>
+          <div className="login-brand-logo">HERDON</div>
+          <div className="login-brand-sub">Gestão inteligente. Resultados reais.</div>
+          <div className="login-brand-icons" aria-hidden="true">
+            <Beef size={16} />
+            <BarChart3 size={16} />
+            <ClipboardList size={16} />
+            <Activity size={16} />
+          </div>
+        </header>
 
-          <div className="login-form-side">
-            <div className="login-form-shell">
-              <div className="login-card">
+        <div className="login-hero-copy">
+          <h1 className="login-brand-title">
+            A operação do rebanho com mais{' '}
+            <span className="login-brand-title-accent">clareza, ritmo e decisão.</span>
+          </h1>
+          <p className="login-brand-description">
+            Centralize rebanho, pesagens, manejo, estoque e financeiro em uma
+            experiência mais limpa, segura e pronta para decisão diária.
+          </p>
+        </div>
+
+        <section className="login-form-side">
+          <div className="login-form-shell">
+            <div className="login-card">
             <div className="login-card-topline">
               <span className="login-card-kicker">Acesso seguro</span>
               <span className="login-card-chip">
@@ -727,26 +745,9 @@ export default function LoginPage() {
               </div>
             </div>
           </div>
-          </div>
         </div>
-        </div>
-      </section>
-
-      <aside className="login-image-panel" aria-hidden="true">
-        <img src={loginBg} alt="" className="login-image-panel-img" loading="lazy" />
-        <div className="login-image-panel-gradient" />
-        <div className="login-hero-copy">
-          <div className="login-image-panel-accent" />
-          <p className="login-brand-title">
-            A operação do rebanho com mais{' '}
-            <span className="login-brand-title-accent">clareza, ritmo e decisão.</span>
-          </p>
-          <p className="login-brand-description">
-            Centralize rebanho, pesagens, manejo, estoque e financeiro em uma
-            experiência mais limpa, segura e pronta para decisão diária.
-          </p>
-        </div>
-      </aside>
+        </section>
+      </div>
     </div>
   );
 }
