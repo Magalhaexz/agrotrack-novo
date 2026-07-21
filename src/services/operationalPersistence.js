@@ -1,4 +1,5 @@
 ﻿import { getSupabaseEnvStatus, supabase, validateSupabaseSessionForCloud } from '../lib/supabase.js';
+const IS_DEV = typeof import.meta !== 'undefined' && Boolean(import.meta?.env?.DEV);
 const NETWORK_CIRCUIT_OPEN_MS = 45000;
 const moduleNetworkCircuit = new Map();
 const OWNER_SCOPE_OPTIONAL_TABLES = new Set([]);
@@ -64,7 +65,7 @@ function isSchemaCompatibilityError(error) {
 }
 
 function logSupabase400Diagnostic(event = {}) {
-  if (!import.meta.env.DEV) return;
+  if (!IS_DEV) return;
   console.warn('[HERDON_SUPABASE_400_DIAGNOSTIC]', {
     table: event.table || null,
     action: event.action || null,
@@ -198,7 +199,7 @@ function logModuleSyncEvent({
   postgrestCode = null,
   safeMessage = null,
 }, level = 'debug') {
-  if (!import.meta.env.DEV) return;
+  if (!IS_DEV) return;
   const logger = level === 'warn' ? console.warn : console.info;
   logger('[HERDON_CLOUD_MODULE_SYNC]', {
     module: module || null,
@@ -240,7 +241,7 @@ function classifyOperationalError(error, fallbackMessage, table = null) {
 }
 
 function logOperationalSync(event = {}, level = 'debug') {
-  if (!import.meta.env.DEV) return;
+  if (!IS_DEV) return;
   const logger = level === 'warn' ? console.warn : console.debug;
   logger('[HERDON_OPERATIONAL_SYNC]', {
     stage: event.stage || null,
@@ -292,7 +293,7 @@ function emitCloudSaveState({ table, action, syncStatus, code, message, session,
 }
 
 function logCloudRuntime(event = {}, level = 'debug') {
-  if (!import.meta.env.DEV) return;
+  if (!IS_DEV) return;
   const logger = level === 'warn' ? console.warn : console.debug;
   logger('[HERDON_CLOUD_RUNTIME]', {
     hasSession: Boolean(event.hasSession),
@@ -410,7 +411,7 @@ const EXPECTED_SCHEMA_TABLES = Object.freeze([
 ]);
 
 function registerSchemaDebugHelpers() {
-  if (!import.meta.env.DEV || typeof window === 'undefined') return;
+  if (!IS_DEV || typeof window === 'undefined') return;
   if (window.HERDON_SCHEMA_DEBUG) return;
   window.HERDON_SCHEMA_DEBUG = {
     getPendingSchemaErrors() {
@@ -460,7 +461,7 @@ export async function ensureSupabaseRequestReadiness(session, context = {}) {
     const activeUserId = activeSession?.user?.id || null;
     const hasAccessToken = Boolean(activeSession?.access_token);
     if (!validated?.ok || !activeUserId || !hasAccessToken || String(activeUserId) !== String(sessionUserId)) {
-      if (!validated?.ok && import.meta.env.DEV) {
+      if (!validated?.ok && IS_DEV) {
         console.info('[HERDON_CLOUD_AUTH_DIAGNOSTIC]', {
           hasSession: Boolean(validated?.authState?.hasSession),
           hasAccessToken: Boolean(validated?.authState?.hasAccessToken),
@@ -1423,7 +1424,7 @@ function validateFazendaCreatePayload(payload = {}, session) {
     safeMessage = 'Falha de validaÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â§ÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â£o do cadastro da fazenda.';
   }
 
-  if (import.meta.env.DEV) {
+  if (IS_DEV) {
     console.debug('[HERDON_FAZENDA_CLOUD_ID_PAYLOAD_CHECK]', {
       hasOwnerUserId,
       hasNome,
@@ -1870,6 +1871,7 @@ export async function processPendingSyncQueue(session, options = {}) {
   const remaining = [...queue];
   let synced = 0;
   let failed = 0;
+  const syncedItems = [];
 
   for (const item of slice) {
     const fingerprint = buildQueueFingerprint(item);
@@ -1892,7 +1894,7 @@ export async function processPendingSyncQueue(session, options = {}) {
       : current?.action === 'update'
         ? buildOperationalUpdatePayload(current.table, current.payload || {}, getSessionUserId(session))
         : buildOperationalCreatePayload(current.table, current.payload || {}, getSessionUserId(session));
-    if (import.meta.env.DEV) {
+    if (IS_DEV) {
       console.info('[HERDON_PENDING_SYNC_PROCESS]', { queueCount: remaining.length, table: current?.table || null, action: current?.action || null, retryCount, code: current?.code || null, message: current?.message || null });
       console.info('[HERDON_PENDING_SYNC_PAYLOAD]', { table: current?.table || null, action: current?.action || null, payloadKeys: Object.keys(current?.payload || {}), hasId: Object.hasOwn(current?.payload || {}, 'id'), hasMetadataLocalId: Boolean(current?.payload?.metadata?.local_id), normalizedPayloadKeys: Object.keys(normalizedPayload || {}) });
     }
@@ -1918,6 +1920,12 @@ export async function processPendingSyncQueue(session, options = {}) {
     if (result?.persisted) {
       remaining.splice(baseIndex, 1);
       synced += 1;
+      syncedItems.push({
+        table: current?.table || null,
+        action: current?.action || null,
+        localId,
+        data: result?.data || null,
+      });
       continue;
     }
 
@@ -1938,7 +1946,7 @@ export async function processPendingSyncQueue(session, options = {}) {
       code: nextCode,
       message: nextMessage,
     };
-    if (import.meta.env.DEV) {
+    if (IS_DEV) {
       const safe = getSafeErrorDetails(result);
       console.info('[HERDON_PENDING_SYNC_RESULT]', { table: current?.table || null, action: current?.action || null, syncStatus: result?.syncStatus || 'pending_sync', code: nextCode, httpStatus: getHttpStatus(result), safeMessage: nextMessage, safeDetails: safe?.details || null, safeHint: safe?.hint || null });
     }
@@ -1953,7 +1961,73 @@ export async function processPendingSyncQueue(session, options = {}) {
     failed,
     pendingCount: remaining.length,
     firstError: firstError ? { code: firstError.code, message: firstError.message } : null,
+    syncedItems,
   };
+}
+
+function recordMatchesLocalId(row, localId) {
+  if (localId === null || localId === undefined) return false;
+  const rowId = row?.id;
+  const rowLocalId = row?.metadata?.local_id;
+  return String(rowId ?? '') === String(localId) || String(rowLocalId ?? '') === String(localId);
+}
+
+/**
+ * Aplica os itens sincronizados com sucesso (retornados por processPendingSyncQueue)
+ * ao estado local, substituindo o registro otimista (identificado por id local ou
+ * metadata.local_id) pelo registro real da nuvem. Evita duplicidade quando a
+ * sincronização em segundo plano confirma um registro criado offline.
+ */
+export function reconcileSyncedRecords(dbState, syncedItems = []) {
+  if (!Array.isArray(syncedItems) || !syncedItems.length) return dbState;
+  let nextDb = { ...(dbState || {}) };
+
+  syncedItems.forEach((item) => {
+    const table = item?.table;
+    if (!table) return;
+    const rows = Array.isArray(nextDb[table]) ? nextDb[table] : [];
+
+    if (item.action === 'delete') {
+      nextDb = { ...nextDb, [table]: rows.filter((row) => !recordMatchesLocalId(row, item.localId)) };
+      return;
+    }
+
+    if (!item.data) return;
+    const matchIndex = rows.findIndex((row) => recordMatchesLocalId(row, item.localId));
+    if (matchIndex === -1) {
+      nextDb = { ...nextDb, [table]: [...rows, item.data] };
+      return;
+    }
+    const nextRows = [...rows];
+    nextRows[matchIndex] = item.data;
+    nextDb = { ...nextDb, [table]: nextRows };
+  });
+
+  return nextDb;
+}
+
+/**
+ * Mescla registros criados offline (ainda pendentes na fila de sincronização) ao
+ * snapshot recém-carregado da nuvem, para que sobrevivam a um reload antes de
+ * sincronizar. Itens já confirmados na nuvem (presentes no snapshot) não são
+ * duplicados.
+ */
+export function mergePendingCreatesIntoSnapshot(table, snapshotRows = [], pendingQueue = []) {
+  const rows = Array.isArray(snapshotRows) ? snapshotRows : [];
+  const pendingCreates = (Array.isArray(pendingQueue) ? pendingQueue : []).filter((item) => (
+    item?.action === 'create' && String(item?.table || '') === String(table || '')
+  ));
+  if (!pendingCreates.length) return rows;
+
+  const extras = pendingCreates
+    .map((item) => {
+      const localId = item?.localId ?? item?.payload?.metadata?.local_id ?? item?.payload?.id ?? null;
+      if (localId === null || rows.some((row) => recordMatchesLocalId(row, localId))) return null;
+      return { ...(item?.payload || {}), id: item?.payload?.id ?? localId };
+    })
+    .filter(Boolean);
+
+  return extras.length ? [...rows, ...extras] : rows;
 }
 
 export async function upsertOperationalRecord(table, record, session) {
@@ -2016,7 +2090,7 @@ export async function deleteOwnerScopedCollection(table, session, extraFilters =
 
 
 function isAuthDebugEnabled() {
-  if (import.meta.env.DEV) return true;
+  if (IS_DEV) return true;
   try {
     return String(localStorage.getItem('HERDON_SHOW_AUTH_DEBUG') || '').toLowerCase() === 'true';
   } catch {
@@ -2337,7 +2411,7 @@ export async function syncLotesWithCloud({ lotes = [], session }) {
   return buildModuleSyncResult({ module: 'lotes', status: 'success', message: 'Lotes sincronizados.', data: mergeLotesSafe(localRows, remoteList), syncedCount, failedCount, selectedCount: Array.isArray(remoteList) ? remoteList.length : 0 });
 }
 
-if (import.meta.env.DEV && typeof window !== 'undefined') {
+if (IS_DEV && typeof window !== 'undefined') {
   window.HERDON_SYNC_DEBUG = {
     clearPendingQueue() {
       writePendingSyncQueue([]);

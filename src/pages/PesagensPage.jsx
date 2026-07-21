@@ -632,7 +632,7 @@ export default function PesagensPage({ db, setDb, onConfirmAction, navigationInt
       return;
     }
 
-    if (pesagemEditando) {
+    if (pesagemEditando?.id) {
       const pesagemPersistida = await updateOperationalRecord('pesagens', pesagemEditando.id, dados, session);
       const registroAtualizado = { ...pesagemEditando, ...(pesagemPersistida.data || dados) };
 
@@ -680,8 +680,10 @@ export default function PesagensPage({ db, setDb, onConfirmAction, navigationInt
       }
       showToast({ type: 'success', message: 'Pesagem atualizada com sucesso!' });
     } else {
-      const pesagemPersistida = await createOperationalRecord('pesagens', dados, session);
-      const novaPesagem = pesagemPersistida.data || { id: gerarNovoId(pesagens || []), ...dados };
+      const localId = gerarNovoId(pesagens || []);
+      const dadosComId = { ...dados, id: localId, metadata: { ...(dados.metadata || {}), local_id: localId } };
+      const pesagemPersistida = await createOperationalRecord('pesagens', dadosComId, session);
+      const novaPesagem = pesagemPersistida.data || dadosComId;
 
       setDb((prev) => {
         const pesagensAtuais = Array.isArray(prev?.pesagens) ? prev.pesagens : [];

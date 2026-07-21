@@ -6,7 +6,7 @@ import {
   deleteOwnerScopedCollection,
 } from '../src/services/operationalPersistence.js';
 import { supabase } from '../src/lib/supabase.js';
-import { makeSession } from './fixtures.js';
+import { makeSession, mockValidSupabaseAuthSession } from './fixtures.js';
 
 function mockInsertSuccess(capture) {
   supabase.from = () => ({
@@ -23,6 +23,7 @@ function mockInsertSuccess(capture) {
 
 test('createOperationalRecord injeta owner_user_id da sessão e ignora owner vindo da UI', async () => {
   const capture = {};
+  mockValidSupabaseAuthSession(supabase);
   mockInsertSuccess(capture);
   const result = await createOperationalRecord('tarefas', {
     titulo: 'Tarefa',
@@ -41,6 +42,7 @@ test('createOperationalRecord sem sessão retorna fallback seguro', async () => 
 });
 
 test('createOperationalRecord com erro do supabase retorna falha estruturada', async () => {
+  mockValidSupabaseAuthSession(supabase);
   supabase.from = () => ({
     insert: () => ({
       select: () => ({
@@ -51,7 +53,9 @@ test('createOperationalRecord com erro do supabase retorna falha estruturada', a
 
   const result = await createOperationalRecord('tarefas', { titulo: 'x' }, makeSession());
   assert.equal(result.persisted, false);
-  assert.match(String(result.error), /erro remoto/i);
+  assert.equal(result.syncStatus, 'pending_sync');
+  assert.ok(result.code, 'deve classificar um código de erro');
+  assert.ok(String(result.error || '').length > 0, 'deve retornar uma mensagem segura para o usuário');
 });
 
 test('deleteOwnerScopedCollection aplica filtro owner_user_id da sessão', async () => {
@@ -81,6 +85,7 @@ test('deleteOwnerScopedCollection aplica filtro owner_user_id da sessão', async
 
 test('createAuditEvent remove campos sensíveis de detalhes e não propaga secrets', async () => {
   const capture = {};
+  mockValidSupabaseAuthSession(supabase);
   mockInsertSuccess(capture);
   const result = await createAuditEvent({
     acao: 'teste',

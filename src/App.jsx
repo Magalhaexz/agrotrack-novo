@@ -36,6 +36,7 @@ import {
   createOperationalRecord,
   getPendingSyncQueueSnapshot,
   processPendingSyncQueue,
+  reconcileSyncedRecords,
 } from './services/operationalPersistence';
 import { buildAlerts } from './utils/alerts';
 import './styles/app.css';
@@ -305,7 +306,10 @@ export default function App() {
 
     async function runRetry() {
       if (!session?.user?.id) return;
-      await processPendingSyncQueue(session, { maxItems: 20 });
+      const result = await processPendingSyncQueue(session, { maxItems: 20 });
+      if (result?.syncedItems?.length) {
+        setDb((prev) => reconcileSyncedRecords(prev, result.syncedItems));
+      }
       refreshPendingState();
     }
 
@@ -342,7 +346,7 @@ export default function App() {
       window.removeEventListener('online', handleOnline);
       window.removeEventListener('herdon-cloud-diagnostic-state', handleDiagnostic);
     };
-  }, [session?.user?.id, session]);
+  }, [session?.user?.id, session, setDb]);
 
 
   useEffect(() => {

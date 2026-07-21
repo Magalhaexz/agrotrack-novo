@@ -8,10 +8,12 @@ import { TIPOS_SAIDA_ANIMAL } from '../utils/constantes';
 import { formatarData, formatarNumero } from '../utils/formatters';
 import { gerarNovoId } from '../utils/id';
 import { useAuth } from '../auth/useAuth';
+import { useToast } from '../hooks/useToast';
 import { createOperationalRecord, deleteOperationalRecord, updateOperationalRecord } from '../services/operationalPersistence';
 
 export default function AnimaisPage({ db, setDb, onConfirmAction }) {
   const { hasPermission, session } = useAuth();
+  const { showToast } = useToast();
   const [abrirForm, setAbrirForm] = useState(false);
   const [animalEditando, setAnimalEditando] = useState(null);
   const [abaAtiva, setAbaAtiva] = useState('grupos');
@@ -43,12 +45,19 @@ export default function AnimaisPage({ db, setDb, onConfirmAction }) {
   }
 
   async function salvarAnimal(dados) {
-    if (animalEditando) {
+    if (animalEditando?.id) {
       const persisted = await updateOperationalRecord('animais', animalEditando.id, dados, session);
       setDb((prev) => ({ ...prev, animais: (prev.animais || []).map((animal) => (animal.id === animalEditando.id ? { ...animal, ...(persisted.data || dados) } : animal)) }));
+      if (persisted.syncStatus === 'cloud_success') showToast({ type: 'success', message: 'Animal atualizado na nuvem.' });
+      else showToast({ type: 'warning', message: 'Alteração salva localmente. Sincronização pendente.' });
     } else {
-      const persisted = await createOperationalRecord('animais', dados, session);
-      setDb((prev) => ({ ...prev, animais: [...(prev.animais || []), persisted.data || { id: gerarNovoId(prev.animais || []), ...dados }] }));
+      const localId = gerarNovoId(animais);
+      const dadosComId = { ...dados, id: localId, metadata: { ...(dados.metadata || {}), local_id: localId } };
+      const persisted = await createOperationalRecord('animais', dadosComId, session);
+      const incoming = persisted.data || dadosComId;
+      setDb((prev) => ({ ...prev, animais: [...(prev.animais || []), incoming] }));
+      if (persisted.syncStatus === 'cloud_success') showToast({ type: 'success', message: 'Animal salvo na nuvem.' });
+      else showToast({ type: 'warning', message: 'Animal salvo localmente. Sincronização pendente.' });
     }
     setAbrirForm(false);
     setAnimalEditando(null);

@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { supabase } from '../lib/supabase';
+import { getPendingSyncQueueSnapshot, mergePendingCreatesIntoSnapshot } from '../services/operationalPersistence';
 
 const OPERACIONAL_TABLES = [
   'fazendas',
@@ -588,7 +589,16 @@ export function useOperationalData(initialDb, session, options = {}) {
         }
 
         const snapshot = snapshotResult?.snapshot || {};
-        setDbState(createOperationalFallbackDb(snapshot));
+        const pendingQueue = getPendingSyncQueueSnapshot().queue;
+        const snapshotWithPending = pendingQueue.length
+          ? Object.fromEntries(
+              OPERACIONAL_TABLES.map((table) => [
+                table,
+                mergePendingCreatesIntoSnapshot(table, snapshot[table], pendingQueue),
+              ])
+            )
+          : snapshot;
+        setDbState(createOperationalFallbackDb(snapshotWithPending));
         if (snapshotResult?.circuitOpen) {
           setDataSource('offline_circuit_open');
           setDataError(new Error('Sincronizacao com a nuvem instavel. O app continuara em modo local.'));
