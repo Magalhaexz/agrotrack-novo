@@ -184,7 +184,6 @@ export const permissoesPorPagina = {
   evolucaoRebanho: 'evolucao_rebanho:ver',
   indicadores: 'indicadores:ver',
   cenarios: 'cenarios:ver',
-  dashboardPremium: 'dashboard_premium:ver',
   relatoriosGerenciais: 'relatorios_gerenciais:ver',
   relatorios: 'relatorios:ver',
   relatorioLote: 'relatorios:ver',

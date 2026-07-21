@@ -27,7 +27,6 @@ const pageRouteMap = {
   evolucaoRebanho: '/evolucao-rebanho',
   indicadores: '/indicadores',
   cenarios: '/cenarios',
-  dashboardPremium: '/dashboard-premium',
   relatoriosGerenciais: '/relatorios-gerenciais',
   relatorios: '/relatorios',
   relatorioLote: '/relatorio-lote',
@@ -58,6 +57,10 @@ export const legacyRouteAliases = {
   // AcompanhamentoPesoPage foi unificada em Pesagens (aba "Nova pesagem" /
   // "Evolução" cobrem tudo que a página separada fazia).
   '/acompanhamento-peso': 'pesagens',
+  // DashboardPremiumPage foi removida por ser subconjunto estrito do Painel
+  // Gerencial (mesmos 12 indicadores, contra 17 de relatoriosGerenciais).
+  // Alias mantém links salvos e bookmarks funcionando.
+  '/dashboard-premium': 'relatoriosGerenciais',
 };
 
 export { pageRouteMap };
