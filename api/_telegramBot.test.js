@@ -150,6 +150,53 @@ function makeClient(tables) {
       }
       return { data: loteId };
     },
+    // P1-03: entrada/saída de estoque via bot passaram a usar RPC transacional
+    // (migration 20260721210000) em vez de writes sequenciais sem checagem de
+    // erro — espelha a mesma lógica em `_fakeTelegramClient.js`.
+    registrar_entrada_estoque_telegram(p) {
+      const item = (tables.estoque || []).find((e) => String(e.id) === String(p.p_item_estoque_id) && e.owner_user_id === p.p_owner_user_id);
+      if (!item) return { error: 'ITEM_NAO_ENCONTRADO' };
+      const movId = nextId('movimentacoes_estoque');
+      tables.movimentacoes_estoque.push({
+        id: movId, owner_user_id: p.p_owner_user_id, item_estoque_id: p.p_item_estoque_id, tipo: 'entrada',
+        quantidade: p.p_quantidade, data: p.p_data, obs: p.p_obs, origem: 'telegram',
+      });
+      const novoSaldo = (item.quantidade_atual || 0) + p.p_quantidade;
+      item.quantidade_atual = novoSaldo;
+      item.quantidade = (item.quantidade || 0) + p.p_quantidade;
+      return { data: [{ movimentacao_id: movId, novo_saldo: novoSaldo }] };
+    },
+    registrar_saida_estoque_telegram(p) {
+      const item = (tables.estoque || []).find((e) => String(e.id) === String(p.p_item_estoque_id) && e.owner_user_id === p.p_owner_user_id);
+      if (!item) return { error: 'ITEM_NAO_ENCONTRADO' };
+      if (p.p_quantidade > (item.quantidade_atual || 0)) return { error: 'SALDO_INSUFICIENTE' };
+      const movId = nextId('movimentacoes_estoque');
+      tables.movimentacoes_estoque.push({
+        id: movId, owner_user_id: p.p_owner_user_id, item_estoque_id: p.p_item_estoque_id, lote_id: p.p_lote_id ?? null,
+        tipo: p.p_tipo, quantidade: p.p_quantidade, custo_unitario: p.p_custo_unitario ?? null, valor_total: p.p_valor_total ?? null,
+        data: p.p_data, obs: p.p_obs, origem: 'telegram',
+      });
+      const novoSaldo = (item.quantidade_atual || 0) - p.p_quantidade;
+      item.quantidade_atual = novoSaldo;
+      item.quantidade = (item.quantidade || 0) - p.p_quantidade;
+      let finId = null;
+      if (p.p_tipo === 'consumo' && p.p_lote_id != null) {
+        finId = nextId('movimentacoes_financeiras');
+        tables.movimentacoes_financeiras.push({
+          id: finId, owner_user_id: p.p_owner_user_id, tipo: 'despesa', categoria: 'consumo_estoque', lote_id: p.p_lote_id,
+          valor: p.p_valor_total || 0, data: p.p_data, data_competencia: p.p_data, status: 'realizado',
+          descricao: p.p_descricao_financeiro, origem_tipo: 'movimentacao_estoque', origem_id: movId, origem: 'telegram',
+        });
+      } else if (p.p_tipo === 'venda') {
+        finId = nextId('movimentacoes_financeiras');
+        tables.movimentacoes_financeiras.push({
+          id: finId, owner_user_id: p.p_owner_user_id, tipo: 'receita', categoria: 'venda_estoque', lote_id: p.p_lote_id ?? null,
+          valor: p.p_valor_total || 0, data: p.p_data, data_competencia: p.p_data, status: 'realizado',
+          descricao: p.p_descricao_financeiro, origem_tipo: 'movimentacao_estoque', origem_id: movId, origem: 'telegram',
+        });
+      }
+      return { data: [{ movimentacao_id: movId, financeiro_id: finId, novo_saldo: novoSaldo }] };
+    },
   };
 
   return {
