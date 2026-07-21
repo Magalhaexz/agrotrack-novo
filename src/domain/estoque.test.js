@@ -6,6 +6,7 @@ import {
   obterCustoUnitarioItem,
   calcularValorItemEstoque,
   calcularCustoMedioPonderado,
+  validarEntradaEstoque,
   validarSaidaEstoque,
   consolidarEstoquePorFazenda,
   calcularValorTotalEstoque,
@@ -16,6 +17,7 @@ import {
 } from './estoque.js';
 import { registrarEntradaEstoque, registrarSaidaEstoque } from '../services/movimentacoes.js';
 import { obterSaldoAtualItemEstoque } from './estoqueSanidade.js';
+import { prepararSaidaEstoque } from './telegram/acoesEstoque.js';
 
 // Sprint 5/7 — Estoque e Consumo.
 // Cenário das medições da matriz: sal mineral comprado 100 kg a R$ 2,00 e
@@ -58,6 +60,65 @@ test('entrada cria movimentação e despesa de compra', () => {
   assert.equal(db.movimentacoes_estoque[0].tipo, 'entrada');
   assert.equal(db.movimentacoes_estoque[0].valor_total, 200);
   assert.equal(db.movimentacoes_financeiras[0].valor, 200);
+});
+
+// ── Entrada: custo ausente × custo zero explícito ───────────────────────────
+
+test('entrada com custo AUSENTE é rejeitada — não pode derrubar a média em silêncio', () => {
+  const db = dbEstoque({ quantidade_atual: 100, valor_unitario: 4 });
+  for (const custoAusente of [undefined, null, '', '   ']) {
+    assert.throws(
+      () => registrarEntradaEstoque(db, { itemId: 1, qtd: 100, custo: custoAusente, data: '2026-02-01' }, ...semPersistir),
+      /Informe o custo unitário da entrada/,
+      `custo ${JSON.stringify(custoAusente)} deveria ser rejeitado`
+    );
+  }
+  assert.equal(db.estoque[0].valor_unitario, 4, 'média intocada');
+  assert.equal(db.estoque[0].quantidade_atual, 100, 'saldo intocado');
+});
+
+test('entrada com custo ZERO explícito é aceita e baixa a média', () => {
+  const db = registrarEntradaEstoque(
+    dbEstoque({ quantidade_atual: 100, valor_unitario: 4 }),
+    { itemId: 1, qtd: 100, custo: 0, data: '2026-02-01' },
+    ...semPersistir
+  );
+  assert.equal(db.estoque[0].quantidade_atual, 200);
+  assert.equal(db.estoque[0].valor_unitario, 2, 'doação/brinde realmente baixa a média');
+});
+
+test('custo zero informado como texto "0" também é aceito', () => {
+  const db = registrarEntradaEstoque(
+    dbEstoque({ quantidade_atual: 100, valor_unitario: 4 }),
+    { itemId: 1, qtd: 100, custo: '0', data: '2026-02-01' },
+    ...semPersistir
+  );
+  assert.equal(db.estoque[0].valor_unitario, 2);
+});
+
+test('custo não numérico é rejeitado, e não confundido com zero', () => {
+  assert.throws(
+    () => registrarEntradaEstoque(dbEstoque(), { itemId: 1, qtd: 10, custo: 'abc', data: '2026-02-01' }, ...semPersistir),
+    /custo unitário válido/
+  );
+});
+
+test('validarEntradaEstoque separa ausente, zero explícito, negativo e inválido', () => {
+  assert.equal(validarEntradaEstoque({ quantidade: 10, custo: undefined }).ok, false);
+  assert.match(validarEntradaEstoque({ quantidade: 10, custo: null }).erro, /digite 0/);
+
+  const zero = validarEntradaEstoque({ quantidade: 10, custo: 0 });
+  assert.equal(zero.ok, true);
+  assert.equal(zero.custo, 0);
+
+  assert.equal(validarEntradaEstoque({ quantidade: 10, custo: '0,00' }).ok, true);
+  assert.equal(validarEntradaEstoque({ quantidade: 10, custo: -1 }).ok, false);
+  assert.equal(validarEntradaEstoque({ quantidade: 10, custo: 'xyz' }).ok, false);
+  assert.equal(validarEntradaEstoque({ quantidade: 0, custo: 5 }).ok, false);
+
+  const brasileiro = validarEntradaEstoque({ quantidade: 10, custo: '1.234,56' });
+  assert.equal(brasileiro.ok, true);
+  assert.equal(brasileiro.custo, 1234.56);
 });
 
 // ── Custo médio após nova compra ────────────────────────────────────────────
@@ -378,4 +439,75 @@ test('lote sem consumo devolve zeros, não null', () => {
   assert.equal(consumo.quantidadeTotal, 0);
   assert.equal(consumo.custoTotal, 0);
   assert.equal(consumo.movimentos, 0);
+});
+
+// ── Telegram lê o mesmo saldo que o app web ─────────────────────────────────
+
+function dbTelegram(item) {
+  return { estoque: [item], lotes: [{ id: 1, nome: 'Lote A', status: 'ativo' }] };
+}
+
+test('Telegram usa a fonte canônica de saldo — campo inexistente não vence mais a coluna real', () => {
+  // `saldo` não é coluna de `estoque`. Antes o bot lia
+  // `quantidade_atual ?? quantidade`, o que já ignorava `saldo`, mas era uma
+  // leitura paralela; agora é a mesma função do app web.
+  const item = { id: 1, produto: 'Sal', unidade: 'kg', quantidade_atual: 30, quantidade: 80, saldo: 55 };
+  const r = prepararSaidaEstoque(dbTelegram(item), { item: 'Sal', quantidade: 10 });
+  assert.equal(r.ok, true);
+  assert.equal(obterSaldoItemEstoque(item), 30);
+  const patchEstoque = r.writes.find((w) => w.tabela === 'estoque');
+  assert.equal(patchEstoque.patch.quantidade_atual, 20, '30 − 10, pelo saldo canônico');
+});
+
+test('Telegram bloqueia saída acima do saldo pelo mesmo saldo do app web', () => {
+  const item = { id: 1, produto: 'Sal', unidade: 'kg', quantidade_atual: 5, quantidade: 500 };
+  const r = prepararSaidaEstoque(dbTelegram(item), { item: 'Sal', quantidade: 10 });
+  assert.equal(r.ok, false);
+  assert.equal(r.erro, 'SALDO_INSUFICIENTE');
+  assert.equal(r.saldoAtual, 5, 'não pode usar o espelho legado de 500');
+});
+
+test('Telegram lê linha legada só com `quantidade`', () => {
+  const item = { id: 1, produto: 'Sal', unidade: 'kg', quantidade: 40 };
+  const r = prepararSaidaEstoque(dbTelegram(item), { item: 'Sal', quantidade: 10 });
+  assert.equal(r.ok, true);
+  assert.equal(r.writes.find((w) => w.tabela === 'estoque').patch.quantidade_atual, 30);
+});
+
+test('Telegram usa o mesmo custo médio do app web para valorizar a baixa', () => {
+  const item = { id: 1, produto: 'Sal', unidade: 'kg', quantidade_atual: 100, valor_unitario: 3, custo_unitario: 99 };
+  const r = prepararSaidaEstoque(dbTelegram(item), { item: 'Sal', quantidade: 10 });
+  assert.equal(r.ok, true);
+  const movimento = r.writes.find((w) => w.tabela === 'movimentacoes_estoque');
+  assert.equal(movimento.registro.custo_unitario, 3, 'valor_unitario vence o espelho legado');
+  assert.equal(movimento.registro.valor_total, 30);
+});
+
+test('Telegram mantém `quantidade` em sincronia com `quantidade_atual`', () => {
+  const item = { id: 1, produto: 'Sal', unidade: 'kg', quantidade_atual: 100, quantidade: 100, valor_unitario: 2 };
+  const r = prepararSaidaEstoque(dbTelegram(item), { item: 'Sal', quantidade: 40 });
+  const patch = r.writes.find((w) => w.tabela === 'estoque').patch;
+  assert.equal(patch.quantidade_atual, 60);
+  assert.equal(patch.quantidade, 60, 'atualizar só uma coluna fazia as telas divergirem');
+});
+
+test('app web e Telegram chegam ao mesmo saldo final para a mesma saída', () => {
+  const item = { id: 1, produto: 'Sal', unidade: 'kg', fazenda_id: 1, quantidade_atual: 100, quantidade: 100, valor_unitario: 3 };
+
+  const web = registrarSaidaEstoque(
+    { ...dbEstoque({ quantidade_atual: 100, valor_unitario: 3 }) },
+    { itemId: 1, loteId: 1, quantidade: 25, tipo: 'consumo', data: '2026-03-01' },
+    ...semPersistir
+  );
+  const bot = prepararSaidaEstoque(dbTelegram(item), { item: 'Sal', quantidade: 25, tipo: 'consumo', lote: 'Lote A' });
+
+  const saldoWeb = obterSaldoItemEstoque(web.estoque[0]);
+  const saldoBot = bot.writes.find((w) => w.tabela === 'estoque').patch.quantidade_atual;
+  assert.equal(saldoWeb, 75);
+  assert.equal(saldoBot, saldoWeb, 'os dois caminhos precisam concordar');
+
+  const custoWeb = web.movimentacoes_financeiras.find((m) => m.categoria === 'consumo_estoque').valor;
+  const custoBot = bot.writes.find((w) => w.tabela === 'movimentacoes_financeiras').registro.valor;
+  assert.equal(custoWeb, 75);
+  assert.equal(custoBot, custoWeb, 'e sobre o mesmo custo médio');
 });

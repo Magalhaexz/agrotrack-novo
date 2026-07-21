@@ -8,6 +8,7 @@ import {
   calcularCustoMedioPonderado,
   obterCustoUnitarioItem,
   obterSaldoItemEstoque,
+  validarEntradaEstoque,
   validarSaidaEstoque,
 } from '../domain/estoque.js';
 
@@ -783,14 +784,15 @@ export function registrarEntradaEstoque(
     throw new Error(`Item de estoque não encontrado.`);
   }
 
+  // Sprint 5 (ajuste): validação única (domain/estoque.js). Custo AUSENTE é
+  // rejeitado — antes virava 0 e derrubava a média móvel sem avisar. Custo 0
+  // explícito continua aceito (doação, brinde, acerto).
+  const validacaoEntrada = validarEntradaEstoque({ quantidade: qtd, custo });
+  if (!validacaoEntrada.ok) {
+    throw new Error(validacaoEntrada.erro);
+  }
   const quantidade = toNumber(qtd);
-  const custoUnitario = toNumber(custo);
-  if (quantidade <= 0) {
-    throw new Error('Informe uma quantidade válida.');
-  }
-  if (custoUnitario < 0) {
-    throw new Error('Informe um custo unitário válido.');
-  }
+  const custoUnitario = validacaoEntrada.custo;
 
   const movimentosEstoque = Array.isArray(db?.movimentacoes_estoque)
     ? db.movimentacoes_estoque

@@ -102,6 +102,59 @@ export function calcularCustoMedioPonderado({ saldoAtual, custoMedioAtual, qtdEn
   return safeDivide(saldo * custoAtual + qtd * custoNovo, saldo + qtd, custoNovo);
 }
 
+/** `true` só quando o chamador realmente informou algum valor de custo. */
+function custoFoiInformado(valor) {
+  if (valor === undefined || valor === null) return false;
+  if (typeof valor === 'string' && valor.trim() === '') return false;
+  return true;
+}
+
+/** Distingue "zero de verdade" de texto não numérico, que `toNumber` também zera. */
+function representaZero(valor) {
+  if (typeof valor === 'number') return valor === 0;
+  return /^-?0*([.,]0*)?$/.test(String(valor).trim());
+}
+
+/**
+ * Valida uma entrada de estoque ANTES de gravar.
+ *
+ * A regra do custo existe porque a entrada repondera a MÉDIA MÓVEL: uma
+ * entrada com quantidade positiva e custo ausente seria tratada como custo
+ * zero e **derrubaria a média silenciosamente** — 100 kg a R$ 4,00 mais 100 kg
+ * "sem custo" fariam a média cair para R$ 2,00, barateando todo o consumo
+ * lançado nos lotes a partir dali.
+ *
+ * Custo `0` continua aceito, mas só quando **informado explicitamente**:
+ * recebimento de doação, brinde ou acerto é um caso real, e o produtor precisa
+ * declará-lo, não deixá-lo em branco.
+ *
+ * @returns {{ok: boolean, erro: string|null, custo: number}}
+ */
+export function validarEntradaEstoque({ quantidade, custo } = {}) {
+  const qtd = toNumber(quantidade);
+  if (!Number.isFinite(qtd) || qtd <= 0) {
+    return { ok: false, erro: 'Informe uma quantidade válida.', custo: 0 };
+  }
+
+  if (!custoFoiInformado(custo)) {
+    return {
+      ok: false,
+      erro: 'Informe o custo unitário da entrada. Se o produto entrou sem custo, digite 0.',
+      custo: 0,
+    };
+  }
+
+  const custoNumerico = toNumber(custo);
+  if (custoNumerico === 0 && !representaZero(custo)) {
+    return { ok: false, erro: 'Informe um custo unitário válido.', custo: 0 };
+  }
+  if (custoNumerico < 0) {
+    return { ok: false, erro: 'Informe um custo unitário válido.', custo: 0 };
+  }
+
+  return { ok: true, erro: null, custo: custoNumerico };
+}
+
 /**
  * Valida uma saída de estoque ANTES de gravar. Fonte única da regra
  * "nenhuma saída pode deixar saldo negativo" — vale para a tela de Estoque, o

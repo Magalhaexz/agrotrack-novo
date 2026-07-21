@@ -263,6 +263,7 @@ Fonte única: `src/domain/estoque.js`.
 | Custo médio após compra | `(saldo × custoAtual + qtdEntrada × custoEntrada) ÷ (saldo + qtdEntrada)` | `estoque` + entrada |
 | Valor do item | `saldo × custo médio` | `estoque` |
 | Valor total do estoque | `Σ valor dos itens`, por fazenda ou consolidado | `estoque` |
+| Validação de entrada | `qtd > 0` **e** custo **informado** (`0` explícito vale; ausente não) | entrada |
 | Validação de saída | `qtd > 0` **e** `qtd ≤ saldo` — nunca deixa negativo | `estoque` |
 | Consumo do lote | `Σ quantidade` e `Σ valor_total` de `consumo`/`tratamento` do lote | `movimentacoes_estoque` |
 | Custo do consumo | `quantidade × custo médio` no momento da baixa | `movimentacoes_estoque` |
@@ -284,6 +285,8 @@ Cenário: sal mineral, 100 kg a R$ 2,00 e depois 100 kg a R$ 4,00 (R$ 600,00 gas
 | 4 | **Estoque negativo bloqueado num caminho e liberado no outro.** Estoque lançava erro; Nutrição perguntava "Deseja continuar com saldo negativo?" e seguia. | saldo negativo gravável | bloqueado nos dois |
 | 5 | **Produto sem fazenda sumia do detalhamento** — o total geral contava, a soma por fazenda não. | 7 de 37 unidades invisíveis | `SEM_FAZENDA`, contado uma vez |
 | 6 | **`quantidade` e `quantidade_atual` divergiam** após uma saída (só a segunda era atualizada). | duas colunas, dois números | mantidas em sincronia |
+| 7 | **Entrada sem custo derrubava a média em silêncio.** O campo em branco virava `0` na tela (`Number(form.custo \|\| 0)`) e reponderava a média. 100 kg a R$ 4,00 + 100 kg "sem custo" → média R$ 2,00, barateando todo o consumo dali em diante. | aceito calado | **rejeitado**; `0` só com declaração explícita |
+| 8 | **Telegram lia o saldo por conta própria** (`quantidade_atual ?? quantidade`), última leitura paralela do domínio. | leitura paralela | usa `domain/estoque.js` |
 
 ### Comportamento corrigido
 
@@ -301,6 +304,15 @@ Cenário: sal mineral, 100 kg a R$ 2,00 e depois 100 kg a R$ 4,00 (R$ 600,00 gas
   indisponível, não consumo zero.
 - **`ajuste` e `perda` não entram no consumo do lote** — são correções internas
   do estoque, não insumo entregue ao lote.
+- **Custo ausente numa entrada é erro, não zero.** A entrada repondera a média,
+  então tratar "em branco" como R$ 0,00 barateava o estoque inteiro sem aviso.
+  Entrada realmente sem custo (doação, brinde, acerto) exige digitar `0` — a
+  intenção fica registrada. A tela passou a repassar o valor cru, senão a regra
+  nunca dispararia. Texto não numérico também é rejeitado, e não confundido
+  com zero.
+- **Telegram e app web compartilham a leitura de saldo e custo**, com teste
+  cruzado garantindo que os dois caminhos chegam ao mesmo saldo final e ao
+  mesmo custo de consumo para a mesma saída.
 
 ### Telas consumidoras
 
@@ -311,15 +323,17 @@ Cenário: sal mineral, 100 kg a R$ 2,00 e depois 100 kg a R$ 4,00 (R$ 600,00 gas
 | Sanidade | `estoqueSanidade` → `obterSaldoAtualItemEstoque` | ✅ **corrigida** — delega à fonte única |
 | Relatório de Estoque | fórmulas inline próprias | ✅ **corrigida** — consolidação e valor pela fonte única |
 | Custos por lote / Financeiro / Resultados | `movimentacoes_financeiras` geradas na baixa | ✅ herdam o custo médio correto |
-| Telegram | `acoesEstoque` / `respostasConsulta` | ⚠️ ver pendência |
+| Telegram | `acoesEstoque` → `obterSaldoItemEstoque` | ✅ **migrado** — sem leitura paralela |
 
 ### Testes criados
 
-`src/domain/estoque.test.js` — 37 testes cobrindo os 15 cenários pedidos:
+`src/domain/estoque.test.js` — 48 testes cobrindo os 15 cenários pedidos:
 entrada, saída válida, saída acima do saldo, ajuste positivo e negativo, custo
 médio após nova compra, valor total, consumo por lote, consumo por cabeça, baixa
 duplicada, estoque zero, prevenção de saldo negativo, produto sem fazenda,
-múltiplas fazendas e visão consolidada.
+múltiplas fazendas e visão consolidada — mais os dois ajustes de fechamento
+(custo ausente × zero explícito, e paridade de saldo/custo entre Telegram e app
+web).
 
 ### Pendências registradas (fora do escopo desta sprint)
 
@@ -327,14 +341,15 @@ múltiplas fazendas e visão consolidada.
    e `valor_unitario`/`custo_unitario`/`preco_unitario`. A fonte única resolve a
    leitura, mas a duplicação no schema continua e é fonte permanente de risco.
    Consolidar exige migration + varredura de escritores.
-2. **Telegram (`acoesEstoque`) não foi migrado** para a fonte única — mantém
-   leitura própria de saldo.
-3. **Custo médio não é recalculado retroativamente.** Itens que já acumularam
+2. **Custo médio não é recalculado retroativamente.** Itens que já acumularam
    entradas a preços diferentes seguem com o `valor_unitario` da última compra
    até a próxima entrada, quando a média passa a valer. Um backfill exigiria
    reprocessar `movimentacoes_estoque` — decisão de dados, não de código.
-4. **Saldos negativos herdados** não foram corrigidos: passam a aparecer, mas
+3. **Saldos negativos herdados** não foram corrigidos: passam a aparecer, mas
    a correção de cada item é operacional.
+4. **Validação visual autenticada** segue pendente — `VITE_SUPABASE_URL` e
+   `VITE_SUPABASE_ANON_KEY` ausentes no ambiente local. As divergências desta
+   sprint foram medidas por execução direta dos módulos de domínio.
 
 ## 🟢 Venda e Resultado dos Lotes — auditado e unificado na Sprint 4/7
 
