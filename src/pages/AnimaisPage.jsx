@@ -3,6 +3,7 @@ import { Plus } from 'lucide-react';
 import AnimalForm from '../components/AnimalForm';
 import Button from '../components/ui/Button';
 import Card from '../components/ui/Card';
+import Table from '../components/ui/Table';
 import { TIPOS_SAIDA_ANIMAL } from '../utils/constantes';
 import { formatarData, formatarNumero } from '../utils/formatters';
 import { gerarNovoId } from '../utils/id';
@@ -55,6 +56,33 @@ export default function AnimaisPage({ db, setDb, onConfirmAction }) {
 
   const listaAtiva = abaAtiva === 'grupos' ? grupos : individuais;
 
+  const colunasAnimais = [
+    { key: 'identificacao', label: 'Identificação/Lote', render: (animal) => `${animal.identificacao} / ${animal.loteNome}` },
+    { key: 'fazenda', label: 'Fazenda/Lote', render: (animal) => `${lotesMap.get(Number(animal.lote_id))?.fazenda || '-'} / ${animal.loteNome}` },
+    { key: 'qtd', label: 'Quantidade' },
+    { key: 'p_ini', label: 'Peso inicial', render: (animal) => `${formatarNumero(animal.p_ini)} kg` },
+    { key: 'p_at', label: 'Peso atual', render: (animal) => `${formatarNumero(animal.p_at)} kg` },
+    { key: 'status', label: 'Status' },
+    {
+      key: 'acoes',
+      label: 'Ações',
+      render: (animal) => (
+        <div className="row-actions">
+          <button className="action-btn" onClick={() => editarAnimal(animal)}>Editar</button>
+          <button className="action-btn action-btn-danger" onClick={() => excluirAnimal(animal.id)}>Excluir</button>
+        </div>
+      ),
+    },
+  ];
+
+  const colunasMovimentacoes = [
+    { key: 'data', label: 'Data', render: (m) => formatarData(m.data) },
+    { key: 'tipo', label: 'Tipo', render: (m) => normalizarSaida(m.tipo) },
+    { key: 'loteNome', label: 'Lote' },
+    { key: 'qtd', label: 'Quantidade' },
+    { key: 'observacao', label: 'Observação', render: (m) => m.observacao || '-' },
+  ];
+
   return <div className="page animais-page">
     <section className="animais-hero"><div><h1>Animais</h1><p>Cadastro organizado para grupos, individuais e movimentações.</p></div><div className="page-actions"><Button size="sm" variant="primary" icon={<Plus size={16} />} onClick={abrirNovo}>Novo cadastro</Button></div></section>
 
@@ -71,10 +99,14 @@ export default function AnimaisPage({ db, setDb, onConfirmAction }) {
         <button type="button" className={`segment ${abaAtiva === 'individuais' ? 'active' : ''}`} onClick={() => setAbaAtiva('individuais')}>Individuais</button>
         <button type="button" className={`segment ${abaAtiva === 'movimentacoes' ? 'active' : ''}`} onClick={() => setAbaAtiva('movimentacoes')}>Movimentações</button>
       </div>
-      {abaAtiva !== 'movimentacoes' && listaAtiva.length > 0 && (<div className="table-responsive"><table className="data-table"><thead><tr><th>Identificação/Lote</th><th>Fazenda/Lote</th><th>Quantidade</th><th>Peso inicial</th><th>Peso atual</th><th>Status</th><th>Ações</th></tr></thead><tbody>{listaAtiva.map((animal) => <tr key={animal.id}><td>{animal.identificacao} / {animal.loteNome}</td><td>{lotesMap.get(Number(animal.lote_id))?.fazenda || '-'} / {animal.loteNome}</td><td>{animal.qtd}</td><td>{formatarNumero(animal.p_ini)} kg</td><td>{formatarNumero(animal.p_at)} kg</td><td>{animal.status}</td><td><div className="row-actions"><button className="action-btn" onClick={() => editarAnimal(animal)}>Editar</button><button className="action-btn action-btn-danger" onClick={() => excluirAnimal(animal.id)}>Excluir</button></div></td></tr>)}</tbody></table></div>)}
+      {abaAtiva !== 'movimentacoes' && listaAtiva.length > 0 && (
+        <Table columns={colunasAnimais} rows={listaAtiva} mobileTitleKey="identificacao" mobileSubtitleKey="loteNome" />
+      )}
       {abaAtiva === 'grupos' && grupos.length === 0 && <div className="animais-empty-state"><strong>Nenhum grupo cadastrado.</strong><Button size="sm" variant="primary" onClick={() => abrirNovoPorModo('grupo')}>Cadastrar grupo</Button></div>}
       {abaAtiva === 'individuais' && individuais.length === 0 && <div className="animais-empty-state"><strong>Nenhum animal individual cadastrado.</strong></div>}
-      {abaAtiva === 'movimentacoes' && (historicoSaidas.length ? <div className="table-responsive"><table className="data-table"><thead><tr><th>Data</th><th>Tipo</th><th>Lote</th><th>Quantidade</th><th>Observação</th></tr></thead><tbody>{historicoSaidas.map((m) => <tr key={m.id}><td>{formatarData(m.data)}</td><td>{normalizarSaida(m.tipo)}</td><td>{m.loteNome}</td><td>{m.qtd}</td><td>{m.observacao || '-'}</td></tr>)}</tbody></table></div> : <div className="animais-empty-state"><strong>Nenhuma movimentação registrada.</strong></div>)}
+      {abaAtiva === 'movimentacoes' && (historicoSaidas.length ? (
+        <Table columns={colunasMovimentacoes} rows={historicoSaidas} mobileTitleKey="loteNome" mobileSubtitleKey={(m) => formatarData(m.data)} />
+      ) : <div className="animais-empty-state"><strong>Nenhuma movimentação registrada.</strong></div>)}
     </Card>
 
     {mostrarCadastro && <Card title="O que você quer cadastrar?"><div className="animais-mode-actions"><Button variant="primary" onClick={() => abrirNovoPorModo('grupo')}>Grupo de animais</Button><p>Use para cadastrar várias cabeças juntas em um lote.</p></div><div className="animais-mode-actions"><Button variant="primary" onClick={() => abrirNovoPorModo('individual')}>Animal individual</Button><p>Use para acompanhar um animal específico.</p></div></Card>}

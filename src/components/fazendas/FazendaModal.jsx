@@ -1,6 +1,7 @@
 ﻿import { useEffect, useState } from 'react';
 import Modal from '../ui/Modal';
 import Button from '../ui/Button';
+import Input from '../ui/Input';
 
 const ESTADOS = [
   'AC', 'AL', 'AM', 'AP', 'BA', 'CE', 'DF', 'ES', 'GO', 'MA',
@@ -97,17 +98,11 @@ export default function FazendaModal({ open, initialData, onSave, onCancel }) {
             <h4>Dados principais</h4>
           </div>
           <div className="form-grid two">
-            <label className="ui-input-wrap full">
-              <span className="ui-input-label">Nome da fazenda *</span>
-              <input className="ui-input" name="nome" value={form.nome} onChange={onChange} placeholder="Ex.: Fazenda Santa Helena" />
-            </label>
-            <label className="ui-input-wrap">
-              <span className="ui-input-label">Status</span>
-              <select className="ui-input" name="status" value={form.status} onChange={onChange}>
-                <option value="ativa">Ativa</option>
-                <option value="inativa">Inativa</option>
-              </select>
-            </label>
+            <Input className="full" label="Nome da fazenda *" name="nome" value={form.nome} onChange={onChange} placeholder="Ex.: Fazenda Santa Helena" />
+            <Input as="select" label="Status" name="status" value={form.status} onChange={onChange}>
+              <option value="ativa">Ativa</option>
+              <option value="inativa">Inativa</option>
+            </Input>
           </div>
         </section>
 
@@ -116,18 +111,12 @@ export default function FazendaModal({ open, initialData, onSave, onCancel }) {
             <h4>Localização</h4>
           </div>
           <div className="form-grid two">
-            <label className="ui-input-wrap">
-              <span className="ui-input-label">Estado</span>
-              <select className="ui-input" name="estado" value={form.estado} onChange={onChange}>
-                {ESTADOS.map((uf) => (
-                  <option key={uf} value={uf}>{uf}</option>
-                ))}
-              </select>
-            </label>
-            <label className="ui-input-wrap">
-              <span className="ui-input-label">Cidade</span>
-              <input className="ui-input" name="cidade" value={form.cidade} onChange={onChange} placeholder="Ex.: Uberlândia" />
-            </label>
+            <Input as="select" label="Estado" name="estado" value={form.estado} onChange={onChange}>
+              {ESTADOS.map((uf) => (
+                <option key={uf} value={uf}>{uf}</option>
+              ))}
+            </Input>
+            <Input label="Cidade" name="cidade" value={form.cidade} onChange={onChange} placeholder="Ex.: Uberlândia" />
           </div>
         </section>
 
@@ -136,18 +125,9 @@ export default function FazendaModal({ open, initialData, onSave, onCancel }) {
             <h4>Capacidade e área</h4>
           </div>
           <div className="form-grid two">
-            <label className="ui-input-wrap">
-              <span className="ui-input-label">Área total (ha)</span>
-              <input className="ui-input" type="number" min={0} name="hectares" value={form.hectares} onChange={onChange} placeholder="ha" />
-            </label>
-            <label className="ui-input-wrap">
-              <span className="ui-input-label">Área de pastagem (ha)</span>
-              <input className="ui-input" type="number" min={0} name="hectares_pastagem" value={form.hectares_pastagem} onChange={onChange} placeholder="ha" />
-            </label>
-            <label className="ui-input-wrap">
-              <span className="ui-input-label">Capacidade (UA)</span>
-              <input className="ui-input" type="number" min={0} name="capacidade_lotacao" value={form.capacidade_lotacao} onChange={onChange} placeholder="UA" />
-            </label>
+            <Input label="Área total (ha)" type="number" min={0} name="hectares" value={form.hectares} onChange={onChange} placeholder="ha" />
+            <Input label="Área de pastagem (ha)" type="number" min={0} name="hectares_pastagem" value={form.hectares_pastagem} onChange={onChange} placeholder="ha" />
+            <Input label="Capacidade (UA)" type="number" min={0} name="capacidade_lotacao" value={form.capacidade_lotacao} onChange={onChange} placeholder="UA" />
           </div>
         </section>
 
@@ -156,18 +136,9 @@ export default function FazendaModal({ open, initialData, onSave, onCancel }) {
             <h4>Contato e observações</h4>
           </div>
           <div className="form-grid two">
-            <label className="ui-input-wrap">
-              <span className="ui-input-label">Responsável</span>
-              <input className="ui-input" name="responsavel" value={form.responsavel} onChange={onChange} placeholder="Nome do responsável" />
-            </label>
-            <label className="ui-input-wrap">
-              <span className="ui-input-label">Telefone</span>
-              <input className="ui-input" name="telefone" value={form.telefone} onChange={onChange} placeholder="(00) 00000-0000" />
-            </label>
-            <label className="ui-input-wrap full">
-              <span className="ui-input-label">Observações</span>
-              <textarea className="ui-input" rows={3} name="observacoes" value={form.observacoes} onChange={onChange} placeholder="Detalhes operacionais e anotações relevantes" />
-            </label>
+            <Input label="Responsável" name="responsavel" value={form.responsavel} onChange={onChange} placeholder="Nome do responsável" />
+            <Input label="Telefone" name="telefone" value={form.telefone} onChange={onChange} placeholder="(00) 00000-0000" />
+            <Input className="full" as="textarea" rows={3} label="Observações" name="observacoes" value={form.observacoes} onChange={onChange} placeholder="Detalhes operacionais e anotações relevantes" />
           </div>
         </section>
 
