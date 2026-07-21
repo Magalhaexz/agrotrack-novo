@@ -2,6 +2,7 @@
 import { useMemo } from 'react';
 import Card from '../ui/Card';
 import { formatCurrency, formatNumber } from '../../utils/calculations';
+import { calcularArrobasCarcaca } from '../../domain/arroba.js';
 
 function formatarData(data) {
   if (!data) return '—';
@@ -39,8 +40,20 @@ export default function RelatorioVendas({ db, dataInicio, dataFim, loteIds = [] 
     [vendas]
   );
 
-  const arrobasVendidas = pesoVendido / 15;
-  const precoMedioArroba = arrobasVendidas > 0 ? receitaTotal / arrobasVendidas : 0;
+  // Sprint 4: esta tela dividia o peso VIVO por 15 e chamava o resultado de
+  // "arrobas vendidas", enquanto o Painel Gerencial usava peso de CARCAÇA —
+  // 240,00 @ contra 124,80 @ (+92,3%) no mesmo lote e período, e preço médio
+  // de R$ 180,00 contra R$ 346,15. A regra oficial é @ de CARCAÇA (ver
+  // domain/vendaLote.js e docs/DECISAO_CALCULO_ARROBA_HERDON.md).
+  const arrobasVendidas = useMemo(() =>
+    vendas.reduce((acc, item) => acc + calcularArrobasCarcaca(
+      Number(item.peso_medio || 0) * Number(item.qtd || 0),
+      mapaLotes[item.lote_id]?.rendimento_carcaca
+    ), 0),
+    [vendas, mapaLotes]
+  );
+  // `null` (não 0) sem venda: R$ 0,00/@ leria como "vendeu de graça".
+  const precoMedioArroba = arrobasVendidas > 0 ? receitaTotal / arrobasVendidas : null;
 
   const porComprador = useMemo(() =>
     Object.entries(
@@ -66,9 +79,9 @@ export default function RelatorioVendas({ db, dataInicio, dataFim, loteIds = [] 
           <>
             <p>Vendas no período: <strong>{vendas.length}</strong></p>
             <p>Peso vendido: <strong>{formatNumber(pesoVendido, 1)} kg</strong></p>
-            <p>Arrobas vendidas: <strong>{formatNumber(arrobasVendidas, 2)} @</strong></p>
+            <p>Arrobas vendidas (carcaça): <strong>{formatNumber(arrobasVendidas, 2)} @</strong></p>
             <p>Receita total: <strong>{formatCurrency(receitaTotal)}</strong></p>
-            <p>Preço médio por @: <strong>{formatCurrency(precoMedioArroba)}</strong></p>
+            <p>Preço médio por @ (carcaça): <strong>{precoMedioArroba === null ? '—' : formatCurrency(precoMedioArroba)}</strong></p>
           </>
         )}
       </Card>

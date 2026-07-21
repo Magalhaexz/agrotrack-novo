@@ -250,6 +250,107 @@ sequenciais e valida contra o `db` carregado no navegador. Consequência:
 > para esses tipos. **Continuam pendentes:** `transferencia_saida` (envolve o
 > lote de destino) e o ajuste de lotação.
 
+## 🟢 Venda e Resultado dos Lotes — auditado e unificado na Sprint 4/7
+
+### Fórmulas oficiais
+
+Fonte única: `src/domain/vendaLote.js` (venda realizada e base de rateio) +
+`src/domain/calculos.js::calcularResultadoLote` (resultado econômico).
+Base de arroba conforme `docs/DECISAO_CALCULO_ARROBA_HERDON.md`.
+
+| Cálculo | Fórmula oficial | Fonte dos dados |
+|---|---|---|
+| Peso total vendido | `Σ (qtd × peso_medio)` das movimentações `venda`/`abate` | `movimentacoes_animais` |
+| Arrobas vendidas | `peso vivo vendido × rendimento_carcaca ÷ 15` — **sempre carcaça** | `movimentacoes_animais` + `lotes.rendimento_carcaca` |
+| Arrobas de peso vivo | `peso vivo ÷ 15` — leitura física, sempre rotulada como tal | idem |
+| Preço por arroba | `valor líquido ÷ arrobas de carcaça vendidas`; `null` sem venda | idem |
+| Valor bruto | `Σ valor_total` das vendas | `movimentacoes_animais` |
+| Deduções | `0` — **não existem campos no fluxo real** (ver pendência) | — |
+| Valor líquido | `valor bruto − deduções` (hoje igual ao bruto) | — |
+| Custo acumulado | despesas do lote no livro-caixa + custos legados não espelhados | `movimentacoes_financeiras` + `custos` |
+| Lucro / prejuízo | `receita total − custo acumulado` | `movimentacoes_financeiras` |
+| Margem % | `lucro ÷ receita × 100` (0 quando não há receita) | idem |
+| Cabeças base | `remanescente + vendidas` | `lotes.qtd` (canônico) + vendas |
+| Arrobas base | `@ carcaça remanescente + @ carcaça vendidas` | idem |
+| Margem por cabeça | `lucro ÷ cabeças base` | idem |
+| Margem por arroba | `lucro ÷ arrobas base` (mesma base do custo/@) | idem |
+
+Nenhum valor é arredondado na base: arredondamento é só de exibição.
+
+### Divergências medidas
+
+Cenário: 20 cabeças a 300 kg por R$ 60.000 + R$ 12.000 de custeio, rendimento
+52%. Venda parcial de 8 cabeças a 450 kg por R$ 43.200; venda total somando
+mais 12 cabeças a 460 kg por R$ 66.240.
+
+| # | Divergência | Antes | Depois |
+|---|---|---|---|
+| 1 | **"Arrobas vendidas" com duas bases** — Relatório de Vendas dividia o peso **vivo** por 15; Painel Gerencial usava **carcaça**. Mesmo rótulo, mesmo período. | 240,00 @ vs 124,80 @ (**+92,3%**) | 124,80 @ nas duas |
+| 2 | **Preço médio por @** herdava a base errada no Relatório de Vendas | R$ 180,00 vs R$ 346,15 | R$ 346,15 nas duas |
+| 3 | **Venda total zerava o resultado por cabeça e por arroba** — a base era só o rebanho remanescente, que é zero num lote 100% vendido | lucro/@ = **0,00** e lucro/cabeça = **0,00** com lucro real de R$ 37.440 | lucro/@ R$ 118,42 · lucro/cabeça R$ 1.872,00 |
+| 4 | **Custo/@ saltava e colapsava** na última venda | R$ 384,62 (parcial) → R$ 0,00 (total) | R$ 230,77 → R$ 227,73 |
+| 5 | **Dois "lucro por cabeça"** — `resumoLote` dividia pelo remanescente, `calcularResultadoLote` pela própria contagem de `animais[]` | −2.400,00 vs −2.400,00 no cenário, divergentes quando `lote.qtd ≠ Σ animais.qtd` | fonte única |
+| 6 | **Receita/custo dobravam** se um reload ou sync reanexasse a mesma linha | receita × 2 | dedup por impressão digital |
+
+### Comportamento corrigido
+
+- **Base de rateio** passa a ser *remanescente + vendido* — o que o lote
+  carregou economicamente. O custo acumulado é do lote inteiro; dividi-lo só
+  pelo que sobrou fazia o indicador explodir na última venda e depois zerar.
+  A base é contínua e nunca colapsa enquanto o lote tiver substância econômica.
+- **Fallback preservado:** sem `lote.qtd` (lote legado, ou registro do lote
+  ainda não carregado), a base soma os animais **ativos** do lote — mantendo a
+  regra F-02 (animal vendido/morto não infla a contagem).
+- **Dedup de lançamentos** usa impressão digital (`id` + lote + tipo +
+  categoria + valor + data + qtd + origem), não só `id`. Ids locais gerados por
+  `gerarNovoId()` já colidiram com a sequence do banco neste projeto; descartar
+  só pelo `id` apagaria lançamentos reais distintos.
+- **Nulo não vira zero:** preço por arroba e preço médio por cabeça são `null`
+  quando não houve venda — `R$ 0,00/@` leria como "vendeu de graça".
+- **Venda parcial** considera somente a quantidade vendida em todos os totais
+  de venda; o rebanho remanescente nunca entra neles.
+- **Lote encerrado** mantém receita, custo e resultado no histórico, e continua
+  fora do rebanho ativo (regra da Sprint 2, revalidada por teste).
+
+### Telas consumidoras
+
+| Tela | Consome | Estado |
+|---|---|---|
+| Resultado dos lotes | `getResumoLote` → `calcularResultadoLote` | ✅ fonte única |
+| Financeiro (por lote) | `calcularReceitaLote` / `calcularCustoLote` | ✅ fonte única |
+| Custos por lote | `calcularCustoLote` | ✅ fonte única |
+| Relatório de Vendas | fórmula inline própria | ✅ **corrigida** para @ carcaça |
+| Painel Gerencial | `indicadoresEstrategicos` | ✅ já usava carcaça |
+| Relatórios de lote | `relatorioLote` → `buildRelatorioLote` → `getResumoLote` | ✅ orquestra, não recalcula |
+| Telegram | `respostasConsulta` / `resumoConsolidado` → `getResumoLote` | ✅ herda a fonte única |
+| Modal de venda | só coleta qtd/peso/valor; não calcula @ nem resultado | ⚠️ ver pendência |
+
+### Testes criados
+
+`src/domain/vendaLote.test.js` — 32 testes cobrindo os 17 cenários pedidos:
+venda parcial e total, preço por @, cálculo de arrobas, valor bruto, deduções e
+frete, valor líquido, custo acumulado, lucro e prejuízo, margem por cabeça e por
+arroba, lote sem custos, lote sem venda, lote encerrado, valores decimais,
+prevenção de receita duplicada, e consistência entre Financeiro, Resultados e
+Relatórios.
+
+### Pendências registradas (fora do escopo desta sprint)
+
+1. **Deduções não existem no fluxo real.** Não há coluna de frete, comissão ou
+   desconto em `movimentacoes_animais` nem em `movimentacoes_financeiras`
+   (verificado no schema de produção). Os únicos campos de frete do projeto
+   vivem no simulador de cenários, que não alimenta o resultado realizado.
+   `valor líquido` é hoje idêntico ao bruto. Criar o fluxo de deduções é um
+   novo campo + UI + migration — sprint própria.
+2. **O modal de venda não mostra @ nem preço/@** antes de confirmar. O produtor
+   digita valor total sem ver quanto isso dá por arroba, que é a unidade em que
+   ele negocia.
+3. **Venda total não encerra o lote automaticamente** — decisão preservada da
+   Sprint 3. Zerar (`qtd = 0`) e encerrar (`status`) seguem sendo ações
+   separadas. Automatizar exige decisão de produto.
+4. **`simuladorCenarios` com `qtd || 1`** no peso médio projetado — pendência
+   herdada da Sprint 2, parte 7/7.
+
 ## 🟢 Impacto financeiro de venda e morte/perda — auditado na Sprint 3
 
 Escopo estrito: só os cálculos financeiros que **venda** e **morte/perda** de
