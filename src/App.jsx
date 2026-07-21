@@ -727,11 +727,11 @@ export default function App() {
     if (!ensureCanWriteOrRedirect('animais.create')) return;
     setDb((prev) => registrarEntradaAnimal(prev, dados, userContext, persistContext));
   };
-  // Sprint 3: venda e morte/perda gravam pela RPC transacional
-  // `registrar_saida_lote` e só então atualizam a tela. Falha da RPC (rede,
-  // RLS, saldo revalidado no servidor, lote finalizado) lança — o estado local
-  // NÃO é tocado e quem chama mantém o formulário aberto com a mensagem.
-  // `transferencia_saida` segue no caminho antigo até sua própria sprint.
+  // Sprint 3 + P1-02: venda, morte/perda e transferência gravam pela RPC
+  // transacional `registrar_saida_lote` e só então atualizam a tela. Falha da
+  // RPC (rede, RLS, saldo revalidado no servidor, lote origem/destino
+  // finalizado) lança — o estado local NÃO é tocado e quem chama mantém o
+  // formulário aberto com a mensagem.
   // Devolve `false` quando a gravação foi barrada pelo paywall — sem isso,
   // quem chama fechava o modal e mostrava "registrada com sucesso" para uma
   // operação que nunca aconteceu.

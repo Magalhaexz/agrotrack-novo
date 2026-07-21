@@ -1,19 +1,24 @@
 // ─────────────────────────────────────────────────────────────────────────────
-// SAÍDA DE LOTE (VENDA / MORTE) — CAMINHO TRANSACIONAL ÚNICO DO APP WEB.
+// SAÍDA DE LOTE (VENDA / MORTE / TRANSFERÊNCIA) — CAMINHO TRANSACIONAL ÚNICO DO
+// APP WEB.
 //
-// Sprint 3. Antes desta sprint, venda e morte no app web gravavam por chamadas
-// sequenciais (`registrarSaidaAnimal` em services/movimentacoes.js): movimentação,
-// baixa do lote, sincronização de `animais` e lançamento financeiro iam ao banco
-// em requisições separadas, sem transação, validadas apenas contra o `db`
-// carregado no navegador. Duas abas viam o mesmo saldo, ambas passavam na
-// validação local e ambas gravavam — o lote podia terminar negativo. E se a
-// movimentação gravasse mas o financeiro falhasse, o estado ficava pela metade.
+// Sprint 3 (venda/morte) + P1-02 (transferência). Antes, essas saídas no app
+// web gravavam por chamadas sequenciais (`registrarSaidaAnimal` em
+// services/movimentacoes.js): movimentação, baixa do lote origem (e, na
+// transferência, alta do lote destino), sincronização de `animais` e
+// lançamento financeiro iam ao banco em requisições separadas, sem transação,
+// validadas apenas contra o `db` carregado no navegador. Duas abas viam o
+// mesmo saldo, ambas passavam na validação local e ambas gravavam — o lote
+// podia terminar negativo, ou uma transferência podia debitar a origem sem
+// creditar o destino se uma etapa falhasse no meio.
 //
-// A RPC `registrar_saida_lote` já existia e já era usada pelo bot do Telegram.
-// Ela faz `SELECT … FOR UPDATE` no lote, revalida saldo/status no servidor e
-// grava movimentação + baixa + sincronização de `animais` + financeiro NA MESMA
-// TRANSAÇÃO. Este módulo passa o app web a usá-la, fechando a assimetria
-// registrada em docs/MATRIZ_INDICADORES_HERDON.md.
+// A RPC `registrar_saida_lote` já existia e já era usada pelo bot do Telegram
+// para os quatro tipos (venda, morte/abate/descarte, transferência). Ela faz
+// `SELECT … FOR UPDATE` no(s) lote(s) envolvido(s), revalida saldo/status no
+// servidor e grava movimentação + baixa da origem + alta do destino (quando
+// transferência) + sincronização de `animais` de ambos os lados + financeiro
+// NA MESMA TRANSAÇÃO. Este módulo passa o app web a usá-la para os três tipos,
+// fechando a assimetria registrada em docs/MATRIZ_INDICADORES_HERDON.md.
 //
 // DIVERGÊNCIA ACEITA E MEDIDA (decisão da Sprint 3): a RPC **não** recalcula
 // `lotes.p_at` da origem. O caminho antigo do web recalculava
@@ -32,7 +37,7 @@
 // ─────────────────────────────────────────────────────────────────────────────
 import { supabase } from '../lib/supabase.js';
 import { getFriendlyErrorMessage } from './movimentacaoPastos.js';
-import { validarBaixaRebanho, loteEstaAtivo } from '../domain/rebanho.js';
+import { validarBaixaRebanho, loteEstaAtivo, qtdCabecasDoLote } from '../domain/rebanho.js';
 import { verificarCarenciaAtivaLote } from '../domain/agendaSanitaria.js';
 import { formatarData } from '../utils/formatters.js';
 import { registrarAuditoria } from './auditoria.js';
@@ -40,10 +45,10 @@ import { sincronizarAnimaisGrupoDoLote } from './movimentacoes.js';
 
 /**
  * Tipos de saída que o app web registra por este caminho transacional.
- * `transferencia_saida` continua em `registrarSaidaAnimal` — migrá-la é uma
- * sprint própria (envolve o lote de destino e a reponderação do peso).
+ * P1-02: `transferencia_saida` entrou aqui também — mesma RPC que já fazia a
+ * baixa da origem e a alta do destino atomicamente para o bot do Telegram.
  */
-export const TIPOS_SAIDA_TRANSACIONAL = Object.freeze(['venda', 'morte']);
+export const TIPOS_SAIDA_TRANSACIONAL = Object.freeze(['venda', 'morte', 'transferencia_saida']);
 
 export function usaSaidaTransacional(tipoSaida) {
   return TIPOS_SAIDA_TRANSACIONAL.includes(String(tipoSaida || '').trim().toLowerCase());
@@ -59,6 +64,14 @@ function toNumeroFinito(valor, campo, { min = -Infinity } = {}) {
 
 function falha(erro) {
   return { ok: false, erro, aplicar: null, ids: null };
+}
+
+/** Peso médio atual de um lote a partir das linhas de `animais` — mesma conta de `obterResumoLote` em services/movimentacoes.js. */
+function pesoMedioAtualDoLote(db, loteId) {
+  const registros = (Array.isArray(db?.animais) ? db.animais : []).filter((item) => Number(item.lote_id) === Number(loteId));
+  const qtdRegistrada = registros.reduce((soma, item) => soma + Number(item.qtd || 0), 0);
+  if (!qtdRegistrada) return 0;
+  return registros.reduce((soma, item) => soma + Number(item.p_at || 0) * Number(item.qtd || 0), 0) / qtdRegistrada;
 }
 
 /**
@@ -118,12 +131,53 @@ export function planejarSaidaLoteTransacional(db, dados = {}) {
   const validacao = validarBaixaRebanho(lote, qtd, db?.animais);
   if (!validacao.ok) return { ok: false, erro: validacao.erro };
 
+  // Transferência: valida o lote de destino contra o mesmo `db` local (mensagem
+  // imediata) e já monta a reponderação do peso do destino — mesma fórmula que
+  // o bot do Telegram usa em `domain/telegram/acoesLote.js::prepararTransferenciaAnimais`
+  // e que o fluxo antigo (`registrarSaidaAnimal`) já aplicava. A RPC revalida
+  // tudo de novo sob lock (existência, status, `p_destino_lote_id === p_lote_id`).
+  let destinoLoteId = null;
+  let destinoQtdFinal = null;
+  let destinoPesoFinal = null;
+  if (tipoSaida === 'transferencia_saida') {
+    const destinoRaw = dados.destinoLoteId ?? dados.destino_lote_id ?? dados.lote_destino;
+    if (destinoRaw === undefined || destinoRaw === null || destinoRaw === '') {
+      return { ok: false, erro: 'Selecione o lote de destino.' };
+    }
+    try {
+      destinoLoteId = toNumeroFinito(destinoRaw, 'lote destino', { min: 1 });
+    } catch (error) {
+      return { ok: false, erro: error.message };
+    }
+    if (Number(destinoLoteId) === Number(loteId)) {
+      return { ok: false, erro: 'Lote de origem e destino devem ser diferentes na transferência.' };
+    }
+    const loteDestino = lotes.find((item) => Number(item.id) === Number(destinoLoteId));
+    if (!loteDestino) {
+      return { ok: false, erro: `Lote de destino ${destinoLoteId} não encontrado para transferência.` };
+    }
+    if (!loteEstaAtivo(loteDestino)) {
+      return { ok: false, erro: 'O lote de destino está finalizado e não aceita novas movimentações.' };
+    }
+    const destinoQtdAtual = qtdCabecasDoLote(loteDestino, db?.animais);
+    const destinoPesoAtual = pesoMedioAtualDoLote(db, destinoLoteId);
+    destinoQtdFinal = destinoQtdAtual + qtd;
+    // Animais saem com `pesoMedio` informado no formulário; o destino recalcula
+    // a média ponderada com o que já tinha. A origem não recalcula o próprio
+    // peso médio (mesma divergência aceita documentada no topo do arquivo).
+    destinoPesoFinal = destinoQtdFinal
+      ? (destinoQtdAtual * destinoPesoAtual + qtd * pesoMedio) / destinoQtdFinal
+      : pesoMedio;
+  }
+
   const obsInformada = String(dados.observacao ?? dados.obs ?? '').trim();
   // A RPC grava `descricao` do lançamento financeiro a partir de `p_obs`. Sem
   // observação do usuário, mandamos a frase padrão que o fluxo antigo já usava,
   // para o extrato financeiro não sair com descrição vazia.
-  const rotulo = tipoSaida === 'venda' ? 'Venda' : 'Morte/perda';
-  const obs = obsInformada || `${rotulo} de ${qtd} animal(is) do lote ${loteId}`;
+  const rotulo = tipoSaida === 'venda' ? 'Venda' : (tipoSaida === 'morte' ? 'Morte/perda' : 'Transferência');
+  const obs = obsInformada || (tipoSaida === 'transferencia_saida'
+    ? `Transferência de ${qtd} animal(is) do lote ${loteId} para o lote ${destinoLoteId}`
+    : `${rotulo} de ${qtd} animal(is) do lote ${loteId}`);
   const comprador = tipoSaida === 'venda' ? String(dados.comprador || '').trim() : '';
 
   return {
@@ -138,8 +192,8 @@ export function planejarSaidaLoteTransacional(db, dados = {}) {
       p_data: data,
       p_comprador_fornecedor: comprador,
       p_obs: obs,
-      p_destino_lote_id: null,
-      p_peso_destino_final: null,
+      p_destino_lote_id: destinoLoteId,
+      p_peso_destino_final: destinoPesoFinal,
     },
     contexto: {
       loteId,
@@ -154,6 +208,9 @@ export function planejarSaidaLoteTransacional(db, dados = {}) {
       // é a mesma conta que a RPC fez (`lotes.qtd - p_qtd`) sob lock.
       saldoFinal: validacao.saldoFinal,
       geraReceita: tipoSaida === 'venda' && valorTotal > 0,
+      destinoLoteId,
+      destinoQtdFinal,
+      destinoPesoFinal,
     },
   };
 }
@@ -167,6 +224,7 @@ export function planejarSaidaLoteTransacional(db, dados = {}) {
 export function aplicarSaidaLoteNoEstadoLocal(db, contexto, ids = {}, ownerUserId = null) {
   const {
     loteId, tipoSaida, qtd, pesoMedio, valorTotal, data, comprador, obs, saldoFinal, geraReceita,
+    destinoLoteId = null, destinoQtdFinal = null, destinoPesoFinal = null,
   } = contexto;
   const movimentacaoId = ids?.movimentacaoId ?? null;
   const financeiroId = ids?.financeiroId ?? null;
@@ -179,7 +237,7 @@ export function aplicarSaidaLoteNoEstadoLocal(db, contexto, ids = {}, ownerUserI
     id: movimentacaoId,
     owner_user_id: ownerUserId,
     lote_id: loteId,
-    destino_lote_id: null,
+    destino_lote_id: destinoLoteId,
     tipo: tipoSaida,
     qtd,
     peso_medio: pesoMedio,
@@ -190,13 +248,24 @@ export function aplicarSaidaLoteNoEstadoLocal(db, contexto, ids = {}, ownerUserI
     obs,
   };
 
-  // `p_at` do lote fica intocado de propósito — ver nota de divergência no topo.
-  const lotesAtualizados = lotes.map((lote) => (
+  // `p_at` do lote de origem fica intocado de propósito — ver nota de
+  // divergência no topo.
+  let lotesAtualizados = lotes.map((lote) => (
     Number(lote.id) === Number(loteId) ? { ...lote, qtd: saldoFinal } : lote
   ));
   // Mesma distribuição proporcional que a RPC aplica nas linhas "grupo" de
   // `animais`; `null` no peso preserva `p_at` de cada linha, como no SQL.
-  const animaisSincronizados = sincronizarAnimaisGrupoDoLote(db?.animais, loteId, saldoFinal, null);
+  let animaisSincronizados = sincronizarAnimaisGrupoDoLote(db?.animais, loteId, saldoFinal, null);
+
+  // Transferência: credita o destino com a mesma reponderação já calculada em
+  // `planejarSaidaLoteTransacional` (espelha o `update public.lotes` do
+  // destino dentro da RPC).
+  if (destinoLoteId != null) {
+    lotesAtualizados = lotesAtualizados.map((lote) => (
+      Number(lote.id) === Number(destinoLoteId) ? { ...lote, qtd: destinoQtdFinal, p_at: destinoPesoFinal } : lote
+    ));
+    animaisSincronizados = sincronizarAnimaisGrupoDoLote(animaisSincronizados, destinoLoteId, destinoQtdFinal, destinoPesoFinal);
+  }
 
   const baseAtualizada = {
     ...db,
