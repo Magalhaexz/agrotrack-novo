@@ -2,7 +2,7 @@ import { calcularResultadoLote } from './calculos.js';
 import { calcLote } from '../utils/calculations.js';
 import { safeDivide, toNumber } from './calcHelpers.js';
 
-function buildInsights({ lote, totalAnimais, lucroTotal, gmdKgDia, custoPorArroba, margemPct }) {
+function buildInsights({ lote, totalAnimais, lucroTotal, gmdKgDia, gmdDisponivel, custoPorArroba, margemPct }) {
   const insights = [];
 
   if (!lote || totalAnimais <= 0) {
@@ -18,7 +18,10 @@ function buildInsights({ lote, totalAnimais, lucroTotal, gmdKgDia, custoPorArrob
     insights.push('Lote em ponto de equilíbrio.');
   }
 
-  if (toNumber(lote.gmd_meta) > 0 && gmdKgDia < toNumber(lote.gmd_meta)) {
+  // P1-05B: só compara com a meta quando o GMD realmente está disponível —
+  // sem isso, um lote sem pesagem suficiente (gmdKgDia = 0 só de borda)
+  // aparecia aqui como "abaixo da meta" mesmo sem nenhum dado real.
+  if (gmdDisponivel && toNumber(lote.gmd_meta) > 0 && gmdKgDia < toNumber(lote.gmd_meta)) {
     insights.push('GMD abaixo da meta configurada.');
   }
 
@@ -40,6 +43,11 @@ export function getResumoLote(db, loteId) {
   const pesoAtualMedio = toNumber(produtivo?.pesoAtualMedio);
   const gmdKgDia = toNumber(produtivo?.gmdMedio);
   const gmdGramasDia = gmdKgDia * 1000;
+  // P1-05B: disponibilidade vem da fonte canônica (calcLote → domain/gmd.js),
+  // nunca do valor numérico convertido — `gmdKgDia` é 0 tanto para "GMD real
+  // igual a zero" quanto para "sem pesagem suficiente" (conversão de borda em
+  // calcLote), e só `produtivo.gmdDisponivel` distingue os dois casos.
+  const gmdDisponivel = Boolean(produtivo?.gmdDisponivel);
   const dias = toNumber(produtivo?.dias);
   const arrobasProduzidas = toNumber(produtivo?.arrobasProduzidas);
   const arrobasCarcaca = toNumber(produtivo?.arrobasCarcaca);
@@ -68,6 +76,7 @@ export function getResumoLote(db, loteId) {
     totalAnimais,
     lucroTotal,
     gmdKgDia,
+    gmdDisponivel,
     custoPorArroba,
     margemPct,
   });
@@ -81,6 +90,7 @@ export function getResumoLote(db, loteId) {
     gmdMedio: gmdKgDia,
     gmdKgDia,
     gmdGramasDia,
+    gmdDisponivel,
     dias,
     arrobasProduzidas,
     arrobasCarcaca,

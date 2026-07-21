@@ -60,6 +60,10 @@ export function montarDadosDecisaoVenda(db, loteId) {
     lucroPorArroba: resumo.lucroPorArroba,
     arrobas: resumo.arrobasCarcaca,
     gmdAtual: resumo.gmdMedio,
+    // P1-05B: disponibilidade real do GMD (fonte canônica), não o número
+    // convertido — `gmdAtual` é 0 tanto para "sem pesagem" quanto para "GMD
+    // real zero"; só este campo distingue os dois casos para quem consome.
+    gmdDisponivel: resumo.gmdDisponivel,
     gmdMeta: toNumber(lote?.gmd_meta) || null,
     dias: resumo.dias,
   };
@@ -198,7 +202,17 @@ export function classificarDecisaoVenda(dados = {}) {
   }
 
   const gmdMeta = toNumber(dados.gmdMeta);
-  if (gmdMeta > 0 && toNumber(dados.gmdAtual) < gmdMeta * 0.9) {
+  // P1-05B: com meta configurada mas sem GMD disponível (sem pesagem
+  // suficiente), não há base para comparar — pula a checagem em vez de
+  // reprovar ("abaixo da meta") OU bloquear a decisão inteira: a classificação
+  // segue para os critérios seguintes (custo, dias, lucro), que não dependem
+  // de GMD. `dadosInsuficientes` aqui é reservado para a falta de dado
+  // FUNDAMENTAL (checada acima); GMD ausente sozinho nunca impede a venda de
+  // ser avaliada por outro critério. `=== false` explícito preserva o
+  // comportamento antigo para chamadores que não informam `gmdDisponivel`
+  // (default: comparação segue normalmente, como sempre foi).
+  const gmdComparavel = dados.gmdDisponivel !== false;
+  if (gmdComparavel && gmdMeta > 0 && toNumber(dados.gmdAtual) < gmdMeta * 0.9) {
     return {
       status: STATUS_DECISAO.ABAIXO_META_GMD,
       statusLabel: STATUS_LABEL[STATUS_DECISAO.ABAIXO_META_GMD],

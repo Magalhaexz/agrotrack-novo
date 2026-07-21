@@ -180,3 +180,82 @@ test('montarDadosDecisaoVenda usa preço padrão de R$270 quando o lote não def
   assert.ok(dados.arrobas > 0);
   assert.ok(dados.custoPorArroba > 0);
 });
+
+// ── P1-05B: guard de gmdDisponivel — nunca bloquear venda por FALTA de dado ──
+
+test('classificarDecisaoVenda: sem GMD disponível (meta cadastrada), não reprova por desempenho — segue avaliando pelos outros critérios', () => {
+  // custo baixo (60 < 270*0.85) e lucro positivo com dias suficientes: sem o
+  // guard, isto teria virado ABAIXO_META_GMD (gmdAtual=0 < meta*0.9); com o
+  // guard, pula a checagem e classifica normalmente pelos critérios restantes
+  // — a decisão não fica bloqueada nem "sem dados" por falta de pesagem.
+  const resultado = classificarDecisaoVenda({
+    qtdCabecas: 10, pesoAtual: 480, arrobas: 166.4, custoTotal: 10000,
+    gmdAtual: 0, gmdMeta: 1.3, gmdDisponivel: false, precoArroba: 270, custoPorArroba: 60, lucroTotal: 5000, dias: 60,
+  });
+  assert.notEqual(resultado.status, STATUS_DECISAO.ABAIXO_META_GMD);
+  assert.notEqual(resultado.status, STATUS_DECISAO.DADOS_INSUFICIENTES);
+  assert.equal(resultado.status, STATUS_DECISAO.PRONTO_AVALIAR);
+});
+
+test('classificarDecisaoVenda: sem meta de GMD cadastrada, gmdDisponivel=false não afeta a classificação', () => {
+  // Sem gmdMeta > 0, o guard de disponibilidade nem entra em jogo — segue
+  // para custo/pronto-para-avaliar normalmente, como sempre.
+  const resultado = classificarDecisaoVenda({
+    qtdCabecas: 10, pesoAtual: 480, arrobas: 166.4, custoTotal: 16640,
+    gmdAtual: 0, gmdMeta: null, gmdDisponivel: false, precoArroba: 270, custoPorArroba: 100, lucroTotal: 28288, dias: 45,
+  });
+  assert.equal(resultado.status, STATUS_DECISAO.PRONTO_AVALIAR);
+});
+
+test('classificarDecisaoVenda: GMD real igual a zero mas DISPONÍVEL ainda reprova por abaixo da meta', () => {
+  // Distingue "sem dado" (não bloqueia) de "dado real, e o real é zero"
+  // (continua sendo um desempenho ruim de verdade).
+  const resultado = classificarDecisaoVenda({
+    qtdCabecas: 10, pesoAtual: 480, arrobas: 166.4, custoTotal: 10000,
+    gmdAtual: 0, gmdMeta: 1.3, gmdDisponivel: true, precoArroba: 270, custoPorArroba: 60, lucroTotal: 5000, dias: 60,
+  });
+  assert.equal(resultado.status, STATUS_DECISAO.ABAIXO_META_GMD);
+});
+
+test('classificarDecisaoVenda: GMD válido acima da meta com gmdDisponivel=true segue para pronto/custo normalmente', () => {
+  const resultado = classificarDecisaoVenda({
+    qtdCabecas: 10, pesoAtual: 480, arrobas: 166.4, custoTotal: 16640,
+    gmdAtual: 1.4, gmdMeta: 1.3, gmdDisponivel: true, precoArroba: 270, custoPorArroba: 100, lucroTotal: 28288, dias: 45,
+  });
+  assert.equal(resultado.status, STATUS_DECISAO.PRONTO_AVALIAR);
+});
+
+test('classificarDecisaoVenda: chamador antigo sem informar gmdDisponivel preserva o comportamento anterior', () => {
+  // Nenhum campo `gmdDisponivel` no payload (contrato antigo) — a comparação
+  // com a meta continua acontecendo normalmente, sem exigir o novo campo.
+  const resultado = classificarDecisaoVenda({
+    qtdCabecas: 10, pesoAtual: 480, arrobas: 166.4, custoTotal: 10000,
+    gmdAtual: 0.8, gmdMeta: 1.3, precoArroba: 270, custoPorArroba: 60, lucroTotal: 5000, dias: 60,
+  });
+  assert.equal(resultado.status, STATUS_DECISAO.ABAIXO_META_GMD);
+});
+
+test('montarDadosDecisaoVenda expõe gmdDisponivel vindo de getResumoLote (sem pesagem = false)', () => {
+  const db = {
+    lotes: [{ id: 1, nome: 'Lote 1', status: 'ativo', gmd_meta: 1.2, entrada: '2026-01-01' }],
+    animais: [{ id: 1, lote_id: 1, qtd: 10, p_ini: 300, p_at: 480, data_entrada: '2026-01-01' }],
+    movimentacoes_financeiras: [
+      { id: 1, tipo: 'despesa', categoria: 'compra_animal', lote_id: 1, valor: 16640 },
+    ],
+  };
+  const dados = montarDadosDecisaoVenda(db, 1);
+  assert.equal(dados.gmdDisponivel, false, 'nenhuma pesagem de lote no db');
+});
+
+test('montarDadosDecisaoVenda expõe gmdDisponivel=true quando há pesagem de lote válida', () => {
+  const db = {
+    lotes: [{ id: 1, nome: 'Lote 1', status: 'ativo', gmd_meta: 1.2, entrada: '2026-01-01', p_ini: 300 }],
+    animais: [{ id: 1, lote_id: 1, qtd: 10, p_ini: 300, p_at: 480, data_entrada: '2026-01-01' }],
+    pesagens: [{ id: 1, lote_id: 1, tipo: 'lote', data: '2026-04-11', peso_medio: 480 }],
+    movimentacoes_financeiras: [
+      { id: 1, tipo: 'despesa', categoria: 'compra_animal', lote_id: 1, valor: 16640 },
+    ],
+  };
+  const dados = montarDadosDecisaoVenda(db, 1);
+  assert.equal(dados.gmdDisponivel, true);
+});
