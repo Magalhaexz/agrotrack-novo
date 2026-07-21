@@ -44,9 +44,12 @@ test('lote existente mas sem nenhuma pesagem pede para cadastrar pesagem antes d
 function dbDoisLotes() {
   return {
     fazendas: [{ id: 1, nome: 'Fazenda Teste' }],
+    // `entrada`/`p_ini` são a base do GMD de vida (domain/gmd.js) e existem em
+    // 100% dos lotes reais — a fixture precisa refletir isso, senão o cálculo
+    // cai para a 1ª pesagem e mede uma janela menor que a real.
     lotes: [
-      { id: 1, nome: 'Lote Saudável', status: 'ativo', faz_id: 1, gmd_meta: 1.0, peso_alvo: 500, preco_arroba: 270, qtd: 10 },
-      { id: 2, nome: 'Lote Nelore Engorda', status: 'ativo', faz_id: 1, gmd_meta: 1.0, peso_alvo: 500, preco_arroba: 270, qtd: 10 },
+      { id: 1, nome: 'Lote Saudável', status: 'ativo', faz_id: 1, gmd_meta: 1.0, peso_alvo: 500, preco_arroba: 270, qtd: 10, entrada: diasAtrasDe(AGORA, 40), p_ini: 300 },
+      { id: 2, nome: 'Lote Nelore Engorda', status: 'ativo', faz_id: 1, gmd_meta: 1.0, peso_alvo: 500, preco_arroba: 270, qtd: 10, entrada: diasAtrasDe(AGORA, 40), p_ini: 300 },
     ],
     animais: [
       { id: 1, lote_id: 1, qtd: 10, p_ini: 300, p_at: 340, data_entrada: diasAtras(40) },

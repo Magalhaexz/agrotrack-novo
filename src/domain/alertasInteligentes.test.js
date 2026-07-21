@@ -54,7 +54,10 @@ test('detectarLotesAbaixoGmd marca crítico quando o GMD fica 50% abaixo da meta
 
 test('detectarLotesAbaixoGmd marca médio para desvio pequeno (abaixo de 10%)', () => {
   const db = {
-    lotes: [{ id: 2, nome: 'Lote Recria', status: 'ativo', gmd_meta: 1.0 }],
+    // `entrada`/`p_ini` do lote são a base oficial do GMD de vida
+    // (domain/gmd.js). Sem eles o cálculo cairia para a 1ª pesagem e mediria
+    // só 55 dias em vez dos 100 reais — lote de verdade sempre tem entrada.
+    lotes: [{ id: 2, nome: 'Lote Recria', status: 'ativo', gmd_meta: 1.0, entrada: diasAtras(100), p_ini: 300 }],
     animais: [{ id: 1, lote_id: 2, qtd: 5, sexo: 'macho', p_ini: 300, p_at: 392, data_entrada: diasAtras(100) }],
     pesagens: [
       { id: 1, lote_id: 2, data: diasAtras(60), peso_medio: 350 },

@@ -61,7 +61,10 @@ test('calcularSaudeLote retorna dados insuficientes quando o lote existe mas nã
 
 function dbLoteSaudavel() {
   return {
-    lotes: [{ id: 1, nome: 'Lote Nelore', status: 'ativo', gmd_meta: 1.0, peso_alvo: 500, preco_arroba: 270, qtd: 10 }],
+    // `entrada`/`p_ini` são a base do GMD de vida (domain/gmd.js) e existem em
+    // 100% dos lotes reais: sem eles o cálculo mediria só a janela entre
+    // pesagens (15 dias) em vez dos 40 dias reais de permanência.
+    lotes: [{ id: 1, nome: 'Lote Nelore', status: 'ativo', gmd_meta: 1.0, peso_alvo: 500, preco_arroba: 270, qtd: 10, entrada: diasAtrasDe(AGORA, 40), p_ini: 300 }],
     animais: [{ id: 1, lote_id: 1, qtd: 10, p_ini: 300, p_at: 340, data_entrada: diasAtras(40) }],
     pesagens: [
       { id: 1, lote_id: 1, data: diasAtrasDe(AGORA, 20), peso_medio: 330 },
@@ -90,8 +93,14 @@ test('lote saudável recebe score alto, classificação saudável e confiança a
 
 test('GMD muito abaixo da meta (30%+) reduz 20 pontos com a explicação esperada', () => {
   const db = dbLoteSaudavel();
-  // GMD real = (340-300)/40 = 1.0 no fixture saudável; forço para bem abaixo:
-  db.animais = [{ id: 1, lote_id: 1, qtd: 10, p_ini: 300, p_at: 328, data_entrada: diasAtras(40) }]; // 0.7 kg/dia, 30% abaixo de 1.0
+  // O GMD vem das PESAGENS (domain/gmd.js), não mais da tabela `animais` —
+  // então é a última pesagem que precisa ser forçada para baixo.
+  // Base: entrada 40d atrás a 300kg; última pesagem 5d atrás ⇒ 35 dias.
+  // 300 + (0,7 × 35) = 324,5 ⇒ GMD 0,70 kg/dia = 30% abaixo da meta 1,0.
+  db.pesagens = [
+    { id: 1, lote_id: 1, data: diasAtrasDe(AGORA, 20), peso_medio: 315 },
+    { id: 2, lote_id: 1, data: diasAtrasDe(AGORA, 5), peso_medio: 324.5 },
+  ];
   const resultado = calcularSaudeLote(db, 1, AGORA);
   const fatorGmd = resultado.fatores.find((f) => f.chave === 'gmd');
   assert.equal(fatorGmd.pontos, -20);
