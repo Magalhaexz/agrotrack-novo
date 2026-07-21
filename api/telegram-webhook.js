@@ -78,11 +78,12 @@ function registrarEventoEAvaliarRateLimit(chatId, agora, limite) {
   return resultado;
 }
 
-function isWebhookAuthorized(req) {
+function getWebhookAuthorizationFailure(req) {
   const secret = readEnv('TELEGRAM_WEBHOOK_SECRET');
-  if (!secret) return true; // Sem secret configurado: aceita (limitação documentada).
+  if (!secret) return { status: 503, reason: 'secret_not_configured' };
   const header = req.headers?.['x-telegram-bot-api-secret-token'];
-  return header === secret;
+  if (header !== secret) return { status: 401, reason: 'invalid_secret' };
+  return null;
 }
 
 /** Identifica o usuário só pela conexão já salva (chat_id → owner_user_id) — nunca por texto da mensagem. */
@@ -134,14 +135,19 @@ export default async function handler(req, res, deps = {}) {
     return res.status(405).json({ ok: false, message: 'Método não permitido.' });
   }
 
-  if (!isWebhookAuthorized(req)) {
+  const authorizationFailure = getWebhookAuthorizationFailure(req);
+  if (authorizationFailure) {
     // Log seguro (sem token, sem secret, sem corpo da mensagem): confirma se
     // o rejeitado é por header ausente (webhook registrado sem secret_token)
     // ou por valor divergente (secret_token diferente do TELEGRAM_WEBHOOK_SECRET).
     console.warn('[telegram-webhook] rejeitado: secret_token ausente ou divergente', {
       headerPresente: Boolean(req.headers?.['x-telegram-bot-api-secret-token']),
+      motivo: authorizationFailure.reason,
     });
-    return res.status(401).json({ ok: false, message: 'Não autorizado.' });
+    return res.status(authorizationFailure.status).json({
+      ok: false,
+      message: authorizationFailure.status === 503 ? 'Webhook não configurado.' : 'Não autorizado.',
+    });
   }
 
   const body = (req.body && typeof req.body === 'object') ? req.body : {};

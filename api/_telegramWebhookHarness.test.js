@@ -1,3 +1,4 @@
+/* global process */
 // Harness de webhook REALISTA (Sprint Paridade 1, bloco 5). Passa pelo
 // handler HTTP real (`api/telegram-webhook.js`): payload de update do Telegram
 // → autenticação por secret_token → rate limit → busca de conexão por
@@ -17,6 +18,9 @@ import { makeClient, baseTables } from './_fakeTelegramClient.js';
 let contadorChat = 900000;
 function novoChat() { contadorChat += 1; return contadorChat; }
 
+const TEST_WEBHOOK_SECRET = 'test-webhook-secret';
+const WEBHOOK_SECRET_HEADER = 'x-telegram-bot-api-secret-token';
+
 function tabelasComConexao(perfil, fazendaId, chatId) {
   const t = baseTables(perfil);
   t.telegram_connections = [{
@@ -27,7 +31,18 @@ function tabelasComConexao(perfil, fazendaId, chatId) {
 }
 
 /** Roda UM update pelo handler real e devolve o texto que o bot enviaria. */
-async function enviarWebhook(client, texto, chatId) {
+async function enviarWebhook(client, texto, chatId, options = {}) {
+  const {
+    envSecret = TEST_WEBHOOK_SECRET,
+    headerSecret = TEST_WEBHOOK_SECRET,
+    vercelEnv = 'test',
+  } = options;
+  const previousSecret = process.env.TELEGRAM_WEBHOOK_SECRET;
+  const previousVercelEnv = process.env.VERCEL_ENV;
+  if (envSecret === null) delete process.env.TELEGRAM_WEBHOOK_SECRET;
+  else process.env.TELEGRAM_WEBHOOK_SECRET = envSecret;
+  process.env.VERCEL_ENV = vercelEnv;
+
   const enviados = [];
   const deps = {
     getSupabaseAdminClient: () => client,
@@ -35,7 +50,7 @@ async function enviarWebhook(client, texto, chatId) {
   };
   const req = {
     method: 'POST',
-    headers: {},
+    headers: headerSecret ? { [WEBHOOK_SECRET_HEADER]: headerSecret } : {},
     body: {
       update_id: Math.floor(Math.random() * 1e9),
       message: {
@@ -52,8 +67,15 @@ async function enviarWebhook(client, texto, chatId) {
     status(code) { captured.status = code; return this; },
     json(payload) { captured.json = payload; return captured; },
   };
-  await handler(req, res, deps);
-  return { status: captured.status, json: captured.json, resposta: enviados.at(-1)?.texto ?? null };
+  try {
+    await handler(req, res, deps);
+    return { status: captured.status, json: captured.json, resposta: enviados.at(-1)?.texto ?? null };
+  } finally {
+    if (previousSecret === undefined) delete process.env.TELEGRAM_WEBHOOK_SECRET;
+    else process.env.TELEGRAM_WEBHOOK_SECRET = previousSecret;
+    if (previousVercelEnv === undefined) delete process.env.VERCEL_ENV;
+    else process.env.VERCEL_ENV = previousVercelEnv;
+  }
 }
 
 test('harness: método não-POST é rejeitado (405)', async () => {
@@ -62,6 +84,54 @@ test('harness: método não-POST é rejeitado (405)', async () => {
   const res = { _s: null, status(c) { this._s = c; return this; }, json() { return this; } };
   await handler({ method: 'GET', headers: {}, body: {} }, res, { getSupabaseAdminClient: () => client, enviarMensagemTelegramParaChat: async () => {} });
   assert.equal(res._s, 405);
+});
+
+test('harness: segredo ausente em produção falha fechado sem processar update', async () => {
+  const chat = novoChat();
+  const t = tabelasComConexao('operador', 1, chat);
+  const client = makeClient(t);
+  const r = await enviarWebhook(client, 'resumo', chat, {
+    envSecret: null,
+    headerSecret: null,
+    vercelEnv: 'production',
+  });
+  assert.equal(r.status, 503);
+  assert.equal(r.json.ok, false);
+  assert.equal(r.resposta, null);
+});
+
+test('harness: segredo ausente em ambiente local também falha fechado', async () => {
+  const chat = novoChat();
+  const t = tabelasComConexao('operador', 1, chat);
+  const client = makeClient(t);
+  const r = await enviarWebhook(client, 'resumo', chat, {
+    envSecret: null,
+    headerSecret: null,
+    vercelEnv: 'development',
+  });
+  assert.equal(r.status, 503);
+  assert.equal(r.json.ok, false);
+  assert.equal(r.resposta, null);
+});
+
+test('harness: segredo inválido é rejeitado com 401', async () => {
+  const chat = novoChat();
+  const t = tabelasComConexao('operador', 1, chat);
+  const client = makeClient(t);
+  const r = await enviarWebhook(client, 'resumo', chat, { headerSecret: 'wrong-secret' });
+  assert.equal(r.status, 401);
+  assert.equal(r.json.ok, false);
+  assert.equal(r.resposta, null);
+});
+
+test('harness: segredo válido permite o processamento normal', async () => {
+  const chat = novoChat();
+  const t = tabelasComConexao('operador', 1, chat);
+  const client = makeClient(t);
+  const r = await enviarWebhook(client, 'resumo', chat);
+  assert.equal(r.status, 200);
+  assert.equal(r.json.ok, true);
+  assert.match(r.resposta, /Resumo|código/i);
 });
 
 test('harness: resumo consolidado de todas as fazendas', async () => {
