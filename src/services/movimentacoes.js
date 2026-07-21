@@ -369,11 +369,22 @@ export function registrarEntradaAnimal(
 /**
  * Registra a saída de animais de um lote.
  *
+ * ESCOPO REDUZIDO NA SPRINT 3: venda e morte NÃO passam mais por aqui. Elas
+ * migraram para `services/saidaLoteTransacional.js`, que grava pela RPC
+ * `registrar_saida_lote` (movimentação + baixa + `animais` + financeiro numa
+ * transação só, com `SELECT … FOR UPDATE` revalidando o saldo no servidor).
+ * As gravações sequenciais abaixo sobrevivem apenas para `transferencia_saida`,
+ * cuja migração depende do lote de destino e ficou para uma sprint própria.
+ *
+ * O guard existe para que não haja um segundo caminho de escrita para venda e
+ * morte: sem ele, qualquer chamador esquecido continuaria gravando sem
+ * transação e sem proteção de concorrência.
+ *
  * @param {object} db - O objeto do banco de dados atual.
  * @param {object} dados - Dados da saída: { loteId, qtd, pesoMedio, valorTotal, data, tipoSaida, comprador, obs }.
  * @param {object} [userContext={}] - Contexto do usuário para auditoria.
  * @returns {object} Um novo objeto de banco de dados com a saída registrada.
- * @throws {Error} Se a quantidade de saída excede a quantidade atual no lote.
+ * @throws {Error} Se o tipo for venda/morte, ou se a quantidade excede o saldo.
  */
 export function registrarSaidaAnimal(
   db,
@@ -392,6 +403,12 @@ export function registrarSaidaAnimal(
     comprador,
     obs,
   } = normalizeAnimalMovementPayload(dados, { movementType: 'saida' });
+
+  if (tipoSaida === 'venda' || tipoSaida === 'morte') {
+    throw new Error(
+      `Saída do tipo "${tipoSaida}" deve ser registrada por registrarSaidaLoteTransacional (services/saidaLoteTransacional.js).`
+    );
+  }
 
   const lotes = Array.isArray(db?.lotes) ? db.lotes : [];
   const lote = lotes.find((item) => Number(item.id) === Number(loteId));

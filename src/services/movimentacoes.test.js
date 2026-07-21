@@ -22,52 +22,37 @@ function makeAnimal(overrides = {}) {
 
 const hoje = '2026-07-11';
 
-// ── Venda ─────────────────────────────────────────────────────────────────
+// ── Venda e morte saíram daqui (Sprint 3) ─────────────────────────────────
+// Passaram a gravar pela RPC transacional `registrar_saida_lote` — cobertura
+// completa em services/saidaLoteTransacional.test.js. O guard abaixo existe
+// para que não reapareça um segundo caminho de escrita para esses dois tipos:
+// sem transação e sem `SELECT … FOR UPDATE`, duas abas conseguiam levar o
+// lote a saldo negativo.
 
-test('venda: reduz o saldo do lote e cria histórico de movimentação', () => {
+test('venda não pode mais ser gravada pelo caminho sequencial antigo', () => {
   const db = makeDb({ lotes: [makeLote()], animais: [makeAnimal()] });
-  const r = registrarSaidaAnimal(db, {
-    loteId: 1, qtd: 10, pesoMedio: 420, valorTotal: 15000, data: hoje, tipoSaida: 'venda', comprador: 'Frigorífico X',
-  }, {}, { persist: false });
-
-  const lote = r.lotes.find((l) => l.id === 1);
-  assert.equal(lote.qtd, 40);
-  assert.equal(r.movimentacoes_animais.length, 1);
-  assert.equal(r.movimentacoes_animais[0].tipo, 'venda');
-  assert.equal(r.movimentacoes_animais[0].qtd, 10);
+  assert.throws(
+    () => registrarSaidaAnimal(db, {
+      loteId: 1, qtd: 10, pesoMedio: 420, valorTotal: 15000, data: hoje, tipoSaida: 'venda',
+    }, {}, { persist: false }),
+    /registrarSaidaLoteTransacional/
+  );
 });
 
-// ── Regressão P0: venda/morte/transferência não sincronizavam `animais[].qtd`
-// (só `lote.qtd`) — a linha "grupo" de `animais`, lida diretamente pela
-// página Animais (resumo "Total de cabeças" e aba "Grupos"), ficava com a
-// quantidade antiga mesmo após a venda, inclusive após reload (persistido). ──
-
-test('venda: sincroniza também a linha "grupo" de animais (não só lote.qtd) — regressão do bug relatado', () => {
+test('morte não pode mais ser gravada pelo caminho sequencial antigo', () => {
   const db = makeDb({ lotes: [makeLote()], animais: [makeAnimal()] });
-  const r = registrarSaidaAnimal(db, {
-    loteId: 1, qtd: 10, pesoMedio: 420, valorTotal: 15000, data: hoje, tipoSaida: 'venda', comprador: 'Frigorífico X',
-  }, {}, { persist: false });
-
-  const animal = r.animais.find((a) => a.id === 1);
-  assert.equal(animal.qtd, 40, 'a linha de animais precisa refletir a venda, não só o lote');
+  assert.throws(
+    () => registrarSaidaAnimal(db, {
+      loteId: 1, qtd: 3, pesoMedio: 400, valorTotal: 0, data: hoje, tipoSaida: 'morte',
+    }, {}, { persist: false }),
+    /registrarSaidaLoteTransacional/
+  );
 });
 
-test('venda total: lote e animais chegam a zero', () => {
-  const db = makeDb({ lotes: [makeLote({ qtd: 20 })], animais: [makeAnimal({ qtd: 20 })] });
-  const r = registrarSaidaAnimal(db, {
-    loteId: 1, qtd: 20, pesoMedio: 420, valorTotal: 30000, data: hoje, tipoSaida: 'venda',
-  }, {}, { persist: false });
-  assert.equal(r.lotes.find((l) => l.id === 1).qtd, 0);
-  assert.equal(r.animais.find((a) => a.id === 1).qtd, 0);
-});
-
-test('morte/perda: também sincroniza a linha "grupo" de animais', () => {
-  const db = makeDb({ lotes: [makeLote()], animais: [makeAnimal()] });
-  const r = registrarSaidaAnimal(db, {
-    loteId: 1, qtd: 3, pesoMedio: 400, valorTotal: 0, data: hoje, tipoSaida: 'morte',
-  }, {}, { persist: false });
-  assert.equal(r.animais.find((a) => a.id === 1).qtd, 47);
-});
+// ── Regressão P0: a transferência não sincronizava `animais[].qtd` (só
+// `lote.qtd`) — a linha "grupo" de `animais`, lida diretamente pela página
+// Animais (resumo "Total de cabeças" e aba "Grupos"), ficava com a quantidade
+// antiga mesmo após a saída, inclusive após reload (persistido). ──
 
 test('transferência: sincroniza a linha "grupo" de animais na origem E no destino', () => {
   const db = makeDb({
@@ -83,20 +68,20 @@ test('transferência: sincroniza a linha "grupo" de animais na origem E no desti
 
 test('registro individual (tipo_registro: individual) nunca é tocado pela sincronização de grupo', () => {
   const db = makeDb({
-    lotes: [makeLote({ qtd: 51 })],
+    lotes: [makeLote({ qtd: 51 }), makeLote({ id: 2, nome: 'Lote B', qtd: 0 })],
     animais: [
       makeAnimal({ id: 1, qtd: 50 }),
       { id: 2, lote_id: 1, qtd: 1, p_at: 410, tipo_registro: 'individual', identificacao: 'Brinco 42' },
     ],
   });
   const r = registrarSaidaAnimal(db, {
-    loteId: 1, qtd: 10, pesoMedio: 400, valorTotal: 15000, data: hoje, tipoSaida: 'venda',
+    loteId: 1, destinoLoteId: 2, qtd: 10, pesoMedio: 400, valorTotal: 0, data: hoje, tipoSaida: 'transferencia_saida',
   }, {}, { persist: false });
   // Saldo canônico é lote.qtd (51: 50 do grupo + 1 individual) → 51-10=41;
   // só a linha "grupo" absorve a redução, a individual fica intocada.
-  assert.equal(r.animais.find((a) => a.id === 1).qtd, 41, 'a linha grupo absorve a venda');
+  assert.equal(r.animais.find((a) => a.id === 1).qtd, 41, 'a linha grupo absorve a saída');
   const individual = r.animais.find((a) => a.id === 2);
-  assert.equal(individual.qtd, 1, 'o registro individual não é decrementado pela venda do grupo');
+  assert.equal(individual.qtd, 1, 'o registro individual não é decrementado pela saída do grupo');
 });
 
 test('compra (entrada): também sincroniza a linha "grupo" de animais', () => {
@@ -105,59 +90,6 @@ test('compra (entrada): também sincroniza a linha "grupo" de animais', () => {
     loteId: 1, qtd: 5, pesoMedio: 300, valorTotal: 5000, data: hoje, tipoEntrada: 'compra',
   }, {}, { persist: false });
   assert.equal(r.animais.find((a) => a.id === 1).qtd, 55);
-});
-
-test('venda: gera receita no financeiro (não vira morte, não finaliza automaticamente)', () => {
-  const db = makeDb({ lotes: [makeLote()], animais: [makeAnimal()] });
-  const r = registrarSaidaAnimal(db, {
-    loteId: 1, qtd: 10, pesoMedio: 420, valorTotal: 15000, data: hoje, tipoSaida: 'venda', comprador: 'Frigorífico X',
-  }, {}, { persist: false });
-
-  assert.equal(r.movimentacoes_financeiras.length, 1);
-  assert.equal(r.movimentacoes_financeiras[0].tipo, 'receita');
-  assert.equal(r.movimentacoes_financeiras[0].categoria, 'venda_animal');
-  assert.equal(r.movimentacoes_financeiras[0].valor, 15000);
-  // Não altera o status do lote (venda parcial não finaliza automaticamente):
-  const lote = r.lotes.find((l) => l.id === 1);
-  assert.equal(lote.status ?? undefined, makeLote().status);
-});
-
-test('venda: impede saldo negativo (quantidade maior que o disponível)', () => {
-  const db = makeDb({ lotes: [makeLote({ qtd: 5 })], animais: [makeAnimal({ qtd: 5 })] });
-  assert.throws(
-    () => registrarSaidaAnimal(db, { loteId: 1, qtd: 10, pesoMedio: 400, valorTotal: 5000, data: hoje, tipoSaida: 'venda' }, {}, { persist: false }),
-    /Quantidade indispon[íi]vel/
-  );
-});
-
-// ── Morte/perda ───────────────────────────────────────────────────────────
-
-test('morte/perda: reduz o saldo e cria movimentação própria, sem gerar receita', () => {
-  const db = makeDb({ lotes: [makeLote()], animais: [makeAnimal()] });
-  const r = registrarSaidaAnimal(db, {
-    loteId: 1, qtd: 3, pesoMedio: 400, valorTotal: 0, data: hoje, tipoSaida: 'morte',
-  }, {}, { persist: false });
-
-  const lote = r.lotes.find((l) => l.id === 1);
-  assert.equal(lote.qtd, 47);
-  assert.equal(r.movimentacoes_animais[0].tipo, 'morte');
-  assert.equal(r.movimentacoes_financeiras.length, 0, 'morte/perda não deve gerar receita');
-});
-
-test('morte/perda: não finaliza o lote automaticamente', () => {
-  const db = makeDb({ lotes: [makeLote({ status: 'ativo' })], animais: [makeAnimal()] });
-  const r = registrarSaidaAnimal(db, {
-    loteId: 1, qtd: 3, pesoMedio: 400, valorTotal: 0, data: hoje, tipoSaida: 'morte',
-  }, {}, { persist: false });
-  assert.equal(r.lotes.find((l) => l.id === 1).status, 'ativo');
-});
-
-test('morte/perda: impede quantidade superior ao saldo', () => {
-  const db = makeDb({ lotes: [makeLote({ qtd: 2 })], animais: [makeAnimal({ qtd: 2 })] });
-  assert.throws(
-    () => registrarSaidaAnimal(db, { loteId: 1, qtd: 5, pesoMedio: 400, valorTotal: 0, data: hoje, tipoSaida: 'morte' }, {}, { persist: false }),
-    /Quantidade indispon[íi]vel/
-  );
 });
 
 // ── Transferência de saída ────────────────────────────────────────────────
@@ -222,56 +154,34 @@ test('transferência: não confunde com troca de pasto (não altera pastagem_id)
 
 // Seção 8 (auditoria lote.qtd) — o saldo de validação segue lote.qtd, mesmo
 // quando diverge de animais.qtd (ex.: após um Ajuste de lotação que só
-// atualiza lote.qtd, sem tocar em animais.qtd).
+// atualiza lote.qtd, sem tocar em animais.qtd). A mesma regra vale para venda
+// e morte no caminho transacional (ver saidaLoteTransacional.test.js).
 test('registrarSaidaAnimal: saldo de validação segue lote.qtd (canônico), não animais.qtd desatualizado', () => {
   // Ajuste de lotação reduziu para 40, mas animais.qtd ainda mostra 50 (não sincronizado).
-  const db = makeDb({ lotes: [makeLote({ qtd: 40 })], animais: [makeAnimal({ qtd: 50 })] });
+  const db = makeDb({
+    lotes: [makeLote({ qtd: 40 }), makeLote({ id: 2, nome: 'Lote B', qtd: 0 })],
+    animais: [makeAnimal({ qtd: 50 })],
+  });
+  const transferir = (qtd) => registrarSaidaAnimal(db, {
+    loteId: 1, destinoLoteId: 2, qtd, pesoMedio: 400, valorTotal: 0, data: hoje, tipoSaida: 'transferencia_saida',
+  }, {}, { persist: false });
 
-  // Vender 45 deveria falhar (só há 40 cabeças reais), mesmo animais.qtd dizendo 50:
-  assert.throws(
-    () => registrarSaidaAnimal(db, { loteId: 1, qtd: 45, pesoMedio: 400, valorTotal: 0, data: hoje, tipoSaida: 'venda' }, {}, { persist: false }),
-    /Quantidade indispon[íi]vel/
-  );
+  // Transferir 45 deveria falhar (só há 40 cabeças reais), mesmo animais.qtd dizendo 50:
+  assert.throws(() => transferir(45), /Quantidade indispon[íi]vel/);
 
-  // Vender 40 (o saldo real canônico) deve funcionar e zerar o lote:
-  const r = registrarSaidaAnimal(db, { loteId: 1, qtd: 40, pesoMedio: 400, valorTotal: 12000, data: hoje, tipoSaida: 'venda' }, {}, { persist: false });
-  assert.equal(r.lotes.find((l) => l.id === 1).qtd, 0);
+  // Transferir 40 (o saldo real canônico) deve funcionar e zerar a origem:
+  assert.equal(transferir(40).lotes.find((l) => l.id === 1).qtd, 0);
 });
 
 test('registrarSaidaAnimal: lote sem lote.qtd definido (legado) cai para animais.qtd', () => {
-  const db = makeDb({ lotes: [makeLote({ qtd: undefined })], animais: [makeAnimal({ qtd: 50 })] });
-  const r = registrarSaidaAnimal(db, { loteId: 1, qtd: 10, pesoMedio: 400, valorTotal: 0, data: hoje, tipoSaida: 'morte' }, {}, { persist: false });
+  const db = makeDb({
+    lotes: [makeLote({ qtd: undefined }), makeLote({ id: 2, nome: 'Lote B', qtd: 0 })],
+    animais: [makeAnimal({ qtd: 50 })],
+  });
+  const r = registrarSaidaAnimal(db, {
+    loteId: 1, destinoLoteId: 2, qtd: 10, pesoMedio: 400, valorTotal: 0, data: hoje, tipoSaida: 'transferencia_saida',
+  }, {}, { persist: false });
   assert.equal(r.lotes.find((l) => l.id === 1).qtd, 40);
-});
-
-// ── Carência sanitária (Onda A — UX-SAN1): venda bloqueada com carência ativa,
-// mesma checagem usada pela venda de lote e pela venda individual. Toda venda
-// é tratada como destino abate (decisão de produto da sprint). ──
-
-test('registrarSaidaAnimal: venda bloqueada quando o lote está em carência ativa', () => {
-  const db = { ...makeDb({ lotes: [makeLote()], animais: [makeAnimal()] }), sanitario: [
-    { id: 1, lote_id: 1, desc: 'Ivermectina', data_fim_carencia: '2026-08-01' },
-  ] };
-  assert.throws(
-    () => registrarSaidaAnimal(db, { loteId: 1, qtd: 1, pesoMedio: 400, valorTotal: 1000, data: hoje, tipoSaida: 'venda' }, {}, { persist: false }),
-    /carência.*abate.*01\/08\/2026/is
-  );
-});
-
-test('registrarSaidaAnimal: morte não é bloqueada por carência (carência só impede venda)', () => {
-  const db = { ...makeDb({ lotes: [makeLote()], animais: [makeAnimal()] }), sanitario: [
-    { id: 1, lote_id: 1, desc: 'Ivermectina', data_fim_carencia: '2026-08-01' },
-  ] };
-  const r = registrarSaidaAnimal(db, { loteId: 1, qtd: 1, pesoMedio: 400, valorTotal: 0, data: hoje, tipoSaida: 'morte' }, {}, { persist: false });
-  assert.equal(r.lotes.find((l) => l.id === 1).qtd, 49);
-});
-
-test('registrarSaidaAnimal: venda liberada quando a carência já terminou', () => {
-  const db = { ...makeDb({ lotes: [makeLote()], animais: [makeAnimal()] }), sanitario: [
-    { id: 1, lote_id: 1, desc: 'Ivermectina', data_fim_carencia: '2026-07-01' },
-  ] };
-  const r = registrarSaidaAnimal(db, { loteId: 1, qtd: 1, pesoMedio: 400, valorTotal: 1000, data: hoje, tipoSaida: 'venda' }, {}, { persist: false });
-  assert.equal(r.lotes.find((l) => l.id === 1).qtd, 49);
 });
 
 // ── registrarSaidaAnimalIndividual (Onda A — UX-P1-1): venda/morte de UM

@@ -506,7 +506,12 @@ export default function LotesPage({ db, setDb, onRegistrarSaidaAnimal, session, 
     showToast({ type: 'success', message: 'Consumo excluído e estoque estornado.' });
   }
 
-  function handleRetirada(payload) {
+  // Sprint 3: `onRegistrarSaidaAnimal` virou assíncrono para venda/morte (RPC
+  // transacional). O `await` garante que o modal só fecha e o toast de sucesso
+  // só aparece depois de a transação confirmar — se a RPC recusar (saldo
+  // revalidado no servidor, lote finalizado, rede), o erro cai no catch, o
+  // formulário continua aberto e nada foi gravado.
+  async function handleRetirada(payload) {
     if (!ensurePermission('animais:movimentar')) return;
     if (!ensureFarmAtiva()) return;
     if (!selectedLote) return;
@@ -516,7 +521,9 @@ export default function LotesPage({ db, setDb, onRegistrarSaidaAnimal, session, 
     }
 
     try {
-      onRegistrarSaidaAnimal(payload);
+      // `false` = gravação barrada (paywall), que já mostrou o próprio aviso e
+      // redirecionou. Fechar o modal com toast de sucesso aqui seria mentira.
+      if (await onRegistrarSaidaAnimal(payload) === false) return;
       setOpenRetirada(false);
       setRetiradaModo('sale_partial');
       // P1 (teste de campo): a mensagem era escolhida pelo botão que abriu o
