@@ -90,11 +90,40 @@ test('internal_test e override interno nunca bloqueiam', () => {
   assert.equal(getAccountStatus(null, { status: 'canceled', override: true }, { now: AGORA }), 'admin_override');
 });
 
-// Falha de consulta da assinatura: falha aberto com aviso (documentado).
-test('erro ao consultar assinatura falha aberto com aviso', () => {
+// P1-06: falha ao consultar a assinatura (rede/RLS) bloqueia escrita — antes
+// (bug corrigido por este ticket) o gate falhava ABERTO aqui, permitindo
+// gravação como se a conta estivesse liberada.
+test('erro ao consultar assinatura bloqueia (fail-closed), com motivo e mensagem neutros', () => {
   const gate = buildAccountAccessGate(null, { now: AGORA, subscriptionLoadError: new Error('rede') });
+  assert.equal(gate.allowed, false);
+  assert.equal(gate.blocked, true);
+  assert.equal(gate.reason, MOTIVOS_BLOQUEIO.ERRO_CONSULTA);
+  assert.equal(gate.reason, 'subscription_check_unavailable');
+  // Mensagem nunca expõe o erro real (rede/RLS/provedor) — só orienta a repetir.
+  assert.doesNotMatch(gate.message, /rede|error|Error|RLS|network/i);
+  assert.match(gate.message, /tente novamente/i);
+});
+
+test('erro de consulta bloqueia mesmo quando um valor de assinatura (cache antigo) é passado', () => {
+  // Simula App.jsx caindo de volta para um valor local stale quando a
+  // consulta atual falhou — a assinatura "active" não deve mascarar o erro.
+  const cacheAntigo = { status: 'active', plan_code: 'pro' };
+  const gate = buildAccountAccessGate(cacheAntigo, { now: AGORA, subscriptionLoadError: new Error('rede') });
+  assert.equal(gate.allowed, false);
+  assert.equal(gate.reason, MOTIVOS_BLOQUEIO.ERRO_CONSULTA);
+});
+
+test('erro de consulta nunca é tratado como "sem plano"', () => {
+  const gate = buildAccountAccessGate(null, { now: AGORA, subscriptionLoadError: new Error('timeout') });
+  assert.notEqual(gate.reason, MOTIVOS_BLOQUEIO.SEM_PLANO);
+  assert.notEqual(gate.status, 'none');
+});
+
+test('admin bootstrap continua acessando mesmo com erro de consulta (exceção interna já existente)', () => {
+  const admin = { email: 'magalhaesh617@gmail.com' };
+  const gate = buildAccountAccessGate(null, { now: AGORA, user: admin, subscriptionLoadError: new Error('rede') });
   assert.equal(gate.allowed, true);
-  assert.equal(gate.warning, true);
+  assert.equal(gate.status, 'admin_override');
 });
 
 // Cenários 7 e 8 — subusuário herda o status da assinatura do proprietário

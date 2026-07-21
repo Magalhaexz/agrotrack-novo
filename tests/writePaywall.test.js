@@ -55,6 +55,52 @@ for (const [nome, sub, esperado] of MATRIZ) {
   });
 }
 
+// ---------------------------------------------------------------------------
+// P1-06: falha ao consultar a assinatura bloqueia escrita (fail-closed) — leitura
+// continua disponível. Antes deste ticket, `canWriteData` liberava a escrita
+// quando a consulta falhava (fail-open), tratando erro como "plano ativo".
+// ---------------------------------------------------------------------------
+
+test('erro na consulta de assinatura bloqueia escrita, mas leitura continua disponível', () => {
+  const opcoes = { now: AGORA, subscriptionLoadError: new Error('falha de rede') };
+  assert.equal(canViewApp(PERFIL_LOGADO, null, opcoes), true, 'leitura disponível mesmo com erro');
+  assert.equal(canWriteData(PERFIL_LOGADO, null, opcoes), false, 'escrita bloqueada com erro');
+  assert.equal(requiresSubscriptionForWrite(PERFIL_LOGADO, null, opcoes), true);
+  assert.equal(getWriteBlockedReason(PERFIL_LOGADO, null, opcoes), MOTIVOS_BLOQUEIO.ERRO_CONSULTA);
+});
+
+test('erro na consulta bloqueia escrita mesmo com assinatura anterior (cache antigo) ativa', () => {
+  // Um `subscription` "active" não deve mascarar um erro de consulta atual —
+  // a autoridade é a consulta de agora, não o que sobrou de um cache local.
+  const cacheAntigo = { status: 'active', plan_code: 'pro' };
+  const opcoes = { now: AGORA, subscriptionLoadError: new Error('timeout') };
+  assert.equal(canWriteData(PERFIL_LOGADO, cacheAntigo, opcoes), false);
+});
+
+test('estado de assinatura desconhecido (status fora do catálogo) bloqueia escrita', () => {
+  const subDesconhecida = { status: 'algo_nunca_visto', plan_code: 'pro' };
+  assert.equal(canWriteData(PERFIL_LOGADO, subDesconhecida, { now: AGORA }), false);
+  assert.equal(canViewApp(PERFIL_LOGADO, subDesconhecida, { now: AGORA }), true, 'leitura não depende do status');
+});
+
+test('mensagem de erro de consulta nunca expõe detalhes técnicos (rede/RLS/provedor)', () => {
+  const opcoes = { now: AGORA, subscriptionLoadError: new Error('PGRST301: JWT expired') };
+  const reason = getWriteBlockedReason(PERFIL_LOGADO, null, opcoes);
+  assert.equal(reason, MOTIVOS_BLOQUEIO.ERRO_CONSULTA);
+  // A mensagem pública do paywall (usada em toda a UI) é sempre a mesma frase
+  // genérica — nunca deriva do texto do erro real.
+  assert.doesNotMatch(WRITE_BLOCKED_MESSAGE, /PGRST|JWT|expired/i);
+});
+
+test('erro de consulta não gera NaN, exceção nem estado permissivo, mesmo com entradas malformadas', () => {
+  const entradasEstranhas = [undefined, null, {}, { status: null }, { status: 123 }, []];
+  for (const sub of entradasEstranhas) {
+    const opcoes = { now: AGORA, subscriptionLoadError: new Error('rede') };
+    assert.doesNotThrow(() => canWriteData(PERFIL_LOGADO, sub, opcoes));
+    assert.equal(canWriteData(PERFIL_LOGADO, sub, opcoes), false, `sub=${JSON.stringify(sub)}`);
+  }
+});
+
 // Subusuário herda o status do proprietário (a assinatura avaliada é a da conta).
 test('subusuário de conta ativa escreve conforme papel; de conta bloqueada não escreve', () => {
   const contaAtiva = { status: 'active', plan_code: 'premium', owner_user_id: 'dono-1' };

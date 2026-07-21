@@ -33,6 +33,10 @@ export const MOTIVOS_BLOQUEIO = {
   PAGAMENTO_VENCIDO: 'pagamento_vencido',
   CANCELADA: 'cancelada',
   BLOQUEADA: 'bloqueada',
+  // P1-06: falha ao consultar a assinatura (rede/RLS/erro do provedor) — nunca
+  // deve ser tratado como "sem plano" (que é um estado comercial conhecido) nem
+  // liberar escrita. Distinto dos motivos acima: é sempre temporário.
+  ERRO_CONSULTA: 'subscription_check_unavailable',
 };
 
 const MENSAGENS_BLOQUEIO = {
@@ -41,6 +45,8 @@ const MENSAGENS_BLOQUEIO = {
   [MOTIVOS_BLOQUEIO.PAGAMENTO_VENCIDO]: 'Sua assinatura está com pagamento vencido. Regularize para continuar usando o HERDON.',
   [MOTIVOS_BLOQUEIO.CANCELADA]: 'Sua assinatura foi cancelada. Escolha um plano para voltar a usar o HERDON.',
   [MOTIVOS_BLOQUEIO.BLOQUEADA]: 'Sua conta está bloqueada. Fale com o suporte para regularizar o acesso.',
+  // Mensagem neutra: nunca expõe o erro do provedor/rede, só orienta a repetir.
+  [MOTIVOS_BLOQUEIO.ERRO_CONSULTA]: 'Não foi possível confirmar sua assinatura agora. Tente novamente em instantes.',
 };
 
 function parseDateMs(value) {
@@ -82,9 +88,13 @@ function buildGate({ status, allowed, reason = null, warning = false, message = 
  *   bootstrap (não bloquear administrador interno sem exceção controlada).
  * - `now`: timestamp de referência (injetável para testes).
  * - `subscriptionLoadError`: se a CONSULTA da assinatura falhou (rede/RLS),
- *   o gate falha aberto com aviso em vez de trancar o produtor no campo —
- *   decisão documentada: bloqueio forte vale para o caso normal online;
- *   endurecer via RLS é a evolução recomendada (ver relatório de prontidão).
+ *   o gate falha FECHADO (P1-06) — nenhuma gravação nova é permitida
+ *   enquanto o estado da assinatura não puder ser confirmado. Checado ANTES
+ *   de normalizar `subscription`: um valor stale (cache local de uma
+ *   sincronização anterior) nunca deve mascarar uma consulta que falhou
+ *   agora — a autoridade é a consulta atual, não o que sobrou de antes.
+ *   A proteção real (RLS) continua sendo a autoridade final; isto só fecha o
+ *   fail-open da camada client-side.
  */
 export function buildAccountAccessGate(subscription, options = {}) {
   const now = Number(options.now) || Date.now();
@@ -97,17 +107,17 @@ export function buildAccountAccessGate(subscription, options = {}) {
     });
   }
 
+  if (options.subscriptionLoadError) {
+    return buildGate({
+      status: 'erro_consulta',
+      allowed: false,
+      reason: MOTIVOS_BLOQUEIO.ERRO_CONSULTA,
+    });
+  }
+
   const normalized = normalizeSubscription(subscription);
 
   if (!normalized) {
-    if (options.subscriptionLoadError) {
-      return buildGate({
-        status: 'indefinido',
-        allowed: true,
-        warning: true,
-        message: 'Não foi possível confirmar sua assinatura agora. Verifique sua conexão — o acesso pode ser bloqueado na próxima sincronização.',
-      });
-    }
     return buildGate({ status: 'none', allowed: false, reason: MOTIVOS_BLOQUEIO.SEM_PLANO });
   }
 
