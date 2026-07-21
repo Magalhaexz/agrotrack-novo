@@ -1,6 +1,7 @@
 import { useMemo } from 'react';
 import Card from '../ui/Card';
 import { formatCurrency, formatNumber } from '../../utils/calculations';
+import { calcularValorItemEstoque, consolidarEstoquePorFazenda } from '../../domain/estoque.js';
 
 function formatarData(data) {
   if (!data) return '—';
@@ -31,16 +32,15 @@ export default function RelatorioEstoque({ db, dataInicio, dataFim }) {
   const entradas = useMemo(() => movimentos.filter((m) => m.tipo === 'entrada'), [movimentos]);
   const saidas = useMemo(() => movimentos.filter((m) => m.tipo !== 'entrada'), [movimentos]);
 
-  const saldoAtual = useMemo(() =>
-    (db.estoque || []).reduce((acc, item) => acc + Number(item.quantidade_atual || 0), 0),
-    [db.estoque]
-  );
+  // Sprint 5: saldo e valor vêm da fonte única (domain/estoque.js), com a mesma
+  // prioridade de campo usada por Estoque, Nutrição e Sanidade.
+  const consolidado = useMemo(() => consolidarEstoquePorFazenda(db), [db]);
+  const saldoAtual = consolidado.total.quantidade;
 
   const custoPorCategoria = useMemo(() =>
     (db.estoque || []).reduce((acc, item) => {
       const categoria = item.categoria || 'Outros';
-      const custo = Number(item.valor_unitario || 0) * Number(item.quantidade_atual || 0);
-      acc[categoria] = (acc[categoria] || 0) + custo;
+      acc[categoria] = (acc[categoria] || 0) + calcularValorItemEstoque(item);
       return acc;
     }, {}),
     [db.estoque]

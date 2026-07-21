@@ -250,6 +250,107 @@ sequenciais e valida contra o `db` carregado no navegador. Consequência:
 > para esses tipos. **Continuam pendentes:** `transferencia_saida` (envolve o
 > lote de destino) e o ajuste de lotação.
 
+## 🟢 Estoque e Consumo — auditado e unificado na Sprint 5/7
+
+### Fórmulas oficiais
+
+Fonte única: `src/domain/estoque.js`.
+
+| Cálculo | Fórmula oficial | Fonte dos dados |
+|---|---|---|
+| Saldo do item | `quantidade_atual`, com `quantidade` de fallback (espelho legado) | `estoque` |
+| Custo unitário | `valor_unitario`, mantido como **média móvel ponderada** | `estoque` |
+| Custo médio após compra | `(saldo × custoAtual + qtdEntrada × custoEntrada) ÷ (saldo + qtdEntrada)` | `estoque` + entrada |
+| Valor do item | `saldo × custo médio` | `estoque` |
+| Valor total do estoque | `Σ valor dos itens`, por fazenda ou consolidado | `estoque` |
+| Validação de entrada | `qtd > 0` **e** custo **informado** (`0` explícito vale; ausente não) | entrada |
+| Validação de saída | `qtd > 0` **e** `qtd ≤ saldo` — nunca deixa negativo | `estoque` |
+| Consumo do lote | `Σ quantidade` e `Σ valor_total` de `consumo`/`tratamento` do lote | `movimentacoes_estoque` |
+| Custo do consumo | `quantidade × custo médio` no momento da baixa | `movimentacoes_estoque` |
+| Consumo por cabeça | `consumo ÷ cabeças`; `null` quando não há cabeças | + `qtdCabecasDoLote` |
+| Previsão de duração | `saldo ÷ consumo diário` (já unificado na Sprint 25) | `previsaoConsumoEstoque` |
+| Consolidação | `total = Σ porFazenda + semFazenda` | `estoque.fazenda_id` |
+
+Nenhum valor é arredondado na base: arredondamento é só de exibição.
+
+### Divergências medidas
+
+Cenário: sal mineral, 100 kg a R$ 2,00 e depois 100 kg a R$ 4,00 (R$ 600,00 gastos).
+
+| # | Divergência | Antes | Depois |
+|---|---|---|---|
+| 1 | **"Custo médio" nunca foi média.** A entrada gravava o preço da **última compra** em `valor_unitario`, e toda a UI chamava isso de custo médio. | estoque avaliado em **R$ 800,00** contra R$ 600,00 gastos (**+33,3%**) | R$ 600,00 |
+| 2 | **O custo do consumo herdava o preço inflado**, entrando no custo do lote e derrubando o lucro. | 50 kg custavam **R$ 200,00** ao lote | R$ 150,00 |
+| 3 | **Saldo lido com prioridades diferentes.** `obterSaldoAtualItemEstoque` testava 8 campos começando por `saldo`, `saldoAtual`, `saldo_atual` — **nenhum existe na tabela** (verificado no schema de produção). | **55** na Sanidade vs **30** no Relatório e na Nutrição | 30 nas três |
+| 4 | **Estoque negativo bloqueado num caminho e liberado no outro.** Estoque lançava erro; Nutrição perguntava "Deseja continuar com saldo negativo?" e seguia. | saldo negativo gravável | bloqueado nos dois |
+| 5 | **Produto sem fazenda sumia do detalhamento** — o total geral contava, a soma por fazenda não. | 7 de 37 unidades invisíveis | `SEM_FAZENDA`, contado uma vez |
+| 6 | **`quantidade` e `quantidade_atual` divergiam** após uma saída (só a segunda era atualizada). | duas colunas, dois números | mantidas em sincronia |
+| 7 | **Entrada sem custo derrubava a média em silêncio.** O campo em branco virava `0` na tela (`Number(form.custo \|\| 0)`) e reponderava a média. 100 kg a R$ 4,00 + 100 kg "sem custo" → média R$ 2,00, barateando todo o consumo dali em diante. | aceito calado | **rejeitado**; `0` só com declaração explícita |
+| 8 | **Telegram lia o saldo por conta própria** (`quantidade_atual ?? quantidade`), última leitura paralela do domínio. | leitura paralela | usa `domain/estoque.js` |
+
+### Comportamento corrigido
+
+- **Média móvel ponderada** na entrada. Casos de borda deliberados: item zerado
+  assume o custo da nova entrada (não arrasta preço de um estoque que não
+  existe mais); saldo negativo herdado conta como 0; entrada sem custo baixa a
+  média (recebeu mercadoria sem custo). Saída **não** repondera a média.
+- **Saldo negativo aparece** quando herdado de dados antigos — não é escondido
+  como 0, para poder ser corrigido. O que se proíbe é **criar** um novo.
+- **Uma saída, uma baixa:** `deduplicarMovimentacoesEstoque` usa impressão
+  digital (`id` + item + lote + tipo + quantidade + valor + data + origem), não
+  só o `id` — mesma disciplina da Sprint 4, porque ids locais já colidiram com
+  a sequence do banco neste projeto.
+- **Consumo por cabeça é `null`** sem rebanho: dividir por zero é dado
+  indisponível, não consumo zero.
+- **`ajuste` e `perda` não entram no consumo do lote** — são correções internas
+  do estoque, não insumo entregue ao lote.
+- **Custo ausente numa entrada é erro, não zero.** A entrada repondera a média,
+  então tratar "em branco" como R$ 0,00 barateava o estoque inteiro sem aviso.
+  Entrada realmente sem custo (doação, brinde, acerto) exige digitar `0` — a
+  intenção fica registrada. A tela passou a repassar o valor cru, senão a regra
+  nunca dispararia. Texto não numérico também é rejeitado, e não confundido
+  com zero.
+- **Telegram e app web compartilham a leitura de saldo e custo**, com teste
+  cruzado garantindo que os dois caminhos chegam ao mesmo saldo final e ao
+  mesmo custo de consumo para a mesma saída.
+
+### Telas consumidoras
+
+| Tela | Consome | Estado |
+|---|---|---|
+| Estoque | `registrarEntradaEstoque` / `registrarSaidaEstoque` | ✅ fonte única |
+| Nutrição / Suplementação | `SuplementacaoConsumoModal` | ✅ **corrigida** — passou a bloquear negativo |
+| Sanidade | `estoqueSanidade` → `obterSaldoAtualItemEstoque` | ✅ **corrigida** — delega à fonte única |
+| Relatório de Estoque | fórmulas inline próprias | ✅ **corrigida** — consolidação e valor pela fonte única |
+| Custos por lote / Financeiro / Resultados | `movimentacoes_financeiras` geradas na baixa | ✅ herdam o custo médio correto |
+| Telegram | `acoesEstoque` → `obterSaldoItemEstoque` | ✅ **migrado** — sem leitura paralela |
+
+### Testes criados
+
+`src/domain/estoque.test.js` — 48 testes cobrindo os 15 cenários pedidos:
+entrada, saída válida, saída acima do saldo, ajuste positivo e negativo, custo
+médio após nova compra, valor total, consumo por lote, consumo por cabeça, baixa
+duplicada, estoque zero, prevenção de saldo negativo, produto sem fazenda,
+múltiplas fazendas e visão consolidada — mais os dois ajustes de fechamento
+(custo ausente × zero explícito, e paridade de saldo/custo entre Telegram e app
+web).
+
+### Pendências registradas (fora do escopo desta sprint)
+
+1. **Colunas espelho duplicadas.** `estoque` tem `quantidade`/`quantidade_atual`
+   e `valor_unitario`/`custo_unitario`/`preco_unitario`. A fonte única resolve a
+   leitura, mas a duplicação no schema continua e é fonte permanente de risco.
+   Consolidar exige migration + varredura de escritores.
+2. **Custo médio não é recalculado retroativamente.** Itens que já acumularam
+   entradas a preços diferentes seguem com o `valor_unitario` da última compra
+   até a próxima entrada, quando a média passa a valer. Um backfill exigiria
+   reprocessar `movimentacoes_estoque` — decisão de dados, não de código.
+3. **Saldos negativos herdados** não foram corrigidos: passam a aparecer, mas
+   a correção de cada item é operacional.
+4. **Validação visual autenticada** segue pendente — `VITE_SUPABASE_URL` e
+   `VITE_SUPABASE_ANON_KEY` ausentes no ambiente local. As divergências desta
+   sprint foram medidas por execução direta dos módulos de domínio.
+
 ## 🟢 Venda e Resultado dos Lotes — auditado e unificado na Sprint 4/7
 
 ### Fórmulas oficiais

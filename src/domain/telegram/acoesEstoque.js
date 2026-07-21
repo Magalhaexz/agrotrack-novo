@@ -8,6 +8,12 @@
 // compartilhado, ambos devem importar dali. Cobertura de paridade nos testes.
 import { normalizarChave, resolverLotePorNome } from './resolvedores.js';
 import { hojeLocalISO } from '../dataCivil.js';
+// Sprint 5: saldo e custo unitário passam a vir da fonte canônica de Estoque.
+// É exatamente o "helper puro compartilhado" previsto na nota acima —
+// `domain/estoque.js` não faz I/O, então serve ao navegador e ao webhook sem
+// arrastar cliente Supabase nenhum. Era a última leitura paralela de saldo
+// deste domínio.
+import { obterCustoUnitarioItem, obterSaldoItemEstoque } from '../estoque.js';
 
 const erro = (codigo, extra = {}) => ({ ok: false, erro: codigo, ...extra });
 
@@ -38,7 +44,7 @@ export function prepararSaidaEstoque(db, dados) {
   if (r.status !== 'ok') return erro('ITEM_NAO_ENCONTRADO');
 
   const registro = r.item;
-  const saldoAtual = Number(registro.quantidade_atual ?? registro.quantidade ?? 0);
+  const saldoAtual = obterSaldoItemEstoque(registro);
   if (quantidade > saldoAtual) return erro('SALDO_INSUFICIENTE', { saldoAtual, unidade: registro.unidade || registro.unidade_medida || '' });
 
   const tipo = TIPOS_VALIDOS.includes(dados?.tipo) ? dados.tipo : 'consumo';
@@ -54,7 +60,7 @@ export function prepararSaidaEstoque(db, dados) {
   }
 
   const dataFinal = dados?.data || hojeLocalISO();
-  const custoUnit = Number(registro.valor_unitario ?? registro.custo_unitario ?? 0);
+  const custoUnit = obterCustoUnitarioItem(registro);
   const valorTotalSaida = quantidade * custoUnit;
   const novoSaldo = saldoAtual - quantidade;
 
@@ -74,7 +80,9 @@ export function prepararSaidaEstoque(db, dados) {
         origem: 'telegram',
       },
     },
-    { tabela: 'estoque', tipo: 'update', match: { id: registro.id }, patch: { quantidade_atual: novoSaldo } },
+    // `quantidade` acompanha `quantidade_atual` — mesma correção do app web:
+    // atualizar só uma das colunas espelho fazia as telas divergirem.
+    { tabela: 'estoque', tipo: 'update', match: { id: registro.id }, patch: { quantidade_atual: novoSaldo, quantidade: novoSaldo } },
   ];
 
   // Mesma regra de `registrarSaidaEstoque`: consumo vinculado a lote vira

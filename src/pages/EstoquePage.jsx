@@ -630,7 +630,11 @@ function EntradaModal({ db, selectedItem, onRegistrarEntradaEstoque, estoqueMap,
         onRegistrarEntradaEstoque({
           itemId: Number(form.item_id),
           qtd: Number(form.qtd),
-          custo: Number(form.custo || 0),
+          // Sprint 5 (ajuste): repassa o valor CRU. `Number(form.custo || 0)`
+          // transformava campo em branco em 0, e a entrada sem custo derrubava
+          // a média móvel sem ninguém perceber. Em branco agora chega como ''
+          // e o serviço rejeita; para entrada sem custo, digite 0.
+          custo: form.custo,
           data: form.data,
           fornecedor: form.fornecedor.trim(),
           obs: [form.nf ? `NF ${form.nf.trim()}` : '', form.obs.trim()].filter(Boolean).join(' • '),

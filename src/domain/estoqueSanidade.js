@@ -11,6 +11,8 @@
 // (quantidade de produto consumida, distinta de `sanitario.qtd` = cabeças
 // atendidas) fica em `sanitario.metadata`, ao lado de `item_estoque_id` —
 // mesmo padrão já usado ali, sem exigir migration.
+import { obterSaldoItemEstoque } from './estoque.js';
+
 const MOTIVO_BLOQUEIO = {
   SALDO_INSUFICIENTE: 'saldo_insuficiente',
 };
@@ -38,16 +40,13 @@ function normalizarSaldo(valor) {
  * função pura testável).
  */
 export function obterSaldoAtualItemEstoque(item) {
-  if (!item || typeof item !== 'object') return 0;
-  const chaves = ['saldo', 'saldoAtual', 'saldo_atual', 'quantidade_atual', 'quantidadeAtual', 'estoque_atual', 'estoqueAtual', 'quantidade'];
-  for (const chave of chaves) {
-    const valor = item[chave];
-    if (valor !== undefined && valor !== null && valor !== '') {
-      const parsed = Number(valor);
-      if (Number.isFinite(parsed)) return parsed;
-    }
-  }
-  return 0;
+  // Sprint 5: delega para a fonte única (domain/estoque.js). Esta função
+  // testava oito nomes de campo, começando por `saldo`, `saldoAtual` e
+  // `saldo_atual` — nenhum dos três existe na tabela `estoque` (verificado no
+  // schema de produção), então um objeto em memória que carregasse `saldo`
+  // vencia a coluna real `quantidade_atual`. Medido no mesmo item: 55 aqui
+  // contra 30 no Relatório de Estoque e na Nutrição.
+  return obterSaldoItemEstoque(item);
 }
 
 /**
