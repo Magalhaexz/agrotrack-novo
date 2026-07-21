@@ -54,7 +54,6 @@ const MODULES_PREMIUM = [
   'pastagens',
   'indicadores',
   'cenarios',
-  'dashboardPremium',
   'evolucaoRebanho',
 ];
 

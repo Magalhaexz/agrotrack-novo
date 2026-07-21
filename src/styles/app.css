@@ -10879,3 +10879,30 @@ html, body, #root, .app, .main, .main-content, .page { max-width: 100%; }
     white-space: nowrap;
   }
 }
+
+/* Importacao (`.page-content` so existe nesta pagina).
+   A tela monta os blocos com `style={{display:'grid'}}` inline e sem
+   grid-template-columns — a coluna implicita vira `auto` e, como itens de
+   grid tem min-width:auto, nao encolhe abaixo do min-content: em 375px o
+   conteudo era cortado. O style inline nao define grid-template-columns,
+   entao a regra abaixo supre sem conflitar com o inline. */
+.page-content [style*='grid'] {
+  grid-template-columns: minmax(0, 1fr);
+}
+
+.importacao-passo {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 2fr);
+  gap: 12px;
+  align-items: start;
+  padding-bottom: 10px;
+  border-bottom: 1px solid var(--color-border, #f3f4f6);
+}
+
+/* Abaixo de 640px o par titulo/descricao empilha em coluna unica. */
+@media (max-width: 640px) {
+  .importacao-passo {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 4px;
+  }
+}

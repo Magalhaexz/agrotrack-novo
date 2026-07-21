@@ -76,7 +76,6 @@ const EvolucaoRebanhoPage = lazy(() => import('./pages/EvolucaoRebanhoPage'));
 const IndicadoresPage = lazy(() => import('./pages/IndicadoresPage'));
 const CenariosPage = lazy(() => import('./pages/CenariosPage'));
 const DecisoesFazendaPage = lazy(() => import('./pages/DecisoesFazendaPage'));
-const DashboardPremiumPage = lazy(() => import('./pages/DashboardPremiumPage'));
 const RelatoriosGerenciaisPage = lazy(() => import('./pages/RelatoriosGerenciaisPage'));
 const RelatoriosPage = lazy(() => import('./pages/RelatoriosPage'));
 const RelatorioLotePage = lazy(() => import('./pages/RelatorioLotePage'));
@@ -173,7 +172,6 @@ const pageMap = {
   evolucaoRebanho: EvolucaoRebanhoPage,
   indicadores: IndicadoresPage,
   cenarios: CenariosPage,
-  dashboardPremium: DashboardPremiumPage,
   relatoriosGerenciais: RelatoriosGerenciaisPage,
   relatorios: RelatoriosPage,
   relatorioLote: RelatorioLotePage,

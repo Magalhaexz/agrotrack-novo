@@ -2,6 +2,11 @@
 /* --- Rebanho Page --- */
 .rebanho-page {
   display: grid;
+  /* minmax(0, 1fr) em vez da coluna implicita `auto`: itens de grid tem
+     min-width:auto por padrao, entao a trilha nao encolhia abaixo do
+     min-content do cabecalho e a pagina era cortada em telas estreitas
+     (CTA "Novo lote" e filtros ficavam inacessiveis em 375px). */
+  grid-template-columns: minmax(0, 1fr);
   gap: 16px;
 }
 

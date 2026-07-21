@@ -475,7 +475,7 @@ export default function ImportacaoPage({ db, setDb, session: sessionProp, onConf
                 ['3. Envie o arquivo', 'De volta aqui, envie o arquivo preenchido. O HERDON vai verificar tudo antes de salvar.'],
                 ['4. Confirme a importação', 'Revise os dados e confirme. Os registros serão criados na ordem certa automaticamente.'],
               ].map(([titulo, desc]) => (
-                <div key={titulo} style={{ display: 'grid', gridTemplateColumns: '1fr 2fr', gap: 12, alignItems: 'start', paddingBottom: 10, borderBottom: '1px solid var(--color-border, #f3f4f6)' }}>
+                <div key={titulo} className="importacao-passo">
                   <strong style={{ fontSize: 14, color: 'var(--color-text)' }}>{titulo}</strong>
                   <span style={{ fontSize: 14, color: 'var(--color-text-secondary)', lineHeight: 1.5 }}>{desc}</span>
                 </div>
