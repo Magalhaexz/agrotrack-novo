@@ -61,15 +61,27 @@ export function calcularOcupacaoPasto(pasto, lotes = [], animais = []) {
   const animaisDosLotes = arr(animais).filter((a) => (
     lotesAtivos.some((l) => toNumber(l.id) === toNumber(a?.lote_id))
   ));
-  let somaPeso = 0;
-  let somaQtdAnimais = 0;
-  animaisDosLotes.forEach((a) => {
-    const qtd = toNonNegativeNumber(a?.qtd);
-    somaPeso += toNumber(a?.p_at) * qtd;
-    somaQtdAnimais += qtd;
+  // P1-08: peso ponderado com o MESMO fallback de peso de `calcularUaPorLote`
+  // (unidadeAnimal.js) — por animal: p_at → peso_vivo_kg → p_ini; sem NENHUM
+  // registro de animal no lote, cai para o peso atual do próprio lote
+  // (`lote.p_at`), em vez de zerar. `uaEstimada` abaixo já usa essa mesma
+  // fonte via `calcularUaPorLote`; isto só alinha os campos de peso exibidos
+  // (`pesoMedioEstimado`/`pesoTotalEstimado`) a ela — nenhuma fórmula de UA
+  // nova, e o peso "por cabeça canônica" (`l.qtd`) mantém o mesmo denominador
+  // já usado por `cabecasEstimadas`.
+  let somaPesoPonderado = 0;
+  lotesAtivos.forEach((l) => {
+    const animaisDoLote = animaisDosLotes.filter((a) => toNumber(a?.lote_id) === toNumber(l.id));
+    const somaPesoAnimais = animaisDoLote.reduce(
+      (s, a) => s + toNumber(a?.p_at || a?.peso_vivo_kg || a?.p_ini) * toNonNegativeNumber(a?.qtd),
+      0
+    );
+    const somaQtdAnimais = animaisDoLote.reduce((s, a) => s + toNonNegativeNumber(a?.qtd), 0);
+    const pesoMedioLote = somaQtdAnimais > 0 ? somaPesoAnimais / somaQtdAnimais : toNumber(l?.p_at);
+    somaPesoPonderado += pesoMedioLote * toNonNegativeNumber(l.qtd);
   });
-  const pesoMedioEstimado = somaQtdAnimais > 0 ? somaPeso / somaQtdAnimais : 0;
-  const pesoTotalEstimado = somaPeso;
+  const pesoMedioEstimado = cabecasEstimadas > 0 ? somaPesoPonderado / cabecasEstimadas : 0;
+  const pesoTotalEstimado = somaPesoPonderado;
 
   // 3º argumento: usa lote.qtd (canônico) como contagem, não animais[] cru —
   // teste de campo PST-1, mesma causa raiz do bug de venda já corrigido em
