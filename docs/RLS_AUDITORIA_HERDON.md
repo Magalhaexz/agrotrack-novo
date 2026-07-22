@@ -69,3 +69,16 @@ A Sprint 30 tinha corrigido só o **script-fonte** (`docs/supabase-production-rl
 ## Conclusão
 
 Isolamento entre contas confirmado correto em 30 tabelas reais (não 28 — a Sprint 30 não via 2 delas), com **duas falhas reais corrigidas** nesta sprint (INSERT sem restrição em 2 tabelas, `forcerowsecurity` inconsistente em 4) e a imutabilidade de `auditoria` confirmada diretamente no banco, não só no script-fonte. Pendências de defesa em profundidade (RLS por papel/perfil) e os avisos do `get_advisors` ficam para a Sprint 31.
+
+## Adendo — P1-11/P1-11-RLS/P1-13: isolamento por FAZENDA (não só por conta)
+
+As seções acima descrevem isolamento por **conta** (`owner_user_id`), a única dimensão que existia até aqui. A partir do P1-11, `profiles.fazenda_id` permite restringir um membro a uma única fazenda dentro da mesma conta — as migrations seguintes estenderam o RLS por fazenda tabela a tabela, sempre confirmando a relação real antes de criar qualquer policy (nunca por suposição):
+
+- **P1-11** (`20260722120000`): `invites`/`profiles.fazenda_id` + RLS nas ~15 tabelas com coluna `fazenda_id`/`faz_id` direta (fazendas, animais, lotes, custos, estoque, sanitario, tarefas, rotinas, funcionarios, consumo_suplementacao, movimentacoes_financeiras, alertas_tratativas, pastagens, lote_pastagens_historico).
+- **P1-11-RLS** (`20260722160000`): estendeu para `pesagens`, `movimentacoes_animais` (origem E destino) e `movimentacoes_estoque` (item E lote), via `EXISTS` contra `lotes`/`estoque` — todas com FK real confirmada antes de escrever a policy.
+- **P1-13** (`20260722170000`): `cenarios.fazenda_id` (uuid, sem FK, nunca populado) foi renomeado para `fazenda_id_legado_uuid` (dado preservado) e substituído por um `fazenda_id` novo, bigint, com FK real para `fazendas.id`. `cenario_eventos` não ganhou coluna nova — sua fazenda é derivada via `cenario_id` (FK já existente para `cenarios`). Ambas ficam nullable e começam `null` para tudo: sem efeito prático até uma tela de UI (fora do escopo dessas migrations) popular o campo — a feature de Cenários hoje não tem nenhum seletor de fazenda.
+
+**Gap residual, documentado, não corrigido:**
+- `pesagens`/`movimentacoes_*` cobrem os casos com FK real; nenhuma tabela recebeu policy por suposição.
+- `alertas_resolvidos`/`alertas_adiados` **não receberam nenhuma mudança**: confirmado que são tabelas retiradas de uso (o motor de alertas foi unificado em `alertas_tratativas`, já protegida por fazenda; nenhum caminho de código escreve mais nessas duas tabelas). Não têm FK nenhuma, só campos de texto livre (`chave`/`ack_key`) — inventar uma coluna de fazenda ali não protegeria nada de verdade, já que nada a populariam. Ficam com o RLS `same_account` que já tinham. Se um dia a decisão for arquivar/purgar esse histórico, é uma decisão de produto separada.
+- `app_can_access_fazenda(fazenda_id)` trata `fazenda_id is null` como "sem restrição" (visível a todo mundo na conta) — mesmo padrão em todas as migrations acima. Isso é intencional (rollout sem quebrar acesso existente), não uma falha: só passa a restringir de verdade a partir do momento em que uma tela real popular o campo.
