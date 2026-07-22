@@ -14,6 +14,14 @@ app_is_same_account(target_owner_user_id) -- true se o usuário logado pertence 
 app_can_manage_account(target_owner_user_id) -- app_is_same_account() + perfil in ('proprietario','gerente')
 ```
 
+> **DESATUALIZADO (P1-09):** a linha de `app_can_manage_account` acima reflete
+> o estado confirmado nesta auditoria (2026-06-23), anterior à migration
+> `20260704173340` (equipe_profiles_status_and_manage_account_role), que
+> removeu `'gerente'` desse grupo — a versão em produção hoje é
+> `perfil in ('proprietario','admin')`. Fonte normativa atual: as migrations
+> aplicadas e `docs/EQUIPE_PERMISSOES_HERDON.md`. Mantido aqui sem edição
+> retroativa por ser um registro histórico do estado confirmado na época.
+
 Confirmado ao vivo: todas com `security definer` e `search_path` fixo. Isolamento por **conta** (`owner_user_id`), não por usuário individual.
 
 ## Tabelas e RLS — situação confirmada no banco real
