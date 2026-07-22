@@ -482,9 +482,18 @@ export default function App() {
   }, []);
 
 
+  // P1-11: membro vinculado a uma fazenda específica (profiles.fazenda_id)
+  // só enxerga essa fazenda no seletor — sem tocar em AppHeader.jsx, a troca
+  // de fazenda já fica impossível porque a lista só tem uma opção.
+  const fazendasPermitidas = useMemo(() => {
+    const fazendas = Array.isArray(db?.fazendas) ? db.fazendas : [];
+    if (user?.fazenda_id == null) return fazendas;
+    return fazendas.filter((fazenda) => Number(fazenda.id) === Number(user.fazenda_id));
+  }, [db, user]);
+
   useEffect(() => {
     const timer = window.setTimeout(() => {
-      const fazendas = Array.isArray(db?.fazendas) ? db.fazendas : [];
+      const fazendas = fazendasPermitidas;
       if (!fazendas.length) {
         setFazendaSelecionada(null);
         return;
@@ -502,7 +511,7 @@ export default function App() {
     }, 0);
 
     return () => window.clearTimeout(timer);
-  }, [db?.fazendas]);
+  }, [fazendasPermitidas]);
 
   // Sprint 21: db recortado pela fazenda ativa (src/domain/escopoFazenda.js)
   // — usado por todas as páginas operacionais (ver FULL_DB_PAGE_KEYS abaixo
@@ -1041,7 +1050,7 @@ export default function App() {
           onConfirmAction={onConfirmAction}
           onOpenMenu={() => window.dispatchEvent(new CustomEvent('agrotrack-open-drawer'))}
           usuarioLogado={usuarioLogado}
-          fazendas={db?.fazendas || []}
+          fazendas={fazendasPermitidas}
           fazendaSelecionada={fazendaSelecionada}
           onSelectFazenda={setFazendaSelecionada}
           tabAtiva={tabAtiva}

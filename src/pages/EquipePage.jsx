@@ -42,7 +42,7 @@ function mensagemErroSegura(error, fallbackMessage) {
  * salvaguardas de `domain/equipe.js` (não remover o único proprietário, não
  * rebaixar o próprio papel até ficar sem admin, etc.).
  */
-export default function EquipePage({ onConfirmAction, subscription = null, onNavigate = null }) {
+export default function EquipePage({ db = null, onConfirmAction, subscription = null, onNavigate = null }) {
   const { perfil, user, session } = useAuth();
   const { showToast } = useToast();
   const podeGerenciar = perfilPodeGerenciarAcessos(perfil);
@@ -201,6 +201,7 @@ export default function EquipePage({ onConfirmAction, subscription = null, onNav
       email: payload.email,
       nome: payload.nome,
       perfil: payload.perfil,
+      fazenda_id: payload.fazenda_id || null,
       status: 'pendente',
       notes: payload.notes || null,
       created_by: user?.id || null,
@@ -319,7 +320,7 @@ export default function EquipePage({ onConfirmAction, subscription = null, onNav
         )}
       </Card>
 
-      <ConviteEquipeModal open={openInvite} onClose={() => setOpenInvite(false)} onInvite={enviarConvite} />
+      <ConviteEquipeModal open={openInvite} onClose={() => setOpenInvite(false)} onInvite={enviarConvite} fazendas={db?.fazendas || []} />
     </div>
   );
 }

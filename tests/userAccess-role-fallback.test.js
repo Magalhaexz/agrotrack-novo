@@ -41,6 +41,22 @@ test('invited visualizador profile remains visualizador', () => {
   assert.equal(mapped.owner_user_id, 'owner-2');
 });
 
+test('P1-11: profile.fazenda_id propaga para o objeto user mapeado', () => {
+  const user = { id: 'u6', email: 'membro-fazenda@herdon.app', user_metadata: {} };
+  const profile = { perfil: 'gerente', owner_user_id: 'owner-3', fazenda_id: 42 };
+
+  const mapped = mapProfileRowToUser(user, profile);
+  assert.equal(mapped.fazenda_id, 42);
+});
+
+test('P1-11: fazenda_id ausente no profile mapeia para null (membro irrestrito)', () => {
+  const user = { id: 'u7', email: 'proprietario@herdon.app', user_metadata: {} };
+  const profile = { perfil: 'proprietario', owner_user_id: 'u7' };
+
+  const mapped = mapProfileRowToUser(user, profile);
+  assert.equal(mapped.fazenda_id, null);
+});
+
 test('metadata admin still resolves proprietario', () => {
   const user = {
     id: 'u2',
