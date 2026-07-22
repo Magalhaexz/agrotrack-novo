@@ -9,6 +9,9 @@ import {
   buscarPastagemNome,
 } from '../src/domain/relatorios.js';
 import { makeBaseDb } from './fixtures.js';
+import { gerarAlertasUnificados, adaptarAlertaParaPainelLegado } from '../src/domain/alertasUnificados.js';
+import { aplicarTratativasAosAlertas } from '../src/domain/tratativasAlertas.js';
+import { gerarResumoGeralTexto } from '../src/domain/whatsappResumo.js';
 
 test('buscarPastagemNome encontra o pasto certo quando o id é uuid (Sprint 34)', () => {
   const db = {
@@ -210,4 +213,137 @@ test('buildResumoGeralFazenda retorna totais finitos e listas válidas', () => {
   assert.equal(Number.isFinite(resumo.lucroTotalFazenda), true);
   assert.equal(Array.isArray(resumo.alertasCriticos), true);
   assert.equal(Array.isArray(resumo.pendencias), true);
+});
+
+// ── P1-07: mesma fonte de alertas do Dashboard/Central (Motor Único) ────────
+
+function diasAtras(dias) {
+  return new Date(Date.now() - dias * 864e5).toISOString().slice(0, 10);
+}
+
+function diasAFrente(dias) {
+  return diasAtras(-dias);
+}
+
+/** Um lote qualquer + uma despesa vencida — dispara o alerta crítico
+ * 'unificado-financeiro-vencidas' (id fixo, sem depender de dado por-registro). */
+function dbComAlertaCritico(overrides = {}) {
+  return {
+    fazendas: [{ id: 1, nome: 'Fazenda A', owner_user_id: 'user-1' }],
+    lotes: [{ id: 10, fazenda_id: 1, nome: 'Lote 10', status: 'ativo', owner_user_id: 'user-1' }],
+    animais: [{ id: 100, lote_id: 10, qtd: 10, p_at: 320, owner_user_id: 'user-1' }],
+    pesagens: [],
+    custos: [],
+    movimentacoes_financeiras: [
+      { id: 900, tipo: 'despesa', categoria: 'outros', valor: 500, data: diasAtras(10), owner_user_id: 'user-1' },
+    ],
+    movimentacoes_animais: [],
+    alertas_tratativas: [],
+    ...overrides,
+  };
+}
+
+const ALERTA_VENCIDAS_ID = 'unificado-financeiro-vencidas';
+
+test('buildResumoGeralFazenda usa os MESMOS ids de alerta que o Dashboard/Central produziriam para o mesmo banco', () => {
+  const db = dbComAlertaCritico();
+  const resumo = buildResumoGeralFazenda(db);
+
+  // Mesma composição usada por App.jsx para alimentar Dashboard/Central.
+  const esperado = aplicarTratativasAosAlertas(gerarAlertasUnificados(db), db.alertas_tratativas, new Date())
+    .filter((a) => a.visivel)
+    .map(adaptarAlertaParaPainelLegado)
+    .filter((a) => a.nivel === 'critical');
+
+  assert.deepEqual(resumo.alertasCriticos.map((a) => a.id).sort(), esperado.map((a) => a.id).sort());
+  assert.ok(resumo.alertasCriticos.some((a) => a.id === ALERTA_VENCIDAS_ID));
+});
+
+test('alerta resolvido não aparece nos alertas críticos do relatório', () => {
+  const db = dbComAlertaCritico({
+    alertas_tratativas: [{ alerta_id: ALERTA_VENCIDAS_ID, status: 'resolvido' }],
+  });
+  const resumo = buildResumoGeralFazenda(db);
+  assert.ok(!resumo.alertasCriticos.some((a) => a.id === ALERTA_VENCIDAS_ID));
+});
+
+test('alerta ignorado não aparece nos alertas críticos do relatório', () => {
+  const db = dbComAlertaCritico({
+    alertas_tratativas: [{ alerta_id: ALERTA_VENCIDAS_ID, status: 'ignorado' }],
+  });
+  const resumo = buildResumoGeralFazenda(db);
+  assert.ok(!resumo.alertasCriticos.some((a) => a.id === ALERTA_VENCIDAS_ID));
+});
+
+test('alerta adiado para o futuro não aparece nos alertas críticos do relatório', () => {
+  const db = dbComAlertaCritico({
+    alertas_tratativas: [{ alerta_id: ALERTA_VENCIDAS_ID, status: 'adiado', adiado_ate: diasAFrente(10) }],
+  });
+  const resumo = buildResumoGeralFazenda(db);
+  assert.ok(!resumo.alertasCriticos.some((a) => a.id === ALERTA_VENCIDAS_ID));
+});
+
+test('alerta adiado já vencido volta a aparecer (reabertura automática)', () => {
+  const db = dbComAlertaCritico({
+    alertas_tratativas: [{ alerta_id: ALERTA_VENCIDAS_ID, status: 'adiado', adiado_ate: diasAtras(1) }],
+  });
+  const resumo = buildResumoGeralFazenda(db);
+  assert.ok(resumo.alertasCriticos.some((a) => a.id === ALERTA_VENCIDAS_ID));
+});
+
+test('lote encerrado não entra nos totais ativos', () => {
+  const db = dbComAlertaCritico();
+  db.lotes[0].status = 'encerrado';
+  const resumo = buildResumoGeralFazenda(db);
+  assert.equal(resumo.totalLotesAtivos, 0);
+  assert.equal(resumo.totalCabecas, 0);
+});
+
+test('lote vendido não entra nos totais ativos', () => {
+  const db = dbComAlertaCritico();
+  db.lotes[0].status = 'vendido';
+  const resumo = buildResumoGeralFazenda(db);
+  assert.equal(resumo.totalLotesAtivos, 0);
+  assert.equal(resumo.totalCabecas, 0);
+});
+
+test('quantidade de cabeças usa a fonte canônica (lote.qtd), não a soma bruta de animais', () => {
+  const db = dbComAlertaCritico();
+  db.lotes[0].qtd = 7; // diverge de propósito da soma de animais (10)
+  const resumo = buildResumoGeralFazenda(db);
+  assert.equal(resumo.totalCabecas, 7);
+});
+
+test('sem lote.qtd definido (lote legado), cai para a soma de animais.qtd — fallback preservado', () => {
+  const db = dbComAlertaCritico();
+  delete db.lotes[0].qtd;
+  const resumo = buildResumoGeralFazenda(db);
+  assert.equal(resumo.totalCabecas, 10);
+});
+
+test('alertas críticos do relatório nunca têm id duplicado', () => {
+  const db = dbComAlertaCritico();
+  const resumo = buildResumoGeralFazenda(db);
+  const ids = resumo.alertasCriticos.map((a) => a.id);
+  assert.equal(ids.length, new Set(ids).size);
+});
+
+test('relatório de banco vazio retorna estrutura válida, sem quebrar', () => {
+  const resumo = buildResumoGeralFazenda({});
+  assert.equal(resumo.totalFazendas, 0);
+  assert.equal(resumo.totalPastos, 0);
+  assert.equal(resumo.totalLotesAtivos, 0);
+  assert.equal(resumo.totalCabecas, 0);
+  assert.equal(resumo.pesoMedioGeral, 0);
+  assert.equal(resumo.lucroTotalFazenda, 0);
+  assert.deepEqual(resumo.alertasCriticos, []);
+  assert.ok(Array.isArray(resumo.pendencias));
+});
+
+test('exportação (whatsappResumo) continua recebendo o formato esperado do relatório', () => {
+  const db = dbComAlertaCritico();
+  const resumo = buildResumoGeralFazenda(db);
+  const texto = gerarResumoGeralTexto(resumo);
+  assert.match(texto, /Resumo Geral da Fazenda/);
+  assert.match(texto, /Alertas críticos: 1/);
 });
