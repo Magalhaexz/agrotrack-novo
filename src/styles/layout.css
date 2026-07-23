@@ -621,3 +621,251 @@ body {
     max-width: min(100%, 1560px);
   }
 }
+
+/* ============================================================
+   Sprint Visual 2 — shell: sidebar em 6 áreas (accordion), flyouts
+   no modo recolhido e seletor de fazenda relocado para a sidebar.
+   Reaproveita os tokens/estados da Sprint Visual 1 (ver ui.css) e o
+   mesmo box de popover já usado em .header-farm-dropdown/.user-dropdown.
+   ============================================================ */
+
+/* Desktop já mostra o seletor de fazenda na sidebar — não duplicar no
+   header (regra explícita da Sprint Visual 2). No mobile o header
+   mantém seu próprio painel de fazenda (.mobile-header-panel). */
+@media (min-width: 768px) {
+  .app-shell .farm-selector-wrap {
+    display: none;
+  }
+}
+
+.app-shell .sidebar-farm-selector-wrap {
+  position: relative;
+  margin: 0 12px 12px;
+  padding-bottom: 12px;
+  border-bottom: 1px solid var(--color-border);
+}
+
+.app-shell .sidebar-farm-selector {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 46px;
+  padding: 8px 10px;
+  border-radius: 12px;
+  border: 1px solid var(--color-border);
+  background: var(--color-surface-2);
+  color: var(--color-text);
+  cursor: pointer;
+  transition: border-color 0.18s ease, background 0.18s ease;
+}
+
+.app-shell .sidebar-farm-selector:hover {
+  border-color: var(--color-border-strong);
+}
+
+.app-shell .sidebar-farm-selector:focus-visible {
+  outline: none;
+  box-shadow:
+    0 0 0 1px color-mix(in srgb, var(--color-primary) 58%, transparent),
+    0 0 0 3px color-mix(in srgb, var(--color-primary) 14%, transparent);
+}
+
+.app-shell .sidebar-farm-dot {
+  width: 8px;
+  height: 8px;
+  flex: 0 0 8px;
+  border-radius: 50%;
+  background: var(--color-primary);
+}
+
+.app-shell .sidebar-farm-consolidada {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  flex: 0 0 22px;
+  border-radius: 50%;
+  background: var(--color-primary-subtle);
+  color: var(--color-primary-light);
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.app-shell .sidebar-farm-copy {
+  display: grid;
+  min-width: 0;
+  flex: 1 1 auto;
+  text-align: left;
+}
+
+.app-shell .sidebar-farm-copy small {
+  color: var(--color-text-muted);
+  font-size: 10.5px;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+
+.app-shell .sidebar-farm-copy strong {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 0.86rem;
+  font-weight: 600;
+}
+
+.app-shell--sidebar-collapsed .sidebar-farm-selector-wrap {
+  margin-inline: 10px;
+  padding-inline: 0;
+}
+
+.app-shell--sidebar-collapsed .sidebar-farm-selector {
+  width: 48px;
+  min-width: 48px;
+  height: 48px;
+  min-height: 48px;
+  padding: 0;
+  margin-inline: auto;
+  justify-content: center;
+  border-radius: 16px;
+}
+
+/* Accordion: cabeçalho de grupo (clicável) + corpo com os itens. */
+.app-shell .sidebar-group-toggle {
+  position: relative;
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-height: var(--layout-sidebar-item-height);
+  padding: 0 10px;
+  border-radius: 10px;
+  background: transparent;
+  color: var(--color-text-secondary);
+  font-size: 0.78rem;
+  font-weight: 700;
+  letter-spacing: 0.03em;
+  text-align: left;
+  cursor: pointer;
+}
+
+.app-shell .sidebar-group-toggle:hover {
+  background: var(--sidebar-item-hover);
+  color: var(--color-text);
+}
+
+.app-shell .sidebar-group-toggle:focus-visible {
+  outline: none;
+  box-shadow:
+    0 0 0 1px color-mix(in srgb, var(--color-primary) 58%, transparent),
+    0 0 0 3px color-mix(in srgb, var(--color-primary) 14%, transparent);
+}
+
+.app-shell .sidebar-group-title-text {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.app-shell .sidebar-group-toggle.is-active-group {
+  color: var(--color-text);
+}
+
+.app-shell .sidebar-group-toggle.is-active-group::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 8px;
+  bottom: 8px;
+  width: 3px;
+  border-radius: 2px;
+  background: var(--sidebar-item-active-border);
+}
+
+.app-shell .sidebar-group-toggle.is-active-group .sidebar-group-icon {
+  color: var(--sidebar-item-active-text);
+}
+
+.app-shell .sidebar-group-body {
+  display: none;
+}
+
+.app-shell .sidebar-group-body.is-open {
+  display: grid;
+  padding-left: 4px;
+  animation: sidebarGroupIn 0.18s ease-in-out;
+}
+
+@keyframes sidebarGroupIn {
+  from {
+    opacity: 0;
+    transform: translateY(-4px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .app-shell .sidebar-group-body.is-open {
+    animation: none;
+  }
+}
+
+/* Recolhida: o cabeçalho do grupo vira um ícone 48x48 (mesmo tratamento
+   dos itens/Painel Geral); clique abre flyout em vez de accordion. */
+.app-shell--sidebar-collapsed .sidebar-group-toggle {
+  width: 48px;
+  min-width: 48px;
+  max-width: 48px;
+  height: 48px;
+  min-height: 48px;
+  justify-content: center;
+  padding-inline: 0;
+  margin-inline: auto;
+  border-radius: 16px;
+}
+
+.app-shell--sidebar-collapsed .sidebar-group-toggle.is-active-group::before {
+  left: 50%;
+  top: auto;
+  bottom: -2px;
+  width: 18px;
+  height: 3px;
+  transform: translateX(-50%);
+}
+
+/* Popover (flyout) — reaproveita a caixa de .header-farm-dropdown/.user-dropdown
+   (definida em app.css), só adiciona o necessário para virar flyout fixo. */
+.sidebar-flyout {
+  z-index: 4100;
+  min-width: 220px;
+  max-width: 280px;
+  max-height: min(70vh, 420px);
+  overflow-y: auto;
+}
+
+.sidebar-flyout-title {
+  margin: 2px 6px 6px;
+  color: var(--color-text-muted);
+  font-size: 10.5px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+
+.user-dropdown--collapsed {
+  min-width: 240px;
+}
+
+.mobile-nav-option--logout {
+  color: var(--color-danger);
+}
+
+.mobile-nav-option--logout:hover {
+  background: var(--color-danger-bg);
+}

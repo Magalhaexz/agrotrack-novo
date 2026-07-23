@@ -1,4 +1,5 @@
 ﻿import { Suspense, lazy, useEffect, useMemo, useRef, useState } from 'react';
+import { LogOut } from 'lucide-react';
 import { useAuth } from './auth/useAuth';
 import { permissoesPorPagina } from './auth/perfis';
 import AppHeader from './components/AppHeader';
@@ -21,7 +22,7 @@ import {
   limparMarcadoresFluxoAuth,
   signOutLocalSafely,
 } from './lib/supabase';
-import { secondaryNavItems, navSections } from './navigation/navConfig';
+import { accountNavItems, navGroups } from './navigation/navConfig';
 import { getPageFromPathname, getRouteForPage, legacyRouteAliases } from './navigation/routes';
 import {
   registrarEntradaAnimal,
@@ -246,7 +247,10 @@ export default function App() {
   const podeEscrever = !subscriptionGate.blocked;
   const writeBlockedRef = useRef(null);
   const [usuarioLogado, setUsuarioLogado] = useState(null);
-  const [menuExtraAberto, setMenuExtraAberto] = useState(false);
+  // null = fechado; array de ids de grupo (mais "conta") define o conteúdo
+  // do bottom sheet mobile: um grupo só (toque em Rebanho/Manejo/Gestão) ou
+  // o restante inteiro (toque em "Mais").
+  const [mobileSheetGroupIds, setMobileSheetGroupIds] = useState(null);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(() => readSidebarCollapsedState());
   const [tabAtiva, setTabAtiva] = useState('geral');
   const [fazendaSelecionada, setFazendaSelecionada] = useState(null);
@@ -833,33 +837,39 @@ export default function App() {
   // carregamento direto de rota/URL e refresh (ver RotaProtegida.jsx).
   const moduloBloqueadoAtual = !canAccessModule(currentSubscription, pageKey);
 
-  const mobileNavGroups = useMemo(() => {
-    const grupos = navSections
-      .map((section) => ({
-        id: section.id,
-        title: section.title || 'Principal',
-        items: section.items.filter((item) => {
+  // Conteúdo do bottom sheet mobile (toque em Rebanho/Manejo/Gestão abre só
+  // aquele grupo; toque em "Mais" abre Acompanhamento + Administração + Conta).
+  // Mesmo filtro de permissão de Sidebar.jsx, mesma fonte de dados (navConfig.js).
+  const mobileSheetSections = useMemo(() => {
+    if (!mobileSheetGroupIds) return [];
+
+    const secoes = [];
+    for (const groupId of mobileSheetGroupIds) {
+      if (groupId === 'conta') {
+        const items = accountNavItems.filter((item) => {
           const permissao = permissoesPorPagina[item.id];
           return !permissao || hasPermission(permissao);
-        }),
-      }))
-      .filter((section) => section.items.length > 0);
+        });
+        if (items.length) secoes.push({ id: 'conta', title: 'Conta', items });
+        continue;
+      }
 
-    const conta = secondaryNavItems.filter((item) => {
-      const permissao = permissoesPorPagina[item.id];
-      return !permissao || hasPermission(permissao);
-    });
-
-    if (conta.length) {
-      grupos.push({
-        id: 'conta',
-        title: 'Conta',
-        items: conta,
+      const grupo = navGroups.find((group) => group.id === groupId);
+      if (!grupo) continue;
+      const items = grupo.items.filter((item) => {
+        const permissao = permissoesPorPagina[item.id];
+        return !permissao || hasPermission(permissao);
       });
+      if (items.length) secoes.push({ id: grupo.id, title: grupo.title, items });
     }
 
-    return grupos;
-  }, [hasPermission]);
+    return secoes;
+  }, [mobileSheetGroupIds, hasPermission]);
+
+  const mobileSheetTitle = mobileSheetGroupIds && mobileSheetGroupIds.length === 1
+    ? (navGroups.find((group) => group.id === mobileSheetGroupIds[0])?.title || 'Mais opções')
+    : 'Mais opções';
+  const mobileSheetShowLogout = Boolean(mobileSheetGroupIds?.includes('conta'));
 
   if (isBootLoading) {
     return (
@@ -942,6 +952,10 @@ export default function App() {
         onSignOut={handleLogout}
         isCollapsed={sidebarCollapsed}
         onToggleCollapse={() => setSidebarCollapsed((prev) => !prev)}
+        fazendas={fazendasPermitidas}
+        fazendaSelecionada={fazendaSelecionada}
+        onSelectFazenda={setFazendaSelecionada}
+        farmName={fazendaSelecionada?.nome || db?.fazendas?.[0]?.nome || 'Fazenda Atual'}
       />
 
       <main className={`main${['lotes', 'estoque', 'financeiro'].includes(pageKey) ? ' main-has-fab' : ''}`}>
@@ -1119,7 +1133,8 @@ export default function App() {
         onNavigate={(pagina) => {
           navigateWithPermission(pagina);
         }}
-        onOpenMore={() => setMenuExtraAberto(true)}
+        onOpenGroup={(groupId) => setMobileSheetGroupIds([groupId])}
+        onOpenMore={() => setMobileSheetGroupIds(['acompanhamento', 'administracao', 'conta'])}
       />
 
       <MobileFab
@@ -1128,13 +1143,13 @@ export default function App() {
       />
 
       <Modal
-        open={menuExtraAberto}
-        onClose={() => setMenuExtraAberto(false)}
-        title="Mais opções"
+        open={Boolean(mobileSheetGroupIds)}
+        onClose={() => setMobileSheetGroupIds(null)}
+        title={mobileSheetTitle}
         subtitle="Todos os módulos do app continuam acessíveis no mobile"
       >
         <div className="mobile-nav-modal">
-          {mobileNavGroups.map((group) => (
+          {mobileSheetSections.map((group) => (
             <section key={group.id} className="mobile-nav-group">
               <p className="mobile-nav-group-title">{group.title}</p>
               <div className="mobile-nav-options">
@@ -1149,7 +1164,7 @@ export default function App() {
                       className={`mobile-nav-option ${isActive ? 'active' : ''}`}
                       onClick={() => {
                         navigateWithPermission(item.id);
-                        setMenuExtraAberto(false);
+                        setMobileSheetGroupIds(null);
                       }}
                       aria-current={isActive ? 'page' : undefined}
                     >
@@ -1166,6 +1181,28 @@ export default function App() {
               </div>
             </section>
           ))}
+
+          {mobileSheetShowLogout ? (
+            <section className="mobile-nav-group">
+              <div className="mobile-nav-options">
+                <button
+                  type="button"
+                  className="mobile-nav-option mobile-nav-option--logout"
+                  onClick={() => {
+                    setMobileSheetGroupIds(null);
+                    handleLogout();
+                  }}
+                >
+                  <div className="mobile-nav-option-icon">
+                    <LogOut size={16} aria-hidden="true" />
+                  </div>
+                  <div>
+                    <strong>Sair da conta</strong>
+                  </div>
+                </button>
+              </div>
+            </section>
+          ) : null}
         </div>
       </Modal>
 

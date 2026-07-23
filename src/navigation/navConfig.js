@@ -1,8 +1,10 @@
 import {
   Activity,
+  AlertTriangle,
   BarChart3,
   Beef,
   BellRing,
+  Building2,
   Calculator,
   CalendarDays,
   CheckSquare,
@@ -20,137 +22,120 @@ import {
   ListChecks,
   MapPin,
   Package,
+  PieChart,
   Receipt,
   RefreshCw,
   Repeat,
   Scale,
   Settings,
   ShieldPlus,
+  Sprout,
   Syringe,
   Tractor,
   TrendingUp,
   User,
   Users,
+  Wallet,
 } from 'lucide-react';
 
-// Sprint de reorganização estratégica da sidebar — grupos seguem o fluxo real
-// de trabalho do produtor (ver o que está acontecendo → operar a fazenda →
-// organizar a rotina → controlar custos → analisar e decidir → administrar a
-// conta), não a ordem em que os módulos foram construídos historicamente.
-// Detalhes e critérios em docs/SPRINT_REORGANIZACAO_SIDEBAR_HERDON.md.
-export const navSections = [
+// Sprint Visual 2 — sidebar simplificada em 6 áreas principais, na
+// linguagem do pecuarista, em vez das 7 seções técnicas anteriores.
+// Grupo "painel" é standalone (item direto, sem submenu/accordion);
+// os outros 5 abrem e fecham (accordion) em Sidebar.jsx. Contas/sistema
+// saíram da navegação principal — ver accountNavItems mais abaixo.
+export const navGroups = [
   {
-    id: 'inicio',
-    title: 'Início',
-    items: [
-      { id: 'dashboard', label: 'Painel Geral', icon: LayoutDashboard },
-      { id: 'alertas', label: 'Central de Alertas', icon: BellRing },
-    ],
+    id: 'painel',
+    title: 'Painel Geral',
+    icon: LayoutDashboard,
+    standalone: true,
+    items: [{ id: 'dashboard', label: 'Painel Geral', icon: LayoutDashboard }],
   },
   {
-    id: 'rebanhoCampo',
-    title: 'Rebanho e Campo',
+    id: 'rebanho',
+    title: 'Rebanho',
+    icon: Beef,
     items: [
-      { id: 'pastagens', label: 'Pastos', icon: Tractor },
-      { id: 'lotes', label: 'Lotes e Rebanho', icon: Beef },
+      { id: 'lotes', label: 'Lotes', icon: Beef },
       { id: 'animais', label: 'Animais', icon: ClipboardList },
       { id: 'pesagens', label: 'Pesagens', icon: Scale },
-      { id: 'suplementacao', label: 'Nutrição e Suplementação', icon: Leaf },
-      { id: 'sanitario', label: 'Sanidade', icon: Syringe },
-      // Antes era o único item do grupo isolado "Estoque" — nenhum grupo
-      // deve ter um item só, e Produtos e Insumos é parte do fluxo de campo.
-      { id: 'estoque', label: 'Produtos e Insumos', icon: Package },
     ],
   },
   {
-    id: 'rotina',
-    title: 'Rotina',
+    id: 'manejo',
+    title: 'Manejo',
+    icon: Tractor,
     items: [
+      { id: 'pastagens', label: 'Pastos', icon: Sprout },
+      { id: 'sanitario', label: 'Sanidade', icon: Syringe },
+      { id: 'suplementacao', label: 'Nutrição', icon: Leaf },
       { id: 'tarefas', label: 'Tarefas', icon: CheckSquare },
       { id: 'calendarioOperacional', label: 'Calendário', icon: CalendarDays },
       { id: 'rotina', label: 'Rotinas da Equipe', icon: Repeat },
     ],
   },
   {
-    id: 'financas',
-    title: 'Finanças',
+    id: 'gestao',
+    title: 'Gestão',
+    icon: Wallet,
     items: [
-      { id: 'financeiro', label: 'Visão Financeira', icon: Receipt },
+      { id: 'estoque', label: 'Estoque', icon: Package },
+      { id: 'financeiro', label: 'Financeiro', icon: Receipt },
       { id: 'fluxoCaixa', label: 'Fluxo de Caixa', icon: TrendingUp },
       { id: 'custos', label: 'Custos por Lote', icon: DollarSign },
       { id: 'custosCompartilhados', label: 'Rateio de Custos', icon: Layers },
-      // "Relatórios Financeiros" saiu daqui: já é um card de acesso claro
-      // dentro do hub "Relatórios" (RelatoriosPage.jsx) — dois pontos de
-      // entrada para o mesmo relatório só duplicavam o menu. A rota
-      // /relatorio-financeiro continua funcionando normalmente.
+      { id: 'resultados', label: 'Resultados', icon: BarChart3 },
+      { id: 'decisoesFazenda', label: 'Decisões', icon: ListChecks },
+      { id: 'cenarios', label: 'Simulador de Decisão', icon: Calculator },
     ],
   },
   {
-    id: 'analisesDecisao',
-    title: 'Análises e Decisão',
+    id: 'acompanhamento',
+    title: 'Acompanhamento',
+    icon: BellRing,
     items: [
-      { id: 'resultados', label: 'Resultado dos Lotes', icon: BarChart3 },
+      { id: 'alertas', label: 'Alertas', icon: AlertTriangle },
+      { id: 'indicadores', label: 'Indicadores', icon: Activity },
+      { id: 'relatorios', label: 'Relatórios', icon: FileBarChart },
+      { id: 'relatoriosGerenciais', label: 'Painel Gerencial', icon: PieChart },
       { id: 'comparativo', label: 'Comparativo de Lotes', icon: GitCompare },
       { id: 'evolucaoRebanho', label: 'Evolução do Rebanho', icon: LineChart },
-      { id: 'indicadores', label: 'Indicadores', icon: Activity },
-      { id: 'cenarios', label: 'Simulador de Decisão', icon: Calculator },
-      // Mantida: agrupa lotes abaixo da meta, estoque crítico e sanidade
-      // próxima por categoria, com ranking de saúde de lote e assistente
-      // HERDON embutido — conteúdo que a Central de Alertas não replica.
-      { id: 'decisoesFazenda', label: 'Decisões da Fazenda', icon: ListChecks },
-      { id: 'relatorios', label: 'Relatórios', icon: FileBarChart },
-      // "Painel Gerencial" (relatoriosGerenciais) VOLTA para a sidebar.
-      // A deduplicação anterior ficou pela metade: tirou a entrada de menu
-      // desta página por duplicar DashboardPremiumPage, mas DashboardPremium
-      // também não tinha entrada — resultado: as duas ficaram inacessíveis,
-      // e "Relatórios avançados" é vendido no plano PRO (domain/planos.js),
-      // ou seja, o cliente pagava por uma tela sem caminho até ela.
-      // Agora DashboardPremiumPage foi removida (era subconjunto estrito:
-      // mesmos 12 campos, enquanto esta tem 17 — inclui margem/cabeça,
-      // margem/ha, arrobas vendidas, kg vivo/ha e área total de pastagem).
-      { id: 'relatoriosGerenciais', label: 'Painel Gerencial', icon: FileBarChart },
     ],
   },
   {
-    id: 'gestao',
-    title: 'Gestão',
+    id: 'administracao',
+    title: 'Administração',
+    icon: Building2,
     items: [
       { id: 'fazendas', label: 'Fazendas', icon: MapPin },
-      // "Equipe e Acessos" (profiles/invites) = quem tem LOGIN na conta.
-      // "Funcionários" (tabela funcionarios) = peões/vaqueiros SEM login,
-      // atribuíveis a tarefas. São entidades distintas, não duplicadas.
-      { id: 'equipeAcessos', label: 'Equipe e Acessos', icon: ShieldPlus },
-      // FuncionariosPage é o ÚNICO lugar que cria funcionário
-      // (createOperationalRecord('funcionarios')). Sem entrada no menu, o
-      // seletor de responsável de Tarefas, Sanidade e Rotinas ficava sempre
-      // vazio — não havia como cadastrar ninguém.
       { id: 'funcionarios', label: 'Funcionários', icon: Users },
+      { id: 'equipeAcessos', label: 'Equipe e Acessos', icon: ShieldPlus },
       { id: 'importacao', label: 'Importação', icon: FileUp },
-    ],
-  },
-  {
-    id: 'contaSistema',
-    title: 'Conta e Sistema',
-    items: [
-      { id: 'perfil', label: 'Perfil', icon: User },
-      { id: 'configuracoes', label: 'Configurações', icon: Settings },
-      { id: 'minhaAssinatura', label: 'Planos e Assinatura', icon: CreditCard },
-      // "Sincronização" saiu do meio dos itens operacionais de Gestão e veio
-      // para o rodapé de conta/sistema (é uma função técnica, não do dia a
-      // dia). Continua como item de sidebar (não só dentro de Configurações)
-      // porque a permissão de configuracoes:ver não cobre visualizador, que
-      // hoje acessa sincronização por ter dashboard:ver — escondê-la só
-      // dentro de Configurações tiraria esse acesso. ConfiguracoesPage.jsx
-      // também ganhou uma seção "Sincronização e dados" com atalho.
-      { id: 'sincronizacao', label: 'Sincronização', icon: RefreshCw },
-      { id: 'guiaCriador', label: 'Guia do Criador', icon: HelpCircle },
     ],
   },
 ];
 
-export const secondaryNavItems = [];
+// Conta/sistema — não competem com as áreas operacionais: aparecem no
+// rodapé da sidebar / menu do usuário, nunca como abas principais.
+export const accountNavItems = [
+  { id: 'perfil', label: 'Perfil', icon: User },
+  { id: 'configuracoes', label: 'Configurações', icon: Settings },
+  { id: 'minhaAssinatura', label: 'Planos e Assinatura', icon: CreditCard },
+  { id: 'sincronizacao', label: 'Sincronização', icon: RefreshCw },
+  { id: 'guiaCriador', label: 'Guia do Criador', icon: HelpCircle },
+];
 
-export const navLabelMap = [...navSections.flatMap((section) => section.items), ...secondaryNavItems].reduce(
+// Mapa pageId -> groupId, usado para abrir automaticamente o grupo
+// correspondente ao entrar numa página interna (ex.: entrar em Pesagens
+// abre o grupo Rebanho e marca Rebanho como contexto ativo).
+export const groupIdByPageId = navGroups.reduce((acc, group) => {
+  for (const item of group.items) {
+    acc[item.id] = group.id;
+  }
+  return acc;
+}, {});
+
+export const navLabelMap = [...navGroups.flatMap((group) => group.items), ...accountNavItems].reduce(
   (acc, item) => {
     acc[item.id] = item.label;
     return acc;
