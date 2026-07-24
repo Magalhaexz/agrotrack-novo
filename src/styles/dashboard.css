@@ -144,6 +144,58 @@
   color: #ffb3b3;
 }
 
+/* Resumo financeiro (Sprint Visual 4): mesmo padrão strong=rótulo/p=valor
+   de .dashboard-grid--dual acima, mas o card não vive mais num grid de 2
+   colunas (o par "Resumo do rebanho" saiu por duplicar os indicadores
+   principais) — replicado aqui como classe própria do card. */
+.dashboard-finance-summary .dashboard-list-copy strong {
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--dash-helper);
+}
+
+.dashboard-finance-summary .dashboard-list-copy p {
+  margin-top: 6px;
+  font-size: 1.1rem;
+  font-weight: 700;
+  line-height: 1.2;
+  color: #edf4f1;
+}
+
+/* Rótulos de agrupamento (Visão do rebanho / Visão financeira / Agenda) —
+   marcam a hierarquia entre blocos sem virar mais um Card. */
+.dashboard-group-title {
+  margin: 8px 0 -4px;
+  font-size: 0.98rem;
+  font-weight: 700;
+}
+
+.dashboard-grid--agenda {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.dashboard-grid--agenda .ui-card-header {
+  margin-bottom: 20px;
+}
+
+.dashboard-task-more {
+  border: 1px dashed var(--color-border);
+  border-radius: 12px;
+  padding: 8px 10px;
+  background: transparent;
+  color: var(--color-text-secondary);
+  font-size: 0.82rem;
+  text-align: center;
+  cursor: pointer;
+}
+
+.dashboard-task-more:hover {
+  border-color: var(--color-border-strong);
+  color: var(--color-text);
+}
+
 .dashboard-hero-shell {
   padding: 16px 18px;
 }

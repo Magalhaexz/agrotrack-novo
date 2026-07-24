@@ -209,10 +209,6 @@ export default function DashboardPage({
       })),
     [alerts]
   );
-  const alertasCriticos = useMemo(
-    () => alertasFormatados.filter((alerta) => String(alerta.prioridade || '').toLowerCase() === 'alta'),
-    [alertasFormatados]
-  );
   const tarefasDoDia = useMemo(() => {
     const hoje = getTodayIso();
     return (db.tarefas || []).filter((tarefa) => (
@@ -255,14 +251,21 @@ export default function DashboardPage({
   // real de permissão, não um estado inventado só para a UI.
   const isSomenteLeitura = !hasPermission('lotes:editar');
 
+  // Resumo da situação: só reaproveita contagens já calculadas acima
+  // (hojeNaFazenda, pesagensPendentes, tarefasDoDia) — nenhum cálculo novo,
+  // nenhuma interpretação inventada. Prioridade: crítico > pesagem > tarefa.
+  const resumoSituacao = totalAlertasCriticos > 0
+    ? `${formatNumber(totalAlertasCriticos, 0)} alerta${totalAlertasCriticos > 1 ? 's' : ''} crítico${totalAlertasCriticos > 1 ? 's' : ''} pedindo atenção agora.`
+    : pesagensPendentes.length > 0
+      ? `${formatNumber(pesagensPendentes.length, 0)} lote${pesagensPendentes.length > 1 ? 's' : ''} sem pesagem recente.`
+      : tarefasDoDia.length > 0
+        ? `${formatNumber(tarefasDoDia.length, 0)} tarefa${tarefasDoDia.length > 1 ? 's' : ''} prevista${tarefasDoDia.length > 1 ? 's' : ''} para hoje.`
+        : 'Nenhum alerta crítico e nenhuma pendência para hoje.';
+
+  // Indicadores principais: 6 (não 7) — "Fazendas" saiu daqui e virou parte
+  // da linha de contexto da fazenda (não é um indicador de decisão do dia a
+  // dia, é metadado da conta); o dado continua visível, só mudou de lugar.
   const kpisMain = [
-    {
-      title: 'Fazendas',
-      value: formatNumber(totalFazendas, 0),
-      variation: { direction: 'neutral', value: 'Cadastradas na conta' },
-      icon: MapPin,
-      variant: KPI_VARIANTS.neutral,
-    },
     {
       title: 'Pastos',
       value: formatNumber(hojeNaFazenda.pastos.totalPastos, 0),
@@ -397,7 +400,7 @@ export default function DashboardPage({
       <header className="dashboard-toolbar page-header">
         <div className="dashboard-toolbar-copy">
           <h1>Painel Geral</h1>
-          <p>Hoje na fazenda: o que precisa de atenção, e o que fazer a seguir.</p>
+          <p>{totalFazendas > 0 ? resumoSituacao : 'Hoje na fazenda: o que precisa de atenção, e o que fazer a seguir.'}</p>
         </div>
         <div className="dashboard-toolbar-actions">
           <AssistenteHerdon db={db} onNavigate={onNavigate} />
@@ -410,7 +413,10 @@ export default function DashboardPage({
             <MapPin size={16} />
             <strong>{nomeFazendaContexto}</strong>
           </div>
-          <span>{formatNumber(totalCabecasAtivas, 0)} cabeças · {formatNumber(hojeNaFazenda.pastos.totalPastos, 0)} pastos</span>
+          <span>
+            {formatNumber(totalCabecasAtivas, 0)} cabeças · {formatNumber(hojeNaFazenda.pastos.totalPastos, 0)} pastos
+            {isConsolidado ? ` · ${formatNumber(totalFazendas, 0)} fazendas` : ''}
+          </span>
           {isSomenteLeitura ? (
             <span className="dashboard-farm-context-badge">
               <Lock size={12} /> Somente leitura
@@ -478,32 +484,17 @@ export default function DashboardPage({
 
       {tabAtiva === 'geral' && (
         <>
-          <section className="section-card dashboard-quick-actions-top">
-            <div className="section-header">
-              <div>
-                <h3 className="dashboard-section-title">Ações rápidas</h3>
-                <p className="dashboard-section-subtitle">Registre direto do campo, sem procurar no menu.</p>
-              </div>
-            </div>
-            <div className="dashboard-action-grid dashboard-action-grid--quick">
-              <Button variant="primary" icon={<Scale size={14} />} onClick={() => onNavigate?.('pesagens', { action: 'novo' })}>Nova pesagem</Button>
-              <Button variant="primary" icon={<Beef size={14} />} onClick={() => onNavigate?.('lotes', { action: 'novo' })}>Novo lote</Button>
-              <Button variant="outline" icon={<MapPin size={14} />} onClick={() => onNavigate?.('pastagens', { action: 'novo' })}>Novo pasto</Button>
-              <Button variant="outline" icon={<MapPinned size={14} />} onClick={() => onNavigate?.('lotes', { action: 'trocar-pasto' })}>Trocar lote de pasto</Button>
-              <Button variant="outline" icon={<DollarSign size={14} />} onClick={() => onNavigate?.('lotes', { action: 'venda' })}>Registrar venda</Button>
-              <Button variant="outline" icon={<AlertTriangle size={14} />} onClick={() => onNavigate?.('lotes', { action: 'morte' })}>Registrar morte/perda</Button>
-              <Button variant="outline" icon={<Truck size={14} />} onClick={() => onNavigate?.('lotes', { action: 'transferir' })}>Transferir entre lotes</Button>
-              <Button variant="outline" icon={<ClipboardList size={14} />} onClick={() => onNavigate?.('lotes', { action: 'ajustar-lotacao' })}>Ajustar lotação</Button>
-              <Button variant="outline" icon={<Receipt size={14} />} onClick={() => onNavigate?.('financeiro', { action: 'novo' })}>Novo lançamento financeiro</Button>
-              <Button variant="outline" icon={<Package size={14} />} onClick={() => onNavigate?.('estoque', { action: 'novo' })}>Novo produto/estoque</Button>
-              <Button variant="outline" icon={<ArrowDown size={14} />} onClick={() => onNavigate?.('estoque')}>Saída de estoque</Button>
-              <Button variant="outline" icon={<Syringe size={14} />} onClick={() => onNavigate?.('sanitario', { action: 'novo' })}>Novo manejo/sanidade</Button>
-              <Button variant="outline" icon={<CheckSquare size={14} />} onClick={() => onNavigate?.('tarefas', { action: 'novo' })}>Nova tarefa</Button>
-              <Button variant="outline" icon={<TrendingUp size={14} />} onClick={() => onNavigate?.('resultados')}>Resultado por lote</Button>
-              <Button variant="outline" icon={<Bell size={14} />} onClick={() => onNavigate?.('alertas')}>Central de Alertas</Button>
-            </div>
+          {/* 1. Indicadores principais — primeiro bloco de leitura, per Sprint
+              Visual 4 (era o 4º bloco antes; "Fazendas" saiu daqui, virou
+              parte do contexto da fazenda acima — 6 indicadores, não 7). */}
+          <section className="dashboard-grid dashboard-grid--kpi-main">
+            {kpisMain.map((item) => (
+              <KpiPanel key={item.title} {...item} />
+            ))}
           </section>
 
+          {/* 2. Precisa da sua atenção — inalterado internamente, só
+              reposicionado logo após os indicadores. */}
           <section className="section-card dashboard-hero-shell">
             <div className="section-header">
               <div>
@@ -552,6 +543,12 @@ export default function DashboardPage({
               </div>
             )}
           </section>
+
+          {/* 3. Visão do rebanho — lotes em destaque + ocupação de pastos.
+              "Resumo do rebanho" (cabeças/lotes/peso/resultado) saiu daqui:
+              os mesmos 4 números já estão nos indicadores principais acima,
+              repeti-los era duplicação pura. */}
+          <h2 className="dashboard-section-title dashboard-group-title">Visão do rebanho</h2>
 
           {lotesDestaque.length > 0 ? (
             <Card
@@ -605,33 +602,70 @@ export default function DashboardPage({
             </Card>
           ) : null}
 
-          <section className="dashboard-grid dashboard-grid--kpi-main">
-            {kpisMain.map((item) => (
-              <KpiPanel key={item.title} {...item} />
-            ))}
-          </section>
+          <Card className="section-card" title="Pastos em uso" subtitle="Ocupação simples dos pastos cadastrados, sem cálculo de UA por animal.">
+            <div className="dashboard-list">
+              <div className="dashboard-list-item">
+                <div className="dashboard-list-copy"><strong>Pastos cadastrados</strong><p>{formatNumber(hojeNaFazenda.pastos.totalPastos, 0)}</p></div>
+              </div>
+              <div className="dashboard-list-item">
+                <div className="dashboard-list-copy"><strong>Pastos com lote ativo</strong><p>{formatNumber(hojeNaFazenda.pastos.pastosComLote, 0)}</p></div>
+              </div>
+              <div className="dashboard-list-item">
+                <div className="dashboard-list-copy"><strong>Pastos sem lote</strong><p>{formatNumber(hojeNaFazenda.pastos.pastosSemLote, 0)}</p></div>
+              </div>
+              <div className="dashboard-list-item">
+                <div className="dashboard-list-copy"><strong>Lotes sem pasto definido</strong><p>{formatNumber(hojeNaFazenda.pastos.lotesSemPasto, 0)}</p></div>
+              </div>
+            </div>
+            {hojeNaFazenda.pastos.pastosAcimaCapacidade.length > 0 ? (
+              <div className="empty-state" style={{ marginTop: 12 }}>
+                <p>
+                  Lotação acima da capacidade informada n{hojeNaFazenda.pastos.pastosAcimaCapacidade.length === 1 ? 'o pasto' : 'os pastos'}:{' '}
+                  {hojeNaFazenda.pastos.pastosAcimaCapacidade.map((pasto) => pasto.nome).join(', ')}.
+                </p>
+              </div>
+            ) : null}
+            {hojeNaFazenda.pastos.pastosEmAtencao.length > 0 ? (
+              <div className="empty-state" style={{ marginTop: 12 }}>
+                <p>
+                  Em atenção n{hojeNaFazenda.pastos.pastosEmAtencao.length === 1 ? 'o pasto' : 'os pastos'}:{' '}
+                  {hojeNaFazenda.pastos.pastosEmAtencao.map((pasto) => pasto.nome).join(', ')}.
+                </p>
+              </div>
+            ) : null}
+          </Card>
 
-          <section className="dashboard-grid dashboard-grid--operations">
-            <Card className="section-card" title="Alertas importantes" subtitle="Focos prioritários para a equipe.">
-              {alertasCriticos.length === 0 ? (
-                <div className="empty-state">
-                  <p>Nenhum alerta crítico ativo.</p>
-                </div>
-              ) : (
-                <div className="dashboard-list">
-                  {alertasCriticos.slice(0, 4).map((alerta) => (
-                    <article key={alerta.id} className="dashboard-list-item dashboard-list-item--button">
-                      <div className="dashboard-list-copy">
-                        <strong>{alerta.titulo}</strong>
-                        <p>{alerta.descricao}</p>
-                      </div>
-                      <Badge variant="danger">Crítico</Badge>
-                    </article>
-                  ))}
-                </div>
-              )}
-            </Card>
+          {/* 4. Visão financeira — mesmos dados/cálculos de antes, só
+              reposicionado e com o rótulo da seção alinhado ao brief. */}
+          <h2 className="dashboard-section-title dashboard-group-title">Visão financeira</h2>
+          <Card
+            className="section-card dashboard-finance-summary"
+            title="Resumo financeiro"
+            subtitle="Situação diária de pagamentos pendentes e liquidados."
+            action={
+              <Button size="sm" variant="ghost" onClick={() => onNavigate?.('financeiro')}>
+                Abrir financeiro
+              </Button>
+            }
+          >
+            <div className="dashboard-list">
+              <div className="dashboard-list-item"><div className="dashboard-list-copy"><strong>Pagamentos vencidos</strong><p>{formatNumber(pagamentosResumo.vencidos, 0)}</p></div></div>
+              <div className="dashboard-list-item"><div className="dashboard-list-copy"><strong>Vencem hoje</strong><p>{formatNumber(pagamentosResumo.hoje, 0)}</p></div></div>
+              <div className="dashboard-list-item"><div className="dashboard-list-copy"><strong>Próximos pagamentos</strong><p>{formatNumber(pagamentosResumo.proximos, 0)}</p></div></div>
+              <div className="dashboard-list-item"><div className="dashboard-list-copy"><strong>Total pendente</strong><p>{pagamentosResumo.totalPendente > 0 ? formatCurrency(pagamentosResumo.totalPendente) : 'Nenhum pagamento pendente'}</p></div></div>
+              <div className="dashboard-list-item"><div className="dashboard-list-copy"><strong>Total pago</strong><p>{formatCurrency(pagamentosResumo.totalPago)}</p></div></div>
+            </div>
+          </Card>
 
+          {/* 5. Agenda e próximos acontecimentos — "Alertas importantes"
+              foi removido daqui (duplicava "Prioridades de hoje": os dois
+              liam, por caminhos diferentes, o mesmo motor de alertas —
+              ver App.jsx::adaptarAlertaParaPainelLegado). "Quadro de
+              tarefas" virou prévia curta (4 por coluna) em vez de lista
+              sem limite; o quadro completo continua em Tarefas. */}
+          <h2 className="dashboard-section-title dashboard-group-title">Agenda e próximos acontecimentos</h2>
+
+          <section className="dashboard-grid dashboard-grid--agenda">
             <Card className="section-card" title="Tarefas do dia" subtitle="Pendências com vencimento para hoje.">
               {tarefasDoDia.length === 0 ? (
                 <div className="empty-state">
@@ -671,41 +705,17 @@ export default function DashboardPage({
             </Card>
           </section>
 
-          <Card className="section-card" title="Pastos em uso" subtitle="Ocupação simples dos pastos cadastrados, sem cálculo de UA por animal.">
-            <div className="dashboard-list">
-              <div className="dashboard-list-item">
-                <div className="dashboard-list-copy"><strong>Pastos cadastrados</strong><p>{formatNumber(hojeNaFazenda.pastos.totalPastos, 0)}</p></div>
-              </div>
-              <div className="dashboard-list-item">
-                <div className="dashboard-list-copy"><strong>Pastos com lote ativo</strong><p>{formatNumber(hojeNaFazenda.pastos.pastosComLote, 0)}</p></div>
-              </div>
-              <div className="dashboard-list-item">
-                <div className="dashboard-list-copy"><strong>Pastos sem lote</strong><p>{formatNumber(hojeNaFazenda.pastos.pastosSemLote, 0)}</p></div>
-              </div>
-              <div className="dashboard-list-item">
-                <div className="dashboard-list-copy"><strong>Lotes sem pasto definido</strong><p>{formatNumber(hojeNaFazenda.pastos.lotesSemPasto, 0)}</p></div>
-              </div>
-            </div>
-            {hojeNaFazenda.pastos.pastosAcimaCapacidade.length > 0 ? (
-              <div className="empty-state" style={{ marginTop: 12 }}>
-                <p>
-                  Lotação acima da capacidade informada n{hojeNaFazenda.pastos.pastosAcimaCapacidade.length === 1 ? 'o pasto' : 'os pastos'}:{' '}
-                  {hojeNaFazenda.pastos.pastosAcimaCapacidade.map((pasto) => pasto.nome).join(', ')}.
-                </p>
-              </div>
-            ) : null}
-            {hojeNaFazenda.pastos.pastosEmAtencao.length > 0 ? (
-              <div className="empty-state" style={{ marginTop: 12 }}>
-                <p>
-                  Em atenção n{hojeNaFazenda.pastos.pastosEmAtencao.length === 1 ? 'o pasto' : 'os pastos'}:{' '}
-                  {hojeNaFazenda.pastos.pastosEmAtencao.map((pasto) => pasto.nome).join(', ')}.
-                </p>
-              </div>
-            ) : null}
-          </Card>
-
           <section className="dashboard-task-board">
-            <Card className="section-card" title="Quadro de tarefas" subtitle="Tarefas acionaveis do dia com status claro para a equipe.">
+            <Card
+              className="section-card"
+              title="Quadro de tarefas"
+              subtitle="Prévia curta — crie uma tarefa rápida ou abra o quadro completo."
+              action={
+                <Button size="sm" variant="ghost" onClick={() => onNavigate?.('tarefas')}>
+                  Ver quadro completo →
+                </Button>
+              }
+            >
               <div className="dashboard-task-create">
                 <input className="ui-input" placeholder="Titulo da tarefa" value={novaTarefa.titulo} onChange={(e) => setNovaTarefa((p) => ({ ...p, titulo: e.target.value }))} />
                 <select className="ui-input" value={novaTarefa.funcionario_id} onChange={(e) => setNovaTarefa((p) => ({ ...p, funcionario_id: e.target.value }))}>
@@ -718,54 +728,62 @@ export default function DashboardPage({
               </div>
 
               <div className="dashboard-task-columns">
-                {['pendentes', 'feitas', 'vencidas'].map((coluna) => (
-                  <div key={coluna} className="dashboard-task-column">
-                    <div className="dashboard-task-column-head">{coluna === 'pendentes' ? 'Pendentes' : coluna === 'feitas' ? 'Feitas' : 'Vencidas'}</div>
-                    <div className="dashboard-task-list">
-                      {boardTarefas.filter((item) => item.coluna === coluna).map((tarefa) => (
-                        <article key={tarefa.id} className="dashboard-task-card">
-                          <strong>{tarefa.titulo}</strong>
-                          <span>{tarefa.responsavelNome}</span>
-                          <small>{formatDate(tarefa.data_vencimento)}</small>
-                          {tarefa.descricao ? <p>{tarefa.descricao}</p> : null}
-                          {coluna !== 'feitas' ? <Button size="sm" variant="ghost" onClick={() => marcarComoFeita(tarefa)}>Marcar feita</Button> : null}
-                        </article>
-                      ))}
+                {['pendentes', 'feitas', 'vencidas'].map((coluna) => {
+                  const itensColuna = boardTarefas.filter((item) => item.coluna === coluna);
+                  return (
+                    <div key={coluna} className="dashboard-task-column">
+                      <div className="dashboard-task-column-head">
+                        {coluna === 'pendentes' ? 'Pendentes' : coluna === 'feitas' ? 'Feitas' : 'Vencidas'} ({itensColuna.length})
+                      </div>
+                      <div className="dashboard-task-list">
+                        {itensColuna.slice(0, 4).map((tarefa) => (
+                          <article key={tarefa.id} className="dashboard-task-card">
+                            <strong>{tarefa.titulo}</strong>
+                            <span>{tarefa.responsavelNome}</span>
+                            <small>{formatDate(tarefa.data_vencimento)}</small>
+                            {tarefa.descricao ? <p>{tarefa.descricao}</p> : null}
+                            {coluna !== 'feitas' ? <Button size="sm" variant="ghost" onClick={() => marcarComoFeita(tarefa)}>Marcar feita</Button> : null}
+                          </article>
+                        ))}
+                        {itensColuna.length > 4 ? (
+                          <button type="button" className="dashboard-task-more" onClick={() => onNavigate?.('tarefas')}>
+                            +{itensColuna.length - 4} no quadro completo
+                          </button>
+                        ) : null}
+                      </div>
                     </div>
-                  </div>
-                ))}
+                  );
+                })}
               </div>
             </Card>
           </section>
 
-          <section className="dashboard-grid dashboard-grid--dual">
-            <Card
-              className="section-card"
-              title="Resumo financeiro"
-              subtitle="Situação diária de pagamentos pendentes e liquidados."
-              action={
-                <Button size="sm" variant="ghost" onClick={() => onNavigate?.('financeiro')}>
-                  Abrir financeiro
-                </Button>
-              }
-            >
-              <div className="dashboard-list">
-                <div className="dashboard-list-item"><div className="dashboard-list-copy"><strong>Pagamentos vencidos</strong><p>{formatNumber(pagamentosResumo.vencidos, 0)}</p></div></div>
-                <div className="dashboard-list-item"><div className="dashboard-list-copy"><strong>Vencem hoje</strong><p>{formatNumber(pagamentosResumo.hoje, 0)}</p></div></div>
-                <div className="dashboard-list-item"><div className="dashboard-list-copy"><strong>Próximos pagamentos</strong><p>{formatNumber(pagamentosResumo.proximos, 0)}</p></div></div>
-                <div className="dashboard-list-item"><div className="dashboard-list-copy"><strong>Total pendente</strong><p>{pagamentosResumo.totalPendente > 0 ? formatCurrency(pagamentosResumo.totalPendente) : 'Nenhum pagamento pendente'}</p></div></div>
-                <div className="dashboard-list-item"><div className="dashboard-list-copy"><strong>Total pago</strong><p>{formatCurrency(pagamentosResumo.totalPago)}</p></div></div>
+          {/* 6. Ações rápidas — mesmas 14 ações, mesmos destinos; só saiu do
+              topo (onde competia com o resto) para o fim da página. */}
+          <section className="section-card dashboard-quick-actions-top">
+            <div className="section-header">
+              <div>
+                <h3 className="dashboard-section-title">Ações rápidas</h3>
+                <p className="dashboard-section-subtitle">Registre direto do campo, sem procurar no menu.</p>
               </div>
-            </Card>
-
-            <Card className="section-card" title="Resumo do rebanho" subtitle="Visão objetiva para decisão diária da operação.">
-              <div className="dashboard-list">
-                <div className="dashboard-list-item"><div className="dashboard-list-copy"><strong>Cabeças ativas</strong><p>{formatNumber(totalCabecasAtivas, 0)}</p></div></div>
-                <div className="dashboard-list-item"><div className="dashboard-list-copy"><strong>Lotes ativos</strong><p>{formatNumber(lotesAtivos.length, 0)}</p></div></div>
-                <div className="dashboard-list-item"><div className="dashboard-list-copy"><strong>Peso médio atual</strong><p>{formatNumber(pesoMedioAtual, 1)} kg</p></div></div>
-                <div className="dashboard-list-item"><div className="dashboard-list-copy"><strong>Resultado do mês</strong><p className={resultadoMes >= 0 ? 'positive' : 'negative'}>{formatCurrency(resultadoMes)}</p></div></div>
-              </div>
-            </Card>
+            </div>
+            <div className="dashboard-action-grid dashboard-action-grid--quick">
+              <Button variant="primary" icon={<Scale size={14} />} onClick={() => onNavigate?.('pesagens', { action: 'novo' })}>Nova pesagem</Button>
+              <Button variant="primary" icon={<Beef size={14} />} onClick={() => onNavigate?.('lotes', { action: 'novo' })}>Novo lote</Button>
+              <Button variant="outline" icon={<MapPin size={14} />} onClick={() => onNavigate?.('pastagens', { action: 'novo' })}>Novo pasto</Button>
+              <Button variant="outline" icon={<MapPinned size={14} />} onClick={() => onNavigate?.('lotes', { action: 'trocar-pasto' })}>Trocar lote de pasto</Button>
+              <Button variant="outline" icon={<DollarSign size={14} />} onClick={() => onNavigate?.('lotes', { action: 'venda' })}>Registrar venda</Button>
+              <Button variant="outline" icon={<AlertTriangle size={14} />} onClick={() => onNavigate?.('lotes', { action: 'morte' })}>Registrar morte/perda</Button>
+              <Button variant="outline" icon={<Truck size={14} />} onClick={() => onNavigate?.('lotes', { action: 'transferir' })}>Transferir entre lotes</Button>
+              <Button variant="outline" icon={<ClipboardList size={14} />} onClick={() => onNavigate?.('lotes', { action: 'ajustar-lotacao' })}>Ajustar lotação</Button>
+              <Button variant="outline" icon={<Receipt size={14} />} onClick={() => onNavigate?.('financeiro', { action: 'novo' })}>Novo lançamento financeiro</Button>
+              <Button variant="outline" icon={<Package size={14} />} onClick={() => onNavigate?.('estoque', { action: 'novo' })}>Novo produto/estoque</Button>
+              <Button variant="outline" icon={<ArrowDown size={14} />} onClick={() => onNavigate?.('estoque')}>Saída de estoque</Button>
+              <Button variant="outline" icon={<Syringe size={14} />} onClick={() => onNavigate?.('sanitario', { action: 'novo' })}>Novo manejo/sanidade</Button>
+              <Button variant="outline" icon={<CheckSquare size={14} />} onClick={() => onNavigate?.('tarefas', { action: 'novo' })}>Nova tarefa</Button>
+              <Button variant="outline" icon={<TrendingUp size={14} />} onClick={() => onNavigate?.('resultados')}>Resultado por lote</Button>
+              <Button variant="outline" icon={<Bell size={14} />} onClick={() => onNavigate?.('alertas')}>Central de Alertas</Button>
+            </div>
           </section>
         </>
       )}
