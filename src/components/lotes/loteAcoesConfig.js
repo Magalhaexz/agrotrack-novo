@@ -10,6 +10,9 @@ import { Settings, ClipboardList, DollarSign, AlertTriangle, Truck, MapPinned, C
 // `bloqueadoPor`: recebe o lote e devolve true quando a ação deve ficar
 // desabilitada além da permissão (lote encerrado/vendido).
 // `handlerKey`: chave no objeto `handlers` passado a <LoteAcoesMenu>.
+// `grupo` (Sprint Visual 5): só agrupa visualmente o mesmo menu — 'comum'
+// (editar/ajustar), 'movimentacao' (venda/morte/transferência/pasto) e
+// 'encerramento' (ação destrutiva, sempre isolada por último).
 export const LOTE_ACOES = [
   {
     id: 'editar',
@@ -18,6 +21,7 @@ export const LOTE_ACOES = [
     variant: 'ghost',
     permissao: 'lotes:editar',
     handlerKey: 'onEditar',
+    grupo: 'comum',
     bloqueadoPor: (lote) => Boolean(lote?.bloqueado),
   },
   {
@@ -27,6 +31,7 @@ export const LOTE_ACOES = [
     variant: 'outline',
     permissao: 'lotes:editar',
     handlerKey: 'onAjusteLotacao',
+    grupo: 'comum',
     bloqueadoPor: (lote) => Boolean(lote?.bloqueado),
   },
   {
@@ -36,6 +41,7 @@ export const LOTE_ACOES = [
     variant: 'warning',
     permissao: 'animais:movimentar',
     handlerKey: 'onVenda',
+    grupo: 'movimentacao',
     bloqueadoPor: (lote) => Boolean(lote?.bloqueado),
   },
   {
@@ -45,6 +51,7 @@ export const LOTE_ACOES = [
     variant: 'warning',
     permissao: 'animais:movimentar',
     handlerKey: 'onMortePerda',
+    grupo: 'movimentacao',
     bloqueadoPor: (lote) => Boolean(lote?.bloqueado),
   },
   {
@@ -54,6 +61,7 @@ export const LOTE_ACOES = [
     variant: 'warning',
     permissao: 'animais:movimentar',
     handlerKey: 'onTransferenciaSaida',
+    grupo: 'movimentacao',
     bloqueadoPor: (lote) => Boolean(lote?.bloqueado),
   },
   {
@@ -63,6 +71,7 @@ export const LOTE_ACOES = [
     variant: 'outline',
     permissao: 'lotes:editar',
     handlerKey: 'onTrocarPasto',
+    grupo: 'movimentacao',
     bloqueadoPor: (lote) => Boolean(lote?.bloqueado),
   },
   {
@@ -72,6 +81,13 @@ export const LOTE_ACOES = [
     variant: 'danger',
     permissao: 'lotes:editar',
     handlerKey: 'onFinalizar',
+    grupo: 'encerramento',
     bloqueadoPor: (lote) => Boolean(lote?.bloqueado),
   },
+];
+
+export const LOTE_ACOES_GRUPOS = [
+  { id: 'comum', label: null },
+  { id: 'movimentacao', label: 'Movimentações' },
+  { id: 'encerramento', label: null },
 ];
