@@ -19,6 +19,7 @@ import { calcularConsumoDiarioTotalPorProduto, calcularDiasRestantesEstoque } fr
 import { isModoConsolidado, construirMapaFazendas } from '../domain/escopoFazenda';
 import { useSubmitOnce } from '../hooks/useSubmitOnce.js';
 import { itemEhNutricao } from './estoqueLogic.js';
+import '../styles/estoque.css';
 
 const CATEGORIAS_ESTOQUE_GERAL = [
   'Medicamento',
@@ -28,6 +29,18 @@ const CATEGORIAS_ESTOQUE_GERAL = [
   'Insumo geral',
   'Outro',
 ];
+
+// Sprint Visual 6: diferenciação visual por tipo de movimentação (mesmos
+// tipos já gravados/filtrados, só ganham cor/badge consistente com o resto
+// do sistema visual — nenhum tipo novo, nenhuma regra de saldo alterada).
+const MOVIMENTACAO_TIPO_VARIANT = {
+  entrada: 'success',
+  saida: 'warning',
+  ajuste: 'info',
+  consumo: 'neutral',
+  perda: 'danger',
+  tratamento: 'info',
+};
 
 const FORM_CADASTRO_ITEM_VAZIO = {
   produto: '',
@@ -244,15 +257,16 @@ export default function EstoquePage({ db, setDb, onRegistrarSaidaEstoque, onRegi
 
   return (
     <div className="page rebanho-page page--estoque">
-      <div className="rebanho-header">
-        <h1>Estoque</h1>
-        <p className="financeiro-subtitle">Medicamentos, vacinas, materiais e insumos gerais.</p>
-        <div className="lote-actions">
-          <select className="ui-input" value={escopoEstoque} onChange={(e) => setEscopoEstoque(e.target.value)} style={{ minWidth: 210 }}>
-            <option value="geral">Estoque geral</option>
-            <option value="nutricao">Nutrição / suplementação</option>
-            <option value="todos">Todos os itens</option>
-          </select>
+      <div className="rebanho-header estoque-header">
+        <div>
+          <h1>Estoque</h1>
+          <p className="estoque-header-context">
+            {consolidado ? 'Todas as fazendas' : (fazendaSelecionada?.nome || 'Nenhuma fazenda selecionada')}
+            <span className="estoque-header-context-dot" aria-hidden="true">·</span>
+            {resumo.total} {resumo.total === 1 ? 'item' : 'itens'}
+          </p>
+        </div>
+        <div className="page-actions action-row">
           <Button icon={<Plus size={14} />} disabled={!hasPermission('estoque:editar')} onClick={() => {
             if (!hasPermission('estoque:editar')) {
               showToast({ type: 'error', message: mensagemSemPermissao });
@@ -267,30 +281,38 @@ export default function EstoquePage({ db, setDb, onRegistrarSaidaEstoque, onRegi
           }}>
             Novo item
           </Button>
-          <Button icon={<ArrowUpCircle size={14} />} disabled={!hasPermission('estoque:editar')} onClick={() => {
-            if (!hasPermission('estoque:editar')) {
-              showToast({ type: 'error', message: mensagemSemPermissao });
-              return;
-            }
-            setSelectedItem(null);
-            setOpenEntrada(true);
-          }}>
-            Registrar entrada
-          </Button>
-          <Button variant="outline" icon={<ArrowDownCircle size={14} />} disabled={!hasPermission('estoque:editar')} onClick={() => {
-            if (!hasPermission('estoque:editar')) {
-              showToast({ type: 'error', message: mensagemSemPermissao });
-              return;
-            }
-            setSelectedItem(null);
-            setOpenSaida(true);
-          }}>
-            Registrar saída
-          </Button>
-          <Button variant={showOnlyCrit ? 'warning' : 'ghost'} onClick={() => setShowOnlyCrit((v) => !v)}>
-            {showOnlyCrit ? 'Mostrar todos' : 'Mostrar apenas críticos'}
-          </Button>
         </div>
+      </div>
+
+      <div className="estoque-toolbar">
+        <select className="ui-input" value={escopoEstoque} onChange={(e) => setEscopoEstoque(e.target.value)} style={{ minWidth: 210 }}>
+          <option value="geral">Estoque geral</option>
+          <option value="nutricao">Nutrição / suplementação</option>
+          <option value="todos">Todos os itens</option>
+        </select>
+        <Button icon={<ArrowUpCircle size={14} />} disabled={!hasPermission('estoque:editar')} onClick={() => {
+          if (!hasPermission('estoque:editar')) {
+            showToast({ type: 'error', message: mensagemSemPermissao });
+            return;
+          }
+          setSelectedItem(null);
+          setOpenEntrada(true);
+        }}>
+          Registrar entrada
+        </Button>
+        <Button variant="outline" icon={<ArrowDownCircle size={14} />} disabled={!hasPermission('estoque:editar')} onClick={() => {
+          if (!hasPermission('estoque:editar')) {
+            showToast({ type: 'error', message: mensagemSemPermissao });
+            return;
+          }
+          setSelectedItem(null);
+          setOpenSaida(true);
+        }}>
+          Registrar saída
+        </Button>
+        <Button variant={showOnlyCrit ? 'warning' : 'ghost'} onClick={() => setShowOnlyCrit((v) => !v)}>
+          {showOnlyCrit ? 'Mostrar todos' : 'Mostrar apenas críticos'}
+        </Button>
       </div>
 
       <ExportActions
@@ -299,20 +321,20 @@ export default function EstoquePage({ db, setDb, onRegistrarSaidaEstoque, onRegi
         onPrint={imprimirItensEstoque}
       />
 
-      <div className="dashboard-strip">
-        <div className="kpi-card">
+      <div className="dashboard-grid dashboard-grid--kpi-main">
+        <div className="kpi-card kpi-card--compact">
           <div className="kpi-content">
             <div className="kpi-label">Total de itens</div>
             <div className="kpi-value">{resumo.total}</div>
           </div>
         </div>
-        <div className="kpi-card">
+        <div className="kpi-card kpi-card--compact">
           <div className="kpi-content">
             <div className="kpi-label">Itens críticos</div>
             <div className={resumo.criticos > 0 ? 'kpi-val rd' : 'kpi-value'}>{resumo.criticos}</div>
           </div>
         </div>
-        <div className="kpi-card">
+        <div className="kpi-card kpi-card--compact">
           <div className="kpi-content">
             <div className="kpi-label">Valor total em estoque</div>
             <div className="kpi-value">{formatCurrency(resumo.valorTotal)}</div>
@@ -444,14 +466,25 @@ export default function EstoquePage({ db, setDb, onRegistrarSaidaEstoque, onRegi
           </label>
         </div>
         {movs.length > 0 ? (
-          <table className="dashboard-table">
-            <thead><tr><th>Data</th><th>Item</th><th>Tipo</th><th>Qtd</th><th>Lote</th><th>Valor</th></tr></thead>
-            <tbody>{movs.map((m) => {
-              const item = estoqueMap.get(m.item_estoque_id);
-              const lote = lotesMap.get(m.lote_id);
-              return <tr key={m.id}><td>{formatDate(m.data)}</td><td>{item?.produto || '—'}</td><td>{m.tipo}</td><td>{formatNumber(m.quantidade, 2)} {item?.unidade || ''}</td><td>{lote?.nome || '—'}</td><td>{formatCurrency(m.valor_total || 0)}</td></tr>;
-            })}</tbody>
-          </table>
+          <div className="estoque-movs-table-wrap">
+            <table className="dashboard-table">
+              <thead><tr><th>Data</th><th>Item</th><th>Tipo</th><th>Qtd</th><th>Lote</th><th>Valor</th></tr></thead>
+              <tbody>{movs.map((m) => {
+                const item = estoqueMap.get(m.item_estoque_id);
+                const lote = lotesMap.get(m.lote_id);
+                return (
+                  <tr key={m.id}>
+                    <td>{formatDate(m.data)}</td>
+                    <td>{item?.produto || '—'}</td>
+                    <td><Badge variant={MOVIMENTACAO_TIPO_VARIANT[m.tipo] || 'neutral'}>{m.tipo}</Badge></td>
+                    <td>{formatNumber(m.quantidade, 2)} {item?.unidade || ''}</td>
+                    <td>{lote?.nome || '—'}</td>
+                    <td>{formatCurrency(m.valor_total || 0)}</td>
+                  </tr>
+                );
+              })}</tbody>
+            </table>
+          </div>
         ) : (
           <div className="table-empty"><AlertTriangle className="table-empty-icon" size={20} />Nenhuma movimentação encontrada para os filtros selecionados.</div>
         )}

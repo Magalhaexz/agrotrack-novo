@@ -218,7 +218,7 @@ const ACTION_LABELS = {
   'trocar-pasto': 'Trocar lote de pasto',
 };
 
-export default function LotesPage({ db, setDb, onRegistrarSaidaAnimal, session, fazendaSelecionada = null, navigationIntent = null }) {
+export default function LotesPage({ db, setDb, onRegistrarSaidaAnimal, session, fazendaSelecionada = null, navigationIntent = null, onNavigate = null }) {
   const abrirNovoLotePorIntent = navigationIntent?.page === 'lotes' && navigationIntent?.action === 'novo';
   const { hasPermission } = useAuth();
   const { showToast } = useToast();
@@ -1209,10 +1209,11 @@ export default function LotesPage({ db, setDb, onRegistrarSaidaAnimal, session, 
                 <LoteAcoesMenu
                   lote={previewLote}
                   size="sm"
-                  hasPermission={(permissao) => (
-                    permissao === 'lotes:editar' ? hasPermission('lotes:editar') : hasPermission('animais:movimentar')
-                  )}
+                  hasPermission={hasPermission}
                   handlers={{
+                    onNovaPesagem: onNavigate
+                      ? () => onNavigate('pesagens', { action: 'novo', loteId: previewLote.id })
+                      : undefined,
                     onEditar: () => {
                       setLoteEmEdicao(previewLote);
                       setOpenNovoLote(true);

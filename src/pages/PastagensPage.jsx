@@ -1,12 +1,14 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { Plus } from 'lucide-react';
+import { AlertTriangle, MapPin, Plus, Users } from 'lucide-react';
 import Button from '../components/ui/Button';
 import Card from '../components/ui/Card';
 import Input from '../components/ui/Input';
+import EmptyState from '../components/EmptyState';
 import PageHeader from '../components/PageHeader';
 import { useAuth } from '../auth/useAuth';
 import { useToast } from '../hooks/useToast';
 import { gerarNovoId } from '../utils/id';
+import { isModoConsolidado } from '../domain/escopoFazenda';
 import {
   createOperationalRecord,
   deleteOperationalRecord,
@@ -18,6 +20,7 @@ import {
   calcularUaPorLote,
 } from '../domain/unidadeAnimal';
 import { calcularOcupacaoPastos } from '../domain/ocupacaoPastos';
+import '../styles/pastagens.css';
 
 function toNumber(value) {
   const parsed = Number(String(value ?? '').replace(',', '.'));
@@ -72,7 +75,7 @@ function getLotacaoBadgeClass(status) {
   return LOTACAO_BADGE_CLASS[status] || LOTACAO_BADGE_CLASS.sem_dados;
 }
 
-export default function PastagensPage({ db, setDb, session, onConfirmAction, navigationIntent = null }) {
+export default function PastagensPage({ db, setDb, session, onConfirmAction, navigationIntent = null, fazendaSelecionada = null }) {
   const { hasPermission } = useAuth();
   const { showToast } = useToast();
   const [form, setForm] = useState(emptyForm());
@@ -104,6 +107,8 @@ export default function PastagensPage({ db, setDb, session, onConfirmAction, nav
     () => new Map(fazendas.map((item) => [Number(item.id), item])),
     [fazendas]
   );
+  const consolidado = isModoConsolidado(fazendaSelecionada);
+  const contextoFazenda = consolidado ? 'Todas as fazendas' : (fazendaSelecionada?.nome || 'Nenhuma fazenda selecionada');
 
   const indicadores = useMemo(() => {
     const animais = Array.isArray(db?.animais) ? db.animais : [];
@@ -288,7 +293,23 @@ export default function PastagensPage({ db, setDb, session, onConfirmAction, nav
     <div className="page">
       <PageHeader
         title="Pastos"
-        subtitle="Cadastre os pastos da fazenda para acompanhar onde cada lote está e receber alertas de lotação."
+        subtitle={
+          <span className="pastagens-header-context">
+            {contextoFazenda}
+            <span className="pastagens-header-context-dot" aria-hidden="true">·</span>
+            {pastagens.length} {pastagens.length === 1 ? 'pasto' : 'pastos'}
+          </span>
+        }
+        actions={
+          <Button
+            icon={<Plus size={14} />}
+            onClick={focarFormularioPasto}
+            disabled={!hasPermission('pastagens:editar')}
+            title={!hasPermission('pastagens:editar') ? mensagemSemPermissao : undefined}
+          >
+            Cadastrar pasto
+          </Button>
+        }
       />
 
       <div ref={formCardRef}>
@@ -352,61 +373,51 @@ export default function PastagensPage({ db, setDb, session, onConfirmAction, nav
 
       {!pastagens.length ? (
         <Card title="Capacidade dos pastos">
-          <div className="empty-state">
-            <strong>Nenhum pasto cadastrado.</strong>
-            <span>Cadastre pastos para acompanhar lotação, capacidade e movimentação dos lotes.</span>
-            {hasPermission('pastagens:editar') ? (
-              <Button icon={<Plus size={14} />} onClick={focarFormularioPasto} style={{ marginTop: 12 }}>Cadastrar pasto</Button>
-            ) : null}
-          </div>
+          <EmptyState
+            title="Nenhum pasto cadastrado."
+            subtitle="Cadastre pastos para acompanhar lotação, capacidade e movimentação dos lotes."
+            action={
+              hasPermission('pastagens:editar') ? (
+                <Button icon={<Plus size={14} />} onClick={focarFormularioPasto}>Cadastrar pasto</Button>
+              ) : null
+            }
+          />
         </Card>
       ) : (
         <div className="report-stack">
-          <div className="report-kpi-grid">
-            <article className="metric-tile metric-tile--success">
-              <span className="metric-tile__label">Capacidade total</span>
-              <strong className="metric-tile__value">{formatNumber(indicadores.capacidadeTotalUa, 2)} UA</strong>
-              <span className="metric-tile__meta">Soma da capacidade instalada nas pastagens cadastradas.</span>
-            </article>
-            <article className="metric-tile">
-              <span className="metric-tile__label">UA da fazenda</span>
-              <strong className="metric-tile__value">{formatNumber(indicadores.uaTotalFazenda, 2)} UA</strong>
-              <span className="metric-tile__meta">Demanda animal estimada com base no rebanho atualmente registrado.</span>
-            </article>
-            <article className="metric-tile">
-              <span className="metric-tile__label">Taxa de lotação</span>
-              <strong className="metric-tile__value">{formatNumber(indicadores.taxaLotacaoUaHa, 3)} UA/ha</strong>
-              <span className="metric-tile__meta">Leitura consolidada da pressão de uso sobre a área de pasto disponível.</span>
-            </article>
-            <article className={`metric-tile ${indicadores.superlotacao ? 'metric-tile--warning' : 'metric-tile--success'}`}>
-              <span className="metric-tile__label">Pasto a arrendar</span>
-              <strong className="metric-tile__value">{formatNumber(indicadores.pastoAArrendarHa, 2)} ha</strong>
-              <span className="metric-tile__meta">
-                {indicadores.superlotacao
-                  ? 'Área estimada necessária para reequilibrar a capacidade da fazenda.'
-                  : 'Sem necessidade de arrendamento no cenário atual.'}
-              </span>
-            </article>
+          <div className="dashboard-grid dashboard-grid--kpi-main">
+            <div className="kpi-card kpi-card--compact">
+              <div className="kpi-content">
+                <div className="kpi-label">Área total</div>
+                <div className="kpi-value">{formatNumber(indicadores.areaTotalPastagem, 2)} ha</div>
+              </div>
+            </div>
+            <div className="kpi-card kpi-card--compact">
+              <div className="kpi-content">
+                <div className="kpi-label">Capacidade total</div>
+                <div className="kpi-value">{formatNumber(indicadores.capacidadeTotalUa, 2)} UA</div>
+              </div>
+            </div>
+            <div className="kpi-card kpi-card--compact">
+              <div className="kpi-content">
+                <div className="kpi-label">UA da fazenda</div>
+                <div className="kpi-value">{formatNumber(indicadores.uaTotalFazenda, 2)} UA</div>
+              </div>
+            </div>
+            <div className="kpi-card kpi-card--compact">
+              <div className="kpi-content">
+                <div className="kpi-label">Taxa de lotação</div>
+                <div className={indicadores.superlotacao ? 'kpi-val rd' : 'kpi-value'}>{formatNumber(indicadores.taxaLotacaoUaHa, 3)} UA/ha</div>
+              </div>
+            </div>
           </div>
 
           <Card
             title="Diagnóstico de capacidade"
-            subtitle="Leitura operacional da área, capacidade instalada e pressão do rebanho sobre os pastos."
+            subtitle={capacityPresentation.helper}
           >
             <div className="summary-panel">
               <div className="summary-list">
-                <div className="summary-row">
-                  <span className="summary-row__label">Área total de pasto</span>
-                  <strong className="summary-row__value">{formatNumber(indicadores.areaTotalPastagem, 2)} ha</strong>
-                </div>
-                <div className="summary-row">
-                  <span className="summary-row__label">Capacidade total</span>
-                  <strong className="summary-row__value">{formatNumber(indicadores.capacidadeTotalUa, 2)} UA</strong>
-                </div>
-                <div className="summary-row">
-                  <span className="summary-row__label">UA da fazenda</span>
-                  <strong className="summary-row__value">{formatNumber(indicadores.uaTotalFazenda, 2)} UA</strong>
-                </div>
                 <div className="summary-row">
                   <span className="summary-row__label">Saldo entre capacidade e demanda</span>
                   <strong className="summary-row__value">{formatNumber(indicadores.saldoCapacidadeUa, 2)} UA</strong>
@@ -419,10 +430,12 @@ export default function PastagensPage({ db, setDb, session, onConfirmAction, nav
                   <span className="summary-row__label">Alerta de superlotação</span>
                   <strong className="summary-row__value">{indicadores.superlotacao ? 'Sim' : 'Não'}</strong>
                 </div>
-              </div>
-              <div className={capacityPresentation.rowClass}>
-                <span className="summary-row__label">Leitura recomendada</span>
-                <strong className="summary-row__value">{capacityPresentation.helper}</strong>
+                <div className="summary-row">
+                  <span className="summary-row__label">Pasto a arrendar</span>
+                  <strong className="summary-row__value">
+                    {indicadores.superlotacao ? `${formatNumber(indicadores.pastoAArrendarHa, 2)} ha` : 'Sem necessidade no cenário atual'}
+                  </strong>
+                </div>
               </div>
             </div>
           </Card>
@@ -459,72 +472,97 @@ export default function PastagensPage({ db, setDb, session, onConfirmAction, nav
 
       <Card title="Pastos cadastrados">
         {!pastagens.length ? (
-          <div className="empty-state">
-            <strong>Nenhum pasto cadastrado.</strong>
-            <span>Cadastre pastos para acompanhar lotação, capacidade e movimentação dos lotes.</span>
-            {hasPermission('pastagens:editar') ? (
-              <Button icon={<Plus size={14} />} onClick={focarFormularioPasto} style={{ marginTop: 12 }}>Cadastrar pasto</Button>
-            ) : null}
-          </div>
+          <EmptyState
+            title="Nenhum pasto cadastrado."
+            subtitle="Cadastre pastos para acompanhar lotação, capacidade e movimentação dos lotes."
+            action={
+              hasPermission('pastagens:editar') ? (
+                <Button icon={<Plus size={14} />} onClick={focarFormularioPasto}>Cadastrar pasto</Button>
+              ) : null
+            }
+          />
         ) : (
-          <div className="table-responsive">
-            <table className="data-table">
-              <thead>
-                <tr>
-                  <th>Fazenda</th>
-                  <th>Nome</th>
-                  <th>Área (ha)</th>
-                  <th>Suporte (UA/ha)</th>
-                  <th>Capacidade (UA)</th>
-                  <th>Status</th>
-                  <th>Lotação</th>
-                  <th>Ações</th>
-                </tr>
-              </thead>
-              <tbody>
-                {pastagens.map((item) => {
-                  const statusAtivo = String(item.status || 'ativo').toLowerCase() !== 'inativo';
-                  const ocupacao = ocupacaoPorPastoMap.get(String(item.id));
+          <div className="pastos-grid">
+            {pastagens.map((item) => {
+              const statusAtivo = String(item.status || 'ativo').toLowerCase() !== 'inativo';
+              const ocupacao = ocupacaoPorPastoMap.get(String(item.id));
+              const percentual = ocupacao?.percentualOcupacao != null ? Math.round(ocupacao.percentualOcupacao * 100) : null;
 
-                  return (
-                    <tr key={item.id}>
-                      <td>{fazendasMap.get(Number(item.fazenda_id ?? item.faz_id))?.nome || '—'}</td>
-                      <td>{item.nome}</td>
-                      <td>{formatNumber(item.area_ha, 2)}</td>
-                      <td>{formatNumber(item.capacidade_suporte_ua_ha, 2)}</td>
-                      <td>{formatNumber(toNumber(item.area_ha) * toNumber(item.capacidade_suporte_ua_ha), 2)}</td>
-                      <td>
-                        <span className={`summary-badge ${statusAtivo ? 'summary-badge--success' : 'summary-badge--warning'}`}>
-                          {statusAtivo ? 'Ativo' : 'Inativo'}
-                        </span>
-                      </td>
-                      <td>
-                        {ocupacao ? (
-                          <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
-                            <span>
-                              {ocupacao.quantidadeLotes} {ocupacao.quantidadeLotes === 1 ? 'lote ativo' : 'lotes ativos'} · {formatNumber(ocupacao.cabecasEstimadas, 0)} cabeças estimadas
-                            </span>
-                            <span className={getLotacaoBadgeClass(ocupacao.status)}>{ocupacao.statusLabel}</span>
-                            {ocupacao.status === 'acima_capacidade' ? (
-                              <small style={{ color: 'var(--color-danger)' }}>Lotação acima da capacidade informada</small>
-                            ) : null}
-                            {ocupacao.status === 'sem_dados' ? (
-                              <small style={{ color: 'var(--color-text-secondary)' }}>Informe área e capacidade para acompanhar a lotação.</small>
-                            ) : null}
-                          </div>
-                        ) : '—'}
-                      </td>
-                      <td>
-                        <div className="row-actions action-row">
-                          <button className="action-btn" type="button" onClick={() => preencherForm(item)}>Editar</button>
-                          <button className="action-btn action-btn-danger" type="button" onClick={() => excluirPastagem(item)}>Excluir</button>
-                        </div>
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
+              return (
+                <div key={item.id} className="pasto-card">
+                  <div className="pasto-card-top">
+                    <div className="pasto-card-heading">
+                      <h3>{item.nome}</h3>
+                      <p className="pasto-card-farm">{fazendasMap.get(Number(item.fazenda_id ?? item.faz_id))?.nome || 'Sem fazenda'}</p>
+                    </div>
+                    <div className="pasto-card-badges">
+                      <span className={`summary-badge ${statusAtivo ? 'summary-badge--success' : 'summary-badge--warning'}`}>
+                        {statusAtivo ? 'Ativo' : 'Inativo'}
+                      </span>
+                      {ocupacao ? <span className={getLotacaoBadgeClass(ocupacao.status)}>{ocupacao.statusLabel}</span> : null}
+                    </div>
+                  </div>
+
+                  <div className="pasto-card-stats">
+                    <div className="pasto-card-stat pasto-card-stat--primary">
+                      <MapPin size={15} aria-hidden="true" />
+                      <strong>{formatNumber(item.area_ha, 2)} ha</strong>
+                      <span>área</span>
+                    </div>
+                    <div className="pasto-card-stat pasto-card-stat--primary">
+                      <Users size={15} aria-hidden="true" />
+                      <strong>{formatNumber(toNumber(item.area_ha) * toNumber(item.capacidade_suporte_ua_ha), 2)} UA</strong>
+                      <span>capacidade</span>
+                    </div>
+                    <div className="pasto-card-stat">
+                      <span>{ocupacao ? `${ocupacao.quantidadeLotes} ${ocupacao.quantidadeLotes === 1 ? 'lote ativo' : 'lotes ativos'}` : 'Sem lote vinculado'}</span>
+                    </div>
+                    <div className="pasto-card-stat">
+                      <span>{ocupacao ? `${formatNumber(ocupacao.cabecasEstimadas, 0)} cabeças estimadas` : '—'}</span>
+                    </div>
+                  </div>
+
+                  {ocupacao?.lotesAtivos?.length ? (
+                    <div className="pasto-card-lotes">
+                      {ocupacao.lotesAtivos.map((lote) => (
+                        <span key={lote.id} className="pasto-card-lote-chip">{lote.nome}</span>
+                      ))}
+                    </div>
+                  ) : null}
+
+                  {percentual !== null ? (
+                    <div className="pasto-card-progress">
+                      <div className="pasto-card-progress-head">
+                        <span>Lotação</span>
+                        <span>{percentual}%</span>
+                      </div>
+                      <div className="progress-bar-container">
+                        <div
+                          className={`progress-bar-fill ${ocupacao.status === 'acima_capacidade' ? 'danger' : ocupacao.status === 'atencao' ? 'warning' : ''}`}
+                          style={{ width: `${Math.min(Math.max(percentual, 4), 100)}%` }}
+                        />
+                      </div>
+                    </div>
+                  ) : null}
+
+                  {ocupacao?.status === 'acima_capacidade' ? (
+                    <p className="pasto-card-alert"><AlertTriangle size={13} aria-hidden="true" /> Lotação acima da capacidade informada</p>
+                  ) : null}
+                  {ocupacao?.status === 'sem_dados' ? (
+                    <p className="pasto-card-hint">Informe área e capacidade para acompanhar a lotação.</p>
+                  ) : null}
+
+                  <div className="pasto-card-actions">
+                    <div className="pasto-actions-group">
+                      <button className="action-btn" type="button" onClick={() => preencherForm(item)} disabled={!hasPermission('pastagens:editar')}>Editar</button>
+                    </div>
+                    <div className="pasto-actions-group pasto-actions-group--destructive">
+                      <button className="action-btn action-btn-danger" type="button" onClick={() => excluirPastagem(item)} disabled={!hasPermission('pastagens:excluir')}>Excluir</button>
+                    </div>
+                  </div>
+                </div>
+              );
+            })}
           </div>
         )}
       </Card>

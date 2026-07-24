@@ -1,8 +1,10 @@
 import { useMemo, useState } from 'react';
+import { AlertTriangle, Plus, Scale } from 'lucide-react';
 import PesagemForm from '../components/PesagemForm';
 import PesoChart from '../components/PesoChart';
 import Card from '../components/ui/Card';
 import Button from '../components/ui/Button';
+import Badge from '../components/ui/Badge';
 import EmptyState from '../components/EmptyState';
 import { formatarNumero, formatarData } from '../utils/formatters';
 import { gerarNovoId } from '../utils/id';
@@ -10,6 +12,7 @@ import { calcularGmdLote, gmdMedioDosLotes } from '../domain/gmd.js';
 import { useToast } from '../hooks/useToast';
 import { useAuth } from '../auth/useAuth';
 import { daysBetween, toDateKey } from '../domain/calcHelpers.js';
+import { isModoConsolidado, construirMapaFazendas } from '../domain/escopoFazenda';
 import {
   resolveTipoPesagem,
   recalcularPesoAtualLote,
@@ -20,6 +23,7 @@ import {
   persistCollectionMutation,
   updateOperationalRecord,
 } from '../services/operationalPersistence';
+import '../styles/pesagens.css';
 
 function normalizeIdKey(value) {
   if (value === undefined || value === null) return null;
@@ -142,14 +146,20 @@ function shouldUpdateLote(record) {
   return resolveTipoPesagem(record) === 'lote' && Number(record?.lote_id) > 0;
 }
 
-export default function PesagensPage({ db, setDb, onConfirmAction, navigationIntent = null, onNavigate }) {
+export default function PesagensPage({ db, setDb, onConfirmAction, navigationIntent = null, onNavigate, fazendaSelecionada = null }) {
   const { hasPermission, session } = useAuth();
   const { showToast } = useToast();
   const mensagemSemPermissao = 'Você não tem permissão para executar esta ação.';
 
   const shouldStartWithNewPesagem = navigationIntent?.page === 'pesagens' && navigationIntent?.action === 'novo';
   const [abrirForm, setAbrirForm] = useState(shouldStartWithNewPesagem);
-  const [pesagemEditando, setPesagemEditando] = useState(null);
+  // Sprint Visual 6: quando a ação "Registrar pesagem" vem de Lotes
+  // (navigationIntent.loteId), o lote já chega pré-selecionado no formulário
+  // — mesmo fluxo/validações de sempre, só evita o pecuarista escolher de
+  // novo um lote que ele já tinha selecionado na tela anterior.
+  const [pesagemEditando, setPesagemEditando] = useState(() => (
+    shouldStartWithNewPesagem && navigationIntent?.loteId ? { lote_id: navigationIntent.loteId } : null
+  ));
   const [ultimoResumoBatch, setUltimoResumoBatch] = useState(null);
   const [resumoPesagem, setResumoPesagem] = useState(null);
   const [loteEvolucaoId, setLoteEvolucaoId] = useState('');
@@ -157,6 +167,8 @@ export default function PesagensPage({ db, setDb, onConfirmAction, navigationInt
   const lotes = db?.lotes;
   const animais = db?.animais;
   const pesagens = db?.pesagens;
+  const consolidado = isModoConsolidado(fazendaSelecionada);
+  const fazendasMap = useMemo(() => construirMapaFazendas(db), [db]);
 
   const lotesMap = useMemo(() => {
     const map = new Map();
@@ -217,16 +229,18 @@ export default function PesagensPage({ db, setDb, onConfirmAction, navigationInt
           || (pesagem?.metadata?.index ? `Animal #${pesagem.metadata.index}` : null)
           || null
         );
+        const loteDaPesagem = lotesMap.get(Number(pesagem.lote_id));
         return {
           ...pesagem,
           tipo,
-          loteNome: lotesMap.get(Number(pesagem.lote_id))?.nome || '—',
+          loteNome: loteDaPesagem?.nome || '—',
+          fazendaNome: fazendasMap.get(Number(loteDaPesagem?.faz_id)) || 'Sem fazenda',
           animalNome: animal?.identificacao || animal?.nome || fallbackAnimalName,
           variacao: tipo === 'lote' ? variacaoPorPesagem.get(pesagem.id) ?? null : null,
         };
       })
       .sort((a, b) => b.data.localeCompare(a.data));
-  }, [pesagens, lotesMap, animaisMap]);
+  }, [pesagens, lotesMap, animaisMap, fazendasMap]);
 
   const resumo = useMemo(() => {
     const basePesagens = pesagens || [];
@@ -815,12 +829,28 @@ export default function PesagensPage({ db, setDb, onConfirmAction, navigationInt
     return { lotesSemPesagem, animaisSemPesagem, diasSemPesagem };
   }, [lotes, animais, dadosTabela]);
 
+  const contextoFazenda = consolidado ? 'Todas as fazendas' : (fazendaSelecionada?.nome || 'Nenhuma fazenda selecionada');
+
   return (
-    <div className="page page--pesagens page--kpi-compact"> 
-      <section className="animais-hero pesagens-hero">
+    <div className="page page--pesagens page--kpi-compact">
+      <section className="animais-hero pesagens-hero pesagens-header">
         <div>
           <h1>Pesagens</h1>
-          <p>Registre pesagens para acompanhar ganho de peso, desempenho e resultado.</p>
+          <p className="pesagens-header-context">
+            {contextoFazenda}
+            <span className="pesagens-header-context-dot" aria-hidden="true">·</span>
+            {resumo.totalPesagens} {resumo.totalPesagens === 1 ? 'pesagem registrada' : 'pesagens registradas'}
+          </p>
+        </div>
+        <div className="page-actions action-row">
+          <Button
+            icon={<Plus size={14} />}
+            onClick={abrirNovaPesagem}
+            disabled={!hasPermission('pesagens:editar')}
+            title={!hasPermission('pesagens:editar') ? mensagemSemPermissao : undefined}
+          >
+            Cadastrar nova pesagem
+          </Button>
         </div>
       </section>
       <div className="segmented-control tab-bar">
@@ -898,47 +928,60 @@ export default function PesagensPage({ db, setDb, onConfirmAction, navigationInt
 
       {abaAtiva === 'historico' && (
         <div className="fazendas-card">
-          <div className="fazendas-table-wrap">
-            {dadosTabela.length === 0 ? (
-              <EmptyState
-                title="Você ainda não registrou nenhuma pesagem."
-                subtitle="Registre a primeira pesagem para acompanhar evolução, GMD e desempenho."
-                action={<Button size="sm" onClick={abrirNovaPesagem}>Registrar pesagem</Button>}
-              />
-            ) : (
-              <table className="data-table herdon-table herdon-table--pesagens">
-                <thead>
-                  <tr>
-                    <th>Data</th>
-                    <th>Tipo</th>
-                    <th>Lote</th>
-                    <th>Animal</th>
-                    <th>Peso</th>
-                    <th>Observação</th>
-                    <th>Ações</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {dadosTabela.map((item) => (
-                    <tr key={item.id}>
-                      <td>{formatarData(item.data)}</td>
-                      <td>{item.tipo === 'animal' ? 'Animal' : 'Lote'}</td>
-                      <td>{item.loteNome}</td>
-                      <td>{item.tipo === 'animal' ? (item.animalNome || 'Animal') : '-'}</td>
-                      <td>{formatarNumero(item.peso_medio)} kg</td>
-                      <td>{item.observacao || '-'}</td>
-                      <td>
-                        <div className="row-actions row-actions--tight">
-                          <button className="action-btn" onClick={() => editarPesagem(item)}>Editar</button>
-                          <button className="action-btn action-btn-danger" onClick={() => excluirPesagem(item.id)}>Cancelar registro</button>
-                        </div>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            )}
-          </div>
+          {dadosTabela.length === 0 ? (
+            <EmptyState
+              title="Você ainda não registrou nenhuma pesagem."
+              subtitle="Registre a primeira pesagem para acompanhar evolução, GMD e desempenho."
+              action={<Button size="sm" onClick={abrirNovaPesagem}>Registrar pesagem</Button>}
+            />
+          ) : (
+            <div className="pesagens-lista">
+              {dadosTabela.map((item) => (
+                <div key={item.id} className="pesagem-row">
+                  <div className="pesagem-row-data">
+                    <strong>{formatarData(item.data)}</strong>
+                    <Badge variant={item.tipo === 'animal' ? 'info' : 'neutral'}>{item.tipo === 'animal' ? 'Animal' : 'Lote'}</Badge>
+                  </div>
+
+                  <div className="pesagem-row-main">
+                    <div className="pesagem-row-lote">
+                      <span className="pesagem-row-lote-nome">{item.loteNome}</span>
+                      {consolidado ? <span className="pesagem-row-fazenda">{item.fazendaNome}</span> : null}
+                    </div>
+                    {item.tipo === 'animal' ? <span className="pesagem-row-animal">{item.animalNome || 'Animal'}</span> : null}
+                  </div>
+
+                  <div className="pesagem-row-peso">
+                    <strong>{formatarNumero(item.peso_medio)} kg</strong>
+                    {item.variacao !== null && item.variacao !== undefined ? (
+                      <span className={`pesagem-row-variacao ${item.variacao >= 0 ? 'is-positive' : 'is-negative'}`}>
+                        {item.variacao >= 0 ? '+' : ''}{formatarNumero(item.variacao)} kg
+                      </span>
+                    ) : null}
+                  </div>
+
+                  {item.observacao ? <p className="pesagem-row-obs">{item.observacao}</p> : null}
+
+                  <div className="pesagem-row-actions row-actions row-actions--tight">
+                    <button
+                      className="action-btn"
+                      onClick={() => editarPesagem(item)}
+                      disabled={!hasPermission('pesagens:editar')}
+                    >
+                      Editar
+                    </button>
+                    <button
+                      className="action-btn action-btn-danger"
+                      onClick={() => excluirPesagem(item.id)}
+                      disabled={!hasPermission('pesagens:excluir')}
+                    >
+                      Cancelar registro
+                    </button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
         </div>
       )}
 
@@ -998,9 +1041,38 @@ export default function PesagensPage({ db, setDb, onConfirmAction, navigationInt
       )}
       {abaAtiva === 'alertas' && (
         <div className="fazendas-card">
-          <p>Lotes sem pesagem há mais de {alertas.diasSemPesagem} dias: {alertas.lotesSemPesagem.length}</p>
-          <p>Animais sem pesagem recente: {alertas.animaisSemPesagem.length}</p>
-          <Button size="sm" onClick={abrirNovaPesagem}>Registrar pesagem</Button>
+          {alertas.lotesSemPesagem.length === 0 && alertas.animaisSemPesagem.length === 0 ? (
+            <EmptyState
+              tone="success"
+              title="Nenhum alerta de pesagem no momento."
+              subtitle="Todos os lotes e animais têm pesagem recente registrada."
+            />
+          ) : (
+            <div className="pesagens-alertas-grid">
+              {alertas.lotesSemPesagem.length > 0 ? (
+                <div className="pesagens-alerta-card">
+                  <div className="pesagens-alerta-head">
+                    <AlertTriangle size={16} aria-hidden="true" />
+                    <strong>{alertas.lotesSemPesagem.length} {alertas.lotesSemPesagem.length === 1 ? 'lote' : 'lotes'} sem pesagem há mais de {alertas.diasSemPesagem} dias</strong>
+                  </div>
+                  <p className="pesagens-alerta-lista">
+                    {alertas.lotesSemPesagem.map((lote) => lote.nome).join(', ')}
+                  </p>
+                </div>
+              ) : null}
+              {alertas.animaisSemPesagem.length > 0 ? (
+                <div className="pesagens-alerta-card">
+                  <div className="pesagens-alerta-head">
+                    <AlertTriangle size={16} aria-hidden="true" />
+                    <strong>{alertas.animaisSemPesagem.length} {alertas.animaisSemPesagem.length === 1 ? 'animal' : 'animais'} sem pesagem recente</strong>
+                  </div>
+                </div>
+              ) : null}
+            </div>
+          )}
+          <Button size="sm" onClick={abrirNovaPesagem} disabled={!hasPermission('pesagens:editar')} style={{ marginTop: 14 }}>
+            Registrar pesagem
+          </Button>
         </div>
       )}
 

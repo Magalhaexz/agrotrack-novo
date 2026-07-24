@@ -1,0 +1,176 @@
+/* Sprint Visual 6 — Pesagens: cabeçalho com contexto de fazenda, histórico
+   virou lista de linhas responsivas (sem tabela larga) e alertas viram
+   cartões compactos. Nenhuma classe legada (.animais-hero, .fazendas-card,
+   .kpi-card--compact) foi removida — só adições. */
+
+.pesagens-header {
+  align-items: center;
+}
+
+.pesagens-header-context {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.9rem;
+  color: var(--color-text-secondary);
+}
+
+.pesagens-header-context-dot {
+  color: var(--color-text-muted);
+}
+
+.pesagens-lista {
+  display: grid;
+  gap: 8px;
+}
+
+.pesagem-row {
+  display: grid;
+  grid-template-columns: 110px 1fr auto;
+  align-items: center;
+  gap: 10px 16px;
+  padding: 12px 14px;
+  border: 1px solid var(--color-border);
+  border-radius: 12px;
+  background: var(--color-surface);
+}
+
+.pesagem-row-data {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.pesagem-row-data strong {
+  font-family: var(--font-mono);
+  font-size: 0.88rem;
+  color: var(--color-text);
+}
+
+.pesagem-row-main {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.pesagem-row-lote {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  min-width: 0;
+}
+
+.pesagem-row-lote-nome {
+  font-weight: 600;
+  color: var(--color-text);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.pesagem-row-fazenda {
+  flex-shrink: 0;
+  font-size: 0.76rem;
+  color: var(--color-text-muted);
+}
+
+.pesagem-row-animal {
+  font-size: 0.8rem;
+  color: var(--color-text-secondary);
+}
+
+.pesagem-row-peso {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 2px;
+  text-align: right;
+}
+
+.pesagem-row-peso strong {
+  font-family: var(--font-mono);
+  font-size: 0.95rem;
+  color: var(--color-text);
+}
+
+.pesagem-row-variacao {
+  font-size: 0.76rem;
+  font-family: var(--font-mono);
+}
+
+.pesagem-row-variacao.is-positive {
+  color: var(--color-success);
+}
+
+.pesagem-row-variacao.is-negative {
+  color: var(--color-danger);
+}
+
+.pesagem-row-obs {
+  grid-column: 1 / -1;
+  margin: 0;
+  padding-top: 6px;
+  border-top: 1px solid var(--color-border-subtle);
+  font-size: 0.82rem;
+  color: var(--color-text-secondary);
+}
+
+.pesagem-row-actions {
+  grid-column: 1 / -1;
+  justify-content: flex-end;
+  padding-top: 6px;
+  border-top: 1px solid var(--color-border-subtle);
+}
+
+.pesagens-alertas-grid {
+  display: grid;
+  gap: 10px;
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+}
+
+.pesagens-alerta-card {
+  padding: 12px 14px;
+  border-radius: 12px;
+  border: 1px solid color-mix(in srgb, var(--color-warning) 35%, var(--color-border));
+  background: color-mix(in srgb, var(--color-warning) 8%, var(--color-surface));
+}
+
+.pesagens-alerta-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--color-warning);
+}
+
+.pesagens-alerta-head strong {
+  color: var(--color-text);
+  font-size: 0.86rem;
+}
+
+.pesagens-alerta-lista {
+  margin: 6px 0 0;
+  font-size: 0.8rem;
+  color: var(--color-text-secondary);
+}
+
+@media (max-width: 720px) {
+  .pesagens-header {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .pesagem-row {
+    grid-template-columns: 1fr;
+  }
+
+  .pesagem-row-peso {
+    align-items: flex-start;
+    text-align: left;
+    flex-direction: row;
+    gap: 8px;
+  }
+
+  .pesagem-row-actions {
+    justify-content: flex-start;
+  }
+}

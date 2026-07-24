@@ -1,0 +1,142 @@
+/* Sprint Visual 6 — Pastos: cabeçalho com contexto de fazenda, indicadores
+   padronizados (.kpi-card--compact, mesma linguagem de Lotes/Pesagens) e a
+   lista de pastos virou cartões em vez de tabela larga. Reaproveita
+   .progress-bar-fill/.summary-badge/.action-btn já existentes — nenhuma
+   classe legada removida. */
+
+.pastagens-header-context {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.pastagens-header-context-dot {
+  color: var(--color-text-muted);
+}
+
+.pastos-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  gap: 12px;
+}
+
+.pasto-card {
+  display: grid;
+  gap: 10px;
+  padding: 14px 16px;
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: 14px;
+}
+
+.pasto-card-top {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.pasto-card-heading h3 {
+  margin: 0;
+  font-family: var(--font-heading);
+  font-size: 1rem;
+  font-weight: 600;
+  color: var(--color-text);
+}
+
+.pasto-card-farm {
+  margin: 2px 0 0;
+  font-size: 0.76rem;
+  color: var(--color-text-muted);
+}
+
+.pasto-card-badges {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 4px;
+  flex-shrink: 0;
+}
+
+.pasto-card-stats {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px 12px;
+}
+
+.pasto-card-stat {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+  color: var(--color-text-secondary);
+  font-size: 0.8rem;
+}
+
+.pasto-card-stat svg {
+  flex-shrink: 0;
+  color: var(--color-text-muted);
+}
+
+.pasto-card-stat--primary strong {
+  font-family: var(--font-mono);
+  font-weight: 600;
+  font-size: 0.92rem;
+  color: var(--color-text);
+}
+
+.pasto-card-lotes {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.pasto-card-lote-chip {
+  padding: 3px 9px;
+  border-radius: 999px;
+  background: var(--color-surface-2);
+  border: 1px solid var(--color-border);
+  font-size: 0.72rem;
+  color: var(--color-text-secondary);
+}
+
+.pasto-card-progress {
+  display: grid;
+  gap: 4px;
+}
+
+.pasto-card-progress-head {
+  display: flex;
+  justify-content: space-between;
+  font-size: 0.74rem;
+  color: var(--color-text-muted);
+}
+
+.pasto-card-alert {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin: 0;
+  color: var(--color-danger);
+  font-size: 0.78rem;
+}
+
+.pasto-card-hint {
+  margin: 0;
+  color: var(--color-text-muted);
+  font-size: 0.78rem;
+}
+
+.pasto-card-actions {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 10px;
+  padding-top: 8px;
+  border-top: 1px solid var(--color-border-subtle);
+}
+
+.pasto-actions-group {
+  display: flex;
+  gap: 8px;
+}
