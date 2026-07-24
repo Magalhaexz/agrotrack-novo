@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
-import { ChevronDown, ChevronRight, LogOut, Menu, X } from 'lucide-react';
+import { ChevronDown, ChevronRight, LogOut, MapPin, Menu, X } from 'lucide-react';
 import { obterLabelPerfil, obterPerfilDoUsuario, permissoesPorPagina } from '../auth/perfis';
 import { TODAS_FAZENDAS } from '../domain/escopoFazenda';
 import herdonLogo from '../assets/logo_app1.png';
@@ -127,7 +127,10 @@ function FarmSelector({ collapsed, fazendas, fazendaSelecionada, onSelectFazenda
         {fazendaSelecionada?.todas ? (
           <span className="sidebar-farm-consolidada" aria-hidden="true">Σ</span>
         ) : (
-          <span className="sidebar-farm-dot" aria-hidden="true" />
+          <span className="sidebar-farm-icon" aria-hidden="true">
+            <MapPin size={collapsed ? 20 : 16} />
+            <span className="sidebar-farm-dot" />
+          </span>
         )}
         {!collapsed ? (
           <span className="sidebar-farm-copy">
