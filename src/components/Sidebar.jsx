@@ -280,7 +280,7 @@ function NavGroup({ group, currentPage, onNavigate, isDesktopCollapsed, isOpen, 
           <div
             ref={setGroupFlyoutRef}
             id={sublistId}
-            className="nav-sublist sidebar-flyout"
+            className="nav-sublist sidebar-flyout header-farm-dropdown"
             role="menu"
             style={{ position: 'fixed', top: flyoutPosition.top, left: flyoutPosition.left }}
           >
