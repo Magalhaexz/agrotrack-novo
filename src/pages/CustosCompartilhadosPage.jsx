@@ -7,6 +7,7 @@ import { useAuth } from '../auth/useAuth';
 import { useToast } from '../hooks/useToast';
 import { aplicarRateioCustoCompartilhado } from '../services/custosCompartilhados';
 import { formatarMoeda } from '../utils/formatters';
+import { isModoConsolidado, construirMapaFazendas } from '../domain/escopoFazenda';
 
 import { hojeLocalISO } from '../domain/dataCivil.js';
 const CRITERIOS = [
@@ -62,9 +63,11 @@ function calcularPrevia(db, form) {
   return lotes.map((l) => ({ lote: l, valor: parte }));
 }
 
-export default function CustosCompartilhadosPage({ db, setDb }) {
+export default function CustosCompartilhadosPage({ db, setDb, fazendaSelecionada = null }) {
   const { hasPermission, session, user } = useAuth();
   const { showToast } = useToast();
+  const consolidado = isModoConsolidado(fazendaSelecionada);
+  const fazendasMap = useMemo(() => construirMapaFazendas(db), [db]);
 
   const [form, setForm] = useState({
     descricao: '',
@@ -172,7 +175,7 @@ export default function CustosCompartilhadosPage({ db, setDb }) {
     <div className="page">
       <PageHeader
         title="Rateio de Custos"
-        subtitle="Lance um custo compartilhado entre lotes. O sistema distribui o valor e gera uma despesa por lote automaticamente."
+        subtitle={`${consolidado ? 'Todas as fazendas' : (fazendaSelecionada?.nome || 'Nenhuma fazenda selecionada')} · Lance um custo compartilhado entre lotes. O sistema distribui o valor e gera uma despesa por lote automaticamente.`}
       />
 
       <div className="dashboard-grid dashboard-grid--dual">
@@ -246,7 +249,7 @@ export default function CustosCompartilhadosPage({ db, setDb }) {
                     />
                     <span>{lote.nome}</span>
                     <span className="badge badge-neutral" style={{ fontSize: 11 }}>
-                      {lote.qtd || 0} cab · {lote.p_at || 0} kg
+                      {fazendasMap.get(Number(lote.faz_id)) || 'Sem fazenda'} · {lote.qtd || 0} cab · {lote.p_at || 0} kg
                     </span>
                   </label>
                 ))}

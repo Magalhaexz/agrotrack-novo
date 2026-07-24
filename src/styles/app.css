@@ -1896,6 +1896,31 @@ a:hover {
   color: var(--color-danger);
 }
 
+/* Sprint Visual 7: `.data-table td { color: ... }` (mais específico:
+   classe+elemento) apagava .text-success/.text-danger quando aplicadas
+   direto na <td> (ex.: coluna Lucro do Financeiro) — resultado negativo
+   ficava com a mesma cor do positivo, silenciosamente. */
+.data-table td.text-success {
+  color: var(--color-success);
+}
+
+.data-table td.text-danger {
+  color: var(--color-danger);
+}
+
+/* Mesmo problema em .metrics-2col > p > strong (usado no Simulador de
+   Cenários e outras telas) — cor fixa #f3f7f4 apagava o sinal
+   positivo/negativo do resultado. */
+.metrics-2col > p > strong.text-success,
+.metrics-2col > p strong.text-success {
+  color: var(--color-success);
+}
+
+.metrics-2col > p > strong.text-danger,
+.metrics-2col > p strong.text-danger {
+  color: var(--color-danger);
+}
+
 .ui-card.no-padding {
   padding: 0;
 }

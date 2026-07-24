@@ -6,6 +6,7 @@ import { useAuth } from '../auth/useAuth';
 import { calcularFluxoCaixa } from '../domain/fluxoCaixa';
 import { normalizarStatusMovimentacao, getDataCompetencia, getDataVencimento } from '../domain/financeiroStatus';
 import { formatarMoeda, formatarData } from '../utils/formatters';
+import { isModoConsolidado, construirMapaFazendas } from '../domain/escopoFazenda';
 
 import { hojeLocalISO } from '../domain/dataCivil.js';
 function getTodayIso() {
@@ -19,11 +20,15 @@ const STATUS_LABELS = {
   cancelado: 'Cancelado',
 };
 
+// Sprint Visual 7: cores por token (var(--color-*)) em vez de hex fixo —
+// "realizado" usava um azul hardcoded (#2563eb) fora do sistema de tokens;
+// troca para --color-info, o mesmo token já usado em badges "informativos"
+// no resto do Financeiro (ex.: FinanceiroPage "Manual").
 const STATUS_CORES = {
-  previsto: '#ca8a04',
-  realizado: '#2563eb',
-  pago: '#16a34a',
-  cancelado: '#6b7280',
+  previsto: 'var(--color-warning)',
+  realizado: 'var(--color-info)',
+  pago: 'var(--color-success)',
+  cancelado: 'var(--color-text-muted)',
 };
 
 function BadgeStatus({ status }) {
@@ -58,10 +63,20 @@ function KpiCard({ label, value, destaque }) {
   );
 }
 
-export default function FluxoCaixaPage({ db }) {
+export default function FluxoCaixaPage({ db, fazendaSelecionada = null }) {
   const { hasPermission } = useAuth();
 
   const lotes = useMemo(() => (Array.isArray(db?.lotes) ? db.lotes : []), [db]);
+  const consolidado = isModoConsolidado(fazendaSelecionada);
+  const fazendasMap = useMemo(() => construirMapaFazendas(db), [db]);
+  // Sprint Visual 7: só identifica a fazenda de cada lançamento para exibição
+  // (via lote → fazenda) — esta página nunca filtrou por fazenda ativa, e
+  // isso não muda aqui (ver observação nas limitações da sprint).
+  const loteFazendaById = useMemo(() => {
+    const map = new Map();
+    lotes.forEach((lote) => map.set(Number(lote.id), fazendasMap.get(Number(lote.faz_id)) || 'Sem fazenda'));
+    return map;
+  }, [lotes, fazendasMap]);
 
   const [filtros, setFiltros] = useState({
     loteId: '',
@@ -131,7 +146,7 @@ export default function FluxoCaixaPage({ db }) {
     <div className="page">
       <PageHeader
         title="Fluxo de Caixa"
-        subtitle="Visão de entradas, saídas e posição financeira por status."
+        subtitle={`${consolidado ? 'Todas as fazendas' : (fazendaSelecionada?.nome || 'Nenhuma fazenda selecionada')} · Visão de entradas, saídas e posição financeira por status.`}
       />
 
       <Card title="Filtros">
@@ -211,6 +226,7 @@ export default function FluxoCaixaPage({ db }) {
                   <th>Data comp.</th>
                   <th>Tipo</th>
                   <th>Categoria</th>
+                  {consolidado ? <th>Fazenda</th> : null}
                   <th>Descrição</th>
                   <th>Valor</th>
                   <th>Status</th>
@@ -232,6 +248,7 @@ export default function FluxoCaixaPage({ db }) {
                         </span>
                       </td>
                       <td>{mov?.categoria || '—'}</td>
+                      {consolidado ? <td>{mov?.lote_id ? (loteFazendaById.get(Number(mov.lote_id)) || 'Sem fazenda') : 'Sem fazenda'}</td> : null}
                       <td style={{ maxWidth: 220, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                         {mov?.descricao || '—'}
                       </td>

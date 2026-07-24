@@ -329,7 +329,7 @@ export default function CenariosPage({ db, setDb, session }) {
           <p>Variação do rebanho: <strong>{formatNumber(p.variacao_rebanho, 2)}</strong></p>
           <p>Receita projetada: <strong>{formatCurrency(p.receita_projetada)}</strong></p>
           <p>Custo projetado: <strong>{formatCurrency(p.custo_projetado)}</strong></p>
-          <p>Margem bruta projetada: <strong>{formatCurrency(p.margem_bruta_projetada)}</strong></p>
+          <p>Margem bruta projetada: <strong className={p.margem_bruta_projetada >= 0 ? 'text-success' : 'text-danger'}>{formatCurrency(p.margem_bruta_projetada)}</strong></p>
           <p>UA projetada: <strong>{formatNumber(p.ua_projetada, 2)}</strong></p>
           <p>Saldo de capacidade, UA: <strong>{formatNumber(p.saldo_ua_projetado, 2)}</strong></p>
           <p>Status: <strong>{p.status_capacidade === 'superlotado' ? 'Superlotado' : p.status_capacidade === 'dentro_da_capacidade' ? 'Dentro da capacidade' : 'Sem dados suficientes'}</strong></p>
@@ -357,12 +357,12 @@ export default function CenariosPage({ db, setDb, session }) {
           <p>Custo diário total: <strong>{formatCurrency(resultadoDecisao.custoDiario)}</strong></p>
           <p>Custo total: <strong>{formatCurrency(resultadoDecisao.custoTotal)}</strong></p>
           <p>Receita projetada: <strong>{formatCurrency(resultadoDecisao.receitaProjetada)}</strong></p>
-          <p>Margem bruta: <strong>{formatCurrency(resultadoDecisao.margemBruta)}</strong></p>
-          <p>Lucro/@ carcaça: <strong>{formatCurrency(resultadoDecisao.lucroPorArroba)}</strong></p>
-          <p>Lucro/cabeça: <strong>{formatCurrency(resultadoDecisao.lucroPorCabeca)}</strong></p>
+          <p>Margem bruta: <strong className={resultadoDecisao.margemBruta >= 0 ? 'text-success' : 'text-danger'}>{formatCurrency(resultadoDecisao.margemBruta)}</strong></p>
+          <p>Lucro/@ carcaça: <strong className={resultadoDecisao.lucroPorArroba >= 0 ? 'text-success' : 'text-danger'}>{formatCurrency(resultadoDecisao.lucroPorArroba)}</strong></p>
+          <p>Lucro/cabeça: <strong className={resultadoDecisao.lucroPorCabeca >= 0 ? 'text-success' : 'text-danger'}>{formatCurrency(resultadoDecisao.lucroPorCabeca)}</strong></p>
           <p>ROI: <strong>{formatNumber(resultadoDecisao.roiPct, 2)} %</strong></p>
           <p>Break-even de venda: <strong>{formatCurrency(resultadoDecisao.breakEvenArroba)} /@</strong></p>
-          <p>Viável: <strong style={{ color: resultadoDecisao.viavel ? 'var(--color-success, #16a34a)' : 'var(--color-danger, #dc2626)' }}>
+          <p>Viável: <strong className={resultadoDecisao.viavel ? 'text-success' : 'text-danger'}>
             {resultadoDecisao.viavel ? 'SIM' : 'NÃO'}
           </strong></p>
         </div>

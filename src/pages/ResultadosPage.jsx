@@ -742,6 +742,7 @@ function buildReportBundle(db, filters) {
             { key: 'animais', label: 'Animais', render: (row) => formatNumber(row.animais, 0) },
             { key: 'gmd', label: 'GMD', render: (row) => `${formatNumber(row.gmd, 3)} kg/dia` },
             { key: 'pesoAtual', label: 'Peso médio', render: (row) => `${formatNumber(row.pesoAtual, 1)} kg` },
+            { key: 'receita', label: 'Receita', render: (row) => formatCurrency(row.receita) },
             { key: 'custoPeriodo', label: 'Custos', render: (row) => formatCurrency(row.custoPeriodo) },
             { key: 'margem', label: 'Margem', render: (row) => <span className={row.margem >= 0 ? 'text-success' : 'text-danger'}>{formatCurrency(row.margem)}</span> },
             { key: 'custoPorArroba', label: 'Custo/@ carcaça', render: (row) => formatCurrency(row.custoPorArroba) },

@@ -1,6 +1,7 @@
 import { useMemo, useState } from 'react';
 import CustoForm from '../components/CustoForm';
 import PageHeader from '../components/PageHeader';
+import Badge from '../components/ui/Badge';
 import { formatarMoeda, formatarData } from '../utils/formatters';
 import { isModoConsolidado, construirMapaFazendas } from '../domain/escopoFazenda';
 import Button from '../components/ui/Button';
@@ -278,7 +279,7 @@ export default function CustosPage({ db, setDb, onConfirmAction, fazendaSelecion
     <div className="page page--custos">
       <PageHeader
         title="Custos Operacionais"
-        subtitle="Lançamento e acompanhamento dos custos por lote."
+        subtitle={`${consolidado ? 'Todas as fazendas' : (fazendaSelecionada?.nome || 'Nenhuma fazenda selecionada')} · Lançamento e acompanhamento dos custos por lote.`}
         actions={(
           <Button onClick={abrirNovo}>
             + Novo custo
@@ -349,9 +350,7 @@ export default function CustosPage({ db, setDb, onConfirmAction, fazendaSelecion
                     <td className="text-h">{custo.loteNome}</td>
                     {consolidado ? <td>{custo.fazendaNome}</td> : null}
                     <td>
-                      <span className="badge b-blue">
-                        {normalizarCategoria(custo.cat)}
-                      </span>
+                      <Badge variant="neutral">{normalizarCategoria(custo.cat)}</Badge>
                     </td>
                     <td>{custo.desc}</td>
                     <td>{formatarMoeda(custo.val)}</td>
