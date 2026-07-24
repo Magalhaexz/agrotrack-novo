@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { ChevronDown, ChevronRight, LogOut, MapPin, Menu, X } from 'lucide-react';
 import { obterLabelPerfil, obterPerfilDoUsuario, permissoesPorPagina } from '../auth/perfis';
@@ -40,34 +40,62 @@ function useOutsideClose(active, onClose) {
 // fazenda abrem um popover ao lado do ícone via portal, em vez de expandir
 // a sidebar inteira. Mesmo padrão de posicionamento por getBoundingClientRect
 // já usado no painel de notificações de AppHeader.jsx.
+//
+// Correção complementar: a versão anterior só usava rect.top do ícone, sem
+// checar a altura real do flyout contra o viewport — para grupos perto da
+// base da sidebar (Gestão, Acompanhamento, Administração), o flyout abria
+// avançando bem além da tela (confirmado: 768px de viewport, flyout indo
+// até ~877px). setContentRef mede o flyout de verdade assim que ele monta
+// (o próprio callback de ref já roda antes do navegador pintar, sem
+// flicker) e sobe o `top` o quanto for preciso para caber, com uma margem
+// de segurança.
 function useFlyoutPosition(open, triggerRef) {
-  const [position, setPosition] = useState({ top: 0, left: 0 });
+  const [position, setPosition] = useState(null);
+  const contentElRef = useRef(null);
+
+  // measure/setContentRef precisam de identidade estável entre renders —
+  // uma ref-callback recriada a cada render dispara detach+attach (e nova
+  // medição) a cada render, o que causa um loop de re-render.
+  const measure = useCallback(() => {
+    if (!triggerRef.current) return;
+    const rect = triggerRef.current.getBoundingClientRect();
+    const margin = 12;
+    const contentHeight = contentElRef.current?.offsetHeight || 0;
+    let top = rect.top;
+    if (contentHeight && top + contentHeight > window.innerHeight - margin) {
+      top = Math.max(margin, window.innerHeight - margin - contentHeight);
+    }
+    setPosition({ top, left: rect.right + 10 });
+  }, [triggerRef]);
+
+  const setContentRef = useCallback((node) => {
+    contentElRef.current = node;
+    if (node) measure();
+  }, [measure]);
 
   useEffect(() => {
-    if (!open || !triggerRef.current) return undefined;
+    // Fechado: nada a assinar. O flyout some do DOM (JSX condicional), o
+    // React chama setContentRef(null) sozinho no desmonte, e a posição
+    // stale não importa — measure() recalcula do zero na próxima abertura.
+    if (!open) return undefined;
 
-    const update = () => {
-      const rect = triggerRef.current.getBoundingClientRect();
-      setPosition({ top: rect.top, left: rect.right + 10 });
-    };
-
-    update();
-    window.addEventListener('resize', update);
-    window.addEventListener('scroll', update, true);
+    measure();
+    window.addEventListener('resize', measure);
+    window.addEventListener('scroll', measure, true);
     return () => {
-      window.removeEventListener('resize', update);
-      window.removeEventListener('scroll', update, true);
+      window.removeEventListener('resize', measure);
+      window.removeEventListener('scroll', measure, true);
     };
-  }, [open, triggerRef]);
+  }, [open, measure]);
 
-  return position;
+  return { position: position || { top: 0, left: 0 }, setContentRef };
 }
 
 function FarmSelector({ collapsed, fazendas, fazendaSelecionada, onSelectFazenda, farmName }) {
   const [open, setOpen] = useState(false);
   const triggerRef = useRef(null);
   const wrapRef = useOutsideClose(open, () => setOpen(false));
-  const flyoutPosition = useFlyoutPosition(collapsed && open, triggerRef);
+  const { position: flyoutPosition, setContentRef: setFarmFlyoutRef } = useFlyoutPosition(collapsed && open, triggerRef);
 
   const nomeAtivo = fazendaSelecionada?.todas
     ? 'Todas as fazendas'
@@ -156,6 +184,7 @@ function FarmSelector({ collapsed, fazendas, fazendaSelecionada, onSelectFazenda
       {open && collapsed
         ? createPortal(
           <div
+            ref={setFarmFlyoutRef}
             className="header-farm-dropdown sidebar-farm-dropdown sidebar-flyout"
             role="menu"
             style={{ position: 'fixed', top: flyoutPosition.top, left: flyoutPosition.left }}
@@ -170,18 +199,17 @@ function FarmSelector({ collapsed, fazendas, fazendaSelecionada, onSelectFazenda
   );
 }
 
-function NavGroup({ group, currentPage, onNavigate, isDesktopCollapsed, isOpen, onToggle, closeMobile }) {
+function NavGroup({ group, currentPage, onNavigate, isDesktopCollapsed, isOpen, onToggle, flyoutOpen, onToggleFlyout, closeMobile }) {
   const triggerRef = useRef(null);
-  const [flyoutOpen, setFlyoutOpen] = useState(false);
-  const flyoutRef = useOutsideClose(flyoutOpen, () => setFlyoutOpen(false));
-  const flyoutPosition = useFlyoutPosition(isDesktopCollapsed && flyoutOpen, triggerRef);
+  const flyoutRef = useOutsideClose(flyoutOpen, onToggleFlyout);
+  const { position: flyoutPosition, setContentRef: setGroupFlyoutRef } = useFlyoutPosition(isDesktopCollapsed && flyoutOpen, triggerRef);
   const GroupIcon = group.icon;
   const isActiveGroup = groupIdByPageId[currentPage] === group.id;
   const sublistId = `sidebar-group-${group.id}`;
 
   function handleHeaderClick() {
     if (isDesktopCollapsed) {
-      setFlyoutOpen((value) => !value);
+      onToggleFlyout();
       return;
     }
     onToggle(group.id);
@@ -189,7 +217,7 @@ function NavGroup({ group, currentPage, onNavigate, isDesktopCollapsed, isOpen, 
 
   function handleItemClick(itemId) {
     onNavigate(itemId);
-    setFlyoutOpen(false);
+    if (flyoutOpen) onToggleFlyout();
     closeMobile();
   }
 
@@ -250,6 +278,7 @@ function NavGroup({ group, currentPage, onNavigate, isDesktopCollapsed, isOpen, 
       {isDesktopCollapsed && flyoutOpen
         ? createPortal(
           <div
+            ref={setGroupFlyoutRef}
             id={sublistId}
             className="nav-sublist sidebar-flyout"
             role="menu"
@@ -282,6 +311,10 @@ export default function Sidebar({
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [dropdownAberto, setDropdownAberto] = useState(false);
   const [openGroupId, setOpenGroupId] = useState(() => groupIdByPageId[currentPage] || null);
+  // Estado do flyout (sidebar recolhida) precisa viver aqui, não em cada
+  // NavGroup: cada grupo tinha seu próprio useState local, então abrir um
+  // segundo grupo nunca fechava o primeiro (dois flyouts simultâneos).
+  const [openFlyoutGroupId, setOpenFlyoutGroupId] = useState(null);
   const dropdownRef = useRef(null);
 
   const usuarioLogado = {
@@ -496,6 +529,8 @@ export default function Sidebar({
                 isDesktopCollapsed={isDesktopCollapsed}
                 isOpen={openGroupId === group.id}
                 onToggle={(groupId) => setOpenGroupId((prev) => (prev === groupId ? null : groupId))}
+                flyoutOpen={openFlyoutGroupId === group.id}
+                onToggleFlyout={() => setOpenFlyoutGroupId((prev) => (prev === group.id ? null : group.id))}
                 closeMobile={closeMobile}
               />
             );

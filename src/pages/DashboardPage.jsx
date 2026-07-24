@@ -484,16 +484,44 @@ export default function DashboardPage({
 
       {tabAtiva === 'geral' && (
         <>
-          {/* 1. Indicadores principais — primeiro bloco de leitura, per Sprint
-              Visual 4 (era o 4º bloco antes; "Fazendas" saiu daqui, virou
-              parte do contexto da fazenda acima — 6 indicadores, não 7). */}
+          {/* 1. Ações rápidas — a proprietária pediu de volta no topo depois
+              da Sprint Visual 4 (que tinha movido pro fim da página). Mesmas
+              15 ações, mesmos destinos, sem alteração de lógica. */}
+          <section className="section-card dashboard-quick-actions-top">
+            <div className="section-header">
+              <div>
+                <h3 className="dashboard-section-title">Ações rápidas</h3>
+                <p className="dashboard-section-subtitle">Registre direto do campo, sem procurar no menu.</p>
+              </div>
+            </div>
+            <div className="dashboard-action-grid dashboard-action-grid--quick">
+              <Button variant="primary" icon={<Scale size={14} />} onClick={() => onNavigate?.('pesagens', { action: 'novo' })}>Nova pesagem</Button>
+              <Button variant="primary" icon={<Beef size={14} />} onClick={() => onNavigate?.('lotes', { action: 'novo' })}>Novo lote</Button>
+              <Button variant="outline" icon={<MapPin size={14} />} onClick={() => onNavigate?.('pastagens', { action: 'novo' })}>Novo pasto</Button>
+              <Button variant="outline" icon={<MapPinned size={14} />} onClick={() => onNavigate?.('lotes', { action: 'trocar-pasto' })}>Trocar lote de pasto</Button>
+              <Button variant="outline" icon={<DollarSign size={14} />} onClick={() => onNavigate?.('lotes', { action: 'venda' })}>Registrar venda</Button>
+              <Button variant="outline" icon={<AlertTriangle size={14} />} onClick={() => onNavigate?.('lotes', { action: 'morte' })}>Registrar morte/perda</Button>
+              <Button variant="outline" icon={<Truck size={14} />} onClick={() => onNavigate?.('lotes', { action: 'transferir' })}>Transferir entre lotes</Button>
+              <Button variant="outline" icon={<ClipboardList size={14} />} onClick={() => onNavigate?.('lotes', { action: 'ajustar-lotacao' })}>Ajustar lotação</Button>
+              <Button variant="outline" icon={<Receipt size={14} />} onClick={() => onNavigate?.('financeiro', { action: 'novo' })}>Novo lançamento financeiro</Button>
+              <Button variant="outline" icon={<Package size={14} />} onClick={() => onNavigate?.('estoque', { action: 'novo' })}>Novo produto/estoque</Button>
+              <Button variant="outline" icon={<ArrowDown size={14} />} onClick={() => onNavigate?.('estoque')}>Saída de estoque</Button>
+              <Button variant="outline" icon={<Syringe size={14} />} onClick={() => onNavigate?.('sanitario', { action: 'novo' })}>Novo manejo/sanidade</Button>
+              <Button variant="outline" icon={<CheckSquare size={14} />} onClick={() => onNavigate?.('tarefas', { action: 'novo' })}>Nova tarefa</Button>
+              <Button variant="outline" icon={<TrendingUp size={14} />} onClick={() => onNavigate?.('resultados')}>Resultado por lote</Button>
+              <Button variant="outline" icon={<Bell size={14} />} onClick={() => onNavigate?.('alertas')}>Central de Alertas</Button>
+            </div>
+          </section>
+
+          {/* 2. Indicadores principais — 6 indicadores (não 7); "Fazendas"
+              virou parte do contexto da fazenda acima. */}
           <section className="dashboard-grid dashboard-grid--kpi-main">
             {kpisMain.map((item) => (
               <KpiPanel key={item.title} {...item} />
             ))}
           </section>
 
-          {/* 2. Precisa da sua atenção — inalterado internamente, só
+          {/* 3. Precisa da sua atenção — inalterado internamente, só
               reposicionado logo após os indicadores. */}
           <section className="section-card dashboard-hero-shell">
             <div className="section-header">
@@ -544,7 +572,7 @@ export default function DashboardPage({
             )}
           </section>
 
-          {/* 3. Visão do rebanho — lotes em destaque + ocupação de pastos.
+          {/* 4. Visão do rebanho — lotes em destaque + ocupação de pastos.
               "Resumo do rebanho" (cabeças/lotes/peso/resultado) saiu daqui:
               os mesmos 4 números já estão nos indicadores principais acima,
               repeti-los era duplicação pura. */}
@@ -635,7 +663,7 @@ export default function DashboardPage({
             ) : null}
           </Card>
 
-          {/* 4. Visão financeira — mesmos dados/cálculos de antes, só
+          {/* 5. Visão financeira — mesmos dados/cálculos de antes, só
               reposicionado e com o rótulo da seção alinhado ao brief. */}
           <h2 className="dashboard-section-title dashboard-group-title">Visão financeira</h2>
           <Card
@@ -657,7 +685,7 @@ export default function DashboardPage({
             </div>
           </Card>
 
-          {/* 5. Agenda e próximos acontecimentos — "Alertas importantes"
+          {/* 6. Agenda e próximos acontecimentos — "Alertas importantes"
               foi removido daqui (duplicava "Prioridades de hoje": os dois
               liam, por caminhos diferentes, o mesmo motor de alertas —
               ver App.jsx::adaptarAlertaParaPainelLegado). "Quadro de
@@ -758,33 +786,6 @@ export default function DashboardPage({
             </Card>
           </section>
 
-          {/* 6. Ações rápidas — mesmas 14 ações, mesmos destinos; só saiu do
-              topo (onde competia com o resto) para o fim da página. */}
-          <section className="section-card dashboard-quick-actions-top">
-            <div className="section-header">
-              <div>
-                <h3 className="dashboard-section-title">Ações rápidas</h3>
-                <p className="dashboard-section-subtitle">Registre direto do campo, sem procurar no menu.</p>
-              </div>
-            </div>
-            <div className="dashboard-action-grid dashboard-action-grid--quick">
-              <Button variant="primary" icon={<Scale size={14} />} onClick={() => onNavigate?.('pesagens', { action: 'novo' })}>Nova pesagem</Button>
-              <Button variant="primary" icon={<Beef size={14} />} onClick={() => onNavigate?.('lotes', { action: 'novo' })}>Novo lote</Button>
-              <Button variant="outline" icon={<MapPin size={14} />} onClick={() => onNavigate?.('pastagens', { action: 'novo' })}>Novo pasto</Button>
-              <Button variant="outline" icon={<MapPinned size={14} />} onClick={() => onNavigate?.('lotes', { action: 'trocar-pasto' })}>Trocar lote de pasto</Button>
-              <Button variant="outline" icon={<DollarSign size={14} />} onClick={() => onNavigate?.('lotes', { action: 'venda' })}>Registrar venda</Button>
-              <Button variant="outline" icon={<AlertTriangle size={14} />} onClick={() => onNavigate?.('lotes', { action: 'morte' })}>Registrar morte/perda</Button>
-              <Button variant="outline" icon={<Truck size={14} />} onClick={() => onNavigate?.('lotes', { action: 'transferir' })}>Transferir entre lotes</Button>
-              <Button variant="outline" icon={<ClipboardList size={14} />} onClick={() => onNavigate?.('lotes', { action: 'ajustar-lotacao' })}>Ajustar lotação</Button>
-              <Button variant="outline" icon={<Receipt size={14} />} onClick={() => onNavigate?.('financeiro', { action: 'novo' })}>Novo lançamento financeiro</Button>
-              <Button variant="outline" icon={<Package size={14} />} onClick={() => onNavigate?.('estoque', { action: 'novo' })}>Novo produto/estoque</Button>
-              <Button variant="outline" icon={<ArrowDown size={14} />} onClick={() => onNavigate?.('estoque')}>Saída de estoque</Button>
-              <Button variant="outline" icon={<Syringe size={14} />} onClick={() => onNavigate?.('sanitario', { action: 'novo' })}>Novo manejo/sanidade</Button>
-              <Button variant="outline" icon={<CheckSquare size={14} />} onClick={() => onNavigate?.('tarefas', { action: 'novo' })}>Nova tarefa</Button>
-              <Button variant="outline" icon={<TrendingUp size={14} />} onClick={() => onNavigate?.('resultados')}>Resultado por lote</Button>
-              <Button variant="outline" icon={<Bell size={14} />} onClick={() => onNavigate?.('alertas')}>Central de Alertas</Button>
-            </div>
-          </section>
         </>
       )}
 
