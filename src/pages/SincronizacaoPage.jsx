@@ -31,6 +31,22 @@ function resumoItem(item) {
   return `${tipoLabel}${data ? ` · ${formatDate(data)}` : ''}`;
 }
 
+function formatDataHora(valorIso) {
+  if (!valorIso) return null;
+  const data = new Date(valorIso);
+  if (Number.isNaN(data.getTime())) return null;
+  return data.toLocaleString('pt-BR', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' });
+}
+
+function obterUltimaSincronizacao(itens) {
+  const sincronizados = itens
+    .map((item) => item.sincronizado_em)
+    .filter(Boolean)
+    .sort()
+    .reverse();
+  return sincronizados.length ? formatDataHora(sincronizados[0]) : null;
+}
+
 export default function SincronizacaoPage({ db, setDb, session }) {
   const { hasPermission } = useAuth();
   const { showToast } = useToast();
@@ -40,6 +56,7 @@ export default function SincronizacaoPage({ db, setDb, session }) {
   const fazendas = Array.isArray(db?.fazendas) ? db.fazendas : [];
   const lotes = Array.isArray(db?.lotes) ? db.lotes : [];
   const pastagens = Array.isArray(db?.pastagens) ? db.pastagens : [];
+  const ultimaSincronizacao = obterUltimaSincronizacao(status.itens);
 
   async function handleSincronizarItem(idLocal) {
     const resultado = await status.sincronizarItemAgora(idLocal);
@@ -100,6 +117,9 @@ export default function SincronizacaoPage({ db, setDb, session }) {
             Tentar sincronizar agora
           </Button>
         </div>
+        <p style={{ margin: '10px 0 0', fontSize: 13, color: 'var(--color-text-muted)' }}>
+          {ultimaSincronizacao ? `Última sincronização: ${ultimaSincronizacao}` : 'Nenhum registro deste aparelho foi sincronizado ainda.'}
+        </p>
       </Card>
 
       <div className="report-kpi-grid">
@@ -139,6 +159,11 @@ export default function SincronizacaoPage({ db, setDb, session }) {
                 <div className="dashboard-list-copy">
                   <strong>{resumoItem(item)}</strong>
                   <p>{item.status === 'erro' ? (item.erro || STATUS_LABELS.erro) : STATUS_LABELS[item.status]}</p>
+                  <p style={{ margin: 0, fontSize: 12, color: 'var(--color-text-muted)' }}>
+                    {item.status === 'sincronizado' && item.sincronizado_em
+                      ? `Sincronizado em ${formatDataHora(item.sincronizado_em)}`
+                      : `Salvo neste aparelho em ${formatDataHora(item.criado_em) || '—'}`}
+                  </p>
                 </div>
                 <div className="row-actions action-row">
                   <Badge variant={item.status === 'sincronizado' ? 'success' : item.status === 'erro' ? 'danger' : 'warning'}>

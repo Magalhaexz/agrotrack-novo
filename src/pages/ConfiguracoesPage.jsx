@@ -3,6 +3,7 @@ import { QRCodeSVG } from 'qrcode.react';
 import { AlertTriangle, FileText, MessageCircle, Plus, X } from 'lucide-react';
 import Card from '../components/ui/Card';
 import Button from '../components/ui/Button';
+import PageHeader from '../components/PageHeader';
 import { perfilPodeGerenciarAcessos } from '../auth/perfis';
 import { supabase } from '../lib/supabase'; // Assumindo que supabase está configurado
 import { useAuth } from '../auth/useAuth';
@@ -452,10 +453,7 @@ export default function ConfiguracoesPage({ db, setDb, onConfirmAction, onNaviga
 
   return (
     <div className="config-page">
-      <header>
-        <h1>Configurações</h1>
-        <p>Parâmetros globais, notificações e segurança dos dados.</p>
-      </header>
+      <PageHeader title="Configurações" subtitle="Parâmetros globais, notificações e segurança dos dados." />
 
       {(() => {
         const integridade = resumirProblemasIntegridade(db);

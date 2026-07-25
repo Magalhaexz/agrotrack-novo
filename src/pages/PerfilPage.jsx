@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { LogOut, Plus } from 'lucide-react';
 import Card from '../components/ui/Card';
 import Button from '../components/ui/Button';
+import PageHeader from '../components/PageHeader';
 import UserAvatar from '../components/ui/UserAvatar';
 import SubscriptionSummary from '../components/subscription/SubscriptionSummary';
 import { obterLabelPerfil } from '../auth/perfis';
@@ -309,10 +310,7 @@ export default function PerfilPage({ db, usuarioLogado, atualizarUsuario, onConf
 
   return (
     <div className="perfil-page">
-      <header className="page-header"> {/* Usar classe page-header para consistência */}
-        <h1>Meu Perfil</h1>
-        <p>Gerencie seus dados, segurança e preferências da conta.</p>
-      </header>
+      <PageHeader title="Meu Perfil" subtitle="Gerencie seus dados, segurança e preferências da conta." />
 
       <Card title="Dados pessoais">
         <div className="perfil-grid">
@@ -413,6 +411,7 @@ export default function PerfilPage({ db, usuarioLogado, atualizarUsuario, onConf
               <option value="">Nenhuma</option> {/* Adicionar opção "Nenhuma" */}
               {(db.fazendas || []).map((f) => <option key={f.id} value={String(f.id)}>{f.nome}</option>)}
             </select>
+            <small style={{ color: 'var(--color-text-muted)' }}>Preferência pessoal sua — não altera a fazenda ativa vista por outros membros da equipe.</small>
           </label>
         </div>
         <div className="perfil-actions"><Button variant="outline" onClick={salvarPreferencias}>Salvar preferências</Button></div>

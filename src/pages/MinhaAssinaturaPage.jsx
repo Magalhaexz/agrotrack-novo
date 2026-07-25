@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { CheckCircle2, FileText } from 'lucide-react';
+import PageHeader from '../components/PageHeader';
 import SubscriptionSummary from '../components/subscription/SubscriptionSummary';
 import PlanoUsoCard from '../components/assinatura/PlanoUsoCard';
 import Badge from '../components/ui/Badge';
@@ -274,16 +275,16 @@ export default function MinhaAssinaturaPage({
 
   return (
     <div className="page page-shell subscription-page">
-      <header className="page-header subscription-page__header">
-        <div>
-          <h1>Planos e Assinatura</h1>
-          <p>Veja seu plano atual, limites de uso e o próximo passo comercial antes da integração de pagamento.</p>
-        </div>
-        <div className="subscription-page__header-badge">
-          <CheckCircle2 size={16} aria-hidden="true" />
-          <span>Área do cliente</span>
-        </div>
-      </header>
+      <PageHeader
+        title="Planos e Assinatura"
+        subtitle="Veja seu plano atual, limites de uso e o próximo passo comercial antes da integração de pagamento."
+        actions={(
+          <div className="subscription-page__header-badge">
+            <CheckCircle2 size={16} aria-hidden="true" />
+            <span>Área do cliente</span>
+          </div>
+        )}
+      />
 
       {upgradeContext ? (
         <div className="plano-upgrade-banner">
