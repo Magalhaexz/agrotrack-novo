@@ -1,8 +1,10 @@
 import { useMemo, useState } from 'react';
 import { TrendingUp } from 'lucide-react';
 import Card from '../components/ui/Card';
+import PageHeader from '../components/PageHeader';
 import { calcLote, formatNumber } from '../utils/calculations'; // Assumindo calcLote e formatNumber são robustos
 import { getResumoLote } from '../domain/resumoLote';
+import { isModoConsolidado } from '../domain/escopoFazenda';
 import { formatarMoeda } from '../utils/formatters'; // Assumindo formatarMoeda é robusto
 import CurvasCrescimento from '../components/comparativo/CurvasCrescimento';
 import GraficoFinanceiro from '../components/comparativo/GraficoFinanceiro';
@@ -24,7 +26,8 @@ const coresLotes = ['#22C55E', '#3B82F6', '#F59E0B', '#EF4444', '#8B5CF6', '#EC4
  * @param {object} props.db - O objeto do banco de dados.
  * @param {function} [props.onNavigate] - Função de callback para navegação.
  */
-export default function ComparativoPage({ db, onNavigate }) {
+export default function ComparativoPage({ db, onNavigate, fazendaSelecionada = null }) {
+  const consolidado = isModoConsolidado(fazendaSelecionada);
   const lotesAtivos = useMemo(() => (db.lotes || []).filter((l) => l.status === 'ativo'), [db.lotes]);
   const [lotesSelecionadosIds, setLotesSelecionadosIds] = useState(lotesAtivos.map((l) => l.id));
   const [periodo, setPeriodo] = useState('todos');
@@ -165,10 +168,10 @@ export default function ComparativoPage({ db, onNavigate }) {
 
   return (
     <div className="page comparativo-page">
-      <header className="page-header">
-        <h1>Análise Comparativa de Lotes</h1>
-        <p>Compare desempenho, crescimento e resultado entre os lotes ativos.</p>
-      </header>
+      <PageHeader
+        title="Análise Comparativa de Lotes"
+        subtitle={`${consolidado ? 'Todas as fazendas' : (fazendaSelecionada?.nome || 'Todas as fazendas')} · Compare desempenho, crescimento e resultado entre os lotes ativos.`}
+      />
 
       <Card>
         <div className="comparativo-topbar">

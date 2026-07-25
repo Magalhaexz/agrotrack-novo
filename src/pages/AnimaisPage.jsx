@@ -18,6 +18,7 @@ import {
 } from '../services/operationalPersistence';
 import { canCreateAnimal, getSubscriptionLimitMessage } from '../services/subscriptions';
 import { isAnimalIndividualAtivo, registrarSaidaAnimalIndividual } from '../services/movimentacoes';
+import { isModoConsolidado } from '../domain/escopoFazenda';
 
 const MOVEMENT_LABELS = {
   criacao: 'Criação',
@@ -135,7 +136,7 @@ function resolveAnimalFazendaNome(animal, fazendasMap, lotesMap) {
   return fazendasMap.get(Number(fazendaId))?.nome || lote?.fazendaNome || '-';
 }
 
-export default function AnimaisPage({ db, setDb, onConfirmAction, subscription = null }) {
+export default function AnimaisPage({ db, setDb, onConfirmAction, subscription = null, fazendaSelecionada = null }) {
   const { hasPermission, session } = useAuth();
   const { showToast } = useToast();
   const [abrirForm, setAbrirForm] = useState(false);
@@ -323,13 +324,14 @@ export default function AnimaisPage({ db, setDb, onConfirmAction, subscription =
   }
 
   const listaAtiva = abaAtiva === 'grupos' ? grupos : individuais;
+  const consolidado = isModoConsolidado(fazendaSelecionada);
 
   return (
     <div className="page animais-page">
       <section className="animais-hero page-header">
         <div>
           <h1>Animais</h1>
-          <p>Gerencie grupos, individuais e movimentações com visão clara da operação.</p>
+          <p>{consolidado ? 'Todas as fazendas' : (fazendaSelecionada?.nome || 'Todas as fazendas')} · Gerencie grupos, individuais e movimentações com visão clara da operação.</p>
         </div>
         <div className="page-actions">
           <Button size="sm" icon={<Plus size={16} />} onClick={abrirNovo}>Novo cadastro</Button>
