@@ -506,6 +506,9 @@ export default function ImportacaoPage({ db, setDb, session: sessionProp, onConf
               <p style={{ margin: '10px 0 0', fontSize: 12, color: 'var(--color-text-secondary)' }}>
                 As abas de pesagens são opcionais — você pode importar só o cadastro inicial e adicionar as pesagens depois.
               </p>
+              <p style={{ margin: '6px 0 0', fontSize: 12, color: 'var(--color-text-secondary)' }}>
+                A fazenda de destino de cada lote, pasto ou animal é a informada na própria planilha — registros existentes com o mesmo nome não são duplicados.
+              </p>
             </div>
           </Card>
 

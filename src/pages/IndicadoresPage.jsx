@@ -3,6 +3,7 @@ import Card from '../components/ui/Card';
 import Input from '../components/ui/Input';
 import PageHeader from '../components/PageHeader';
 import { hojeLocalISO } from '../domain/dataCivil.js';
+import { isModoConsolidado } from '../domain/escopoFazenda';
 import {
   computeIndicadoresEstrategicos,
   resolveIndicadoresPeriod,
@@ -40,7 +41,8 @@ function metricTone(value) {
   return '';
 }
 
-export default function IndicadoresPage({ db }) {
+export default function IndicadoresPage({ db, fazendaSelecionada }) {
+  const consolidado = isModoConsolidado(fazendaSelecionada);
   const [tipoPeriodo, setTipoPeriodo] = useState('mes');
   const [mesRef, setMesRef] = useState(nowDate().slice(0, 7));
   const [anoRef, setAnoRef] = useState(nowDate().slice(0, 4));
@@ -135,7 +137,10 @@ export default function IndicadoresPage({ db }) {
 
   return (
     <div className="page">
-      <PageHeader title="Indicadores" subtitle="Indicadores técnicos e econômicos da operação." />
+      <PageHeader
+        title="Indicadores"
+        subtitle={`${consolidado ? 'Todas as fazendas' : (fazendaSelecionada?.nome || 'Todas as fazendas')} · Indicadores técnicos e econômicos da operação.`}
+      />
 
       <Card title="Filtros de período">
         <div className="form-grid two">

@@ -7,8 +7,10 @@ import AcoesRelatorio from '../components/relatorios/AcoesRelatorio';
 import { buildRelatorioFinanceiro } from '../domain/relatorios';
 import { gerarResumoFinanceiroTexto } from '../domain/whatsappResumo';
 import { formatCurrency, formatDate } from '../utils/calculations';
+import { isModoConsolidado } from '../domain/escopoFazenda';
 
-export default function RelatorioFinanceiroPage({ db, onNavigate }) {
+export default function RelatorioFinanceiroPage({ db, onNavigate, fazendaSelecionada }) {
+  const consolidado = isModoConsolidado(fazendaSelecionada);
   const fazendas = Array.isArray(db?.fazendas) ? db.fazendas : [];
   const lotes = Array.isArray(db?.lotes) ? db.lotes : [];
   const [fazendaId, setFazendaId] = useState('');
@@ -28,7 +30,7 @@ export default function RelatorioFinanceiroPage({ db, onNavigate }) {
     <div className="page reports-page">
       <PageHeader
         title="Relatório Financeiro"
-        subtitle="Veja o que entrou, o que saiu e o saldo do período."
+        subtitle={`${consolidado ? 'Todas as fazendas' : (fazendaSelecionada?.nome || 'Todas as fazendas')} · Veja o que entrou, o que saiu e o saldo do período.`}
       />
 
       <Card title="Filtros">

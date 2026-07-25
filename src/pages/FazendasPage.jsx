@@ -77,10 +77,14 @@ export default function FazendasPage({ db, setDb, onConfirmAction, session: sess
   }, [lotes]);
 
   const cards = useMemo(
-    () => fazendas.map((fazenda) => ({
-      ...fazenda,
-      lotesVinculados: (lotesByFazendaMap.get(Number(fazenda.id)) || []).length,
-    })),
+    () => fazendas.map((fazenda) => {
+      const lotesDaFazenda = lotesByFazendaMap.get(Number(fazenda.id)) || [];
+      return {
+        ...fazenda,
+        lotesVinculados: lotesDaFazenda.length,
+        animaisVinculados: lotesDaFazenda.reduce((total, lote) => total + Number(lote.heads || lote.qtd || 0), 0),
+      };
+    }),
     [fazendas, lotesByFazendaMap]
   );
 
@@ -734,6 +738,7 @@ export default function FazendasPage({ db, setDb, onConfirmAction, session: sess
               key={fazenda.id}
               fazenda={fazenda}
               lotesVinculados={fazenda.lotesVinculados}
+              animaisVinculados={fazenda.animaisVinculados}
               onClick={() => { setEditando(fazenda); setOpenModal(true); }}
               onDelete={() => excluirFazenda(fazenda.id)}
             />

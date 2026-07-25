@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Plus } from 'lucide-react';
 import Card from '../components/ui/Card';
 import Button from '../components/ui/Button';
+import Badge from '../components/ui/Badge';
 import PageHeader from '../components/PageHeader';
 import EmptyState from '../components/EmptyState';
 import BloqueadoPorPermissao from '../components/BloqueadoPorPermissao';
@@ -304,18 +305,22 @@ export default function EquipePage({ db = null, onConfirmAction, subscription = 
           <EmptyState compact title="Nenhum convite pendente." />
         ) : (
           <div className="equipe-lista">
-            {invitesPendentes.map((invite) => (
+            {invitesPendentes.map((invite) => {
+              const expirado = Boolean(invite.expires_at) && new Date(invite.expires_at) < new Date();
+              return (
               <div key={invite.id} className="equipe-convite-row">
                 <div className="equipe-convite-row__info">
                   <strong>{invite.nome || 'Convite sem nome'}</strong>
                   <span>{invite.email} — {obterLabelPerfil(invite.perfil)}</span>
+                  <Badge variant={expirado ? 'danger' : 'neutral'}>{expirado ? 'Convite expirado' : 'Aguardando aceite'}</Badge>
                 </div>
                 <div className="equipe-convite-row__acoes">
                   <Button size="sm" variant="outline" onClick={() => cancelarConvite(invite)}>Cancelar convite</Button>
                   <Button size="sm" variant="danger" onClick={() => removerConvitePendente(invite)}>Remover</Button>
                 </div>
               </div>
-            ))}
+              );
+            })}
           </div>
         )}
       </Card>

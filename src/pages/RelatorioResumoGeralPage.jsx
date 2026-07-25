@@ -6,8 +6,10 @@ import AcoesRelatorio from '../components/relatorios/AcoesRelatorio';
 import { buildResumoGeralFazenda } from '../domain/relatorios';
 import { gerarResumoGeralTexto } from '../domain/whatsappResumo';
 import { formatCurrency, formatNumber } from '../utils/calculations';
+import { isModoConsolidado } from '../domain/escopoFazenda';
 
-export default function RelatorioResumoGeralPage({ db }) {
+export default function RelatorioResumoGeralPage({ db, fazendaSelecionada }) {
+  const consolidado = isModoConsolidado(fazendaSelecionada);
   const containerRef = useRef(null);
   const resumo = useMemo(() => buildResumoGeralFazenda(db), [db]);
 
@@ -15,7 +17,7 @@ export default function RelatorioResumoGeralPage({ db }) {
     <div className="page reports-page">
       <PageHeader
         title="Resumo Geral da Fazenda"
-        subtitle="Um resumo rápido para enviar ao dono, sócio ou gerente."
+        subtitle={`${consolidado ? 'Todas as fazendas' : (fazendaSelecionada?.nome || 'Todas as fazendas')} · Um resumo rápido para enviar ao dono, sócio ou gerente.`}
       />
 
       <AcoesRelatorio
