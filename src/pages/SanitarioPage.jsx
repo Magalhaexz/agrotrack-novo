@@ -17,6 +17,7 @@ import {
   updateOperationalRecord,
 } from '../services/operationalPersistence';
 import { sincronizarEstoqueSanidade, reverterEstoqueSanidadeExcluido } from '../services/estoqueSanidade';
+import { isModoConsolidado, construirMapaFazendas } from '../domain/escopoFazenda';
 import { formatarDataExportacao, montarNomeArquivo } from '../domain/exportacaoRelatorios';
 import { baixarCsv, abrirRelatorioParaImpressao } from '../utils/exportacaoArquivos';
 
@@ -31,8 +32,13 @@ const AGENDA_SECOES = [
   { chave: 'realizados', titulo: 'Realizados recentemente', badge: 'badge-g' },
 ];
 
-export default function SanitarioPage({ db, setDb, onConfirmAction, navigationIntent = null }) {
+export default function SanitarioPage({ db, setDb, onConfirmAction, navigationIntent = null, fazendaSelecionada = null }) {
   const { hasPermission, session } = useAuth();
+  // Sprint Visual 8: só identifica a fazenda de cada manejo para exibição
+  // (via lote → fazenda) — esta página nunca filtrou por fazenda ativa, e
+  // isso não muda aqui (ver limitações da sprint).
+  const consolidado = isModoConsolidado(fazendaSelecionada);
+  const fazendasMap = useMemo(() => construirMapaFazendas(db), [db]);
   const { showToast } = useToast(); // Hook para exibir toasts
   const mensagemSemPermissao = 'Você não tem permissão para executar esta ação.';
   const abrirManejoPorIntent = navigationIntent?.page === 'sanitario' && navigationIntent?.action === 'novo';
@@ -76,6 +82,7 @@ export default function SanitarioPage({ db, setDb, onConfirmAction, navigationIn
         return {
           ...item,
           loteNome: lote?.nome || '—',
+          fazendaNome: lote ? (fazendasMap.get(Number(lote.faz_id)) || 'Sem fazenda') : '—',
           funcionarioNome: funcionario?.nome || '—',
           status: obterStatus(item.proxima, item.alerta_dias_antes),
         };
@@ -89,7 +96,7 @@ export default function SanitarioPage({ db, setDb, onConfirmAction, navigationIn
         if (!dataB) return -1; // Coloca itens sem data no final
         return new Date(dataA).getTime() - new Date(dataB).getTime();
       });
-  }, [sanitario, lotesMap, funcionariosMap]);
+  }, [sanitario, lotesMap, funcionariosMap, fazendasMap]);
 
   // Agrupamento APENAS visual: registros com o mesmo metadata.grupo_manejo_id
   // formam um manejo composto. Registros sem grupo (legados/individuais)
@@ -540,7 +547,7 @@ export default function SanitarioPage({ db, setDb, onConfirmAction, navigationIn
     <div className="page page--sanitario page--kpi-compact">
       <PageHeader
         title="Sanitário / Manejo"
-        subtitle="Controle de vacinas, medicações e manejos com status e responsáveis."
+        subtitle={`${consolidado ? 'Todas as fazendas' : (fazendaSelecionada?.nome || 'Todas as fazendas')} · Controle de vacinas, medicações e manejos com status e responsáveis.`}
         actions={<Button className="sanitario-cta" disabled={!hasPermission('sanitario:editar')} onClick={abrirNovo}>Registrar manejo</Button>}
       />
 
@@ -698,6 +705,7 @@ export default function SanitarioPage({ db, setDb, onConfirmAction, navigationIn
                   <th>Tipo</th>
                   <th>Descrição</th>
                   <th>Lote</th>
+                  {consolidado ? <th>Fazenda</th> : null}
                   <th>Data Aplicação</th>
                   <th>Próxima Data</th>
                   <th>Responsável</th>
@@ -714,6 +722,7 @@ export default function SanitarioPage({ db, setDb, onConfirmAction, navigationIn
                       <td>{normalizarTipo(item.tipo)}</td>
                       <td>{item.desc}</td>
                       <td>{item.loteNome}</td>
+                      {consolidado ? <td>{item.fazendaNome}</td> : null}
                       <td>{formatarData(item.data_aplic)}</td>
                       <td>{item.proxima ? formatarData(item.proxima) : '—'}</td>
                       <td>{item.funcionarioNome || '—'}</td>
@@ -749,7 +758,7 @@ export default function SanitarioPage({ db, setDb, onConfirmAction, navigationIn
                   return (
                     <Fragment key={`grupo-${entry.grupoId}`}>
                       <tr className="sanitario-grupo-head">
-                        <td colSpan={10}>
+                        <td colSpan={consolidado ? 11 : 10}>
                           <span className="sanitario-grupo-badge">Manejo composto</span>
                           {' '}
                           <strong>{cabeca.loteNome}</strong>

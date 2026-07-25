@@ -24,6 +24,7 @@ import {
   updateOperationalRecord,
 } from '../services/operationalPersistence';
 import { matchesRotinaRecurrence, matchesEventoRecurrence } from './calendarioOperacionalLogic.js';
+import { isModoConsolidado } from '../domain/escopoFazenda';
 
 import { hojeLocalISO } from '../domain/dataCivil.js';
 const MONTH_LABELS = ['Janeiro', 'Fevereiro', 'Março', 'Abril', 'Maio', 'Junho', 'Julho', 'Agosto', 'Setembro', 'Outubro', 'Novembro', 'Dezembro'];
@@ -50,6 +51,11 @@ export default function CalendarioOperacionalPage({ db, setDb, session, fazendaS
   const { showToast } = useToast();
   const { hasPermission } = useAuth();
   const hoje = getTodayIso();
+  // Sprint Visual 8: esta página nunca filtrou eventos por fazenda ativa —
+  // o rótulo abaixo só reflete a seleção global, honestamente (ver
+  // limitações da sprint).
+  const consolidado = isModoConsolidado(fazendaSelecionada);
+  const contextoFazenda = consolidado ? 'Todas as fazendas' : (fazendaSelecionada?.nome || 'Todas as fazendas');
   const [selectedDate, setSelectedDate] = useState(hoje);
   const [viewMode, setViewMode] = useState('mensal');
   const [cursorDate, setCursorDate] = useState(() => new Date(`${hoje}T00:00:00`));
@@ -195,7 +201,7 @@ export default function CalendarioOperacionalPage({ db, setDb, session, fazendaS
         <div>
           <span className="calendar-hero-kicker">Operação coordenada</span>
           <h1>Calendário Operacional</h1>
-          <p>Monitore eventos sanitários e operacionais, navegue entre períodos e abra o detalhe de qualquer data com contexto completo.</p>
+          <p>{`${contextoFazenda} · Monitore eventos sanitários e operacionais, navegue entre períodos e abra o detalhe de qualquer data com contexto completo.`}</p>
         </div>
 
         <div className="calendar-hero-actions">

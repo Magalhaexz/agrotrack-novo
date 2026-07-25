@@ -8,6 +8,7 @@ import Input from '../components/ui/Input'; // Importar o componente Input
 import { useToast } from '../hooks/useToast'; // Assumindo que você tem um hook de toast
 import { useSubmitOnce } from '../hooks/useSubmitOnce.js';
 import { useAuth } from '../auth/useAuth';
+import { isModoConsolidado } from '../domain/escopoFazenda';
 import { daysBetween } from '../domain/calcHelpers.js';
 import { hojeLocalISO } from '../domain/dataCivil.js';
 import {
@@ -39,10 +40,15 @@ const EMPTY_TASK = {
   data_vencimento: '',
 };
 
-export default function TarefasPage({ db, setDb, onConfirmAction, navigationIntent = null }) {
+export default function TarefasPage({ db, setDb, onConfirmAction, navigationIntent = null, fazendaSelecionada = null }) {
   const { showToast } = useToast();
   const { hasPermission, session } = useAuth();
   const mensagemSemPermissao = 'Você não tem permissão para executar esta ação.';
+  // Sprint Visual 8: esta página nunca filtrou tarefas por fazenda ativa —
+  // o rótulo abaixo só reflete a seleção global, honestamente (ver
+  // limitações da sprint). Cada card já mostra fazenda/lote via "Vinculado".
+  const consolidado = isModoConsolidado(fazendaSelecionada);
+  const contextoFazenda = consolidado ? 'Todas as fazendas' : (fazendaSelecionada?.nome || 'Todas as fazendas');
   const tarefas = useMemo(() => (Array.isArray(db?.tarefas) ? db.tarefas : []), [db.tarefas]);
   const abrirNovaTarefaPorIntent = navigationIntent?.page === 'tarefas' && navigationIntent?.action === 'novo';
   const [openModal, setOpenModal] = useState(abrirNovaTarefaPorIntent);
@@ -243,7 +249,7 @@ export default function TarefasPage({ db, setDb, onConfirmAction, navigationInte
     <div className="tarefas-page">
       <header className="page-header">
         <h1>Tarefas</h1>
-        <p>Organize responsáveis, prioridades e prazos da rotina da fazenda.</p>
+        <p>{`${contextoFazenda} · Organize responsáveis, prioridades e prazos da rotina da fazenda.`}</p>
         <Button icon={<Plus size={16} />} onClick={openNewTask}>Nova tarefa</Button>
       </header>
 
