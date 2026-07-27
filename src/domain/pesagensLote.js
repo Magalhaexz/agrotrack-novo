@@ -63,3 +63,31 @@ export function recalcularPesoAtualLote(db, loteId, pesagensRestantes) {
 // `calculateAverageGmdByLote` usava primeira→última pesagem, enquanto outras
 // telas usavam janela de 30 dias ou a tabela `animais` — divergência de até
 // 8x no mesmo lote. Ver gmd.js para a semântica oficial e os casos-limite.
+
+/**
+ * Peso médio oficial de uma pesagem individual por cabeça (Sprint Funcional
+ * 15). Recebe os pesos já digitados (um por cabeça) e devolve soma,
+ * quantidade efetivamente pesada e a média — fonte única, reaproveitada pela
+ * UI e pela persistência para nunca depender de um valor de média digitado
+ * manualmente.
+ *
+ * Pesos inválidos (vazio, zero, negativo, não numérico) são ignorados aqui
+ * também, para que o cálculo nunca dependa de o chamador já ter filtrado.
+ *
+ * @param {Array<number|string>} pesos
+ * @returns {{ soma: number, quantidade: number, media: number|null }}
+ */
+export function calcularPesoMedioIndividual(pesos) {
+  const validos = (Array.isArray(pesos) ? pesos : [])
+    .map((valor) => Number(String(valor ?? '').replace(',', '.')))
+    .filter((valor) => Number.isFinite(valor) && valor > 0);
+
+  const quantidade = validos.length;
+  if (quantidade === 0) return { soma: 0, quantidade: 0, media: null };
+
+  const soma = validos.reduce((total, valor) => total + valor, 0);
+  // Arredondamento consistente com formatarNumero (2 casas) — ex.: 1100/3 kg
+  // vira 366.67, não 366.666666...
+  const media = Math.round((soma / quantidade) * 100) / 100;
+  return { soma, quantidade, media };
+}

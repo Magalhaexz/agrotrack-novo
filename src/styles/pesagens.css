@@ -123,6 +123,34 @@
   border-top: 1px solid var(--color-border-subtle);
 }
 
+.pesagem-row-detalhes-wrap {
+  grid-column: 1 / -1;
+  padding-top: 6px;
+}
+
+.pesagem-row-detalhes-lista {
+  list-style: none;
+  margin: 8px 0 0;
+  padding: 0;
+  display: grid;
+  gap: 4px;
+  font-size: 0.82rem;
+}
+
+.pesagem-row-detalhes-lista li {
+  display: flex;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 4px 8px;
+  border-radius: 8px;
+  background: var(--color-surface-2);
+}
+
+.pesagem-row-detalhes-pendente {
+  color: var(--color-warning);
+  justify-content: flex-start !important;
+}
+
 .pesagens-alertas-grid {
   display: grid;
   gap: 10px;
@@ -154,7 +182,65 @@
   color: var(--color-text-secondary);
 }
 
+/* Sprint Funcional 15 — resumo em tempo real da pesagem individual por
+   cabeça (PesagemForm) e aviso de peso fora da faixa esperada. */
+.pesagem-resumo-vivo {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 10px;
+  margin-bottom: 14px;
+  padding: 12px 14px;
+  border: 1px solid var(--color-border);
+  border-radius: 12px;
+  background: var(--color-surface-2);
+}
+
+.pesagem-resumo-item {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.pesagem-resumo-label {
+  font-size: 0.72rem;
+  color: var(--color-text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.pesagem-resumo-valor {
+  font-family: var(--font-mono);
+  font-size: 1rem;
+  color: var(--color-text);
+}
+
+.pesagem-resumo-valor.is-pendente {
+  color: var(--color-warning);
+}
+
+.pesagem-resumo-valor.is-destaque {
+  color: var(--color-primary);
+  font-size: 1.1rem;
+}
+
+.pesagem-peso-aviso {
+  display: block;
+  margin-top: 4px;
+  color: var(--color-warning);
+  font-size: 0.76rem;
+}
+
+.pesagem-mobile-card .mobile-card-body {
+  display: grid;
+  gap: 10px;
+}
+
 @media (max-width: 720px) {
+  .pesagem-resumo-vivo {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
   .pesagens-header {
     grid-template-columns: minmax(0, 1fr);
   }

@@ -1,4 +1,5 @@
 import { toDateKey, toNumber } from './calcHelpers.js';
+import { resolveTipoPesagem } from './pesagensLote.js';
 import { getResumoLote } from './resumoLote.js';
 import { calcularFluxoCaixa } from './fluxoCaixa.js';
 import { construirResumoPastos, listarContasFinanceiras, construirHojeNaFazenda } from './hojeNaFazenda.js';
@@ -102,7 +103,11 @@ export function buildRelatorioPesagens(db, { loteId, fazendaId, dataInicio, data
     ? new Set(lotes.filter((l) => toNumber(l.fazenda_id ?? l.faz_id) === toNumber(fazendaId)).map((l) => toNumber(l.id)))
     : null;
 
-  let pesagens = arr(db?.pesagens);
+  // Pesagens de animal individual (Sprint Funcional 15) nunca entram no
+  // relatório por lote — a média oficial já vive na pesagem agregada
+  // (tipo:'lote'); misturar as duas contaria o mesmo peso mais de uma vez e
+  // trocaria "peso médio do lote" por um peso de uma única cabeça.
+  let pesagens = arr(db?.pesagens).filter((p) => resolveTipoPesagem(p) === 'lote');
 
   if (loteId) {
     pesagens = pesagens.filter((p) => toNumber(p.lote_id) === toNumber(loteId));

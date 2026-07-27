@@ -1,6 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { calcularGmdLote, gmdDoLote, gmdMedioDosLotes } from './gmd.js';
+import { calcularPesoMedioIndividual, recalcularPesoAtualLote } from './pesagensLote.js';
 
 const lote = (over = {}) => ({ id: 1, entrada: '2026-01-01', p_ini: 200, ...over });
 const pesagem = (data, peso, over = {}) => ({ lote_id: 1, tipo: 'lote', data, peso_medio: peso, ...over });
@@ -183,4 +184,48 @@ test('GMD médio é a média dos GMD por lote (não do rebanho agregado)', () =>
     { lote_id: 2, tipo: 'lote', data: '2026-01-31', peso_medio: 260 }, // lote 2: +60/30d = 2.0
   ];
   assert.equal(gmdMedioDosLotes(lotes, pesagens), 1.5);
+});
+
+// ── Integração com a pesagem individual por cabeça (Sprint Funcional 15) ────
+// A pesagem principal criada a partir de calcularPesoMedioIndividual é
+// tipo:'lote' — precisa entrar no GMD e em recalcularPesoAtualLote sem
+// nenhuma mudança nessas duas funções (fonte única, não duplicada).
+test('pesagem principal calculada a partir de pesos individuais alimenta o GMD do lote normalmente', () => {
+  const { media } = calcularPesoMedioIndividual([350, 370, 380]); // exemplo da sprint: 366.67
+  assert.equal(media, 366.67);
+
+  const loteComEntrada = { id: 1, entrada: '2026-01-01', p_ini: 300 };
+  const pesagemPrincipal = { id: 50, lote_id: 1, tipo: 'lote', data: '2026-01-31', peso_medio: media };
+
+  const r = calcularGmdLote(loteComEntrada, [pesagemPrincipal]);
+  assert.equal(r.fim.peso, 366.67);
+  assert.equal(r.dias, 30);
+  assert.ok(Math.abs(r.ganho - (366.67 - 300)) < 1e-9);
+});
+
+test('pesagem principal calculada a partir de pesos individuais atualiza o peso atual do lote', () => {
+  const { media } = calcularPesoMedioIndividual([350, 370, 380]);
+  const db = { animais: [] };
+  const pesagens = [
+    { id: 50, lote_id: 1, tipo: 'lote', data: '2026-01-31', peso_medio: media },
+  ];
+  const r = recalcularPesoAtualLote(db, 1, pesagens);
+  assert.equal(r.pesoAtual, 366.67);
+  assert.equal(r.ultimaPesagem, '2026-01-31');
+});
+
+test('pesos individuais vinculados (metadata.pesagem_principal_id) continuam fora do GMD e do peso atual do lote', () => {
+  const { media } = calcularPesoMedioIndividual([350, 370, 380]);
+  const pesagens = [
+    { id: 50, lote_id: 1, tipo: 'lote', data: '2026-01-31', peso_medio: media },
+    { id: 51, lote_id: 1, tipo: 'animal', animal_id: 'a1', data: '2026-01-31', peso_medio: 350, metadata: { pesagem_principal_id: 50 } },
+    { id: 52, lote_id: 1, tipo: 'animal', animal_id: 'a2', data: '2026-01-31', peso_medio: 370, metadata: { pesagem_principal_id: 50 } },
+    { id: 53, lote_id: 1, tipo: 'animal', animal_id: 'a3', data: '2026-01-31', peso_medio: 380, metadata: { pesagem_principal_id: 50 } },
+  ];
+
+  const gmdResult = calcularGmdLote({ id: 1, entrada: '2026-01-01', p_ini: 300 }, pesagens);
+  assert.equal(gmdResult.fim.peso, media);
+
+  const pesoAtual = recalcularPesoAtualLote({ animais: [] }, 1, pesagens);
+  assert.equal(pesoAtual.pesoAtual, media);
 });

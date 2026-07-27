@@ -23,6 +23,7 @@ import Table from '../components/ui/Table';
 import { calcLote, formatCurrency, formatDate, formatNumber } from '../utils/calculations';
 import { getResumoLote } from '../domain/resumoLote';
 import { classificarDecisaoVenda, PRECO_ARROBA_PADRAO } from '../domain/decisaoVenda';
+import { resolveTipoPesagem } from '../domain/pesagensLote';
 import { exportarCsvCompatExcel, exportarExcelXmlCompat } from '../utils/exportadores';
 import '../styles/relatorios.css';
 
@@ -431,8 +432,14 @@ function buildReportBundle(db, filters) {
           Number(item.lote_id) === Number(lote.id) &&
           dateInRange(item.data, filters.dataInicio, filters.dataFim)
       );
+      // Pesagens de animal individual (Sprint Funcional 15) ficam de fora
+      // daqui — sem esse filtro, o "Peso atual" do ranking podia ser
+      // sobrescrito pelo peso de uma única cabeça em vez da média oficial do
+      // lote (tipo:'lote').
       const pesagensPeriodo = pesagens.filter(
-        (item) => Number(item.lote_id) === Number(lote.id) && dateInRange(item.data, filters.dataInicio, filters.dataFim)
+        (item) => Number(item.lote_id) === Number(lote.id)
+          && dateInRange(item.data, filters.dataInicio, filters.dataFim)
+          && resolveTipoPesagem(item) === 'lote'
       );
       const sanitarioPeriodo = sanitario.filter(
         (item) =>
