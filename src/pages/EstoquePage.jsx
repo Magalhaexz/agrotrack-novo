@@ -16,6 +16,7 @@ import { createOperationalRecord, updateOperationalRecord } from '../services/op
 import { formatarDataExportacao, montarNomeArquivo } from '../domain/exportacaoRelatorios';
 import { baixarCsv, abrirRelatorioParaImpressao } from '../utils/exportacaoArquivos';
 import { calcularConsumoDiarioTotalPorProduto, calcularDiasRestantesEstoque } from '../domain/previsaoConsumoEstoque';
+import { obterSaldoItemEstoque, obterCustoUnitarioItem, calcularValorItemEstoque } from '../domain/estoque.js';
 import { isModoConsolidado, construirMapaFazendas } from '../domain/escopoFazenda';
 import { useSubmitOnce } from '../hooks/useSubmitOnce.js';
 import { itemEhNutricao } from './estoqueLogic.js';
@@ -63,26 +64,13 @@ function parseSafeNumber(value) {
   return Number.isFinite(parsed) ? parsed : null;
 }
 
+// Sprint 6: delega para a fonte única (domain/estoque.js). Esta função tinha a
+// mesma lista de 8 campos corrigida em `estoqueSanidade.js` na Sprint 5, mas
+// passou despercebida — começava por `saldo`, `saldoAtual` e `saldo_atual`,
+// que NÃO existem na tabela `estoque` (verificado no schema de produção).
+// Medido no mesmo item: 55 aqui contra 30 na fonte única.
 function getCurrentItemStockBalance(item) {
-  if (!item || typeof item !== 'object') return 0;
-
-  const candidateKeys = [
-    'saldo',
-    'saldoAtual',
-    'saldo_atual',
-    'quantidade_atual',
-    'quantidadeAtual',
-    'estoque_atual',
-    'estoqueAtual',
-    'quantidade',
-  ];
-
-  for (const key of candidateKeys) {
-    const parsed = parseSafeNumber(item[key]);
-    if (parsed != null) return parsed;
-  }
-
-  return 0;
+  return obterSaldoItemEstoque(item);
 }
 
 function getCadastroItemInicial(data) {
@@ -163,7 +151,10 @@ export default function EstoquePage({ db, setDb, onRegistrarSaidaEstoque, onRegi
         diasRest,
         coberturaPlanejada,
         fazendaNome: fazendasMap.get(Number(item.fazenda_id)) || 'Sem fazenda',
-        valorTotal: saldo * Number(item.valor_unitario || item.preco_unitario || 0),
+        // Sprint 6: delega para a fonte única — evita recalcular o valor com
+        // um fallback próprio (que pulava `custo_unitario`) e divergir do
+        // Painel Geral, que já usa `calcularValorTotalEstoque`.
+        valorTotal: calcularValorItemEstoque(item),
         status,
       };
     });
@@ -371,7 +362,7 @@ export default function EstoquePage({ db, setDb, onRegistrarSaidaEstoque, onRegi
                 </div>
                 <div className="estoque-card-details">
                   {consolidado ? <div className="estoque-detail-row"><span>Fazenda</span><span>{item.fazendaNome}</span></div> : null}
-                  <div className="estoque-detail-row"><span>Valor unitário</span><span>{formatCurrency(item.valor_unitario || item.preco_unitario || 0)}</span></div>
+                  <div className="estoque-detail-row"><span>Valor unitário</span><span>{formatCurrency(obterCustoUnitarioItem(item))}</span></div>
                   <div className="estoque-detail-row"><span>Valor total</span><span>{formatCurrency(item.valorTotal)}</span></div>
                   <div className="estoque-detail-row"><span>Consumo médio diário</span><span>{formatNumber(item.mediaConsumo, 2)} {item.unidade}</span></div>
                   <div className="estoque-detail-row"><span>Dias restantes</span><span>{item.diasRest > 900 ? '—' : `${formatNumber(item.diasRest, 0)} dias`}</span></div>
@@ -598,7 +589,7 @@ function EntradaModal({ db, selectedItem, onRegistrarEntradaEstoque, estoqueMap,
   const [form, setForm] = useState({
     item_id: selectedItem?.id || '',
     qtd: '',
-    custo: selectedItem?.valor_unitario || selectedItem?.preco_unitario || '',
+    custo: selectedItem ? (obterCustoUnitarioItem(selectedItem) || '') : '',
     validade: '',
     fornecedor: '',
     nf: '',

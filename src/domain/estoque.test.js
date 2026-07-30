@@ -491,6 +491,84 @@ test('Telegram mantém `quantidade` em sincronia com `quantidade_atual`', () => 
   assert.equal(patch.quantidade, 60, 'atualizar só uma coluna fazia as telas divergirem');
 });
 
+// ── Painel Geral × Estoque: mesma regra de domínio (Sprint 6) ──────────────
+// DashboardPage.jsx e EstoquePage.jsx passaram a delegar saldo, custo
+// unitário e valor total inteiramente para estas funções (antes cada tela
+// tinha sua própria leitura de `quantidade_atual`/`preco_unitario`). Os
+// quatro cenários abaixo são os mesmos cobrados na auditoria: item parado,
+// item com entrada, item com saída e item reabastecido a um custo diferente
+// — este último é o caso que gerava a divergência de −33,3% entre as duas
+// telas (ver comentário em DashboardPage.jsx).
+
+function dbEstoqueComEspelhoAntigo({ quantidade_atual, valor_unitario, preco_unitario = valor_unitario, fazenda_id = 1 } = {}) {
+  return {
+    estoque: [{
+      id: 1, produto: 'Sal mineral', unidade: 'kg', fazenda_id,
+      quantidade_atual, quantidade: quantidade_atual, valor_unitario, preco_unitario,
+    }],
+    movimentacoes_estoque: [],
+    movimentacoes_financeiras: [],
+    lotes: [{ id: 1, nome: 'Lote A', faz_id: 1, qtd: 20 }],
+    animais: [],
+  };
+}
+
+test('item sem movimentação: saldo e valor total são consistentes e não geram NaN', () => {
+  const db = dbEstoqueComEspelhoAntigo({ quantidade_atual: 0, valor_unitario: 0 });
+  const item = db.estoque[0];
+  assert.equal(obterSaldoItemEstoque(item), 0);
+  assert.equal(calcularValorItemEstoque(item), 0);
+  assert.equal(calcularValorTotalEstoque(db), 0);
+});
+
+test('item com uma entrada: Estoque e Painel Geral calculam o mesmo valor, pelo custo real da compra', () => {
+  const db = registrarEntradaEstoque(
+    dbEstoqueComEspelhoAntigo({ quantidade_atual: 0, valor_unitario: 0, preco_unitario: 0 }),
+    { itemId: 1, qtd: 100, custo: 2, data: '2026-01-01' },
+    ...semPersistir
+  );
+  const item = db.estoque[0];
+  assert.equal(obterSaldoItemEstoque(item), 100);
+  assert.equal(calcularValorItemEstoque(item), 200);
+  assert.equal(calcularValorTotalEstoque(db), 200, 'Painel Geral tem que bater com o item individual do Estoque');
+});
+
+test('item com saída: saldo cai, mas custo médio e valor total não mudam em nenhuma das duas telas', () => {
+  let db = registrarEntradaEstoque(
+    dbEstoqueComEspelhoAntigo({ quantidade_atual: 0, valor_unitario: 0, preco_unitario: 0 }),
+    { itemId: 1, qtd: 100, custo: 2, data: '2026-01-01' },
+    ...semPersistir
+  );
+  db = registrarSaidaEstoque(db, { itemId: 1, loteId: 1, quantidade: 40, tipo: 'consumo', data: '2026-02-01' }, ...semPersistir);
+
+  const item = db.estoque[0];
+  assert.equal(obterSaldoItemEstoque(item), 60);
+  assert.equal(obterCustoUnitarioItem(item), 2, 'saída não repondera a média');
+  assert.equal(calcularValorItemEstoque(item), 120);
+  assert.equal(calcularValorTotalEstoque(db), 120);
+});
+
+test('item com reposição por valor diferente: valor total usa a média móvel, não o preco_unitario congelado (bug medido na auditoria)', () => {
+  // Cadastro: 100 kg a R$ 2,00 — preco_unitario nasce = valor_unitario = 2 e
+  // não é mais tocado pelas entradas seguintes (services/movimentacoes.js só
+  // repondera `valor_unitario`).
+  const cadastro = dbEstoqueComEspelhoAntigo({ quantidade_atual: 100, valor_unitario: 2, preco_unitario: 2 });
+  // Reposição a um custo diferente: +100 kg a R$ 4,00.
+  const db = registrarEntradaEstoque(cadastro, { itemId: 1, qtd: 100, custo: 4, data: '2026-02-01' }, ...semPersistir);
+
+  const item = db.estoque[0];
+  assert.equal(item.quantidade_atual, 200);
+  assert.equal(item.valor_unitario, 3, 'média móvel: (100×2 + 100×4) / 200');
+  assert.equal(item.preco_unitario, 2, 'espelho legado não é tocado pela entrada — continua o valor do cadastro');
+
+  const valorReal = calcularValorItemEstoque(item);
+  const valorComEspelhoAntigo = obterSaldoItemEstoque(item) * Number(item.preco_unitario || 0);
+
+  assert.equal(valorReal, 600, 'dinheiro realmente gasto: 100×2 + 100×4');
+  assert.equal(valorComEspelhoAntigo, 400, 'o valor que o Painel Geral mostrava antes da Sprint 6 — 33,3% a menos');
+  assert.equal(calcularValorTotalEstoque(db), 600, 'Painel Geral (calcularValorTotalEstoque) e Estoque (calcularValorItemEstoque) concordam');
+});
+
 test('app web e Telegram chegam ao mesmo saldo final para a mesma saída', () => {
   const item = { id: 1, produto: 'Sal', unidade: 'kg', fazenda_id: 1, quantidade_atual: 100, quantidade: 100, valor_unitario: 3 };
 

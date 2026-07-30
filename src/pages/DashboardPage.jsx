@@ -41,6 +41,7 @@ import { gerarNovoId } from '../utils/id';
 import { createOperationalRecord, updateOperationalRecord } from '../services/operationalPersistence';
 import { useAuth } from '../auth/useAuth';
 import { useToast } from '../hooks/useToast';
+import { calcularValorTotalEstoque, obterSaldoItemEstoque, obterCustoUnitarioItem, calcularValorItemEstoque } from '../domain/estoque.js';
 import '../styles/dashboard.css';
 
 import { hojeLocalISO } from '../domain/dataCivil.js';
@@ -147,7 +148,9 @@ export default function DashboardPage({
           acc.pesoPonderado += item.indicators.pesoAtualMedio * item.indicators.totalAnimais;
           acc.receitaMes += item.indicators.receitaTotal;
           acc.custoMes += item.indicators.custoTotal;
-          acc.gmdTotal += item.indicators.gmdMedio;
+          // Sprint 6: `gmdTotal` foi removido — somava o GMD MÉDIO de cada
+          // lote, o que não significa nada (soma de médias não é média), e
+          // nunca era lido por ninguém.
           return acc;
         },
         {
@@ -155,7 +158,6 @@ export default function DashboardPage({
           pesoPonderado: 0,
           receitaMes: 0,
           custoMes: 0,
-          gmdTotal: 0,
         }
       ),
     [lotesStats]
@@ -177,7 +179,7 @@ export default function DashboardPage({
     () =>
       (db.estoque || [])
         .map((item) => {
-          const atual = Number(item.quantidade_atual || 0);
+          const atual = obterSaldoItemEstoque(item);
           const min = Number(item.quantidade_minima || 0);
           const ratio = min ? Math.min((atual / min) * 100, 100) : 100;
           return { ...item, ratio, critico: atual <= min };
@@ -187,15 +189,13 @@ export default function DashboardPage({
     [db.estoque]
   );
 
-  const valorTotalEstoque = useMemo(
-    () =>
-      (db.estoque || []).reduce(
-        (acc, item) =>
-          acc + Number(item.preco_unitario || 0) * Number(item.quantidade_atual || 0),
-        0
-      ),
-    [db.estoque]
-  );
+  // Sprint 6: usa a fonte única (domain/estoque.js). Antes multiplicava por
+  // `preco_unitario` — coluna espelho congelada no cadastro, que a entrada de
+  // estoque nunca atualiza (só `valor_unitario` recebe a média móvel). Medido:
+  // item comprado a R$ 2,00 e reabastecido a R$ 4,00 aparecia por R$ 400,00 no
+  // Painel Geral contra R$ 600,00 no Estoque (−33,3%), sendo R$ 600,00 o
+  // dinheiro realmente gasto.
+  const valorTotalEstoque = useMemo(() => calcularValorTotalEstoque(db), [db]);
 
   const alertasFormatados = useMemo(
     () =>
@@ -827,7 +827,11 @@ export default function DashboardPage({
               </thead>
               <tbody>
                 {(db.estoque || []).map((item) => {
-                  const critico = Number(item.quantidade_atual) <= Number(item.quantidade_minima || 0);
+                  // Sprint 6: mesma fonte única do restante da tela — saldo e
+                  // valor aqui têm que bater com a página de Estoque, não uma
+                  // leitura própria de `quantidade_atual`/`preco_unitario`.
+                  const saldo = obterSaldoItemEstoque(item);
+                  const critico = saldo <= Number(item.quantidade_minima || 0);
                   return (
                     <tr key={item.id}>
                       <td>{item.nome || item.produto}</td>
@@ -835,7 +839,7 @@ export default function DashboardPage({
                         <span className="badge-categoria">{item.categoria}</span>
                       </td>
                       <td>
-                        {item.quantidade_atual} {item.unidade}
+                        {saldo} {item.unidade}
                       </td>
                       <td>
                         {item.quantidade_minima || '-'} {item.unidade}
@@ -846,8 +850,8 @@ export default function DashboardPage({
                         </span>
                       </td>
                       <td>
-                        {item.preco_unitario
-                          ? formatarMoeda(item.preco_unitario * item.quantidade_atual)
+                        {obterCustoUnitarioItem(item)
+                          ? formatarMoeda(calcularValorItemEstoque(item))
                           : '-'}
                       </td>
                     </tr>
