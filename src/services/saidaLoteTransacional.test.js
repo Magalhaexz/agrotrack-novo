@@ -81,8 +81,29 @@ function makeFakeClient({ lotes = [{ id: 1, qtd: 50, status: 'ativo' }], falhaDe
         };
       }
 
-      // Transação: baixa + movimentação + (venda/abate com valor) financeiro.
+      // Mesma validação de destino da migration 20260717120000: destino
+      // obrigatório, diferente da origem, existente e não finalizado.
+      let destino = null;
+      if (params.p_tipo === 'transferencia_saida') {
+        if (params.p_destino_lote_id == null) {
+          return { data: null, error: { code: '22004', message: 'Informe o lote de destino.' } };
+        }
+        if (Number(params.p_destino_lote_id) === Number(params.p_lote_id)) {
+          return { data: null, error: { code: '22023', message: 'Origem e destino não podem ser o mesmo lote.' } };
+        }
+        destino = lotes.find((l) => Number(l.id) === Number(params.p_destino_lote_id));
+        if (!destino) {
+          return { data: null, error: { code: '42501', message: 'Lote de destino não encontrado ou não pertence à sua conta.' } };
+        }
+        if (['encerrado', 'vendido'].includes(destino.status)) {
+          return { data: null, error: { code: '22023', message: 'O lote de destino está finalizado e não aceita novas movimentações.' } };
+        }
+      }
+
+      // Transação: baixa da origem + (transferência: alta do destino) +
+      // movimentação + (venda/abate com valor) financeiro.
       lote.qtd -= params.p_qtd;
+      if (destino) destino.qtd += params.p_qtd;
       const movimentacaoId = (proximoMovId += 1);
       const geraReceita = ['venda', 'abate'].includes(params.p_tipo) && (params.p_valor_total || 0) > 0;
       const financeiroId = geraReceita ? (proximoFinId += 1) : null;
@@ -95,10 +116,10 @@ const opcoes = (client) => ({ session, client, persist: false, userContext: { id
 
 // ── Roteamento ───────────────────────────────────────────────────────────────
 
-test('usaSaidaTransacional cobre venda e morte, e deixa transferência no caminho antigo', () => {
+test('usaSaidaTransacional cobre venda, morte e transferência (P1-02)', () => {
   assert.equal(usaSaidaTransacional('venda'), true);
   assert.equal(usaSaidaTransacional('morte'), true);
-  assert.equal(usaSaidaTransacional('transferencia_saida'), false);
+  assert.equal(usaSaidaTransacional('transferencia_saida'), true);
   assert.equal(usaSaidaTransacional(undefined), false);
 });
 
@@ -499,6 +520,151 @@ test('a saída fica registrada na auditoria com a criticidade certa', async () =
   assert.equal(venda.aplicar(db).auditoria.at(-1).acao, 'saida_animal');
 });
 
+// ── 9. Transferência (P1-02) — mesmo caminho transacional do Telegram ──────
+
+const makeLoteDestino = (o = {}) => ({ id: 2, nome: 'Lote B', qtd: 20, p_at: 350, status: 'ativo', ...o });
+const makeAnimalDestino = (o = {}) => ({ id: 2, lote_id: 2, qtd: 20, p_at: 350, ...o });
+
+test('transferência válida: decrementa a origem, incrementa o destino e sincroniza os dois grupos de animais', async () => {
+  const db = makeDb({
+    lotes: [makeLote(), makeLoteDestino()],
+    animais: [makeAnimal(), makeAnimalDestino()],
+  });
+  const client = makeFakeClient({ lotes: [{ id: 1, qtd: 50, status: 'ativo' }, { id: 2, qtd: 20, status: 'ativo' }] });
+
+  const resultado = await registrarSaidaLoteTransacional(db, {
+    loteId: 1, tipoSaida: 'transferencia_saida', qtd: 10, pesoMedio: 400, data: hoje, destinoLoteId: 2,
+  }, opcoes(client));
+
+  assert.equal(resultado.ok, true);
+  assert.equal(client.chamadas[0].params.p_destino_lote_id, 2);
+  assert.equal(client.lotesServidor[0].qtd, 40, 'origem decrementada no servidor');
+  assert.equal(client.lotesServidor[1].qtd, 30, 'destino incrementado no servidor');
+
+  const proximo = resultado.aplicar(db);
+  assert.equal(proximo.lotes.find((l) => l.id === 1).qtd, 40);
+  assert.equal(proximo.lotes.find((l) => l.id === 2).qtd, 30);
+  assert.equal(proximo.animais.find((a) => a.id === 1).qtd, 40, 'grupo da origem acompanha a baixa');
+  assert.equal(proximo.animais.find((a) => a.id === 2).qtd, 30, 'grupo do destino acompanha a alta');
+  // Reponderação do destino: (20×350 + 10×400) / 30.
+  assert.equal(proximo.lotes.find((l) => l.id === 2).p_at, (20 * 350 + 10 * 400) / 30);
+  assert.equal(proximo.lotes.find((l) => l.id === 1).p_at, 400, 'peso médio da origem não é recalculado (mesma regra da venda/morte)');
+});
+
+test('transferência: a movimentação registrada aponta o lote de destino e nunca gera receita', async () => {
+  const db = makeDb({ lotes: [makeLote(), makeLoteDestino()], animais: [makeAnimal(), makeAnimalDestino()] });
+  const client = makeFakeClient({ lotes: [{ id: 1, qtd: 50, status: 'ativo' }, { id: 2, qtd: 20, status: 'ativo' }] });
+
+  const resultado = await registrarSaidaLoteTransacional(db, {
+    loteId: 1, tipoSaida: 'transferencia_saida', qtd: 10, pesoMedio: 400, data: hoje, destinoLoteId: 2, valorTotal: 9999,
+  }, opcoes(client));
+
+  assert.equal(client.chamadas[0].params.p_valor_total, 0, 'transferência nunca leva valor à RPC, mesmo informado por engano');
+  const proximo = resultado.aplicar(db);
+  assert.equal(proximo.movimentacoes_animais[0].destino_lote_id, 2);
+  assert.equal(proximo.movimentacoes_financeiras.length, 0, 'transferência não é receita nem despesa');
+  assert.equal(resultado.ids.financeiroId, null);
+});
+
+test('transferência acima do saldo da origem é rejeitada e não grava nada', async () => {
+  const db = makeDb({ lotes: [makeLote({ qtd: 5 }), makeLoteDestino()], animais: [makeAnimal({ qtd: 5 }), makeAnimalDestino()] });
+  const client = makeFakeClient({ lotes: [{ id: 1, qtd: 5, status: 'ativo' }, { id: 2, qtd: 20, status: 'ativo' }] });
+
+  const resultado = await registrarSaidaLoteTransacional(db, {
+    loteId: 1, tipoSaida: 'transferencia_saida', qtd: 10, pesoMedio: 400, data: hoje, destinoLoteId: 2,
+  }, opcoes(client));
+
+  assert.equal(resultado.ok, false);
+  assert.match(resultado.erro, /Quantidade indispon[íi]vel/);
+  assert.equal(client.chamadas.length, 0, 'barrada localmente, sem nem chamar a RPC');
+  assert.equal(client.lotesServidor[0].qtd, 5);
+  assert.equal(client.lotesServidor[1].qtd, 20);
+});
+
+test('lote de origem encerrado recusa a transferência localmente', async () => {
+  const db = makeDb({ lotes: [makeLote({ status: 'encerrado' }), makeLoteDestino()], animais: [makeAnimal(), makeAnimalDestino()] });
+  const client = makeFakeClient({ lotes: [{ id: 1, qtd: 50, status: 'encerrado' }, { id: 2, qtd: 20, status: 'ativo' }] });
+
+  const resultado = await registrarSaidaLoteTransacional(db, {
+    loteId: 1, tipoSaida: 'transferencia_saida', qtd: 5, pesoMedio: 400, data: hoje, destinoLoteId: 2,
+  }, opcoes(client));
+
+  assert.equal(resultado.ok, false);
+  assert.match(resultado.erro, /finalizado/i);
+  assert.equal(client.chamadas.length, 0);
+});
+
+test('lote de destino inexistente recusa a transferência localmente', async () => {
+  const db = makeDb({ lotes: [makeLote()], animais: [makeAnimal()] });
+  const client = makeFakeClient();
+
+  const resultado = await registrarSaidaLoteTransacional(db, {
+    loteId: 1, tipoSaida: 'transferencia_saida', qtd: 5, pesoMedio: 400, data: hoje, destinoLoteId: 999,
+  }, opcoes(client));
+
+  assert.equal(resultado.ok, false);
+  assert.match(resultado.erro, /destino.*999.*não encontrado/i);
+  assert.equal(client.chamadas.length, 0);
+});
+
+test('lote de destino encerrado recusa a transferência localmente', async () => {
+  const db = makeDb({ lotes: [makeLote(), makeLoteDestino({ status: 'vendido' })], animais: [makeAnimal(), makeAnimalDestino()] });
+  const client = makeFakeClient();
+
+  const resultado = await registrarSaidaLoteTransacional(db, {
+    loteId: 1, tipoSaida: 'transferencia_saida', qtd: 5, pesoMedio: 400, data: hoje, destinoLoteId: 2,
+  }, opcoes(client));
+
+  assert.equal(resultado.ok, false);
+  assert.match(resultado.erro, /destino está finalizado/i);
+  assert.equal(client.chamadas.length, 0);
+});
+
+test('origem e destino iguais são rejeitados localmente', async () => {
+  const db = makeDb({ lotes: [makeLote()], animais: [makeAnimal()] });
+  const client = makeFakeClient();
+
+  const resultado = await registrarSaidaLoteTransacional(db, {
+    loteId: 1, tipoSaida: 'transferencia_saida', qtd: 5, pesoMedio: 400, data: hoje, destinoLoteId: 1,
+  }, opcoes(client));
+
+  assert.equal(resultado.ok, false);
+  assert.match(resultado.erro, /origem e destino devem ser diferentes/i);
+  assert.equal(client.chamadas.length, 0);
+});
+
+test('falha de rede na transferência: nenhum aplicar, estado local intocado', async () => {
+  const db = makeDb({ lotes: [makeLote(), makeLoteDestino()], animais: [makeAnimal(), makeAnimalDestino()] });
+  const client = makeFakeClient({ falhaDeRede: new Error('Failed to fetch') });
+
+  const resultado = await registrarSaidaLoteTransacional(db, {
+    loteId: 1, tipoSaida: 'transferencia_saida', qtd: 10, pesoMedio: 400, data: hoje, destinoLoteId: 2,
+  }, opcoes(client));
+
+  assert.equal(resultado.ok, false);
+  assert.equal(resultado.aplicar, null);
+  assert.equal(db.lotes[0].qtd, 50, 'origem intocada');
+  assert.equal(db.lotes[1].qtd, 20, 'destino intocado');
+  assert.equal(db.movimentacoes_animais.length, 0);
+});
+
+test('duas transferências concorrentes não ultrapassam o saldo: o navegador estava desatualizado e o servidor recusa', async () => {
+  // Outra aba já transferiu 48 das 50 cabeças; este `db` ainda mostra 50.
+  const db = makeDb({ lotes: [makeLote({ qtd: 50 }), makeLoteDestino()], animais: [makeAnimal({ qtd: 50 }), makeAnimalDestino()] });
+  const client = makeFakeClient({ lotes: [{ id: 1, qtd: 2, status: 'ativo' }, { id: 2, qtd: 68, status: 'ativo' }] });
+
+  const resultado = await registrarSaidaLoteTransacional(db, {
+    loteId: 1, tipoSaida: 'transferencia_saida', qtd: 10, pesoMedio: 400, data: hoje, destinoLoteId: 2,
+  }, opcoes(client));
+
+  assert.equal(resultado.ok, false, 'a validação local passou; quem barra é o FOR UPDATE do servidor');
+  assert.match(resultado.erro, /excede o saldo do lote/);
+  assert.equal(client.lotesServidor[0].qtd, 2, 'origem inalterada no servidor');
+  assert.equal(client.lotesServidor[1].qtd, 68, 'destino inalterado no servidor — nada gravado pela metade');
+  assert.equal(db.lotes[0].qtd, 50, 'o db local não foi mutado');
+  assert.equal(db.lotes[1].qtd, 20, 'o db local não foi mutado');
+});
+
 // ── Plano local (validações de formulário) ──────────────────────────────────
 
 test('planejarSaidaLoteTransacional recusa entradas inválidas antes de qualquer I/O', () => {
@@ -510,7 +676,7 @@ test('planejarSaidaLoteTransacional recusa entradas inválidas antes de qualquer
   assert.match(planejarSaidaLoteTransacional(db, { ...base, qtd: -3 }).erro, /quantidade/i);
   assert.match(planejarSaidaLoteTransacional(db, { ...base, pesoMedio: 0 }).erro, /peso médio/i);
   assert.match(planejarSaidaLoteTransacional(db, { ...base, loteId: 999 }).erro, /não encontrado/i);
-  assert.match(planejarSaidaLoteTransacional(db, { ...base, tipoSaida: 'transferencia_saida' }).erro, /não suportado/i);
+  assert.match(planejarSaidaLoteTransacional(db, { ...base, tipoSaida: 'transferencia_saida' }).erro, /lote de destino/i);
 });
 
 test('planejarSaidaLoteTransacional usa lote.qtd como saldo canônico, não animais.qtd desatualizado', () => {

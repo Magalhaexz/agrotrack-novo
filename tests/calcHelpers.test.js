@@ -6,6 +6,7 @@ import {
   calculateDailyConsumptionKg,
   calculateEstimatedDays,
   daysBetween,
+  parseMoedaBRL,
   toNumber,
 } from '../src/domain/calcHelpers.js';
 import {
@@ -64,4 +65,26 @@ test('calc helpers: UA e capacidade tratam strings e valores ausentes', () => {
 test('calc helpers: dias entre datas eh seguro para entradas invalidas', () => {
   assert.equal(daysBetween('2026-01-01', '2026-01-10'), 9);
   assert.equal(daysBetween('data-invalida', '2026-01-10'), 0);
+});
+
+test('parseMoedaBRL: ponto isolado eh sempre separador de milhar (P1-12)', () => {
+  assert.equal(parseMoedaBRL('250.000'), 250000);
+  assert.equal(parseMoedaBRL('250.000,00'), 250000);
+  assert.equal(parseMoedaBRL('250000'), 250000);
+  assert.equal(parseMoedaBRL(250000), 250000);
+  assert.equal(parseMoedaBRL('250,50'), 250.5);
+  assert.equal(parseMoedaBRL('R$ 250.000,00'), 250000);
+  assert.equal(parseMoedaBRL('1.234.567,89'), 1234567.89);
+});
+
+test('parseMoedaBRL: vazio, invalido e negativo nao quebram o calculo', () => {
+  assert.equal(parseMoedaBRL(''), 0);
+  assert.equal(parseMoedaBRL('   '), 0);
+  assert.equal(parseMoedaBRL(null), 0);
+  assert.equal(parseMoedaBRL(undefined), 0);
+  assert.equal(parseMoedaBRL('texto'), 0);
+  assert.equal(parseMoedaBRL('-150000'), -150000);
+  assert.equal(parseMoedaBRL('-250.000,50'), -250000.5);
+  assert.equal(Number.isFinite(parseMoedaBRL('abc.def')), true);
+  assert.equal(Number.isFinite(parseMoedaBRL(Infinity)), true);
 });

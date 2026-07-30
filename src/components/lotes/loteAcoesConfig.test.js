@@ -4,10 +4,12 @@ import { LOTE_ACOES } from './loteAcoesConfig.js';
 
 // Fonte única do menu de ações do lote (Seção 2 do sprint de fechamento) —
 // garante que LoteCard e LoteDetailsPanel nunca voltem a divergir (bug 1.1/1.4).
-test('LOTE_ACOES tem exatamente as 7 ações do menu padronizado, na ordem', () => {
+// Sprint Visual 6: "novaPesagem" entrou como atalho para o fluxo já existente
+// de cadastro de pesagem (reaproveitado via navigationIntent, sem lógica nova).
+test('LOTE_ACOES tem exatamente as 8 ações do menu padronizado, na ordem', () => {
   assert.deepEqual(
     LOTE_ACOES.map((a) => a.id),
-    ['editar', 'ajusteLotacao', 'venda', 'mortePerda', 'transferenciaSaida', 'trocarPasto', 'finalizar']
+    ['novaPesagem', 'editar', 'ajusteLotacao', 'venda', 'mortePerda', 'transferenciaSaida', 'trocarPasto', 'finalizar']
   );
 });
 

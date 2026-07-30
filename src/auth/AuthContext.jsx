@@ -55,6 +55,7 @@ function buildFallbackProfile(userAtual, cachedProfile = null) {
     foto_url: cachedProfile?.foto_url ?? userAtual?.user_metadata?.avatar_url ?? null,
     telefone: cachedProfile?.telefone ?? userAtual?.user_metadata?.telefone ?? '',
     cargo: cachedProfile?.cargo ?? userAtual?.user_metadata?.cargo ?? '',
+    fazenda_id: cachedProfile?.fazenda_id ?? null,
     profile: cachedProfile || null,
   };
 }

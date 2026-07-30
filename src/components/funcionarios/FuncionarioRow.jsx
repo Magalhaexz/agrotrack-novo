@@ -1,3 +1,5 @@
+import Badge from '../ui/Badge';
+
 function iniciais(nome) {
   return String(nome || 'US')
     .split(' ')
@@ -37,7 +39,7 @@ export default function FuncionarioRow({ funcionario, fazendaNome = '—', onEdi
 
       <div className="funcionario-phone">{funcionario.telefone || funcionario.email || '—'}</div>
 
-      <span className={`funcionario-status ${ativo ? 'badge-ativo' : desligado ? 'badge-r' : 'badge-inativo'}`}>{ativo ? 'Ativo' : desligado ? 'Desligado' : 'Inativo'}</span>
+      <Badge variant={ativo ? 'success' : desligado ? 'danger' : 'neutral'}>{ativo ? 'Ativo' : desligado ? 'Desligado' : 'Inativo'}</Badge>
       <div className="row-actions row-actions--tight" onClick={(e) => e.stopPropagation()}>
         {ativo ? <button className="action-btn" onClick={onDesativar}>Desativar</button> : <button className="action-btn" onClick={onReativar}>Reativar</button>}
         {!desligado ? <button className="action-btn action-btn-danger" onClick={onDesligar}>Marcar desligado</button> : null}

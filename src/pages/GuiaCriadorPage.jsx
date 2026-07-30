@@ -91,16 +91,18 @@ export default function GuiaCriadorPage({ db, onNavigate }) {
         </div>
       </Card>
 
-      {SECOES.map((secao) => (
-        <Card key={secao.titulo} title={secao.titulo}>
-          <div className="summary-panel" style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-            <p style={{ margin: 0 }}>{secao.texto}</p>
-            <div>
-              <Button size="sm" onClick={() => onNavigate?.(secao.rota)}>{secao.acao}</Button>
+      <div className="report-kpi-grid">
+        {SECOES.map((secao) => (
+          <Card key={secao.titulo} title={secao.titulo}>
+            <div className="summary-panel" style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+              <p style={{ margin: 0 }}>{secao.texto}</p>
+              <div>
+                <Button size="sm" onClick={() => onNavigate?.(secao.rota)}>{secao.acao}</Button>
+              </div>
             </div>
-          </div>
-        </Card>
-      ))}
+          </Card>
+        ))}
+      </div>
 
       <Card title="Precisa de ajuda?">
         <div className="summary-panel" style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>

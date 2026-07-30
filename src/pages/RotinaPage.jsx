@@ -9,6 +9,7 @@ import EmptyState from '../components/EmptyState';
 import PageHeader from '../components/PageHeader'; // Importar PageHeader
 import { Plus } from 'lucide-react'; // Importar ícone
 import { useAuth } from '../auth/useAuth';
+import { isModoConsolidado, construirMapaFazendas } from '../domain/escopoFazenda';
 import {
   createOperationalRecord,
   deleteOperationalRecord,
@@ -19,7 +20,7 @@ import { hojeLocalISO } from '../domain/dataCivil.js';
 
 const MENSAGEM_SEM_PERMISSAO = 'Você não tem permissão para executar esta ação.';
 
-export default function RotinaPage({ db, setDb, onConfirmAction }) {
+export default function RotinaPage({ db, setDb, onConfirmAction, fazendaSelecionada = null }) {
   const { showToast } = useToast(); // Usar o hook de toast
   const { session, hasPermission } = useAuth();
 
@@ -39,6 +40,12 @@ export default function RotinaPage({ db, setDb, onConfirmAction }) {
     return map;
   }, [db?.lotes]);
 
+  // Sprint Visual 8: só identifica a fazenda de cada rotina/tarefa para
+  // exibição (via lote → fazenda) — esta página nunca filtrou por fazenda
+  // ativa, e isso não muda aqui (ver limitações da sprint).
+  const consolidado = isModoConsolidado(fazendaSelecionada);
+  const fazendasMap = useMemo(() => construirMapaFazendas(db), [db]);
+
   const rotinas = useMemo(() => (Array.isArray(db?.rotinas) ? db.rotinas : []), [db]);
 
   const hojeStr = useMemo(() => hojeLocalISO(), []);
@@ -53,9 +60,10 @@ export default function RotinaPage({ db, setDb, onConfirmAction }) {
         funcionarioNome: funcionario?.nome || '—',
         funcionarioFuncao: funcionario?.funcao || '—',
         loteNome: lote?.nome || '—',
+        fazendaNome: lote ? (fazendasMap.get(Number(lote.faz_id)) || 'Sem fazenda') : null,
       };
     });
-  }, [rotinas, funcionariosMap, lotesMap]);
+  }, [rotinas, funcionariosMap, lotesMap, fazendasMap]);
 
   const tarefasAvulsas = useMemo(() => dadosBase.filter((item) => !item.recorrente), [dadosBase]);
   const tarefasRecorrentes = useMemo(() => dadosBase.filter((item) => item.recorrente), [dadosBase]);
@@ -248,7 +256,7 @@ export default function RotinaPage({ db, setDb, onConfirmAction }) {
     <div className="page rotina-page">
       <PageHeader
         title="Rotinas e Tarefas"
-        subtitle="Gerencie as atividades diárias e recorrentes da sua fazenda."
+        subtitle={`${consolidado ? 'Todas as fazendas' : (fazendaSelecionada?.nome || 'Todas as fazendas')} · Gerencie as atividades diárias e recorrentes da sua fazenda.`}
         actions={<Button icon={<Plus size={16} />} onClick={abrirNovo}>Nova Tarefa</Button>}
       />
 
@@ -342,7 +350,7 @@ function TodoList({ items, vazioTitulo, vazioTexto, destaque, onToggleStatus, on
               <div className="todo-card-title">
                 {item.tarefa}{' '}
                 {item._instanciaRecorrente ? (
-                  <span className="badge b-blue" style={{ marginLeft: 8 }}>
+                  <span className="badge badge-n" style={{ marginLeft: 8 }}>
                     Recorrente
                   </span>
                 ) : null}
@@ -350,7 +358,7 @@ function TodoList({ items, vazioTitulo, vazioTexto, destaque, onToggleStatus, on
 
               <div className="todo-card-meta">
                 {item.funcionarioNome} • {item.setor}
-                {item.lote_id ? ` • ${item.loteNome}` : ''}
+                {item.lote_id ? ` • ${item.loteNome}${item.fazendaNome ? ` (${item.fazendaNome})` : ''}` : ''}
               </div>
             </div>
 
@@ -443,7 +451,7 @@ function renderStatus(status) {
   }
 
   if (status === 'em_andamento') {
-    return <span className="badge b-blue">Em andamento</span>;
+    return <span className="badge badge-n">Em andamento</span>;
   }
 
   if (status === 'concluido') {

@@ -35,6 +35,51 @@ export function toNonNegativeNumber(value) {
   return Math.max(0, toNumber(value));
 }
 
+/**
+ * Parser monetário brasileiro (P1-12) — separado de toNumber() de propósito.
+ * Em notação BR, um ponto isolado (sem vírgula) é SEMPRE separador de milhar
+ * ("250.000" = 250 mil), nunca decimal; toNumber() não pode assumir isso
+ * porque é usado por peso/GMD/UA/arroba, que também recebem números "soltos"
+ * (formato US/JSON, onde o ponto É decimal). Use esta função só em campos
+ * monetários (R$).
+ */
+export function parseMoedaBRL(value) {
+  if (typeof value === 'number') {
+    return Number.isFinite(value) ? value : 0;
+  }
+  if (typeof value !== 'string') {
+    const parsed = Number(value);
+    return Number.isFinite(parsed) ? parsed : 0;
+  }
+
+  const semEspacos = value.trim().replace(/\s+/g, '');
+  if (!semEspacos) return 0;
+
+  const negativo = semEspacos.startsWith('-');
+  const semSinalNemSimbolo = semEspacos.replace(/[^0-9.,-]/g, '').replace(/-/g, '');
+  if (!semSinalNemSimbolo) return 0;
+
+  const ultimaVirgula = semSinalNemSimbolo.lastIndexOf(',');
+  const ultimoPonto = semSinalNemSimbolo.lastIndexOf('.');
+
+  let normalized;
+  if (ultimaVirgula > -1 && ultimoPonto > -1) {
+    normalized = ultimaVirgula > ultimoPonto
+      ? semSinalNemSimbolo.replace(/\./g, '').replace(',', '.')
+      : semSinalNemSimbolo.replace(/,/g, '');
+  } else if (ultimaVirgula > -1) {
+    normalized = semSinalNemSimbolo.replace(',', '.');
+  } else if (ultimoPonto > -1) {
+    normalized = semSinalNemSimbolo.replace(/\./g, '');
+  } else {
+    normalized = semSinalNemSimbolo;
+  }
+
+  const parsed = Number(normalized);
+  if (!Number.isFinite(parsed)) return 0;
+  return negativo ? -parsed : parsed;
+}
+
 export function safeDivide(value, divisor, fallback = 0) {
   const safeDivisor = toNumber(divisor);
   if (!safeDivisor) return fallback;

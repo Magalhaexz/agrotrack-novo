@@ -18,6 +18,7 @@ import {
   rotuloCustoPorEmbalagem,
   resolverCustoPorEmbalagemParaEdicao,
 } from '../domain/custoProdutoNutricional';
+import { isModoConsolidado, construirMapaFazendas } from '../domain/escopoFazenda';
 
 function getActiveFarmId(fazendaSelecionada) {
   const direct = fazendaSelecionada?.id ?? fazendaSelecionada?.fazenda_id ?? fazendaSelecionada?.fazendaSelecionadaId ?? null;
@@ -108,6 +109,11 @@ export default function SuplementacaoPage({ db, setDb, session, fazendaSeleciona
   const { showToast } = useToast();
   const { hasPermission } = useAuth();
   const activeFarmId = useMemo(() => getActiveFarmId(fazendaSelecionada), [fazendaSelecionada]);
+  // Sprint Visual 8: esta página nunca filtrou produtos/dietas pela fazenda
+  // ativa (activeFarmId só pré-preenche o cadastro) — a coluna Fazenda abaixo
+  // só torna essa mistura visível, não filtra nada (ver limitações da sprint).
+  const consolidado = isModoConsolidado(fazendaSelecionada);
+  const fazendasMap = useMemo(() => construirMapaFazendas(db), [db]);
   const [aba, setAba] = useState('produtos');
   const [openProduto, setOpenProduto] = useState(false);
   const [openDieta, setOpenDieta] = useState(false);
@@ -216,7 +222,9 @@ export default function SuplementacaoPage({ db, setDb, session, fazendaSeleciona
       <header className="page-header">
         <div>
           <h1>Nutrição / Suplementação</h1>
-          <p>Produtos nutricionais, dietas e consumo diário integrados ao estoque e financeiro.</p>
+          <p>
+            {`${consolidado ? 'Todas as fazendas' : (fazendaSelecionada?.nome || 'Todas as fazendas')} · Produtos nutricionais, dietas e consumo diário integrados ao estoque e financeiro.`}
+          </p>
         </div>
         <div className="page-actions">
           <Button
@@ -250,6 +258,7 @@ export default function SuplementacaoPage({ db, setDb, session, fazendaSeleciona
                 <tr>
                   <th>Produto</th>
                   <th>Categoria</th>
+                  <th>Fazenda</th>
                   <th>Estoque</th>
                   <th>Unidade</th>
                   <th>Duração estimada</th>
@@ -263,6 +272,7 @@ export default function SuplementacaoPage({ db, setDb, session, fazendaSeleciona
                   <tr key={produto.id}>
                     <td>{produto.produto}</td>
                     <td><Badge variant="info">{produto.subcategoria || 'Nutrição'}</Badge></td>
+                    <td>{fazendasMap.get(Number(produto.fazenda_id)) || 'Sem fazenda'}</td>
                     <td>{formatNumber(produto.quantidade_atual || 0, 2)}</td>
                     <td>{produto.unidade_medida || 'kg'}</td>
                     <td>
@@ -293,7 +303,7 @@ export default function SuplementacaoPage({ db, setDb, session, fazendaSeleciona
                   </tr>
                 )) : (
                   <tr>
-                    <td colSpan="8" className="empty-state-td">
+                    <td colSpan="9" className="empty-state-td">
                       <strong>Nenhum produto nutricional cadastrado.</strong>
                       <div>Cadastre rações, suplementos, sal mineral ou dietas para vincular ao estoque.</div>
                       <Button

@@ -99,7 +99,11 @@ export function detectarLotesAbaixoGmd(db = {}) {
 
     const resumo = getResumoLote(db, lote.id);
     const qtdPesagens = contarPesagens(db, lote.id);
-    const avaliacao = avaliarDesempenhoGmd({ gmdMeta: meta, gmdReal: resumo.gmdMedio, qtdPesagens });
+    // P1-05B: `gmdDisponivel` (fonte canônica) evita falso alerta quando
+    // `qtdPesagens` conta linhas sem `peso_medio` válido — ver gmdAlerta.js.
+    const avaliacao = avaliarDesempenhoGmd({
+      gmdMeta: meta, gmdReal: resumo.gmdMedio, qtdPesagens, gmdDisponivel: resumo.gmdDisponivel,
+    });
     if (avaliacao.status !== 'abaixo') return [];
 
     const percentualAbaixo = meta > 0 ? Math.abs(avaliacao.diferenca) / meta : 0;

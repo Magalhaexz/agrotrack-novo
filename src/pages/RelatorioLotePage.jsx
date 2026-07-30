@@ -33,7 +33,7 @@ export default function RelatorioLotePage({ db, onNavigate }) {
     <div className="page reports-page">
       <PageHeader
         title="Relatório do Lote"
-        subtitle="Selecione um lote para ver peso, desempenho, custos e resultado."
+        subtitle={relatorio?.encontrado && relatorio.fazendaNome ? `${relatorio.fazendaNome} · Peso, desempenho, custos e resultado do lote selecionado.` : 'Selecione um lote para ver peso, desempenho, custos e resultado.'}
         actions={(
           <select
             className="ui-input"

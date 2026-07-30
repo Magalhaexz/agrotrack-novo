@@ -14,13 +14,19 @@ const PAPEIS_CONVITE = [
  * papel; a página (`EquipePage`) decide onde persistir (tabela `invites`
  * quando disponível). Sem envio de e-mail real nesta sprint — ver
  * docs/EQUIPE_PERMISSOES_HERDON.md.
+ *
+ * P1-11: quando a conta tem mais de uma fazenda, exige escolher a fazenda à
+ * qual o convite (e o acesso resultante) fica vinculado — RLS/servidor
+ * nunca aceitam fazenda vinda só do cliente sem um convite correspondente,
+ * mas a UI já evita mandar um convite sem fazenda definida nesse caso.
  */
-export default function ConviteEquipeModal({ open, onClose, onInvite }) {
+export default function ConviteEquipeModal({ open, onClose, onInvite, fazendas = [] }) {
   const { showToast } = useToast();
-  const [form, setForm] = useState({ nome: '', email: '', perfil: 'visualizador', notes: '' });
+  const [form, setForm] = useState({ nome: '', email: '', perfil: 'visualizador', fazenda_id: '', notes: '' });
+  const exigeFazenda = fazendas.length > 1;
 
   function fecharEReiniciar() {
-    setForm({ nome: '', email: '', perfil: 'visualizador', notes: '' });
+    setForm({ nome: '', email: '', perfil: 'visualizador', fazenda_id: '', notes: '' });
     onClose?.();
   }
 
@@ -34,7 +40,12 @@ export default function ConviteEquipeModal({ open, onClose, onInvite }) {
             showToast({ type: 'error', message: 'Informe nome e e-mail do membro.' });
             return;
           }
-          onInvite?.({ ...form, nome: form.nome.trim(), email: form.email.trim() });
+          if (exigeFazenda && !form.fazenda_id) {
+            showToast({ type: 'error', message: 'Escolha a fazenda à qual este membro terá acesso.' });
+            return;
+          }
+          const fazendaId = form.fazenda_id || (fazendas.length === 1 ? fazendas[0].id : null);
+          onInvite?.({ ...form, nome: form.nome.trim(), email: form.email.trim(), fazenda_id: fazendaId });
         }}
       >
         <label className="ui-input-wrap">
@@ -53,6 +64,17 @@ export default function ConviteEquipeModal({ open, onClose, onInvite }) {
             ))}
           </select>
         </label>
+        {exigeFazenda ? (
+          <label className="ui-input-wrap">
+            <span className="ui-input-label">Fazenda</span>
+            <select className="ui-input" value={form.fazenda_id} onChange={(e) => setForm((prev) => ({ ...prev, fazenda_id: e.target.value }))}>
+              <option value="">Selecione a fazenda</option>
+              {fazendas.map((fazenda) => (
+                <option key={fazenda.id} value={fazenda.id}>{fazenda.nome}</option>
+              ))}
+            </select>
+          </label>
+        ) : null}
         <label className="ui-input-wrap">
           <span className="ui-input-label">Observação interna (opcional)</span>
           <input className="ui-input" value={form.notes} onChange={(e) => setForm((prev) => ({ ...prev, notes: e.target.value }))} />

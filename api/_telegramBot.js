@@ -752,6 +752,7 @@ async function executarCadastro(client, conexao, op) {
   if (!plano.ok) throw new Error(plano.erro);
 
   if (plano.rpc) await aplicarRpc(client, conexao, plano.rpc);
+  else if (plano.tipo === 'entrada_estoque' || plano.tipo === 'saida_estoque') await aplicarRpc(client, conexao, montarRpcEstoque(plano));
   else await aplicarWrites(client, conexao, plano.writes);
   await registrarAuditoria(client, conexao, {
     acao: plano.tipo, intencao, sucesso: true, dados_posteriores: dados,
@@ -814,20 +815,74 @@ async function aplicarRpc(client, conexao, rpc) {
   if (error) throw new Error(error.message || 'RPC_FALHOU');
 }
 
+// P1-03: cada write agora verifica `{ error }` e interrompe no primeiro
+// problema — antes, o `for` sequencial ignorava totalmente o retorno de cada
+// chamada, então um update/insert que falhasse (rede, RLS, constraint) não
+// impedia o loop de seguir nem o chamador de reportar sucesso. Quem chama
+// (`confirmar`, no catch) já garante que a pendência nunca é marcada como
+// `executada` e nenhuma mensagem de sucesso é enviada quando isto lança.
 export async function aplicarWrites(client, conexao, writes) {
   for (const w of writes) {
+    let resultado;
     if (w.tipo === 'insert') {
-      await client.from(w.tabela).insert({ owner_user_id: conexao.owner_user_id, ...w.registro });
+      resultado = await client.from(w.tabela).insert({ owner_user_id: conexao.owner_user_id, ...w.registro });
     } else if (w.tipo === 'update') {
       let q = client.from(w.tabela).update(w.patch);
       Object.entries(w.match || {}).forEach(([k, v]) => { q = q.eq(k, v); });
-      await q.eq('owner_user_id', conexao.owner_user_id);
+      resultado = await q.eq('owner_user_id', conexao.owner_user_id);
     } else if (w.tipo === 'delete') {
       let q = client.from(w.tabela).delete();
       Object.entries(w.match || {}).forEach(([k, v]) => { q = q.eq(k, v); });
-      await q.eq('owner_user_id', conexao.owner_user_id);
+      resultado = await q.eq('owner_user_id', conexao.owner_user_id);
+    }
+    if (resultado?.error) {
+      // Log seguro: só tabela/tipo/código do erro — nunca o registro/patch
+      // (pode carregar texto livre do produtor) nem o objeto de erro inteiro.
+      console.error('[telegram-bot] write falhou, interrompendo a operação', {
+        tabela: w.tabela, tipo: w.tipo, code: resultado.error.code || null,
+      });
+      throw new Error(resultado.error.message || 'WRITE_FALHOU');
     }
   }
+}
+
+// P1-03: entrada/saída de estoque (REGISTRAR_ENTRADA_ESTOQUE/DAR_BAIXA_ESTOQUE
+// via `prepararCadastro`) gravavam movimentação + saldo (+ financeiro na
+// saída) como `writes` sequenciais sem transação. `prepararCadastro` continua
+// puro — só remonta aqui os MESMOS campos já validados em params de uma RPC
+// específica (migration 20260721210000); a RPC revalida saldo/existência de
+// novo sob lock, então nenhuma regra de negócio é duplicada neste mapeamento.
+function montarRpcEstoque(plano) {
+  const insertMovimentacao = plano.writes.find((w) => w.tabela === 'movimentacoes_estoque' && w.tipo === 'insert');
+  const updateEstoque = plano.writes.find((w) => w.tabela === 'estoque' && w.tipo === 'update');
+  const insertFinanceiro = plano.writes.find((w) => w.tabela === 'movimentacoes_financeiras' && w.tipo === 'insert');
+  const itemEstoqueId = updateEstoque?.match?.id ?? insertMovimentacao.registro.item_estoque_id;
+
+  if (plano.tipo === 'entrada_estoque') {
+    return {
+      nome: 'registrar_entrada_estoque_telegram',
+      params: {
+        p_item_estoque_id: itemEstoqueId,
+        p_quantidade: insertMovimentacao.registro.quantidade,
+        p_data: insertMovimentacao.registro.data,
+        p_obs: insertMovimentacao.registro.obs ?? null,
+      },
+    };
+  }
+  return {
+    nome: 'registrar_saida_estoque_telegram',
+    params: {
+      p_item_estoque_id: itemEstoqueId,
+      p_quantidade: insertMovimentacao.registro.quantidade,
+      p_tipo: insertMovimentacao.registro.tipo,
+      p_lote_id: insertMovimentacao.registro.lote_id ?? null,
+      p_data: insertMovimentacao.registro.data,
+      p_obs: insertMovimentacao.registro.obs ?? null,
+      p_custo_unitario: insertMovimentacao.registro.custo_unitario ?? null,
+      p_valor_total: insertMovimentacao.registro.valor_total ?? null,
+      p_descricao_financeiro: insertFinanceiro?.registro?.descricao ?? null,
+    },
+  };
 }
 
 // ── Confirmar / cancelar (Parte 15/16) ───────────────────────────────────────

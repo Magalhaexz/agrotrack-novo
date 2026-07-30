@@ -1,4 +1,5 @@
 ﻿import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { AlertTriangle, Calendar, MapPin, Users, Weight } from 'lucide-react';
 import Input from '../components/ui/Input';
 import Modal from '../components/ui/Modal';
 import Button from '../components/ui/Button';
@@ -217,7 +218,7 @@ const ACTION_LABELS = {
   'trocar-pasto': 'Trocar lote de pasto',
 };
 
-export default function LotesPage({ db, setDb, onRegistrarSaidaAnimal, session, fazendaSelecionada = null, navigationIntent = null }) {
+export default function LotesPage({ db, setDb, onRegistrarSaidaAnimal, session, fazendaSelecionada = null, navigationIntent = null, onNavigate = null }) {
   const abrirNovoLotePorIntent = navigationIntent?.page === 'lotes' && navigationIntent?.action === 'novo';
   const { hasPermission } = useAuth();
   const { showToast } = useToast();
@@ -305,7 +306,7 @@ export default function LotesPage({ db, setDb, onRegistrarSaidaAnimal, session, 
     const progressoPeso = pesoInicialPlanejado > 0
       ? ((pesoAtual - pesoInicialPlanejado) / Math.max(1, toNumber(lote.peso_alvo || pesoInicialPlanejado) - pesoInicialPlanejado)) * 100
       : 0;
-    const fazendaNome = fazendas.find((f) => Number(f.id) === Number(lote.faz_id))?.nome || '—';
+    const fazendaNome = fazendas.find((f) => Number(f.id) === Number(lote.faz_id))?.nome || 'Sem fazenda';
     const pastagemNome = resolvePastagemNome(pastagensMap, lote);
     const categoriaAnimal = String(lote.categoria_animal || lote.categoria || '').trim() || LABEL_OR_DASH;
     const raca = String(lote.raca || lote.raca_animal || lote.gen || '').trim() || LABEL_OR_DASH;
@@ -347,6 +348,28 @@ export default function LotesPage({ db, setDb, onRegistrarSaidaAnimal, session, 
     }
     return true;
   }), [filters, lotesDaFazendaAtiva]);
+
+  // Sprint Visual 5: indicadores compactos do cabeçalho — só agregam dados já
+  // calculados em lotesEnriquecidos (heads/pesoAtual/saude), nenhuma conta nova.
+  // Base é lotesDaFazendaAtiva (não lotesFiltrados): o resumo do contexto não
+  // deve variar conforme a busca/filtro do usuário.
+  const indicadores = useMemo(() => {
+    const ativos = lotesDaFazendaAtiva.filter((lote) => lote.status === 'ativo');
+    const comPeso = ativos.filter((lote) => lote.pesoAtual > 0);
+    const pesoMedio = comPeso.length > 0
+      ? comPeso.reduce((soma, lote) => soma + lote.pesoAtual, 0) / comPeso.length
+      : 0;
+    const emAtencao = lotesDaFazendaAtiva.filter((lote) => (
+      !lote.saude?.dadosInsuficientes
+      && ['atencao', 'risco', 'critico'].includes(lote.saude?.classificacao)
+    )).length;
+    return {
+      totalLotes: lotesDaFazendaAtiva.length,
+      totalCabecas: ativos.reduce((soma, lote) => soma + lote.heads, 0),
+      pesoMedio,
+      emAtencao,
+    };
+  }, [lotesDaFazendaAtiva]);
 
   const selectedLote = useMemo(
     () => lotesEnriquecidos.find((lote) => Number(lote.id) === Number(selectedLoteId)) || null,
@@ -425,6 +448,13 @@ export default function LotesPage({ db, setDb, onRegistrarSaidaAnimal, session, 
 
   function updateFilter(field, value) {
     setFilters((prev) => ({ ...prev, [field]: value }));
+  }
+
+  // Sprint Visual 5: "Limpar filtros" — só zera busca/status/período. `fazenda`
+  // não é escolha do usuário aqui (segue a fazenda ativa do topo do app), não
+  // faz sentido "limpar" ela.
+  function resetFilters() {
+    setFilters((prev) => ({ ...prev, status: 'todos', periodo: 'todos', busca: '' }));
   }
 
   function ensurePermission(permission) {
@@ -968,6 +998,10 @@ export default function LotesPage({ db, setDb, onRegistrarSaidaAnimal, session, 
     <div className="rebanho-page">
       <LotesPageHeader
         canEdit={hasPermission('lotes:editar')}
+        consolidado={consolidado}
+        fazendaAtiva={fazendaAtiva}
+        totalLotes={indicadores.totalLotes}
+        podeCadastrar={canCreateLoteInCurrentFarm(activeFarmId, null)}
         onNovoLote={() => {
           if (!canCreateLoteInCurrentFarm(activeFarmId, null)) {
             showToast({ type: 'warning', message: 'Selecione uma fazenda ativa para cadastrar um lote.' });
@@ -978,10 +1012,37 @@ export default function LotesPage({ db, setDb, onRegistrarSaidaAnimal, session, 
         }}
       />
 
+      <div className="dashboard-grid dashboard-grid--kpi-main lotes-kpi-row">
+        <div className="kpi-card kpi-card--compact">
+          <div className="kpi-content">
+            <div className="kpi-label">Total de lotes</div>
+            <div className="kpi-value">{indicadores.totalLotes}</div>
+          </div>
+        </div>
+        <div className="kpi-card kpi-card--compact">
+          <div className="kpi-content">
+            <div className="kpi-label">Total de cabeças</div>
+            <div className="kpi-value">{formatNumber(indicadores.totalCabecas, 0)}</div>
+          </div>
+        </div>
+        <div className="kpi-card kpi-card--compact">
+          <div className="kpi-content">
+            <div className="kpi-label">Peso médio</div>
+            <div className="kpi-value">{indicadores.pesoMedio > 0 ? `${formatNumber(indicadores.pesoMedio, 1)} kg` : '—'}</div>
+          </div>
+        </div>
+        <div className="kpi-card kpi-card--compact">
+          <div className="kpi-content">
+            <div className="kpi-label">Precisam de atenção</div>
+            <div className={indicadores.emAtencao > 0 ? 'kpi-val rd' : 'kpi-value'}>{indicadores.emAtencao}</div>
+          </div>
+        </div>
+      </div>
+
       <LotesFilters
         filters={filters}
-        fazendaAtiva={fazendaAtiva}
         onChange={updateFilter}
+        onClear={resetFilters}
       />
 
       {avisoAcaoRapida ? (
@@ -991,74 +1052,102 @@ export default function LotesPage({ db, setDb, onRegistrarSaidaAnimal, session, 
         </div>
       ) : null}
 
-      {lotesFiltrados.length === 0 ? (
+      {fazendas.length === 0 ? (
         <EmptyState
-          title={activeFarmId ? 'Você ainda não cadastrou nenhum lote.' : 'Selecione uma fazenda ativa.'}
+          title="Nenhuma fazenda cadastrada."
+          subtitle="Cadastre uma fazenda antes de criar seus lotes — cada lote pertence a uma fazenda."
+        />
+      ) : !activeFarmId && !consolidado ? (
+        <EmptyState
+          title="Selecione uma fazenda ativa."
+          subtitle="Os lotes são exibidos por fazenda ativa."
+        />
+      ) : lotesDaFazendaAtiva.length === 0 ? (
+        <EmptyState
+          title={consolidado ? 'Sua conta ainda não tem lotes.' : 'Esta fazenda ainda não tem lotes.'}
           subtitle={
-            activeFarmId
-              ? 'Crie seu primeiro lote para acompanhar pesagens, GMD, custos e resultado financeiro.'
-              : 'Os lotes são exibidos por fazenda ativa.'
+            consolidado
+              ? 'Selecione uma fazenda ativa no topo da tela para cadastrar o primeiro lote.'
+              : 'Crie seu primeiro lote para acompanhar pesagens, GMD, custos e resultado financeiro.'
           }
           action={
-            activeFarmId ? (
+            !consolidado && hasPermission('lotes:editar') ? (
               <Button
                 variant="primary"
                 onClick={() => {
-                  if (!canCreateLoteInCurrentFarm(activeFarmId, null)) {
-                    showToast({ type: 'warning', message: 'Selecione uma fazenda ativa para cadastrar um lote.' });
-                    return;
-                  }
                   setLoteEmEdicao(null);
                   setOpenNovoLote(true);
                 }}
               >
-                Criar lote
+                Cadastrar lote
               </Button>
             ) : null
           }
         />
+      ) : lotesFiltrados.length === 0 ? (
+        <EmptyState
+          title="Nenhum lote encontrado para os filtros aplicados."
+          subtitle="Ajuste a busca, o status ou o período — ou limpe os filtros para ver todos os lotes."
+          action={<Button variant="outline" onClick={resetFilters}>Limpar filtros</Button>}
+        />
       ) : (
         <div className="lotes-table-shell">
-          <div className="lotes-table-card table-responsive">
-            <table className="data-table lotes-table">
-              <thead>
-                <tr>
-                  <th>Lote</th>
-                  <th>Categoria</th>
-                  <th>Cabeças</th>
-                  <th>Peso médio</th>
-                  <th>GMD</th>
-                  <th>Resultado</th>
-                  <th>Status</th>
-                </tr>
-              </thead>
-              <tbody>
-                {lotesFiltrados.map((lote) => (
-                  <tr
-                    key={lote.id}
-                    tabIndex={0}
-                    role="button"
-                    aria-label={`Ver resumo do lote ${lote.nome}`}
-                    className={Number(previewLoteId) === Number(lote.id) ? 'is-selected' : ''}
-                    onClick={() => setPreviewLoteId(lote.id)}
-                    onKeyDown={(event) => {
-                      if (event.key === 'Enter' || event.key === ' ') {
-                        event.preventDefault();
-                        setPreviewLoteId(lote.id);
-                      }
-                    }}
-                  >
-                    <td>{lote.nome}</td>
-                    <td>{lote.categoriaAnimal}</td>
-                    <td>{formatNumber(lote.heads, 0)}</td>
-                    <td>{lote.pesoAtual > 0 ? `${formatNumber(lote.pesoAtual, 1)} kg` : '—'}</td>
-                    <td>{lote.gmd !== null ? `${formatNumber(lote.gmd, 2)} kg/dia` : '—'}</td>
-                    <td>{formatCurrency(lote.resumo?.lucroTotal || 0)}</td>
-                    <td><Badge variant={statusVariantLote(lote.status)}>{lote.status}</Badge></td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+          <div className="lotes-grid">
+            {lotesFiltrados.map((lote) => {
+              const emAtencao = !lote.saude?.dadosInsuficientes
+                && ['atencao', 'risco', 'critico'].includes(lote.saude?.classificacao);
+              return (
+                <button
+                  type="button"
+                  key={lote.id}
+                  className={`lote-row-card ${Number(previewLoteId) === Number(lote.id) ? 'is-selected' : ''}`}
+                  aria-pressed={Number(previewLoteId) === Number(lote.id)}
+                  aria-label={`Ver resumo do lote ${lote.nome}`}
+                  onClick={() => setPreviewLoteId(lote.id)}
+                >
+                  <div className="lote-row-card-top">
+                    <div className="lote-row-card-heading">
+                      <h3>{lote.nome}</h3>
+                      <p className="lote-row-card-farm">{lote.fazendaNome}</p>
+                    </div>
+                    <div className="lote-row-card-badges">
+                      <Badge variant={statusVariantLote(lote.status)}>{lote.status}</Badge>
+                      {emAtencao ? (
+                        <span className={`lote-row-card-alert lote-row-card-alert--${lote.saude.classificacao}`}>
+                          <AlertTriangle size={12} aria-hidden="true" />
+                          {lote.saude.classificacaoLabel}
+                        </span>
+                      ) : null}
+                    </div>
+                  </div>
+
+                  <div className="lote-row-card-stats">
+                    <div className="lote-row-card-stat lote-row-card-stat--primary">
+                      <Users size={15} aria-hidden="true" />
+                      <strong>{formatNumber(lote.heads, 0)}</strong>
+                      <span>cabeças</span>
+                    </div>
+                    <div className="lote-row-card-stat lote-row-card-stat--primary">
+                      <Weight size={15} aria-hidden="true" />
+                      <strong>{lote.pesoAtual > 0 ? `${formatNumber(lote.pesoAtual, 1)} kg` : '—'}</strong>
+                      <span>peso atual</span>
+                    </div>
+                    <div className="lote-row-card-stat">
+                      <span>{lote.categoriaAnimal}</span>
+                    </div>
+                    <div className="lote-row-card-stat">
+                      <MapPin size={13} aria-hidden="true" />
+                      <span>{lote.pastagemNome}</span>
+                    </div>
+                  </div>
+
+                  <div className="lote-row-card-foot">
+                    <Calendar size={12} aria-hidden="true" />
+                    {lote.ultimaPesagem ? `Última pesagem: ${formatDate(lote.ultimaPesagem)}` : 'Sem pesagem registrada'}
+                  </div>
+                </button>
+              );
+            })}
           </div>
 
           {previewLote ? (
@@ -1066,7 +1155,7 @@ export default function LotesPage({ db, setDb, onRegistrarSaidaAnimal, session, 
               <div className="lote-preview-panel-head">
                 <div>
                   <h3>{previewLote.nome}</h3>
-                  <p>{previewLote.categoriaAnimal} · {previewLote.pastagemNome}</p>
+                  <p>{previewLote.fazendaNome} · {previewLote.categoriaAnimal} · {previewLote.pastagemNome}</p>
                 </div>
                 <button
                   type="button"
@@ -1120,10 +1209,11 @@ export default function LotesPage({ db, setDb, onRegistrarSaidaAnimal, session, 
                 <LoteAcoesMenu
                   lote={previewLote}
                   size="sm"
-                  hasPermission={(permissao) => (
-                    permissao === 'lotes:editar' ? hasPermission('lotes:editar') : hasPermission('animais:movimentar')
-                  )}
+                  hasPermission={hasPermission}
                   handlers={{
+                    onNovaPesagem: onNavigate
+                      ? () => onNavigate('pesagens', { action: 'novo', loteId: previewLote.id })
+                      : undefined,
                     onEditar: () => {
                       setLoteEmEdicao(previewLote);
                       setOpenNovoLote(true);

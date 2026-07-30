@@ -13,12 +13,18 @@ function toNumber(value) {
   return Number.isFinite(parsed) ? parsed : 0;
 }
 
-export function avaliarDesempenhoGmd({ gmdMeta, gmdReal, qtdPesagens } = {}) {
+export function avaliarDesempenhoGmd({ gmdMeta, gmdReal, qtdPesagens, gmdDisponivel } = {}) {
   const meta = toNumber(gmdMeta);
   const real = toNumber(gmdReal);
   const pesagens = toNumber(qtdPesagens);
 
-  const semDados = meta <= 0 || pesagens < 2;
+  // P1-05B: `gmdDisponivel === false` vem da fonte canônica (domain/gmd.js,
+  // via calcLote/resumoLote) e é mais confiável que `qtdPesagens` — uma
+  // pesagem contada aqui pode não ter `peso_medio` válido e ainda assim não
+  // produzir GMD real. Só o `=== false` explícito barra a comparação; sem
+  // esse dado (chamador antigo que não o informa), a contagem de pesagens
+  // continua valendo como antes.
+  const semDados = meta <= 0 || gmdDisponivel === false || pesagens < 2;
   if (semDados) {
     return {
       status: 'sem_dados',

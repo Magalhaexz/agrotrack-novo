@@ -1,4 +1,57 @@
 :root {
+  /* ============================================================
+     HERDON — TOKENS OFICIAIS (Figma vrkLCKBDraMupa8inB9L08)
+     Fonte: docs/figma/TOKENS.md. Conceito A / Light é a direção oficial.
+     Ativação visual: [data-theme="concept-a"] em <html>, ainda não
+     aplicado por nenhuma página — decisão da Sprint Visual 2 (shell).
+     ============================================================ */
+
+  /* ── PRIMITIVOS OFICIAIS (Color/*) ── */
+  --primitive-green-300: #86efac;
+  --primitive-green-500: #22c55e;
+  --primitive-green-600: #16a34a;
+  --primitive-green-800: #166534;
+  --primitive-neutral-950: #030705;
+  --primitive-neutral-900: #0b0f0c;
+  --primitive-neutral-800: #121815;
+  --primitive-neutral-700: #17201a;
+  --primitive-status-success: #22c55e;
+  --primitive-status-warning: #f59e0b;
+  --primitive-status-danger: #ef4444;
+  --primitive-status-info: #3b82f6;
+
+  /* ── SEMÂNTICOS OFICIAIS · Conceito A / Light ── */
+  --surface-background: #f4f7f5;
+  --surface-card: #ffffff;
+  --surface-content-warm: #f5f1e8;
+  --surface-header: #ffffff;
+  --surface-sidebar: #173a2b;
+  --primary-500: #258f55;
+  --status-success: var(--primitive-status-success);
+  --status-warning: #d4a12d;
+  --status-danger: var(--primitive-status-danger);
+  --status-info: var(--primitive-status-info);
+  --text-primary: #16301f;
+  /* Text/Secondary e Border/Default não têm hex oficial para o Conceito A
+     em TOKENS.md — derivados por color-mix a partir de Text/Primary.
+     Ajustar para o valor exato assim que o Figma especificar. */
+  --text-secondary: color-mix(in srgb, var(--text-primary) 55%, var(--surface-background));
+  --border-default: color-mix(in srgb, var(--text-primary) 14%, var(--surface-card));
+  /* Sombras "discretas" do Conceito A — TOKENS.md pede discrição e não
+     especifica rgba exato; valores provisórios, calibrar visualmente. */
+  --shadow-sm-a: 0 1px 2px rgba(16, 24, 20, 0.06);
+  --shadow-md-a: 0 4px 12px rgba(16, 24, 20, 0.08);
+  --shadow-lg-a: 0 12px 32px rgba(16, 24, 20, 0.1);
+
+  /* ============================================================
+     ALIASES TEMPORÁRIOS — compatibilidade com páginas ainda não
+     migradas. Valores idênticos aos de antes da Sprint Visual 1;
+     não alterar sem migrar quem consome. Remover na Sprint Visual 13.
+     (Espaçamento, raios, tipografia e breakpoints abaixo já batem com
+     o Figma e não são alias — são tokens compartilhados pelos dois
+     conceitos.)
+     ============================================================ */
+
   /* ── BRAND ── */
   --color-primary: #22c55e;
   --color-primary-light: #4ade80;

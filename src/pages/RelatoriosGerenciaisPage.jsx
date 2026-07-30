@@ -1,6 +1,7 @@
 import { useMemo } from 'react';
 import Card from '../components/ui/Card';
 import PageHeader from '../components/PageHeader';
+import { isModoConsolidado } from '../domain/escopoFazenda';
 import { computeIndicadoresEstrategicos } from '../domain/indicadoresEstrategicos';
 import { calcularProjecaoCenario } from '../domain/simuladorCenarios';
 
@@ -32,7 +33,8 @@ function formatPercent(value) {
   return formatNumber(value, 2, '%');
 }
 
-export default function RelatoriosGerenciaisPage({ db }) {
+export default function RelatoriosGerenciaisPage({ db, fazendaSelecionada }) {
+  const consolidado = isModoConsolidado(fazendaSelecionada);
   const period = useMemo(() => nowPeriod(), []);
   const indicadores = useMemo(
     () => computeIndicadoresEstrategicos(db, period.start, period.end),
@@ -58,7 +60,7 @@ export default function RelatoriosGerenciaisPage({ db }) {
     <div className="page reports-page">
       <PageHeader
         title="Painel Gerencial"
-        subtitle="Resumo executivo consolidado para leitura estratégica da operação."
+        subtitle={`${consolidado ? 'Todas as fazendas' : (fazendaSelecionada?.nome || 'Todas as fazendas')} · Resumo executivo consolidado para leitura estratégica da operação.`}
       />
 
       <Card title="Resumo da fazenda" subtitle={`Período: ${period.start} até ${period.end}`}>

@@ -1,3 +1,4 @@
+/* global process */
 // Harness de webhook REALISTA (Sprint Paridade 1, bloco 5). Passa pelo
 // handler HTTP real (`api/telegram-webhook.js`): payload de update do Telegram
 // → autenticação por secret_token → rate limit → busca de conexão por
@@ -17,6 +18,9 @@ import { makeClient, baseTables } from './_fakeTelegramClient.js';
 let contadorChat = 900000;
 function novoChat() { contadorChat += 1; return contadorChat; }
 
+const TEST_WEBHOOK_SECRET = 'test-webhook-secret';
+const WEBHOOK_SECRET_HEADER = 'x-telegram-bot-api-secret-token';
+
 function tabelasComConexao(perfil, fazendaId, chatId) {
   const t = baseTables(perfil);
   t.telegram_connections = [{
@@ -26,8 +30,33 @@ function tabelasComConexao(perfil, fazendaId, chatId) {
   return t;
 }
 
+const CODIGO_PAREAMENTO = 'HERDON-482913';
+
+/** Conta sem conexão ainda, com um código de pareamento pronto para uso. */
+function tabelasComCodigo(overrides = {}) {
+  const t = baseTables('operador');
+  t.telegram_connections = [];
+  t.telegram_connection_codes = [{
+    id: 'code-1', code: CODIGO_PAREAMENTO, owner_user_id: 'o1', user_id: 'u1', fazenda_id: 1,
+    expires_at: new Date(Date.now() + 15 * 60 * 1000).toISOString(), used_at: null,
+    ...overrides,
+  }];
+  return t;
+}
+
 /** Roda UM update pelo handler real e devolve o texto que o bot enviaria. */
-async function enviarWebhook(client, texto, chatId) {
+async function enviarWebhook(client, texto, chatId, options = {}) {
+  const {
+    envSecret = TEST_WEBHOOK_SECRET,
+    headerSecret = TEST_WEBHOOK_SECRET,
+    vercelEnv = 'test',
+  } = options;
+  const previousSecret = process.env.TELEGRAM_WEBHOOK_SECRET;
+  const previousVercelEnv = process.env.VERCEL_ENV;
+  if (envSecret === null) delete process.env.TELEGRAM_WEBHOOK_SECRET;
+  else process.env.TELEGRAM_WEBHOOK_SECRET = envSecret;
+  process.env.VERCEL_ENV = vercelEnv;
+
   const enviados = [];
   const deps = {
     getSupabaseAdminClient: () => client,
@@ -35,7 +64,7 @@ async function enviarWebhook(client, texto, chatId) {
   };
   const req = {
     method: 'POST',
-    headers: {},
+    headers: headerSecret ? { [WEBHOOK_SECRET_HEADER]: headerSecret } : {},
     body: {
       update_id: Math.floor(Math.random() * 1e9),
       message: {
@@ -52,8 +81,15 @@ async function enviarWebhook(client, texto, chatId) {
     status(code) { captured.status = code; return this; },
     json(payload) { captured.json = payload; return captured; },
   };
-  await handler(req, res, deps);
-  return { status: captured.status, json: captured.json, resposta: enviados.at(-1)?.texto ?? null };
+  try {
+    await handler(req, res, deps);
+    return { status: captured.status, json: captured.json, resposta: enviados.at(-1)?.texto ?? null };
+  } finally {
+    if (previousSecret === undefined) delete process.env.TELEGRAM_WEBHOOK_SECRET;
+    else process.env.TELEGRAM_WEBHOOK_SECRET = previousSecret;
+    if (previousVercelEnv === undefined) delete process.env.VERCEL_ENV;
+    else process.env.VERCEL_ENV = previousVercelEnv;
+  }
 }
 
 test('harness: método não-POST é rejeitado (405)', async () => {
@@ -62,6 +98,54 @@ test('harness: método não-POST é rejeitado (405)', async () => {
   const res = { _s: null, status(c) { this._s = c; return this; }, json() { return this; } };
   await handler({ method: 'GET', headers: {}, body: {} }, res, { getSupabaseAdminClient: () => client, enviarMensagemTelegramParaChat: async () => {} });
   assert.equal(res._s, 405);
+});
+
+test('harness: segredo ausente em produção falha fechado sem processar update', async () => {
+  const chat = novoChat();
+  const t = tabelasComConexao('operador', 1, chat);
+  const client = makeClient(t);
+  const r = await enviarWebhook(client, 'resumo', chat, {
+    envSecret: null,
+    headerSecret: null,
+    vercelEnv: 'production',
+  });
+  assert.equal(r.status, 503);
+  assert.equal(r.json.ok, false);
+  assert.equal(r.resposta, null);
+});
+
+test('harness: segredo ausente em ambiente local também falha fechado', async () => {
+  const chat = novoChat();
+  const t = tabelasComConexao('operador', 1, chat);
+  const client = makeClient(t);
+  const r = await enviarWebhook(client, 'resumo', chat, {
+    envSecret: null,
+    headerSecret: null,
+    vercelEnv: 'development',
+  });
+  assert.equal(r.status, 503);
+  assert.equal(r.json.ok, false);
+  assert.equal(r.resposta, null);
+});
+
+test('harness: segredo inválido é rejeitado com 401', async () => {
+  const chat = novoChat();
+  const t = tabelasComConexao('operador', 1, chat);
+  const client = makeClient(t);
+  const r = await enviarWebhook(client, 'resumo', chat, { headerSecret: 'wrong-secret' });
+  assert.equal(r.status, 401);
+  assert.equal(r.json.ok, false);
+  assert.equal(r.resposta, null);
+});
+
+test('harness: segredo válido permite o processamento normal', async () => {
+  const chat = novoChat();
+  const t = tabelasComConexao('operador', 1, chat);
+  const client = makeClient(t);
+  const r = await enviarWebhook(client, 'resumo', chat);
+  assert.equal(r.status, 200);
+  assert.equal(r.json.ok, true);
+  assert.match(r.resposta, /Resumo|código/i);
 });
 
 test('harness: resumo consolidado de todas as fazendas', async () => {
@@ -164,4 +248,88 @@ test('harness: sem conexão (chat desconhecido) orienta a enviar o código', asy
   const client = makeClient(t);
   const r = await enviarWebhook(client, 'resumo', chat);
   assert.match(r.resposta, /código/i);
+});
+
+// Pareamento atômico e idempotente (P1-01, RPC parear_telegram_por_codigo /
+// migration 20260721160000): antes, o webhook validava o código em JS,
+// gravava a conexão e só depois marcava used_at em passos separados — duas
+// requisições concorrentes podiam validar o mesmo código antes de qualquer
+// uma marcar used_at. Os testes abaixo cobrem os critérios de aceite do
+// ticket usando o fake `parear_telegram_por_codigo` de _fakeTelegramClient.js,
+// que espelha a RPC real (trava lógica equivalente ao FOR UPDATE: cada
+// chamada muta as tabelas em memória de forma síncrona, sem gap de I/O real,
+// então duas chamadas "concorrentes" via Promise.all continuam serializadas
+// exatamente como a transação real seria).
+
+test('harness: pareamento com código válido cria a conexão e marca o código como usado', async () => {
+  const chat = novoChat();
+  const t = tabelasComCodigo();
+  const client = makeClient(t);
+  const r = await enviarWebhook(client, CODIGO_PAREAMENTO, chat);
+  assert.equal(r.status, 200);
+  assert.equal(r.json.connected, true);
+  assert.match(r.resposta, /sucesso/i);
+  assert.equal(t.telegram_connections.length, 1);
+  assert.equal(t.telegram_connections[0].telegram_chat_id, String(chat));
+  assert.ok(t.telegram_connection_codes[0].used_at);
+});
+
+test('harness: código inexistente não cria conexão', async () => {
+  const chat = novoChat();
+  const t = tabelasComCodigo();
+  const client = makeClient(t);
+  const r = await enviarWebhook(client, 'HERDON-000001', chat);
+  assert.equal(r.json.connected, false);
+  assert.match(r.resposta, /inválido|expirado/i);
+  assert.equal(t.telegram_connections.length, 0);
+});
+
+test('harness: código expirado não cria conexão', async () => {
+  const chat = novoChat();
+  const t = tabelasComCodigo({ expires_at: new Date(Date.now() - 1000).toISOString() });
+  const client = makeClient(t);
+  const r = await enviarWebhook(client, CODIGO_PAREAMENTO, chat);
+  assert.equal(r.json.connected, false);
+  assert.match(r.resposta, /inválido|expirado/i);
+  assert.equal(t.telegram_connections.length, 0);
+});
+
+test('harness: código já usado não cria conexão', async () => {
+  const chat = novoChat();
+  const t = tabelasComCodigo({ used_at: new Date().toISOString() });
+  const client = makeClient(t);
+  const r = await enviarWebhook(client, CODIGO_PAREAMENTO, chat);
+  assert.equal(r.json.connected, false);
+  assert.match(r.resposta, /inválido|expirado/i);
+  assert.equal(t.telegram_connections.length, 0);
+});
+
+test('harness: duas tentativas simultâneas com o mesmo código só consomem uma vez', async () => {
+  const chat1 = novoChat();
+  const chat2 = novoChat();
+  const t = tabelasComCodigo();
+  const client = makeClient(t);
+  const [r1, r2] = await Promise.all([
+    enviarWebhook(client, CODIGO_PAREAMENTO, chat1),
+    enviarWebhook(client, CODIGO_PAREAMENTO, chat2),
+  ]);
+  const sucessos = [r1, r2].filter((r) => r.json.connected);
+  const falhas = [r1, r2].filter((r) => !r.json.connected);
+  assert.equal(sucessos.length, 1);
+  assert.equal(falhas.length, 1);
+  assert.match(sucessos[0].resposta, /sucesso/i);
+  assert.match(falhas[0].resposta, /inválido|expirado/i);
+  assert.equal(t.telegram_connections.length, 1);
+  assert.ok(t.telegram_connection_codes[0].used_at);
+});
+
+test('harness: falha na gravação da conexão não envia sucesso e não deixa conexão parcial', async () => {
+  const chat = novoChat();
+  const t = tabelasComCodigo();
+  const errorClient = { rpc: async () => ({ data: null, error: { message: 'falha simulada ao gravar conexão' } }) };
+  const r = await enviarWebhook(errorClient, CODIGO_PAREAMENTO, chat);
+  assert.equal(r.json.connected, false);
+  assert.match(r.resposta, /inválido|expirado/i);
+  assert.equal(t.telegram_connections.length, 0);
+  assert.equal(t.telegram_connection_codes[0].used_at, null);
 });

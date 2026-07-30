@@ -240,6 +240,15 @@ export default function FinanceiroPage({ db, setDb, navigationIntent = null, faz
     return map;
   }, [lotes]);
 
+  // Sprint Visual 7: mesma fonte (fazendasMap) já usada pela aba "Por Lote" —
+  // só reaproveitada aqui para identificar a fazenda de cada lançamento na
+  // aba "Lançamentos" em Todas as fazendas.
+  const loteFazendaById = useMemo(() => {
+    const map = new Map();
+    lotes.forEach((lote) => map.set(Number(lote.id), fazendasMap.get(Number(lote.faz_id)) || 'Sem fazenda'));
+    return map;
+  }, [lotes, fazendasMap]);
+
   const pagamentosVisaoGeral = useMemo(
     () => buildPagamentosVisaoGeral(db, getTodayIso()),
     [db]
@@ -464,8 +473,10 @@ export default function FinanceiroPage({ db, setDb, navigationIntent = null, faz
     <div className="page rebanho-page financeiro-page">
       <div className="rebanho-header financeiro-header">
         <div>
-          <h1>Movimentações Financeiras</h1>
-          <p className="financeiro-subtitle">Lance custos e receitas para entender o resultado dos lotes.</p>
+          <h1>Financeiro</h1>
+          <p className="financeiro-subtitle">
+            {`${consolidado ? 'Todas as fazendas' : (fazendaSelecionada?.nome || 'Nenhuma fazenda selecionada')} · Lance custos e receitas para entender o resultado dos lotes.`}
+          </p>
         </div>
         <div className="lote-actions">
           <Button variant="outline" onClick={() => { if (!podeEditarFinanceiro()) return; setOpenLanc(true); }}>Nova receita</Button>
@@ -795,6 +806,7 @@ export default function FinanceiroPage({ db, setDb, navigationIntent = null, faz
                       <th>Tipo</th>
                       <th>Categoria</th>
                       <th>Lote</th>
+                      {consolidado ? <th>Fazenda</th> : null}
                       <th>Descrição</th>
                       <th className="is-number">Valor</th>
                       {podeEditarFinanceiroUi ? <th>Ações</th> : null}
@@ -812,6 +824,7 @@ export default function FinanceiroPage({ db, setDb, navigationIntent = null, faz
                           <td><Badge variant={receita ? 'success' : 'danger'}>{item.tipo}</Badge></td>
                           <td>{item.categoria}</td>
                           <td>{item.lote_id ? (loteNomeById.get(Number(item.lote_id)) || `Lote ${item.lote_id}`) : '—'}</td>
+                          {consolidado ? <td>{item.lote_id ? (loteFazendaById.get(Number(item.lote_id)) || 'Sem fazenda') : 'Sem fazenda'}</td> : null}
                           <td>
                             {item.fornecedor || item.comprador || item.descricao || '—'}
                             <div className="financeiro-lancamento-badges">

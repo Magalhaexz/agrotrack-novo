@@ -3,6 +3,7 @@ import Card from '../components/ui/Card';
 import Input from '../components/ui/Input';
 import PageHeader from '../components/PageHeader';
 import { computeEvolucaoRebanho } from '../domain/evolucaoRebanho';
+import { isModoConsolidado } from '../domain/escopoFazenda';
 
 import { hojeLocalISO } from '../domain/dataCivil.js';
 function toDateKey(value) {
@@ -49,7 +50,8 @@ function labelTipo(tipo) {
   return map[tipo] || tipo || '-';
 }
 
-export default function EvolucaoRebanhoPage({ db }) {
+export default function EvolucaoRebanhoPage({ db, fazendaSelecionada = null }) {
+  const consolidado = isModoConsolidado(fazendaSelecionada);
   const [modoPeriodo, setModoPeriodo] = useState('mes');
   const [mesRef, setMesRef] = useState(nowDate().slice(0, 7));
   const [anoRef, setAnoRef] = useState(nowDate().slice(0, 4));
@@ -75,7 +77,7 @@ export default function EvolucaoRebanhoPage({ db }) {
     <div className="page">
       <PageHeader
         title="Evolução do Rebanho"
-        subtitle="Acompanhe a variação do estoque animal por período."
+        subtitle={`${consolidado ? 'Todas as fazendas' : (fazendaSelecionada?.nome || 'Todas as fazendas')} · Acompanhe a variação do estoque animal por período.`}
       />
 
       <Card title="Filtro de período">

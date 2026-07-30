@@ -102,6 +102,12 @@ function validarForm(form) {
   return null;
 }
 
+// PENDENTE (Sprint Funcional 15): este formulário registra pesagem por lote
+// (peso médio + quantidade), sem campo por cabeça individual. A Sprint
+// Visual 6 só reorganizou a apresentação — quantidade, peso médio, lote,
+// data, observações, validações e persistência continuam as mesmas. A
+// pesagem individual por cabeça substituirá este fluxo somente na Sprint
+// Funcional 15; não há aviso disso para o usuário final.
 export default function PesagemForm({
   initialData,
   lotes = [],

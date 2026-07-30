@@ -15,6 +15,27 @@ function buildUsageLine(label, current, limit) {
   return `${label}: ${new Intl.NumberFormat('pt-BR').format(Number(current || 0))} / ${formatLimit(limit)}`;
 }
 
+function formatDatePtBr(value) {
+  if (!value) return null;
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return null;
+  return date.toLocaleDateString('pt-BR');
+}
+
+function buildDateLine(subscription, status) {
+  const trialEnd = formatDatePtBr(subscription?.trial_ends_at);
+  const periodEnd = formatDatePtBr(subscription?.current_period_end);
+  const canceledAt = formatDatePtBr(subscription?.canceled_at);
+  const blockedAt = formatDatePtBr(subscription?.blocked_at);
+
+  if (status === 'trialing' && trialEnd) return `Período de teste até ${trialEnd}`;
+  if (status === 'active' && periodEnd) return `Próxima cobrança em ${periodEnd}`;
+  if (status === 'past_due' && periodEnd) return `Vencimento em ${periodEnd}`;
+  if (status === 'canceled' && canceledAt) return `Cancelada em ${canceledAt}`;
+  if (status === 'blocked' && blockedAt) return `Bloqueada em ${blockedAt}`;
+  return null;
+}
+
 export default function SubscriptionSummary({
   subscription = null,
   usage = {},
@@ -39,6 +60,7 @@ export default function SubscriptionSummary({
   const resolvedSecondaryLabel = secondaryLabel || actionCopy.secondaryLabel || 'Falar com o suporte';
   const helperText = actionCopy.helperText;
   const limitSnapshot = plan?.limits || {};
+  const dateLine = buildDateLine(gate.subscription, gate.status);
 
   return (
     <Card title={title} subtitle={subtitle}>
@@ -50,6 +72,9 @@ export default function SubscriptionSummary({
         </div>
 
         <p style={{ margin: 0, color: 'var(--color-text-secondary)', lineHeight: 1.5 }}>{message}</p>
+        {dateLine ? (
+          <p style={{ margin: '-4px 0 0', color: 'var(--color-text-muted)', fontSize: 13 }}>{dateLine}</p>
+        ) : null}
         {helperText ? (
           <p style={{ margin: '-4px 0 0', color: 'var(--color-text-muted)', fontSize: 13 }}>
             {helperText}

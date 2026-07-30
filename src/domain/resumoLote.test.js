@@ -119,3 +119,38 @@ test('getResumoLote: lucroPorCabeca e custoPorCabeca usam lote.qtd quando diverg
   // As duas divisões usam o MESMO denominador (nenhuma delas usa os 50 de animais.qtd):
   assert.equal(resumo.custoTotal / resumo.custoPorCabeca, resumo.lucroTotal / resumo.lucroPorCabeca);
 });
+
+// ── P1-05B: getResumoLote expõe gmdDisponivel (fonte canônica) ─────────────
+
+test('getResumoLote: sem pesagens, gmdDisponivel é false e gmdMedio é 0 (nunca inventado)', () => {
+  const db = makeDb({
+    lotes: [makeLote({ entrada: '2025-01-01' })],
+    animais: [makeAnimal({ p_ini: 300, p_at: 450 })],
+  });
+  const resumo = getResumoLote(db, 1);
+  assert.equal(resumo.gmdDisponivel, false);
+  assert.equal(resumo.gmdMedio, 0);
+});
+
+test('getResumoLote: com pesagem de lote válida, gmdDisponivel é true e gmdMedio bate com o ganho real', () => {
+  const db = makeDb({
+    lotes: [makeLote({ entrada: '2025-01-01', p_ini: 300 })],
+    animais: [makeAnimal()],
+  });
+  db.pesagens = [{ id: 1, lote_id: 1, tipo: 'lote', data: '2025-04-11', peso_medio: 400 }];
+  const resumo = getResumoLote(db, 1);
+  assert.equal(resumo.gmdDisponivel, true);
+  // (400 - 300) / 100 dias = 1.0 kg/dia
+  assert.ok(Math.abs(resumo.gmdMedio - 1.0) < 0.001);
+});
+
+test('getResumoLote: GMD real igual a zero (peso não mudou) continua gmdDisponivel=true — distinguível de "sem dado"', () => {
+  const db = makeDb({
+    lotes: [makeLote({ entrada: '2025-01-01', p_ini: 350 })],
+    animais: [makeAnimal({ p_ini: 350, p_at: 350 })],
+  });
+  db.pesagens = [{ id: 1, lote_id: 1, tipo: 'lote', data: '2025-04-11', peso_medio: 350 }];
+  const resumo = getResumoLote(db, 1);
+  assert.equal(resumo.gmdDisponivel, true, 'há dado real e válido, mesmo que o ganho seja zero');
+  assert.equal(resumo.gmdMedio, 0);
+});

@@ -1,18 +1,30 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { navSections, secondaryNavItems, navLabelMap, getNavLabel } from './navConfig.js';
+import { navGroups, accountNavItems, navLabelMap, getNavLabel, groupIdByPageId } from './navConfig.js';
 import { pageRouteMap, getPageFromPathname } from './routes.js';
 import { permissoesPorPagina, perfilTemPermissao } from '../auth/perfis.js';
 import { NAV_ITEMS as MOBILE_BOTTOM_NAV_ITEMS } from '../components/mobileBottomNavItems.js';
 
-// Sprint de reorganização estratégica da sidebar — testes cobrindo a
-// estrutura de navConfig.js. navSections é a ÚNICA fonte usada tanto pela
-// sidebar desktop (Sidebar.jsx) quanto pelo drawer mobile "Mais opções"
-// (App.jsx::mobileNavGroups é derivado dela, mesmo filtro de permissão) —
-// então testar a estrutura de dados aqui cobre os dois.
-const todosItens = [...navSections.flatMap((section) => section.items), ...secondaryNavItems];
+// Sprint Visual 2 — sidebar simplificada em 6 áreas principais (linguagem do
+// pecuarista). navGroups é a ÚNICA fonte usada pela sidebar desktop
+// (Sidebar.jsx), pelo bottom sheet mobile (App.jsx::mobileSheetSections) e
+// pela barra inferior (mobileBottomNavItems.js aponta pra cá por groupId) —
+// testar a estrutura aqui cobre as três superfícies.
+const todosItens = [...navGroups.flatMap((group) => group.items), ...accountNavItems];
 
-test('nenhum pageId duplicado em navSections/secondaryNavItems', () => {
+test('a sidebar tem exatamente 6 áreas principais', () => {
+  assert.equal(navGroups.length, 6, `esperado 6 grupos, encontrado ${navGroups.length}`);
+});
+
+test('"Painel Geral" é o único grupo standalone (item direto, sem submenu)', () => {
+  const standalone = navGroups.filter((group) => group.standalone);
+  assert.equal(standalone.length, 1, 'deveria haver exatamente 1 grupo standalone');
+  assert.equal(standalone[0].id, 'painel');
+  assert.equal(standalone[0].items.length, 1, 'grupo standalone deve ter exatamente 1 item');
+  assert.equal(standalone[0].items[0].id, 'dashboard');
+});
+
+test('nenhum pageId duplicado em navGroups/accountNavItems', () => {
   const ids = todosItens.map((item) => item.id);
   const duplicados = ids.filter((id, index) => ids.indexOf(id) !== index);
   assert.equal(new Set(ids).size, ids.length, `ids duplicados: ${duplicados.join(', ')}`);
@@ -20,8 +32,8 @@ test('nenhum pageId duplicado em navSections/secondaryNavItems', () => {
 
 test('nenhum item aparece em mais de um grupo', () => {
   const vistos = new Set();
-  for (const section of navSections) {
-    for (const item of section.items) {
+  for (const group of navGroups) {
+    for (const item of group.items) {
       assert.ok(!vistos.has(item.id), `${item.id} aparece em mais de um grupo`);
       vistos.add(item.id);
     }
@@ -29,14 +41,15 @@ test('nenhum item aparece em mais de um grupo', () => {
 });
 
 test('nenhum grupo vazio', () => {
-  for (const section of navSections) {
-    assert.ok(section.items.length > 0, `grupo "${section.id}" está vazio`);
+  for (const group of navGroups) {
+    assert.ok(group.items.length > 0, `grupo "${group.id}" está vazio`);
   }
 });
 
-test('nenhum grupo com apenas 1 item (sem justificativa formal registrada)', () => {
-  for (const section of navSections) {
-    assert.ok(section.items.length > 1, `grupo "${section.id}" tem só 1 item — junte a outro grupo ou justifique`);
+test('nenhum grupo (fora o standalone Painel Geral) tem só 1 item sem justificativa', () => {
+  for (const group of navGroups) {
+    if (group.standalone) continue;
+    assert.ok(group.items.length > 1, `grupo "${group.id}" tem só 1 item — junte a outro grupo ou justifique`);
   }
 });
 
@@ -49,13 +62,13 @@ test('"Pesagens" está na sidebar e "Acompanhamento de Peso" não aparece mais',
   );
 });
 
-test('"Produtos e Insumos" saiu do grupo isolado "Estoque" e foi para Rebanho e Campo', () => {
-  const grupoEstoqueIsolado = navSections.find((section) => section.id === 'estoque');
-  assert.equal(grupoEstoqueIsolado, undefined, 'o grupo isolado "estoque" deveria ter sido removido');
+test('"Estoque" está no grupo Gestão, não isolado', () => {
+  const grupoIsolado = navGroups.find((group) => group.id === 'estoque');
+  assert.equal(grupoIsolado, undefined, 'não deveria existir um grupo isolado "estoque"');
 
-  const grupoComProdutos = navSections.find((section) => section.items.some((item) => item.id === 'estoque'));
-  assert.ok(grupoComProdutos, '"Produtos e Insumos" (id: estoque) deveria estar em algum grupo');
-  assert.ok(grupoComProdutos.items.length > 1, 'o grupo que recebeu Produtos e Insumos não pode ficar com 1 item só');
+  const grupoGestao = navGroups.find((group) => group.id === 'gestao');
+  assert.ok(grupoGestao.items.some((item) => item.id === 'estoque'), '"estoque" deveria estar no grupo Gestão');
+  assert.ok(grupoGestao.items.length > 1, 'o grupo Gestão não pode ficar com 1 item só');
 });
 
 test('hub "Relatórios" continua na sidebar; relatórios específicos continuam com rota própria', () => {
@@ -71,9 +84,6 @@ test('"Relatórios Financeiros" segue fora da sidebar mas mantém rota funcionan
 });
 
 test('"Painel Gerencial" está na sidebar — é recurso vendido no plano PRO', () => {
-  // A dedup anterior tirou este item do menu por duplicar DashboardPremiumPage,
-  // mas DashboardPremium também não tinha entrada: as duas ficaram órfãs e o
-  // recurso "Relatórios avançados" (plano PRO) não tinha caminho na interface.
   assert.ok(
     todosItens.some((item) => item.id === 'relatoriosGerenciais'),
     'relatoriosGerenciais precisa estar na sidebar: é vendido como "Relatórios avançados" no plano PRO'
@@ -91,9 +101,6 @@ test('DashboardPremiumPage foi removida e sua rota antiga redireciona sem quebra
 });
 
 test('"Funcionários" está na sidebar — é o único ponto de cadastro de responsáveis', () => {
-  // Sem esta entrada, o seletor de responsável em Tarefas/Sanidade/Rotinas
-  // fica permanentemente vazio: FuncionariosPage é o único lugar que executa
-  // createOperationalRecord('funcionarios').
   assert.ok(
     todosItens.some((item) => item.id === 'funcionarios'),
     'funcionarios precisa estar na sidebar (único cadastro de funcionário do app)'
@@ -101,7 +108,16 @@ test('"Funcionários" está na sidebar — é o único ponto de cadastro de resp
   assert.ok(pageRouteMap.funcionarios, 'rota de funcionários precisa existir');
 });
 
-test('toda página da sidebar tem rota registrada (nenhum item leva a rota inexistente)', () => {
+test('"Equipe e Acessos" e "Funcionários" continuam como entradas distintas (entidades diferentes)', () => {
+  // Funcionários (tabela funcionarios) = peões/vaqueiros sem login. Equipe e
+  // Acessos (profiles/invites) = quem tem login na conta. Forçar uma entrada
+  // única esconderia o único cadastro de funcionário do app (ver teste acima).
+  const grupoAdministracao = navGroups.find((group) => group.id === 'administracao');
+  assert.ok(grupoAdministracao.items.some((item) => item.id === 'funcionarios'));
+  assert.ok(grupoAdministracao.items.some((item) => item.id === 'equipeAcessos'));
+});
+
+test('toda página da sidebar/conta tem rota registrada (nenhum item leva a rota inexistente)', () => {
   for (const item of todosItens) {
     assert.ok(pageRouteMap[item.id], `sem rota registrada para o item de sidebar "${item.id}"`);
   }
@@ -112,17 +128,21 @@ test('getNavLabel devolve o label configurado e cai para um label legível em pa
   assert.equal(getNavLabel('paginaSemLabelAlgumaCoisa'), 'Pagina Sem Label Alguma Coisa');
 });
 
-test('navLabelMap cobre todos os itens de navSections e secondaryNavItems', () => {
+test('navLabelMap cobre todos os itens de navGroups e accountNavItems', () => {
   for (const item of todosItens) {
     assert.equal(navLabelMap[item.id], item.label);
   }
 });
 
-// Permissões — a reorganização não pode alterar quem vê o quê (Etapa 8).
-// Reaproveita permissoesPorPagina/permissoesPorPerfil de auth/perfis.js,
-// que não foi tocado nesta sprint; só confirma que a filtragem por
-// permissão (mesma lógica usada em Sidebar.jsx e App.jsx::mobileNavGroups)
-// continua produzindo o resultado esperado por perfil.
+test('groupIdByPageId cobre todo item de navGroups e aponta pro grupo certo', () => {
+  for (const group of navGroups) {
+    for (const item of group.items) {
+      assert.equal(groupIdByPageId[item.id], group.id);
+    }
+  }
+});
+
+// Permissões — a reorganização não pode alterar quem vê o quê.
 function podeVerPagina(perfil, pageId) {
   const permissao = permissoesPorPagina[pageId];
   return !permissao || perfilTemPermissao(perfil, permissao);
@@ -160,16 +180,35 @@ test('"Planos e Assinatura" continua restrito conforme regra atual (só propriet
   assert.ok(perfilTemPermissao('proprietario', 'assinatura:gerenciar'));
 });
 
-// Mobile: a barra inferior é uma lista curta e fixa (não deriva de
-// navSections), mas precisa continuar curta, sem "Acompanhamento de Peso"
-// e sem pageId inválido.
-test('barra inferior mobile é curta, sem duplicados, sem acompanhamentoPeso e com pageIds válidos', () => {
-  assert.ok(MOBILE_BOTTOM_NAV_ITEMS.length <= 6, 'a barra inferior deve permanecer curta');
+// Mobile: a barra inferior é uma lista curta e fixa (não deriva 1:1 de
+// navGroups), mas "rebanho"/"manejo"/"gestao" apontam por groupId para um
+// grupo real (abrem um bottom sheet); só "dashboard" navega direto e só
+// "mais" abre o restante.
+test('barra inferior mobile tem no máximo 5 itens, sem duplicados e sem acompanhamentoPeso', () => {
+  assert.ok(MOBILE_BOTTOM_NAV_ITEMS.length <= 5, 'a barra inferior deve ter no máximo 5 itens');
   const ids = MOBILE_BOTTOM_NAV_ITEMS.map((item) => item.id);
   assert.equal(new Set(ids).size, ids.length, 'ids duplicados na barra inferior');
   assert.ok(!ids.includes('acompanhamentoPeso'));
+
   for (const item of MOBILE_BOTTOM_NAV_ITEMS) {
-    if (item.id === 'mais') continue; // "mais" abre o drawer, não é um pageId
-    assert.ok(pageRouteMap[item.id], `item "${item.id}" da barra inferior não tem rota`);
+    if (item.type === 'page') {
+      assert.ok(pageRouteMap[item.id], `item de página "${item.id}" da barra inferior não tem rota`);
+    } else if (item.type === 'group') {
+      assert.ok(
+        navGroups.some((group) => group.id === item.groupId),
+        `item "${item.id}" aponta para um groupId inexistente ("${item.groupId}")`
+      );
+    } else {
+      assert.equal(item.type, 'more', `item "${item.id}" tem tipo desconhecido`);
+    }
   }
+});
+
+test('barra inferior mobile não deixa nenhum grupo órfão: rebanho/manejo/gestao cobertos, resto vai para "mais"', () => {
+  const groupIdsNaBarra = MOBILE_BOTTOM_NAV_ITEMS.filter((item) => item.type === 'group').map((item) => item.groupId);
+  const groupIdsForaDaBarra = navGroups.map((group) => group.id).filter((id) => id !== 'painel' && !groupIdsNaBarra.includes(id));
+  // Os grupos que não têm aba própria (acompanhamento, administracao) só
+  // são alcançáveis mobile via "mais" — isso é validado em App.jsx, aqui só
+  // garantimos que a lista de "restantes" é a esperada (nada some sem querer).
+  assert.deepEqual(groupIdsForaDaBarra.sort(), ['acompanhamento', 'administracao']);
 });

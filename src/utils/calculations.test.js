@@ -1,6 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { calcLote } from './calculations.js';
+import { gmdDoLote } from '../domain/gmd.js';
 
 function makeDb({ lotes = [], animais = [], movimentacoes = [], custos = [] } = {}) {
   return { lotes, animais, movimentacoes_financeiras: movimentacoes, custos };
@@ -32,8 +33,18 @@ function makeAnimal(overrides = {}) {
 }
 
 // --- F-03: GMD dinâmico ---
+//
+// P1-05: `gmdMedio` passou a vir EXCLUSIVAMENTE da fonte única (domain/gmd.js,
+// baseada em PESAGENS) — nenhum destes fixtures tem `pesagens`, então
+// `gmdMedio` agora é sempre 0 (sem dado, nunca um número inventado; ver bloco
+// "GMD canônico" mais abaixo). A cadeia de fallback de data (item.data_entrada
+// → lote.entrada → item.dias) que estes testes exercitavam CONTINUA existindo
+// em `calcGmd`, só que agora só alimenta gmdMacho/gmdFemea (não há fonte
+// canônica alternativa para GMD por sexo — pesagem de lote não é segregada).
+// Os testes abaixo passam a checar `gmdMacho` (população 100% macho por
+// padrão de `makeAnimal`), preservando a mesma cobertura da lógica de datas.
 
-test('calcLote calcula GMD usando entrada do lote como fallback de data (F-03)', () => {
+test('calcLote calcula GMD (por sexo) usando entrada do lote como fallback de data (F-03)', () => {
   const db = makeDb({
     lotes: [makeLote({ entrada: '2025-01-01' })],
     // item.dias = 9999 (valor errado propositalmente para validar que não é usado)
@@ -42,7 +53,7 @@ test('calcLote calcula GMD usando entrada do lote como fallback de data (F-03)',
   // 2025-01-01 → 2025-04-11 = 100 dias
   const result = calcLote(db, 1, '2025-04-11');
   // GMD = (400 - 300) / 100 = 1.0 kg/dia
-  assert.ok(Math.abs(result.gmdMedio - 1.0) < 0.001, `GMD esperado 1.0, recebido ${result.gmdMedio}`);
+  assert.ok(Math.abs(result.gmdMacho - 1.0) < 0.001, `GMD macho esperado 1.0, recebido ${result.gmdMacho}`);
 });
 
 test('calcLote calcula dias médio a partir da data de entrada do lote (F-03)', () => {
@@ -63,7 +74,7 @@ test('calcLote usa item.data_entrada quando disponível, ignorando lote.entrada 
   // 2025-02-19 → 2025-04-10 = 50 dias
   const result = calcLote(db, 1, '2025-04-10');
   // GMD = (350 - 300) / 50 = 1.0 kg/dia
-  assert.ok(Math.abs(result.gmdMedio - 1.0) < 0.001, `GMD esperado 1.0, recebido ${result.gmdMedio}`);
+  assert.ok(Math.abs(result.gmdMacho - 1.0) < 0.001, `GMD macho esperado 1.0, recebido ${result.gmdMacho}`);
 });
 
 test('calcLote cai para item.dias quando lote não tem data de entrada (F-03)', () => {
@@ -73,10 +84,10 @@ test('calcLote cai para item.dias quando lote não tem data de entrada (F-03)', 
   });
   const result = calcLote(db, 1, '2025-04-11');
   // GMD = (400 - 300) / 50 = 2.0 kg/dia (usando item.dias como fallback)
-  assert.ok(Math.abs(result.gmdMedio - 2.0) < 0.001, `GMD esperado 2.0 (fallback), recebido ${result.gmdMedio}`);
+  assert.ok(Math.abs(result.gmdMacho - 2.0) < 0.001, `GMD macho esperado 2.0 (fallback), recebido ${result.gmdMacho}`);
 });
 
-test('calcLote GMD ponderado por qtd entre machos e fêmeas (F-03)', () => {
+test('calcLote GMD por sexo, ponderado por qtd entre machos e fêmeas (F-03)', () => {
   const db = makeDb({
     lotes: [makeLote({ entrada: '2025-01-01' })],
     animais: [
@@ -87,20 +98,124 @@ test('calcLote GMD ponderado por qtd entre machos e fêmeas (F-03)', () => {
       makeAnimal({ id: '2', p_ini: 250, p_at: 300, qtd: 10, sexo: 'femea' }), // ganho 50 kg
     ],
   });
-  // 100 dias; GMD ponderado = ((100/100)*10 + (50/100)*10) / 20 = (10 + 5) / 20 = 0.75 kg/dia
   const result = calcLote(db, 1, '2025-04-11');
-  assert.ok(Math.abs(result.gmdMedio - 0.75) < 0.001, `GMD esperado 0.75, recebido ${result.gmdMedio}`);
   assert.ok(Math.abs(result.gmdMacho - 1.0) < 0.001, `GMD macho esperado 1.0, recebido ${result.gmdMacho}`);
   assert.ok(Math.abs(result.gmdFemea - 0.5) < 0.001, `GMD fêmea esperado 0.5, recebido ${result.gmdFemea}`);
+  // Sem pesagens no fixture: gmdMedio (fonte canônica) não tem dado suficiente.
+  assert.equal(result.gmdMedio, 0);
+  assert.equal(result.gmdDisponivel, false);
 });
 
-test('calcLote com ganho de peso zero retorna GMD zero (F-03)', () => {
+test('calcLote com ganho de peso zero (por sexo) — gmdMedio segue 0 por falta de pesagem', () => {
   const db = makeDb({
     lotes: [makeLote({ entrada: '2025-01-01' })],
     animais: [makeAnimal({ p_ini: 350, p_at: 350, qtd: 10 })],
   });
   const result = calcLote(db, 1, '2025-04-11');
   assert.equal(result.gmdMedio, 0);
+  assert.equal(result.gmdDisponivel, false);
+  assert.equal(result.gmdMacho, 0);
+});
+
+// ── P1-05: GMD canônico (fonte única domain/gmd.js) ──────────────────────────
+
+test('GMD canônico: entrada do lote + pesagem final válidas calcula gmdMedio', () => {
+  const db = makeDb({
+    lotes: [makeLote({ entrada: '2025-01-01', p_ini: 300 })],
+    animais: [makeAnimal()],
+  });
+  db.pesagens = [{ id: 1, lote_id: 1, tipo: 'lote', data: '2025-04-11', peso_medio: 400 }];
+  const result = calcLote(db, 1, '2025-04-11');
+  // (400 - 300) / 100 dias = 1.0 kg/dia
+  assert.ok(Math.abs(result.gmdMedio - 1.0) < 0.001, `GMD esperado 1.0, recebido ${result.gmdMedio}`);
+  assert.equal(result.gmdDisponivel, true);
+});
+
+test('GMD canônico: múltiplas pesagens usa a ÚLTIMA como ponto final', () => {
+  const db = makeDb({
+    lotes: [makeLote({ entrada: '2025-01-01', p_ini: 300 })],
+    animais: [makeAnimal()],
+  });
+  db.pesagens = [
+    { id: 1, lote_id: 1, tipo: 'lote', data: '2025-02-01', peso_medio: 340 },
+    { id: 2, lote_id: 1, tipo: 'lote', data: '2025-03-01', peso_medio: 370 },
+    { id: 3, lote_id: 1, tipo: 'lote', data: '2025-04-11', peso_medio: 400 },
+  ];
+  const result = calcLote(db, 1, '2025-04-11');
+  assert.ok(Math.abs(result.gmdMedio - 1.0) < 0.001, `GMD esperado 1.0 (última pesagem), recebido ${result.gmdMedio}`);
+});
+
+test('GMD canônico: sem pesagem suficiente devolve 0 (não inventa valor)', () => {
+  const db = makeDb({
+    lotes: [makeLote({ entrada: '2025-01-01', p_ini: 300 })],
+    animais: [makeAnimal({ p_ini: 300, p_at: 500 })], // ganho enorme na tabela `animais`
+  });
+  db.pesagens = []; // nenhuma pesagem de lote
+  const result = calcLote(db, 1, '2025-04-11');
+  assert.equal(result.gmdMedio, 0, 'não deve recalcular pela fórmula legada de animais');
+  assert.equal(result.gmdDisponivel, false);
+});
+
+test('GMD canônico: data de pesagem inválida é ignorada (mesmo efeito de "sem pesagem")', () => {
+  const db = makeDb({
+    lotes: [makeLote({ entrada: '2025-01-01', p_ini: 300 })],
+    animais: [makeAnimal()],
+  });
+  db.pesagens = [{ id: 1, lote_id: 1, tipo: 'lote', data: 'data-invalida', peso_medio: 400 }];
+  const result = calcLote(db, 1, '2025-04-11');
+  assert.equal(result.gmdMedio, 0);
+  assert.equal(result.gmdDisponivel, false);
+});
+
+test('GMD canônico: peso inicial do lote ausente cai para a primeira pesagem como base', () => {
+  const db = makeDb({
+    lotes: [makeLote({ entrada: '2025-01-01', p_ini: undefined })],
+    animais: [makeAnimal()],
+  });
+  db.pesagens = [
+    { id: 1, lote_id: 1, tipo: 'lote', data: '2025-01-01', peso_medio: 320 },
+    { id: 2, lote_id: 1, tipo: 'lote', data: '2025-02-20', peso_medio: 370 },
+  ];
+  const result = calcLote(db, 1, '2025-02-20');
+  // Sem p_ini do lote: base = primeira pesagem (320 em 2025-01-01); 50 dias.
+  assert.ok(Math.abs(result.gmdMedio - 1.0) < 0.001, `GMD esperado 1.0, recebido ${result.gmdMedio}`);
+  assert.equal(result.gmdDisponivel, true);
+});
+
+test('GMD canônico: intervalo de dias zero (mesma data) devolve 0, nunca divide por zero', () => {
+  const db = makeDb({
+    lotes: [makeLote({ entrada: '2025-04-11', p_ini: 300 })],
+    animais: [makeAnimal()],
+  });
+  db.pesagens = [{ id: 1, lote_id: 1, tipo: 'lote', data: '2025-04-11', peso_medio: 400 }];
+  const result = calcLote(db, 1, '2025-04-11');
+  assert.equal(result.gmdMedio, 0);
+  assert.equal(result.gmdDisponivel, false);
+  assert.equal(Number.isNaN(result.gmdMedio), false);
+  assert.notEqual(result.gmdMedio, Infinity);
+});
+
+test('calcLote e gmdDoLote retornam o MESMO valor (mesma fonte, mesma unidade)', () => {
+  const db = makeDb({
+    lotes: [makeLote({ entrada: '2025-01-01', p_ini: 300 })],
+    animais: [makeAnimal()],
+  });
+  db.pesagens = [{ id: 1, lote_id: 1, tipo: 'lote', data: '2025-04-11', peso_medio: 430 }];
+  const result = calcLote(db, 1, '2025-04-11');
+  const gmdCanonico = gmdDoLote(db.lotes[0], db.pesagens);
+  assert.equal(result.gmdMedio, gmdCanonico, 'mesmo número — mesma fonte, mesma unidade (kg/dia)');
+});
+
+test('registro antigo sem `pesagens` no db mantém compatibilidade (gmdMedio=0, sem NaN)', () => {
+  const db = makeDb({
+    lotes: [makeLote({ entrada: '2025-01-01' })],
+    animais: [makeAnimal()],
+  });
+  // db.pesagens nunca foi definido — simula registro/db legado.
+  const result = calcLote(db, 1, '2025-04-11');
+  assert.equal(result.gmdMedio, 0);
+  assert.equal(result.gmdDisponivel, false);
+  assert.equal(Number.isNaN(result.gmdMedio), false);
 });
 
 // --- F-07: arrobasProduzidas usa calcularArrobasProduzidas ---

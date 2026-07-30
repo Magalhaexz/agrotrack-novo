@@ -14,7 +14,6 @@ body:has(.login-page),
 .login-page {
   --login-surface: rgba(10, 16, 12, 0.84);
   --login-surface-strong: rgba(9, 14, 11, 0.94);
-  --login-border: rgba(112, 255, 170, 0.14);
   --login-shadow: 0 30px 72px rgba(0, 0, 0, 0.42);
   min-height: 100vh;
   min-height: 100svh;
@@ -181,14 +180,14 @@ body:has(.login-page),
 .login-card {
   position: relative;
   border-radius: 28px;
-  border: 1px solid var(--login-border);
   background:
     linear-gradient(180deg, rgba(22, 28, 25, 0.8), rgba(10, 14, 12, 0.96)),
     var(--login-surface);
+  /* Sem borda perimetral — o cartão se define só pela superfície e pela
+     sombra (pedido explícito: remover bordas visuais desnecessárias). */
   box-shadow:
     inset 0 1px 0 rgba(255, 255, 255, 0.06),
     inset 0 -1px 0 rgba(0, 0, 0, 0.28),
-    0 0 0 1px rgba(255, 255, 255, 0.015),
     var(--login-shadow);
   padding: clamp(22px, 2.4vw, 30px);
   overflow: hidden;
@@ -727,11 +726,16 @@ body:has(.login-page),
   }
 }
 
-@media (max-height: 820px) {
+/* 1366x768 e 1440x900 (notebooks comuns) caem aqui — o card sozinho já
+   passava de 550px de altura, então além de apertar o espaçamento do card
+   o texto promocional (tagline, ícones, headline/descrição) recolhe, do
+   mesmo jeito que a tagline/ícones já recolhiam abaixo de 700px. Logo e
+   nome HERDON (identidade) continuam sempre visíveis. */
+@media (max-height: 920px) {
   .login-page-frame {
-    gap: 6px;
-    padding-top: 8px;
-    padding-bottom: 8px;
+    gap: 4px;
+    padding-top: 6px;
+    padding-bottom: 6px;
   }
 
   .login-brand-header {
@@ -743,22 +747,10 @@ body:has(.login-page),
     height: clamp(54px, 6.5vh, 72px);
   }
 
-  .login-brand-sub {
-    line-height: 1.35;
-  }
-
-  .login-brand-icons {
-    margin-top: 2px;
-  }
-
+  .login-brand-sub,
+  .login-brand-icons,
   .login-hero-copy {
-    gap: 6px;
-    margin-bottom: 4px;
-  }
-
-  .login-brand-description {
-    font-size: 0.86rem;
-    line-height: 1.45;
+    display: none;
   }
 
   .login-card {
@@ -766,12 +758,12 @@ body:has(.login-page),
   }
 
   .login-card-topline {
-    margin-bottom: 8px;
+    margin-bottom: 6px;
   }
 
   .login-header {
     gap: 4px;
-    margin-bottom: 8px;
+    margin-bottom: 6px;
   }
 
   .login-title {
@@ -788,7 +780,7 @@ body:has(.login-page),
   }
 
   .login-form {
-    gap: 10px;
+    gap: 8px;
   }
 
   .login-input {
@@ -797,8 +789,8 @@ body:has(.login-page),
   }
 
   .login-actions {
-    gap: 8px;
-    margin-top: 2px;
+    gap: 6px;
+    margin-top: 0;
   }
 
   .login-btn {
@@ -806,17 +798,17 @@ body:has(.login-page),
   }
 
   .login-divider {
-    margin: 10px 0 8px;
+    margin: 6px 0;
   }
 
   .login-links-card {
-    padding: 8px 14px;
-    gap: 5px;
+    padding: 6px 12px;
+    gap: 4px;
   }
 
   .login-card-foot {
-    margin-top: 10px;
-    padding-top: 10px;
+    margin-top: 6px;
+    padding-top: 6px;
   }
 
   .login-card-foot-text {

@@ -18,6 +18,7 @@ import {
 import { aplicarTratativasAosAlertas, resumirTratativas, STATUS_TRATATIVA } from '../domain/tratativasAlertas';
 import { listarTratativasAlertas, salvarTratativaAlerta } from '../services/tratativasAlertas';
 import { formatarDataExportacao, montarNomeArquivo } from '../domain/exportacaoRelatorios';
+import { isModoConsolidado, construirMapaFazendas } from '../domain/escopoFazenda';
 import { baixarCsv, abrirRelatorioParaImpressao } from '../utils/exportacaoArquivos';
 import '../styles/alertas.css';
 
@@ -129,10 +130,23 @@ export default function AlertasPage({
   );
 
   const lotes = useMemo(() => (Array.isArray(db.lotes) ? db.lotes : []), [db.lotes]);
+  // Sprint Visual 8: só identifica a fazenda de cada alerta para exibição
+  // (via lote → fazenda) — não altera o motor de alertas nem a filtragem
+  // por pastagem já existente acima.
+  const consolidado = isModoConsolidado(fazendaSelecionada);
+  const fazendasMap = useMemo(() => construirMapaFazendas(db), [db]);
+  const lotesMap = useMemo(() => new Map(lotes.map((lote) => [Number(lote.id), lote])), [lotes]);
 
   const alertasNormalizados = useMemo(
-    () => alertasBrutos.map((alerta) => normalizarAlertaCentral(alerta, { lotes })),
-    [alertasBrutos, lotes]
+    () => alertasBrutos.map((alerta) => {
+      const normalizado = normalizarAlertaCentral(alerta, { lotes });
+      const lote = normalizado.loteId != null ? lotesMap.get(Number(normalizado.loteId)) : null;
+      return {
+        ...normalizado,
+        fazendaNome: lote ? (fazendasMap.get(Number(lote.faz_id)) || 'Sem fazenda') : null,
+      };
+    }),
+    [alertasBrutos, lotes, lotesMap, fazendasMap]
   );
 
   // Sprint 16 — camada de tratativa (em_analise/resolvido/adiado/ignorado)
@@ -309,7 +323,7 @@ export default function AlertasPage({
     <div className="page page--alertas">
       <PageHeader
         title="Central de Alertas"
-        subtitle="Priorize ocorrências, prazos e ações críticas da operação."
+        subtitle={`${consolidado ? 'Todas as fazendas' : (fazendaSelecionada?.nome || 'Todas as fazendas')} · Priorize ocorrências, prazos e ações críticas da operação.`}
       />
 
       <div className="summary-cards-grid alertas-summary-grid">
@@ -471,7 +485,12 @@ export default function AlertasPage({
 
                 <h3 className="alertas-card-titulo">{alerta.titulo}</h3>
                 {alerta.descricao ? <p className="alertas-card-descricao">{alerta.descricao}</p> : null}
-                {alerta.loteNome ? <p className="alertas-card-lote">Lote: <strong>{alerta.loteNome}</strong></p> : null}
+                {alerta.loteNome ? (
+                  <p className="alertas-card-lote">
+                    Lote: <strong>{alerta.loteNome}</strong>
+                    {consolidado && alerta.fazendaNome ? <> · Fazenda: <strong>{alerta.fazendaNome}</strong></> : null}
+                  </p>
+                ) : null}
 
                 <div className="alertas-card-acao">
                   <span className="alertas-card-acao-label">Ação recomendada</span>

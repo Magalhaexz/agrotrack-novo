@@ -1,6 +1,6 @@
 ﻿import Badge from '../ui/Badge';
 
-export default function FazendaCard({ fazenda, lotesVinculados = 0, onClick, onDelete }) {
+export default function FazendaCard({ fazenda, lotesVinculados = 0, animaisVinculados = 0, onClick, onDelete }) {
   if (!fazenda) return null;
 
   const area = Number(fazenda.hectares ?? fazenda.area_total_ha ?? 0);
@@ -38,6 +38,10 @@ export default function FazendaCard({ fazenda, lotesVinculados = 0, onClick, onD
         <div>
           <div className="fazenda-stat-label">Lotes</div>
           <div className="fazenda-stat-value">{lotesVinculados}</div>
+        </div>
+        <div>
+          <div className="fazenda-stat-label">Animais</div>
+          <div className="fazenda-stat-value">{animaisVinculados}</div>
         </div>
         <div>
           <div className="fazenda-stat-label">Capacidade</div>

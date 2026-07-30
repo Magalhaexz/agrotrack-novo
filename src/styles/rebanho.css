@@ -204,6 +204,222 @@ label textarea {
   }
 }
 
+/* --- Sprint Visual 5: contexto no cabeçalho --- */
+.lotes-header-context {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin: 4px 0 0;
+  font-size: 0.86rem;
+  color: var(--color-text-secondary);
+}
+
+.lotes-header-context-dot {
+  color: var(--color-text-muted);
+}
+
+.lotes-kpi-row {
+  margin-bottom: 0;
+}
+
+/* --- Sprint Visual 5: barra de filtros compacta --- */
+.rebanho-filters-bar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: 10px;
+}
+
+.rebanho-filters-search {
+  flex: 1 1 220px;
+  min-width: 0;
+}
+
+.rebanho-filters-bar > .ui-input-wrap:not(.rebanho-filters-search) {
+  flex: 0 1 180px;
+  min-width: 140px;
+}
+
+.rebanho-filters-clear-wrap {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-left: auto;
+}
+
+.rebanho-filters-active-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--color-primary);
+  flex-shrink: 0;
+}
+
+@media (max-width: 640px) {
+  .rebanho-filters-bar > .ui-input-wrap {
+    flex: 1 1 100%;
+  }
+
+  .rebanho-filters-clear-wrap {
+    margin-left: 0;
+    width: 100%;
+    justify-content: flex-end;
+  }
+}
+
+/* --- Sprint Visual 5: grade de lotes (substitui a tabela) — cada lote é um
+   cartão compacto; clique abre o mesmo painel de preview de sempre (nenhuma
+   ação/dado somem, só mudou de tabela para cartão). --- */
+.lotes-grid {
+  flex: 1;
+  min-width: 0;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+  gap: 12px;
+  align-content: start;
+}
+
+.lote-row-card {
+  display: grid;
+  gap: 10px;
+  text-align: left;
+  padding: 14px 16px;
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: 14px;
+  color: inherit;
+  font: inherit;
+  cursor: pointer;
+  transition: border-color 0.15s ease, background 0.15s ease;
+}
+
+.lote-row-card:hover {
+  border-color: var(--color-border-strong);
+  background: var(--color-surface-hover);
+}
+
+.lote-row-card:focus-visible {
+  outline: 2px solid var(--color-primary);
+  outline-offset: 1px;
+}
+
+.lote-row-card.is-selected {
+  border-color: var(--color-primary);
+  background: var(--sidebar-item-active-bg, rgba(34, 197, 94, 0.13));
+}
+
+.lote-row-card-top {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.lote-row-card-heading {
+  min-width: 0;
+}
+
+.lote-row-card-heading h3 {
+  margin: 0;
+  font-family: var(--font-heading);
+  font-size: 1rem;
+  font-weight: 600;
+  color: var(--color-text);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.lote-row-card-farm {
+  margin: 2px 0 0;
+  font-size: 0.76rem;
+  color: var(--color-text-muted);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.lote-row-card-badges {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 4px;
+  flex-shrink: 0;
+}
+
+.lote-row-card-alert {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 0.7rem;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.lote-row-card-alert--atencao { color: var(--color-warning); }
+.lote-row-card-alert--risco { color: #f97316; }
+.lote-row-card-alert--critico { color: var(--color-danger); }
+
+.lote-row-card-stats {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px 12px;
+}
+
+.lote-row-card-stat {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+  color: var(--color-text-secondary);
+  font-size: 0.8rem;
+}
+
+.lote-row-card-stat svg {
+  flex-shrink: 0;
+  color: var(--color-text-muted);
+}
+
+.lote-row-card-stat span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.lote-row-card-stat--primary strong {
+  font-family: var(--font-mono);
+  font-weight: 600;
+  font-size: 0.92rem;
+  color: var(--color-text);
+}
+
+.lote-row-card-foot {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding-top: 8px;
+  border-top: 1px solid var(--color-border-subtle);
+  font-size: 0.74rem;
+  color: var(--color-text-muted);
+}
+
+.lote-row-card-foot svg {
+  flex-shrink: 0;
+}
+
+/* --- Sprint Visual 5: menu de ações agrupado (comuns / movimentações /
+   encerramento) — mesmas ações e permissões de sempre, só separadas
+   visualmente; a de encerramento (destrutiva) ganha um divisor. --- */
+.lote-actions-groups {
+  display: grid;
+  gap: 10px;
+}
+
+.lote-actions-group--encerramento {
+  padding-top: 10px;
+  border-top: 1px solid var(--color-border-subtle);
+}
+
 /* --- Lote Cards Grid (legado — algumas páginas/telas menores ainda usam
    classes .lote-card* isoladas em outros componentes) --- */
 .lote-cards-grid {

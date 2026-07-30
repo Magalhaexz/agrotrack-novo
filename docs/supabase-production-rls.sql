@@ -1,5 +1,16 @@
 -- HERDON production RLS bundle
 -- Run after docs/supabase-production-schema.sql
+--
+-- NOTA DE AUTORIDADE (P1-09): as migrations aplicadas em
+-- supabase/migrations/ são a fonte normativa do RLS em produção — não este
+-- bundle. Este arquivo é um snapshot de referência/disaster-recovery, e por
+-- ser atualizado manualmente pode ficar temporariamente desatualizado em
+-- relação a uma migration mais recente. Antes de rodar este bundle contra
+-- produção, ou de usá-lo para decidir qual papel tem qual permissão, confira
+-- se ele ainda bate com o histórico de migrations (e com
+-- docs/EQUIPE_PERMISSOES_HERDON.md, que documenta a matriz de papéis atual).
+-- `app_can_manage_account` abaixo já reflete a correção da migration
+-- 20260704173340 (ver comentário na própria função).
 
 create or replace function public.app_current_owner_user_id()
 returns uuid
@@ -62,6 +73,21 @@ as $$
     and public.app_current_owner_user_id() = target_owner_user_id
 $$;
 
+-- P1-09: corrigido para bater com a migration 20260704173340
+-- (equipe_profiles_status_and_manage_account_role) — a versão aplicada em
+-- produção NÃO inclui 'gerente' neste grupo. Regra vigente (Sprint 6,
+-- docs/EQUIPE_PERMISSOES_HERDON.md): "apenas proprietário/admin gerencia
+-- equipe, convites, assinatura e cobrança" — gerente NÃO gerencia conta.
+-- Papéis e o que cada um gerencia (para quem consultar este bundle):
+--   - proprietario / admin (mesmo papel, dois rótulos aceitos pelo app):
+--     gerencia conta — perfis/convites, assinatura, cobrança, checkout.
+--   - gerente: opera fazenda/lotes/financeiro/estoque no dia a dia, mas NÃO
+--     gerencia equipe nem assinatura (bloqueado tanto aqui quanto na matriz
+--     de permissões do app, src/auth/perfis.js).
+--   - operador: registra operações do dia a dia, sem gerenciar conta.
+--   - visualizador: somente leitura, nenhuma escrita.
+-- Versão histórica (até a migration acima): incluía 'gerente' neste grupo —
+-- mantida só como registro em docs/RLS_AUDITORIA_HERDON.md, nunca reaplicar.
 create or replace function public.app_can_manage_account(target_owner_user_id uuid)
 returns boolean
 language sql
@@ -71,7 +97,7 @@ set search_path = public
 as $$
   select
     public.app_is_same_account(target_owner_user_id)
-    and coalesce(public.app_current_profile_role(), '') in ('proprietario', 'gerente')
+    and coalesce(public.app_current_profile_role(), '') in ('proprietario', 'admin')
 $$;
 
 alter table public.profiles enable row level security;

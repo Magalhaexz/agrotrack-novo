@@ -1,19 +1,37 @@
 import { NAV_ITEMS } from './mobileBottomNavItems.js';
+import { groupIdByPageId } from '../navigation/navConfig.js';
 
-export default function MobileBottomNav({ currentPage, onNavigate, onOpenMore }) {
+export default function MobileBottomNav({ currentPage, onNavigate, onOpenGroup, onOpenMore }) {
+  const activeGroupId = groupIdByPageId[currentPage] || null;
+
   return (
     <nav className="mobile-bottom-nav sem-impressao" aria-label="Navegação principal">
       {NAV_ITEMS.map((item) => {
         const Icone = item.icon;
-        const isMoreButton = item.id === 'mais';
-        const isActive = !isMoreButton && currentPage === item.id;
+        const isActive = item.type === 'page'
+          ? currentPage === item.id
+          : item.type === 'group'
+            ? activeGroupId === item.groupId
+            : false;
+
+        function handleClick() {
+          if (item.type === 'page') {
+            onNavigate?.(item.id);
+            return;
+          }
+          if (item.type === 'group') {
+            onOpenGroup?.(item.groupId);
+            return;
+          }
+          onOpenMore?.();
+        }
 
         return (
           <button
             key={item.id}
             type="button"
             className={`mobile-bottom-nav-item ${isActive ? 'active' : ''}`}
-            onClick={() => (isMoreButton ? onOpenMore?.() : onNavigate?.(item.id))}
+            onClick={handleClick}
             aria-current={isActive ? 'page' : undefined}
             aria-label={item.label}
           >

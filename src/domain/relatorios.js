@@ -3,7 +3,9 @@ import { getResumoLote } from './resumoLote.js';
 import { calcularFluxoCaixa } from './fluxoCaixa.js';
 import { construirResumoPastos, listarContasFinanceiras, construirHojeNaFazenda } from './hojeNaFazenda.js';
 import { calcularOcupacaoPastos, listarLotesSemPasto } from './ocupacaoPastos.js';
-import { buildAlerts } from '../utils/alerts.js';
+import { gerarAlertasUnificados, adaptarAlertaParaPainelLegado } from './alertasUnificados.js';
+import { aplicarTratativasAosAlertas } from './tratativasAlertas.js';
+import { loteEstaAtivo, qtdCabecasDoLote } from './rebanho.js';
 import { classificarDecisaoVenda, compararVenderOuManter, montarDadosDecisaoVenda, STATUS_DECISAO } from './decisaoVenda.js';
 import { gerarSinaisComplementaresVenda, montarDadosManejoResultado } from './manejoResultado.js';
 import { deveEntrarNoResultadoLote } from './financeiroStatus.js';
@@ -236,15 +238,26 @@ export function buildRelatorioPastagens(db, { fazendaId } = {}) {
 }
 
 /**
- * Resumo executivo da fazenda para envio rápido a sócios/gerentes, reaproveitando
- * buildAlerts() e construirHojeNaFazenda() já existentes no dashboard.
+ * Resumo executivo da fazenda para envio rápido a sócios/gerentes.
+ *
+ * P1-07: alertas vêm do Motor Único (`gerarAlertasUnificados` +
+ * `aplicarTratativasAosAlertas`, filtrado por `.visivel`) — a MESMA fonte do
+ * Dashboard e da Central de Alertas, com os mesmos `id`s estáveis, para que
+ * resolvido/ignorado/adiado não reapareça aqui e um alerta reaberto volte
+ * exatamente como nas outras telas. `adaptarAlertaParaPainelLegado` (já usado
+ * por App.jsx para alimentar `construirHojeNaFazenda`) preserva o formato
+ * `{ id, titulo, tipoLabel, nivel: 'critical'|... }` que esta página e
+ * `whatsappResumo.js` já esperam — nenhuma mudança de contrato.
+ * Lote ativo e cabeças seguem `loteEstaAtivo`/`qtdCabecasDoLote`
+ * (domain/rebanho.js), a mesma fonte canônica do resto do app.
  */
 export function buildResumoGeralFazenda(db) {
   const fazendas = arr(db?.fazendas);
   const pastagens = arr(db?.pastagens);
-  const lotesAtivos = arr(db?.lotes).filter((l) => l.status === 'ativo');
+  const animais = arr(db?.animais);
+  const lotesAtivos = arr(db?.lotes).filter(loteEstaAtivo);
 
-  const totalCabecas = lotesAtivos.reduce((soma, l) => soma + toNumber(l.qtd), 0);
+  const totalCabecas = lotesAtivos.reduce((soma, l) => soma + qtdCabecasDoLote(l, animais), 0);
 
   let lucroTotalFazenda = 0;
   let somaPesoPonderado = 0;
@@ -255,9 +268,12 @@ export function buildResumoGeralFazenda(db) {
   });
   const pesoMedioGeral = totalCabecas > 0 ? somaPesoPonderado / totalCabecas : 0;
 
-  const alertas = buildAlerts(db);
-  const alertasCriticos = alertas.filter((a) => a?.nivel === 'critical');
-  const hojeNaFazenda = construirHojeNaFazenda(db, { alerts: alertas });
+  const alertasBrutos = gerarAlertasUnificados(db);
+  const alertasVisiveis = aplicarTratativasAosAlertas(alertasBrutos, db?.alertas_tratativas, new Date())
+    .filter((a) => a.visivel);
+  const alertasParaPainel = alertasVisiveis.map(adaptarAlertaParaPainelLegado);
+  const alertasCriticos = alertasParaPainel.filter((a) => a?.nivel === 'critical');
+  const hojeNaFazenda = construirHojeNaFazenda(db, { alerts: alertasParaPainel });
 
   return {
     totalFazendas: fazendas.length,

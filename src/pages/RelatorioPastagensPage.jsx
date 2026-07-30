@@ -7,8 +7,10 @@ import AcoesRelatorio from '../components/relatorios/AcoesRelatorio';
 import { buildRelatorioPastagens } from '../domain/relatorios';
 import { gerarResumoPastagensTexto } from '../domain/whatsappResumo';
 import { formatNumber } from '../utils/calculations';
+import { isModoConsolidado } from '../domain/escopoFazenda';
 
-export default function RelatorioPastagensPage({ db, onNavigate }) {
+export default function RelatorioPastagensPage({ db, onNavigate, fazendaSelecionada }) {
+  const consolidado = isModoConsolidado(fazendaSelecionada);
   const fazendas = Array.isArray(db?.fazendas) ? db.fazendas : [];
   const [fazendaId, setFazendaId] = useState('');
   const containerRef = useRef(null);
@@ -35,7 +37,7 @@ export default function RelatorioPastagensPage({ db, onNavigate }) {
     <div className="page reports-page">
       <PageHeader
         title="Relatório de Pastos"
-        subtitle="Veja quais pastos estão ocupados e quais estão vazios."
+        subtitle={`${consolidado ? 'Todas as fazendas' : (fazendaSelecionada?.nome || 'Todas as fazendas')} · Veja quais pastos estão ocupados e quais estão vazios.`}
       />
 
       <Card title="Filtros">

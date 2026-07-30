@@ -122,6 +122,7 @@ export const calcLote = (db, loteId, referenceDate = hojeLocalISO()) => {
       gmdMacho: 0,
       gmdFemea: 0,
       gmdMedio: 0,
+      gmdDisponivel: false,
       qtdMachos: 0,
       qtdFemeas: 0,
       custoPorArroba: 0,
@@ -229,13 +230,23 @@ export const calcLote = (db, loteId, referenceDate = hojeLocalISO()) => {
   const consumoSuplementoDia = totalAnimais * (pesoAtualMedio * percentualPv / 100);
   const diasEstoque = consumoSuplementoDia > 0 ? toNumber(lote.supl_estoque_kg || 0) / consumoSuplementoDia : 999;
   const custoSuplementoCabDia = (toNumber(lote.supl_rkg || 0) * (pesoAtualMedio * percentualPv / 100)) / 100;
-  // GMD do lote vem da fonte única (domain/gmd.js), baseada nas PESAGENS —
-  // registro autoritativo do peso. `calcGmd` (tabela `animais`, p_ini→p_at) só
-  // entra como fallback quando o lote ainda não tem pesagem suficiente, e
-  // segue sendo a única opção para gmdMacho/gmdFemea, já que pesagem de lote
-  // não é segregada por sexo.
-  const gmdPorPesagens = gmdDoLote(lote, db?.pesagens);
-  const gmdMedio = gmdPorPesagens !== null ? gmdPorPesagens : calcGmd(animaisDoLote);
+  // P1-05: `gmdMedio` vem EXCLUSIVAMENTE da fonte única (domain/gmd.js),
+  // baseada nas PESAGENS — registro autoritativo do peso. Removido o fallback
+  // para `calcGmd` (fórmula legada sobre p_ini/p_at de `animais`): ela usava
+  // base/data diferentes da oficial e podia fabricar um GMD divergente
+  // exatamente quando a fonte canônica corretamente diz "sem dado
+  // suficiente" (`gmdDoLote` retorna `null` nesse caso, nunca um número
+  // inventado). A conversão para `0` abaixo é só de BORDA — os muitos
+  // consumidores existentes de `gmdMedio` esperam número —, nunca um
+  // recálculo; `gmdDisponivel` preserva a distinção entre "0 real" e "sem
+  // dado" para quem precisar dela (mesmo padrão de `gmdMedioDisponivel` em
+  // PesagensPage.jsx).
+  // `calcGmd` continua servindo gmdMacho/gmdFemea logo abaixo: pesagem de
+  // lote não é segregada por sexo, então não existe fonte canônica
+  // alternativa para eles — fora do escopo desta correção.
+  const gmdCanonico = gmdDoLote(lote, db?.pesagens);
+  const gmdMedio = gmdCanonico ?? 0;
+  const gmdDisponivel = gmdCanonico !== null;
 
   return {
     lote,
@@ -246,6 +257,7 @@ export const calcLote = (db, loteId, referenceDate = hojeLocalISO()) => {
     gmdMacho: calcGmd(machos),
     gmdFemea: calcGmd(femeas),
     gmdMedio,
+    gmdDisponivel,
     qtdMachos: machos.reduce((sum, item) => sum + toNumber(item.qtd), 0),
     qtdFemeas: femeas.reduce((sum, item) => sum + toNumber(item.qtd), 0),
     custoPorArroba: arrobasProduzidas ? totalCustos / arrobasProduzidas : 0,
@@ -281,8 +293,10 @@ export const computeAlerts = (db) => {
   lotes.forEach((lote) => {
     const indicators = calcLote(db, lote.id);
 
-    // Alerta: GMD abaixo da meta
-    if (indicators.totalAnimais > 0 && lote.gmd_meta && indicators.gmdMedio < toNumber(lote.gmd_meta) * 0.9) {
+    // Alerta: GMD abaixo da meta. `gmdDisponivel` evita falso positivo quando
+    // o lote ainda não tem pesagem suficiente (gmdMedio vira 0 só de borda,
+    // P1-05 — nunca um GMD real "abaixo da meta").
+    if (indicators.totalAnimais > 0 && lote.gmd_meta && indicators.gmdDisponivel && indicators.gmdMedio < toNumber(lote.gmd_meta) * 0.9) {
       alerts.push({
         level: 'crit',
         title: `GMD abaixo da meta — ${lote.nome}`,

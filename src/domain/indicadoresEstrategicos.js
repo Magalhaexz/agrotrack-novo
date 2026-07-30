@@ -6,6 +6,9 @@ import { computeEvolucaoRebanho } from './evolucaoRebanho.js';
 import { calcularRendimentoCarcaca } from './indicadores.js';
 import { safeDivide, toDateKey, toNonNegativeNumber, toNumber } from './calcHelpers.js';
 import { loteEstaAtivo, qtdCabecasDoLote, uaDoLote, uaTotalAtiva } from './rebanho.js';
+import { deveEntrarNoResultadoLote } from './financeiroStatus.js';
+import { deduplicarLancamentos } from './vendaLote.js';
+import { calcularCustoLote, calcularReceitaLote } from './calculos.js';
 
 import { hojeLocalISO } from './dataCivil.js';
 function isDateInPeriod(value, start, end) {
@@ -141,18 +144,56 @@ function calculateTecnicos(db, evolucao, periodStart, periodEnd, areaPastagemHa)
   };
 }
 
-function calculateEconomicos(db, periodStart, periodEnd, areaPastagemHa, estoqueInicial, estoqueFinal) {
-  const movimentosFinanceiros = Array.isArray(db?.movimentacoes_financeiras) ? db.movimentacoes_financeiras : [];
-  const inPeriod = movimentosFinanceiros.filter((m) => isDateInPeriod(m?.data, periodStart, periodEnd));
+/**
+ * Recorta `movimentacoes_financeiras`/`custos` para o período do indicador,
+ * preservando o resto do `db` intocado. `calcularReceitaLote`/`calcularCustoLote`
+ * (calculos.js) não filtram por período — são a fonte "vida toda" que
+ * `resumoLote`/DRE usam —, então o recorte por data é a ÚNICA coisa que este
+ * módulo adiciona por cima delas; toda a regra de negócio (status oficial,
+ * deduplicação, custos legados não espelhados) vem de lá, sem duplicação.
+ */
+function filtrarDbNoPeriodo(db, periodStart, periodEnd) {
+  return {
+    ...db,
+    movimentacoes_financeiras: (Array.isArray(db?.movimentacoes_financeiras) ? db.movimentacoes_financeiras : [])
+      .filter((m) => isDateInPeriod(m?.data, periodStart, periodEnd)),
+    custos: (Array.isArray(db?.custos) ? db.custos : [])
+      .filter((c) => isDateInPeriod(c?.data, periodStart, periodEnd)),
+  };
+}
 
-  const receitaTotal = inPeriod
+// P1-04: economicos/loteResumo somavam `movimentacoes_financeiras` direto (só
+// por tipo + data), sem excluir previsto/cancelado nem deduplicar lançamentos
+// espelhados (custo/venda que também existem como registro legado em
+// `custos`) — podendo divergir de Indicadores para Resultados/Financeiro/DRE.
+// Agora usam as MESMAS fontes de `resumoLote` (`calcularReceitaLote`/
+// `calcularCustoLote`, calculos.js), que já aplicam `deveEntrarNoResultadoLote`
+// + `deduplicarLancamentos` — nenhuma fórmula financeira nova aqui.
+function calculateEconomicos(db, periodStart, periodEnd, areaPastagemHa, estoqueInicial, estoqueFinal) {
+  const dbNoPeriodo = filtrarDbNoPeriodo(db, periodStart, periodEnd);
+  const lotes = Array.isArray(db?.lotes) ? db.lotes : [];
+
+  const { receitaLotes, custosLotes } = lotes.reduce((acc, lote) => {
+    acc.receitaLotes += calcularReceitaLote(dbNoPeriodo, lote.id).receitaTotal;
+    acc.custosLotes += calcularCustoLote(dbNoPeriodo, lote.id).custoTotal;
+    return acc;
+  }, { receitaLotes: 0, custosLotes: 0 });
+
+  // Lançamentos sem lote (receita/despesa "geral" da fazenda) — mesma
+  // composição de `computeDRE` (receitaLotes + receitasGerais), com dedup
+  // aplicada antes do somatório.
+  const movimentacoesNoPeriodo = Array.isArray(dbNoPeriodo.movimentacoes_financeiras) ? dbNoPeriodo.movimentacoes_financeiras : [];
+  const geraisNoPeriodo = deduplicarLancamentos(movimentacoesNoPeriodo)
+    .filter((m) => deveEntrarNoResultadoLote(m) && m?.lote_id == null);
+  const receitasGerais = geraisNoPeriodo
     .filter((m) => String(m?.tipo || '').toLowerCase() === 'receita')
     .reduce((sum, m) => sum + toNumber(m?.valor), 0);
-
-  const custosTotais = inPeriod
+  const despesasGerais = geraisNoPeriodo
     .filter((m) => String(m?.tipo || '').toLowerCase() === 'despesa')
     .reduce((sum, m) => sum + toNumber(m?.valor), 0);
 
+  const receitaTotal = receitaLotes + receitasGerais;
+  const custosTotais = custosLotes + despesasGerais;
   const margemBruta = receitaTotal - custosTotais;
   const estoqueMedio = (toNumber(estoqueInicial) + toNumber(estoqueFinal)) / 2;
   const margemPorHa = safeDivide(margemBruta, areaPastagemHa);
@@ -170,19 +211,13 @@ function calculateEconomicos(db, periodStart, periodEnd, areaPastagemHa, estoque
 
 function calculateLoteResumo(db, periodStart, periodEnd, uaPorLote) {
   const lotes = Array.isArray(db?.lotes) ? db.lotes : [];
-  const movFinanceiro = Array.isArray(db?.movimentacoes_financeiras) ? db.movimentacoes_financeiras : [];
+  const dbNoPeriodo = filtrarDbNoPeriodo(db, periodStart, periodEnd);
   const uaMap = new Map((uaPorLote || []).map((item) => [Number(item.lote_id), toNumber(item.ua_total_lote)]));
 
   return lotes.map((lote) => {
     const loteId = Number(lote.id);
-    const receita = movFinanceiro
-      .filter((m) => isDateInPeriod(m?.data, periodStart, periodEnd))
-      .filter((m) => Number(m?.lote_id) === loteId && String(m?.tipo || '').toLowerCase() === 'receita')
-      .reduce((sum, m) => sum + toNumber(m?.valor), 0);
-    const custos = movFinanceiro
-      .filter((m) => isDateInPeriod(m?.data, periodStart, periodEnd))
-      .filter((m) => Number(m?.lote_id) === loteId && String(m?.tipo || '').toLowerCase() === 'despesa')
-      .reduce((sum, m) => sum + toNumber(m?.valor), 0);
+    const receita = calcularReceitaLote(dbNoPeriodo, loteId).receitaTotal;
+    const custos = calcularCustoLote(dbNoPeriodo, loteId).custoTotal;
     const margem = receita - custos;
     return {
       lote_id: loteId,

@@ -73,7 +73,10 @@ test('detectarLotesAbaixoGmd não alerta sem meta cadastrada, com GMD ok ou sem 
   const semMeta = { lotes: [{ id: 1, nome: 'A', status: 'ativo', gmd_meta: 0 }], animais: [{ id: 1, lote_id: 1, qtd: 1, p_ini: 300, p_at: 400, data_entrada: diasAtras(30) }], pesagens: [{ id: 1, lote_id: 1, data: diasAtras(10) }, { id: 2, lote_id: 1, data: diasAtras(1) }] };
   assert.deepEqual(detectarLotesAbaixoGmd(semMeta), []);
 
-  const gmdOk = { lotes: [{ id: 1, nome: 'A', status: 'ativo', gmd_meta: 1.0 }], animais: [{ id: 1, lote_id: 1, qtd: 1, p_ini: 300, p_at: 340, data_entrada: diasAtras(40) }], pesagens: [{ id: 1, lote_id: 1, data: diasAtras(10) }, { id: 2, lote_id: 1, data: diasAtras(1) }] };
+  // P1-05: GMD vem exclusivamente da fonte canônica por pesagens (peso_medio
+  // é obrigatório para o cálculo — sem ele a pesagem é descartada e o GMD
+  // fica indisponível, não "0 por engano").
+  const gmdOk = { lotes: [{ id: 1, nome: 'A', status: 'ativo', gmd_meta: 1.0 }], animais: [{ id: 1, lote_id: 1, qtd: 1, p_ini: 300, p_at: 340, data_entrada: diasAtras(40) }], pesagens: [{ id: 1, lote_id: 1, data: diasAtras(10), peso_medio: 300 }, { id: 2, lote_id: 1, data: diasAtras(1), peso_medio: 320 }] };
   assert.deepEqual(detectarLotesAbaixoGmd(gmdOk), []);
 
   const semPesagens = { lotes: [{ id: 1, nome: 'A', status: 'ativo', gmd_meta: 1.0 }], animais: [{ id: 1, lote_id: 1, qtd: 1, p_ini: 300, p_at: 320, data_entrada: diasAtras(40) }], pesagens: [{ id: 1, lote_id: 1, data: diasAtras(1) }] };

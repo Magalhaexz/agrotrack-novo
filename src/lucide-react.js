@@ -429,3 +429,27 @@ export const Printer = icon([
   createElement('rect', { x: 4, y: 9, width: 16, height: 8, rx: 1.5 }),
   createElement('path', { d: 'M6 17v4h12v-4' }),
 ]);
+
+/* Sprint Visual 2 — ícones da sidebar reorganizada em 6 áreas */
+
+export const Building2 = icon([
+  createElement('rect', { x: 4, y: 3, width: 10, height: 18, rx: 1 }),
+  createElement('rect', { x: 14, y: 9, width: 6, height: 12, rx: 1 }),
+  createElement('path', { d: 'M7 7h1M11 7h1M7 11h1M11 11h1M7 15h1M11 15h1' }),
+]);
+
+export const PieChart = icon([
+  createElement('path', { d: 'M12 2a10 10 0 1 0 10 10H12V2Z' }),
+]);
+
+export const Sprout = icon([
+  createElement('path', { d: 'M12 20V10' }),
+  createElement('path', { d: 'M12 10c0-3 2-5 6-5 0 4-2 6-6 5Z' }),
+  createElement('path', { d: 'M12 13c0-3-2-5-6-5 0 4 2 6 6 5Z' }),
+]);
+
+export const Wallet = icon([
+  createElement('path', { d: 'M3 7a2 2 0 0 1 2-2h12a2 2 0 0 1 2 2v10a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V7Z' }),
+  createElement('path', { d: 'M16 12h3' }),
+  createElement('path', { d: 'M3 9h18' }),
+]);

@@ -9,6 +9,7 @@ import {
   calculateDailyConsumptionKg,
   calculateConsumptionCost,
   calculateEstimatedDays,
+  parseMoedaBRL,
   toDateKey,
   toNumber,
 } from '../domain/calcHelpers.js';
@@ -61,6 +62,13 @@ function formatNumber(value, fractionDigits = 2) {
     minimumFractionDigits: fractionDigits,
     maximumFractionDigits: fractionDigits,
   }).format(toNumber(value));
+}
+
+/** Formata um campo monetário (R$) para exibição em pt-BR (P1-12) — vazio/zero vira ''. */
+function formatCurrencyInput(value) {
+  const numero = parseMoedaBRL(value);
+  if (!numero) return '';
+  return numero.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 }
 
 function formatDateBr(value) {
@@ -162,9 +170,9 @@ function normalizarInitialData(data, pastagens = [], fazendaAtiva = null) {
     supl_nome: data.supl_nome ?? '',
     consumo_tipo: getInitialConsumoTipo(data),
     consumo_por_cabeca_dia: getInitialConsumoValue(data),
-    supl_rkg: data.supl_rkg ?? data.preco_kg ?? '',
-    preco_arroba: data.preco_arroba ?? '',
-    investimento: data.investimento ?? '',
+    supl_rkg: formatCurrencyInput(data.supl_rkg ?? data.preco_kg ?? ''),
+    preco_arroba: formatCurrencyInput(data.preco_arroba ?? ''),
+    investimento: formatCurrencyInput(data.investimento ?? ''),
     custo_fixo_mensal: data.custo_fixo_mensal ?? '',
     rendimento_carcaca: data.rendimento_carcaca ?? '52',
     outras_desp_pc_mes: data.outras_desp_pc_mes ?? 0,
@@ -187,7 +195,7 @@ function calcularPlanejamento(form) {
   const pesoAlvo = toNumber(form.peso_alvo);
   const gmdEsperado = toNumber(form.gmd_meta);
   const consumoInformado = toNumber(form.consumo_por_cabeca_dia);
-  const precoKg = toNumber(form.supl_rkg);
+  const precoKg = parseMoedaBRL(form.supl_rkg);
   const diasEstimados = calculateEstimatedDays(pesoInicial, pesoAlvo, gmdEsperado);
   const consumoKgDiaPorAnimal = calculateDailyConsumptionKg({
     mode: form.consumo_tipo,
@@ -220,6 +228,9 @@ function validarForm(form, planejamento, pastagensDisponiveis = []) {
   if (toNumber(form.peso_alvo) <= 0) return 'Informe o peso alvo final.';
   if (toNumber(form.peso_alvo) <= toNumber(form.p_ini)) return 'O peso alvo final deve ser maior que o peso médio inicial.';
   if (toNumber(form.gmd_meta) <= 0) return 'Informe o GMD esperado.';
+  if (parseMoedaBRL(form.investimento) < 0) return 'O investimento inicial não pode ser negativo.';
+  if (parseMoedaBRL(form.preco_arroba) < 0) return 'O preço da arroba não pode ser negativo.';
+  if (parseMoedaBRL(form.supl_rkg) < 0) return 'O preço do suplemento não pode ser negativo.';
   if (planejamento.diasEstimados <= 0) return 'Não foi possível calcular os dias estimados com os dados informados.';
   if (!planejamento.dataPrevistaSaida) return 'Não foi possível calcular a data prevista de saída.';
   if (!isWholePositiveInteger(form.supl_meta_dias)) return 'Informe um número inteiro de dias.';
@@ -308,6 +319,12 @@ export default function LoteForm({ initialData, fazendas = [], pastagens = [], e
     setForm((prev) => ({ ...prev, [name]: value }));
   }
 
+  /** Reformata um campo monetário (R$) ao sair do campo (P1-12) — o valor digitado livremente vira "250.000,00". */
+  function handleCurrencyBlur(event) {
+    const { name, value } = event.target;
+    setForm((prev) => ({ ...prev, [name]: formatCurrencyInput(value) }));
+  }
+
   async function handleSubmit(event) {
     event.preventDefault();
     const erroValidacao = validarForm(form, planejamento, pastagensCompativeis);
@@ -352,18 +369,18 @@ export default function LoteForm({ initialData, fazendas = [], pastagens = [], e
         p_at: initialData?.p_at ?? pesoInicial,
         peso_alvo: toNumber(form.peso_alvo),
         gmd_meta: toNumber(form.gmd_meta),
-        investimento: toNumber(form.investimento),
+        investimento: parseMoedaBRL(form.investimento),
         custo_fixo_mensal: toNumber(form.custo_fixo_mensal),
-        preco_arroba: toNumber(form.preco_arroba),
+        preco_arroba: parseMoedaBRL(form.preco_arroba),
         rendimento_carcaca: toNumber(form.rendimento_carcaca),
         dias_estimados: planejamento.diasEstimados,
         consumo_tipo: form.consumo_tipo,
         consumo_por_cabeca_dia: toNumber(form.consumo_por_cabeca_dia),
         consumo_total_estimado: planejamento.consumoTotalEstimado,
         custo_total_estimado: planejamento.custoEstimadoTotal,
-        preco_kg: toNumber(form.supl_rkg),
+        preco_kg: parseMoedaBRL(form.supl_rkg),
         supl_nome: form.supl_nome.trim(),
-        supl_rkg: toNumber(form.supl_rkg),
+        supl_rkg: parseMoedaBRL(form.supl_rkg),
         supl_pv_pct: form.consumo_tipo === 'percentual_pv' ? toNumber(form.consumo_por_cabeca_dia) : 0,
         supl_meta_dias: metaDias,
         obs: manualObs ? `${manualObs} | ${planningSummary}` : planningSummary,
@@ -644,11 +661,11 @@ export default function LoteForm({ initialData, fazendas = [], pastagens = [], e
               <input
                 className="ui-input"
                 name="supl_rkg"
-                type="number"
-                min={0}
-                step="0.01"
+                type="text"
+                inputMode="decimal"
                 value={form.supl_rkg}
                 onChange={handleChange}
+                onBlur={handleCurrencyBlur}
                 placeholder="Ex: 2,85"
               />
             </label>
@@ -679,11 +696,11 @@ export default function LoteForm({ initialData, fazendas = [], pastagens = [], e
               <input
                 className="ui-input"
                 name="preco_arroba"
-                type="number"
-                min={0}
-                step="0.01"
+                type="text"
+                inputMode="decimal"
                 value={form.preco_arroba}
                 onChange={handleChange}
+                onBlur={handleCurrencyBlur}
                 placeholder="Ex: 250,00"
               />
             </label>
@@ -693,12 +710,12 @@ export default function LoteForm({ initialData, fazendas = [], pastagens = [], e
               <input
                 className="ui-input"
                 name="investimento"
-                type="number"
-                min={0}
-                step="0.01"
+                type="text"
+                inputMode="decimal"
                 value={form.investimento}
                 onChange={handleChange}
-                placeholder="Ex: 150000"
+                onBlur={handleCurrencyBlur}
+                placeholder="Ex: 150.000,00"
               />
             </label>
           </div>

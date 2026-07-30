@@ -7,8 +7,10 @@ import AcoesRelatorio from '../components/relatorios/AcoesRelatorio';
 import { buildRelatorioPesagens } from '../domain/relatorios';
 import { gerarResumoPesagensTexto } from '../domain/whatsappResumo';
 import { formatDate, formatNumber } from '../utils/calculations';
+import { isModoConsolidado } from '../domain/escopoFazenda';
 
-export default function RelatorioPesagensPage({ db, onNavigate }) {
+export default function RelatorioPesagensPage({ db, onNavigate, fazendaSelecionada }) {
+  const consolidado = isModoConsolidado(fazendaSelecionada);
   const fazendas = Array.isArray(db?.fazendas) ? db.fazendas : [];
   const lotes = Array.isArray(db?.lotes) ? db.lotes : [];
   const [fazendaId, setFazendaId] = useState('');
@@ -28,7 +30,7 @@ export default function RelatorioPesagensPage({ db, onNavigate }) {
     <div className="page reports-page">
       <PageHeader
         title="Relatório de Pesagens"
-        subtitle="Acompanhe a evolução de peso e o GMD entre pesagens."
+        subtitle={`${consolidado ? 'Todas as fazendas' : (fazendaSelecionada?.nome || 'Todas as fazendas')} · Acompanhe a evolução de peso e o GMD entre pesagens.`}
       />
 
       <Card title="Filtros">

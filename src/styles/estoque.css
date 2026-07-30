@@ -1,0 +1,58 @@
+/* Sprint Visual 6 — Estoque: cabeçalho com contexto de fazenda + botão
+   principal separado da barra de ferramentas (escopo/entrada/saída/filtro
+   de críticos), indicadores padronizados (.kpi-card--compact) e os detalhes
+   do card do item viram 2 colunas para reduzir a altura. Nenhuma classe
+   legada (.estoque-card, .lote-cards-grid, .dashboard-table) foi removida. */
+
+.estoque-header {
+  align-items: center;
+}
+
+.estoque-header-context {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin: 4px 0 0;
+  font-size: 0.9rem;
+  color: var(--color-text-secondary);
+}
+
+.estoque-header-context-dot {
+  color: var(--color-text-muted);
+}
+
+.estoque-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 4px;
+}
+
+/* Achado da auditoria: .lote-cards-grid (grade de itens do estoque) só tinha
+   display:grid definido em rebanho.css, importado por LotesPage/
+   DecisoesFazendaPage — não por esta página. Numa sessão que nunca visita
+   essas duas telas, os cards do estoque caíam para bloco de 1 coluna em vez
+   da grade. Reforça a mesma regra aqui, escopada à própria página, sem
+   depender de outra tela ter carregado antes. */
+.page--estoque .lote-cards-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+}
+
+.estoque-card-details {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 2px 16px;
+}
+
+.estoque-movs-table-wrap {
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+}
+
+@media (max-width: 560px) {
+  .estoque-card-details {
+    grid-template-columns: 1fr;
+  }
+}

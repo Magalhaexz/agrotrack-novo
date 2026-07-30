@@ -1,8 +1,8 @@
 import { obterLabelPerfil, PERFIS, normalizarPerfil, perfilEhAdministrador } from '../auth/perfis.js';
 import { supabase } from '../lib/supabase.js';
 
-const PROFILE_COLUMNS = 'id, owner_user_id, email, nome, perfil, status, telefone, cargo, foto_url, created_at, updated_at';
-const INVITE_COLUMNS = 'id, email, nome, perfil, status, notes, created_by, used_by, used_at, created_at, updated_at';
+const PROFILE_COLUMNS = 'id, owner_user_id, email, nome, perfil, status, telefone, cargo, foto_url, fazenda_id, created_at, updated_at';
+const INVITE_COLUMNS = 'id, email, nome, perfil, status, notes, created_by, used_by, used_at, fazenda_id, expires_at, created_at, updated_at';
 const PROFILE_CACHE_PREFIX = 'HERDON_PROFILE_CACHE::';
 const DEFAULT_BOOTSTRAP_ADMIN_EMAILS = ['magalhaesh617@gmail.com'];
 
@@ -148,6 +148,7 @@ export function mapProfileRowToUser(user, profile) {
     foto_url: profile?.foto_url ?? user?.user_metadata?.avatar_url ?? null,
     telefone: profile?.telefone ?? user?.user_metadata?.telefone ?? '',
     cargo: profile?.cargo ?? user?.user_metadata?.cargo ?? '',
+    fazenda_id: profile?.fazenda_id ?? null,
     profile: profile || null,
   };
 }
@@ -316,4 +317,15 @@ export async function deleteInvite(inviteId) {
     .from('invites')
     .delete()
     .eq('id', inviteId);
+}
+
+/**
+ * Aceita um convite de equipe para um usuário JÁ autenticado (P1-11) — RPC
+ * `aceitar_convite_equipe` valida no servidor (e-mail, validade, status) e
+ * vincula owner_user_id/perfil/fazenda_id na mesma transação. Para um
+ * cadastro novo com o mesmo e-mail do convite, o trigger de signup já faz
+ * esse vínculo sozinho — esta função é só para conta existente.
+ */
+export async function acceptTeamInvite(inviteId) {
+  return supabase.rpc('aceitar_convite_equipe', { p_invite_id: inviteId });
 }
