@@ -244,6 +244,17 @@ credencial de produção foi usada em nenhum momento desta sprint.
    como `GENERATED ... AS IDENTITY`, mas não confirmado via
    `information_schema.columns.is_identity` (consulta não feita).
 
+**Nota de verificação adicional:** depois de escrever a candidata, uma
+varredura por `ALTER COLUMN ... TYPE` em todas as 31 migrations encontrou
+`20260618000000_lotes_pastagem_id_uuid.sql`, que converte
+`lotes.pastagem_id` de `text` para `uuid` — ou seja, historicamente essa
+coluna passou por um estado intermediário `text` que a baseline não
+reproduz (ela já nasce `uuid`, direto no tipo final). Isso é seguro porque a
+migration é idempotente (`IF EXISTS ... data_type = 'text'` antes de
+converter, `IF NOT EXISTS` antes de criar a FK) — ao rodar sobre uma baseline
+que já começa em `uuid`, ambos os passos viram no-op. Nenhuma outra conversão
+de tipo de coluna foi encontrada nas 31 migrations.
+
 ## 10. Plano da próxima sprint
 
 1. Resolver o bloqueio do ambiente de teste (upgrade para Pro, ou Postgres
