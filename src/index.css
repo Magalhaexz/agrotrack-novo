@@ -1,4 +1,9 @@
-@import url('https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,300;9..144,400;9..144,500;9..144,600&family=DM+Mono:wght@400;500&family=Outfit:wght@300;400;500;600;700&display=swap');
+/* Sprint Tipografia: removido o @import de Fraunces/DM Mono/Outfit — eram
+   3 famílias extras baixadas sem necessidade (index.css carrega antes de
+   tokens.css, mas token.css sempre venceu a cascata para --font-sans/body;
+   essas 3 fontes nunca apareciam de fato, só custavam requests). Fonte
+   única do sistema agora é var(--font-sans)/var(--font-heading) (Inter),
+   com var(--font-mono) (IBM Plex Mono) para números — ver tokens.css. */
 
 /* --- Root Variables --- */
  :root {
@@ -66,7 +71,7 @@
   --radius-xl: 20px;
   --radius-full: 9999px;
 
-  --font-sans: 'Outfit', system-ui, sans-serif;
+  --font-sans: 'Inter', system-ui, -apple-system, sans-serif;
   --text-xs: 0.75rem;
   --text-sm: 0.875rem;
   --text-base: 1rem;
@@ -95,7 +100,7 @@ body,
 body {
   background: var(--bg);
   color: var(--text);
-  font-family: 'Outfit', system-ui, sans-serif;
+  font-family: var(--font-sans);
   line-height: 1.5;
   -webkit-font-smoothing: antialiased; /* Better font rendering */
 }
@@ -185,26 +190,10 @@ table {
 /* =========================================================
    ADVANCED TYPOGRAPHY
    ========================================================= */
-.title-brand {
-  font-family: 'Fraunces', serif;
-  font-size: 24px;
-  font-weight: 500;
-  color: var(--text-strong);
-  letter-spacing: -0.02em;
-}
-
-.title-page {
-  font-family: 'Fraunces', serif;
-  font-size: 36px;
-  font-weight: 500;
-  color: var(--text-strong);
-  margin-bottom: 8px;
-  line-height: 1.1;
-}
-
-.text-mono {
-  font-family: 'DM Mono', monospace;
-}
+/* .title-brand, .title-page, .text-mono removidas (Sprint Tipografia):
+   0 usos em src/pages e src/components, e hardcodavam Fraunces/DM Mono —
+   fontes que não fazem mais parte do sistema tipográfico único
+   (var(--font-sans)). */
 
 .subtitle {
   color: var(--text-soft);
@@ -247,7 +236,7 @@ table {
 }
 
 .kpi-value {
-  font-family: 'DM Mono', monospace;
+  font-family: var(--font-mono);
   font-size: 36px;
   color: var(--text-strong);
   font-weight: 500;
@@ -258,7 +247,7 @@ table {
 }
 
 .kpi-unit {
-  font-family: 'Outfit', sans-serif;
+  font-family: var(--font-sans);
   font-size: 16px;
   color: var(--text-soft);
   font-weight: 400;

@@ -4113,7 +4113,7 @@ button,
 input,
 select,
 textarea {
-  font-family: "Manrope", "Segoe UI", sans-serif;
+  font-family: var(--font-sans);
 }
 
 h1,
@@ -4123,7 +4123,7 @@ h4,
 .sidebar-logo-text,
 .header-brand-copy strong,
 .ui-card-title {
-  font-family: "Inter Tight", "Segoe UI", sans-serif;
+  font-family: var(--font-heading);
 }
 
 .app-shell,
@@ -5921,7 +5921,7 @@ body,
 .sanitario-summary-card strong {
   display: block;
   color: #f2f7f4;
-  font-family: "Inter Tight", "Segoe UI", sans-serif;
+  font-family: var(--font-sans);
   font-size: clamp(1.5rem, 2vw, 2rem);
   line-height: 1;
   letter-spacing: -0.04em;
@@ -10529,7 +10529,7 @@ html, body, #root, .app, .main, .main-content, .page { max-width: 100%; }
 
 .metric-tile__value {
   color: #f5f8f6;
-  font-family: "Inter Tight", "Segoe UI", sans-serif;
+  font-family: var(--font-sans);
   font-size: clamp(1.32rem, 1.5vw, 2rem);
   font-weight: 700;
   letter-spacing: -0.05em;

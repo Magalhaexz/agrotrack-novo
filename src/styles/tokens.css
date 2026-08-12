@@ -144,11 +144,18 @@
   --table-row-alt: #101512;
   --table-border: #1f2a22;
 
-  /* ── TIPOGRAFIA ── */
+  /* ── TIPOGRAFIA ──
+     Sprint Tipografia (docs/AUDITORIA_VISUAL_LAYOUT_HERDON.md): família
+     única (Inter) para todo o sistema — hierarquia vem de tamanho, peso e
+     espaçamento, não de trocar de fonte. --font-heading existia com 'Sora'
+     antes; consolidado para Inter para não misturar duas famílias sem
+     necessidade. Mantida como variável separada só para não obrigar a
+     tocar em todo consumidor — hoje é idêntica a --font-sans.
+     IBM Plex Mono é a única exceção deliberada: números tabulares em KPIs
+     e colunas monetárias/peso, onde alinhamento e distinção 0/O, 1/l/I
+     importam mais do que unificação. */
   --font-sans: 'Inter', system-ui, -apple-system, sans-serif;
-  /* Sora = títulos (h1/h2/section headers) — nunca corpo/labels/números. */
-  --font-heading: 'Sora', 'Inter', system-ui, -apple-system, sans-serif;
-  /* IBM Plex Mono = só números/valores monetários/pesos/%/indicadores. */
+  --font-heading: 'Inter', system-ui, -apple-system, sans-serif;
   --font-mono: 'IBM Plex Mono', 'Consolas', 'SFMono-Regular', ui-monospace, monospace;
   --text-xs: 0.75rem;
   --text-sm: 0.875rem;
