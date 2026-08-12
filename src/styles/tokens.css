@@ -157,6 +157,14 @@
   --font-sans: 'Inter', system-ui, -apple-system, sans-serif;
   --font-heading: 'Inter', system-ui, -apple-system, sans-serif;
   --font-mono: 'IBM Plex Mono', 'Consolas', 'SFMono-Regular', ui-monospace, monospace;
+  /* Sprint Tipografia 2 (docs/SPRINT_TIPOGRAFIA_HIERARQUIA_HERDON.md):
+     escala consolidada a partir de ~47 valores soltos em app.css. 7 dos 8
+     tamanhos já existiam aqui — só --text-2xs é novo, para cobrir o
+     aglomerado de micro-labels/badges que não tinha token nenhum
+     (0.62–0.7rem). Papéis: 2xs=micro-label/badge-dot, xs=label/badge/
+     caption, sm=texto secundário/tabela, base=corpo, lg=subtítulo de
+     seção, xl=título de card em destaque, 2xl=H2, 3xl=H1. */
+  --text-2xs: 0.6875rem;
   --text-xs: 0.75rem;
   --text-sm: 0.875rem;
   --text-base: 1rem;

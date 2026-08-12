@@ -72,13 +72,9 @@
   --radius-full: 9999px;
 
   --font-sans: 'Inter', system-ui, -apple-system, sans-serif;
-  --text-xs: 0.75rem;
-  --text-sm: 0.875rem;
-  --text-base: 1rem;
-  --text-lg: 1.125rem;
-  --text-xl: 1.25rem;
-  --text-2xl: 1.5rem;
-  --text-3xl: 1.875rem;
+  /* --text-* removidos daqui (Sprint Tipografia 2): duplicavam os mesmos
+     valores já oficiais em tokens.css, que carrega depois e sempre vence
+     a cascata — eram só uma segunda fonte de verdade morta. */
 }
 
 /* --- Global Resets --- */
@@ -197,8 +193,8 @@ table {
 
 .subtitle {
   color: var(--text-soft);
-  font-size: 15px;
-  font-weight: 300;
+  font-size: var(--text-sm);
+  font-weight: 400;
 }
 
 /* =========================================================
@@ -227,7 +223,7 @@ table {
 }
 
 .kpi-label {
-  font-size: 11px;
+  font-size: var(--text-2xs);
   text-transform: uppercase;
   letter-spacing: 0.15em;
   color: var(--text-soft);
@@ -237,7 +233,7 @@ table {
 
 .kpi-value {
   font-family: var(--font-mono);
-  font-size: 36px;
+  font-size: var(--text-3xl);
   color: var(--text-strong);
   font-weight: 500;
   line-height: 1;
@@ -248,7 +244,7 @@ table {
 
 .kpi-unit {
   font-family: var(--font-sans);
-  font-size: 16px;
+  font-size: var(--text-base);
   color: var(--text-soft);
   font-weight: 400;
 }
@@ -270,7 +266,7 @@ table {
   border-radius: 10px;
   color: var(--text);
   font-weight: 500;
-  font-size: 15px;
+  font-size: var(--text-sm);
   cursor: pointer;
   transition: all 0.2s ease;
   border: 1px solid transparent;
@@ -295,7 +291,7 @@ table {
   align-items: center;
   padding: 4px 10px;
   border-radius: 99px;
-  font-size: 12px;
+  font-size: var(--text-xs);
   font-weight: 600;
   letter-spacing: 0.05em;
 }

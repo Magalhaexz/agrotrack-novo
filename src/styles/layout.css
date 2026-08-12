@@ -156,7 +156,7 @@ body {
 .app-shell .sidebar-section-title {
   min-height: 30px;
   padding: 0 10px 4px;
-  font-size: 10.5px;
+  font-size: var(--text-2xs);
   font-weight: 600;
   letter-spacing: 0.09em;
   text-transform: uppercase;
@@ -286,6 +286,7 @@ body {
 .app-shell .page-header h1,
 .app-shell .ph h1 {
   font-size: clamp(1.7rem, 2.1vw, 2.4rem);
+  font-weight: 600;
   line-height: 1.05;
 }
 
@@ -710,8 +711,8 @@ body {
   border-radius: 50%;
   background: var(--color-primary-subtle);
   color: var(--color-primary-light);
-  font-size: 12px;
-  font-weight: 700;
+  font-size: var(--text-xs);
+  font-weight: 600;
 }
 
 .app-shell .sidebar-farm-copy {
@@ -723,7 +724,7 @@ body {
 
 .app-shell .sidebar-farm-copy small {
   color: var(--color-text-muted);
-  font-size: 10.5px;
+  font-size: var(--text-2xs);
   text-transform: uppercase;
   letter-spacing: 0.06em;
 }
@@ -732,7 +733,7 @@ body {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-  font-size: 0.86rem;
+  font-size: var(--text-sm);
   font-weight: 600;
 }
 
@@ -764,8 +765,8 @@ body {
   border-radius: 10px;
   background: transparent;
   color: var(--color-text-secondary);
-  font-size: 0.78rem;
-  font-weight: 700;
+  font-size: var(--text-xs);
+  font-weight: 600;
   letter-spacing: 0.03em;
   text-align: left;
   cursor: pointer;
@@ -894,8 +895,8 @@ body {
 .sidebar-flyout-title {
   margin: 2px 6px 6px;
   color: var(--color-text-muted);
-  font-size: 10.5px;
-  font-weight: 700;
+  font-size: var(--text-2xs);
+  font-weight: 600;
   text-transform: uppercase;
   letter-spacing: 0.08em;
 }
@@ -930,11 +931,11 @@ body {
 }
 
 .sidebar-farm-dropdown .header-farm-item span {
-  font-size: 0.82rem;
+  font-size: var(--text-sm);
 }
 
 .sidebar-farm-dropdown .header-farm-item small {
-  font-size: 0.7rem;
+  font-size: var(--text-2xs);
 }
 
 /* Fazenda selecionada: destaque discreto (barra + fundo leve), não um

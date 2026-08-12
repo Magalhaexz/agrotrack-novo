@@ -140,8 +140,8 @@ textarea.ui-input {
   padding: 0 11px;
   border-radius: 999px;
   border: 1px solid rgba(255, 255, 255, 0.08);
-  font-size: 0.7rem;
-  font-weight: 700;
+  font-size: var(--text-2xs);
+  font-weight: 600;
   letter-spacing: 0.1em;
   text-transform: uppercase;
   white-space: nowrap;
@@ -278,8 +278,8 @@ textarea.ui-input:hover {
   background: #151c20;
   color: rgba(198, 208, 204, 0.72);
   text-align: left;
-  font-size: 0.7rem;
-  font-weight: 700;
+  font-size: var(--text-2xs);
+  font-weight: 600;
   letter-spacing: 0.1em;
   text-transform: uppercase;
   white-space: nowrap;
@@ -380,7 +380,7 @@ textarea.ui-input:hover {
   border-bottom: 1px solid rgba(255, 255, 255, 0.06);
   color: #f5f8f6;
   font-size: var(--text-lg);
-  font-weight: 700;
+  font-weight: 600;
 }
 
 .ui-modal-body {
@@ -462,7 +462,7 @@ button[type='reset'] {
   border-radius: 16px;
   padding-inline: 16px;
   font-family: var(--font-sans);
-  font-weight: 650;
+  font-weight: 600;
   letter-spacing: 0.01em;
   transition:
     transform 0.18s ease,
@@ -506,8 +506,8 @@ button[type='reset'] {
 
 .ui-input-label {
   color: rgba(219, 227, 223, 0.78);
-  font-size: 0.82rem;
-  font-weight: 600;
+  font-size: var(--text-sm);
+  font-weight: 500;
   letter-spacing: 0.02em;
 }
 
@@ -596,8 +596,8 @@ textarea.ui-input,
   margin: 0;
   color: #f5f8f6;
   font-family: var(--font-sans);
-  font-size: 1.05rem;
-  font-weight: 700;
+  font-size: var(--text-base);
+  font-weight: 600;
   letter-spacing: -0.01em;
 }
 
@@ -631,15 +631,15 @@ textarea.ui-input,
 .section-header h3 {
   margin: 0;
   color: var(--color-text);
-  font-size: 0.98rem;
-  font-weight: 700;
+  font-size: var(--text-base);
+  font-weight: 600;
   letter-spacing: -0.01em;
 }
 
 .section-header p {
   margin: 4px 0 0;
   color: rgba(219, 227, 223, 0.66);
-  font-size: 0.84rem;
+  font-size: var(--text-sm);
 }
 
 .form-grid {

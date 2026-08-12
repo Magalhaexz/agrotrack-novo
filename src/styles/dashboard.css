@@ -37,7 +37,7 @@
   max-width: 680px;
   margin: 8px 0 0;
   color: var(--dash-helper);
-  font-size: 0.92rem;
+  font-size: var(--text-sm);
   line-height: 1.5;
 }
 
@@ -115,8 +115,8 @@
    (padrão invertido em relação às outras listas do dashboard, onde
    strong=título e p=descrição). Ajuste escopado só a esses 2 cards. */
 .dashboard-grid--dual .dashboard-list-copy strong {
-  font-size: 0.72rem;
-  font-weight: 700;
+  font-size: var(--text-xs);
+  font-weight: 600;
   letter-spacing: 0.08em;
   text-transform: uppercase;
   color: var(--dash-helper);
@@ -124,7 +124,7 @@
 
 .dashboard-grid--dual .dashboard-list-copy p {
   margin-top: 6px;
-  font-size: 1.1rem;
+  font-size: var(--text-lg);
   font-weight: 700;
   line-height: 1.2;
 }
@@ -149,8 +149,8 @@
    colunas (o par "Resumo do rebanho" saiu por duplicar os indicadores
    principais) — replicado aqui como classe própria do card. */
 .dashboard-finance-summary .dashboard-list-copy strong {
-  font-size: 0.72rem;
-  font-weight: 700;
+  font-size: var(--text-xs);
+  font-weight: 600;
   letter-spacing: 0.08em;
   text-transform: uppercase;
   color: var(--dash-helper);
@@ -158,7 +158,7 @@
 
 .dashboard-finance-summary .dashboard-list-copy p {
   margin-top: 6px;
-  font-size: 1.1rem;
+  font-size: var(--text-lg);
   font-weight: 700;
   line-height: 1.2;
   color: #edf4f1;
@@ -168,8 +168,8 @@
    marcam a hierarquia entre blocos sem virar mais um Card. */
 .dashboard-group-title {
   margin: 8px 0 -4px;
-  font-size: 0.98rem;
-  font-weight: 700;
+  font-size: var(--text-base);
+  font-weight: 600;
 }
 
 .dashboard-grid--agenda {
@@ -186,7 +186,7 @@
   padding: 8px 10px;
   background: transparent;
   color: var(--color-text-secondary);
-  font-size: 0.82rem;
+  font-size: var(--text-sm);
   text-align: center;
   cursor: pointer;
 }
@@ -203,14 +203,14 @@
 .dashboard-section-title {
   margin: 0;
   font-family: var(--font-heading);
-  font-size: 1.08rem;
+  font-size: var(--text-lg);
   color: var(--color-text);
 }
 
 .dashboard-section-subtitle {
   margin-top: 6px;
   color: rgba(214, 223, 219, 0.74);
-  font-size: 0.86rem;
+  font-size: var(--text-sm);
 }
 
 /* Central de Alertas Internos — grupos Crítico/Atenção/Decisão (Sprint 4) */
@@ -221,7 +221,7 @@
 
 .dashboard-priority-group-title {
   margin: 0 0 8px;
-  font-size: 0.76rem;
+  font-size: var(--text-xs);
   font-weight: 600;
   text-transform: uppercase;
   letter-spacing: 0.04em;
@@ -275,8 +275,8 @@
 
 .kpi-panel-label {
   color: rgba(198, 209, 204, 0.72);
-  font-size: 0.72rem;
-  font-weight: 700;
+  font-size: var(--text-xs);
+  font-weight: 600;
   letter-spacing: 0.12em;
   text-transform: uppercase;
 }
@@ -318,8 +318,8 @@
   border-radius: 999px;
   border: 1px solid var(--color-border);
   background: var(--color-surface-2);
-  font-size: 0.76rem;
-  font-weight: 700;
+  font-size: var(--text-xs);
+  font-weight: 500;
   letter-spacing: 0.04em;
 }
 
@@ -389,7 +389,7 @@
 
 .dashboard-list-copy strong {
   display: block;
-  font-size: 0.96rem;
+  font-size: var(--text-base);
 }
 
 .dashboard-list-copy p,
@@ -401,7 +401,7 @@
 
 .dashboard-list-copy p {
   margin: 4px 0 0;
-  font-size: 0.84rem;
+  font-size: var(--text-sm);
   line-height: 1.6;
 }
 
@@ -420,14 +420,14 @@
   border-radius: 999px;
   background: rgba(255, 255, 255, 0.05);
   color: rgba(222, 236, 230, 0.82);
-  font-size: 0.68rem;
-  font-weight: 700;
+  font-size: var(--text-2xs);
+  font-weight: 600;
   letter-spacing: 0.08em;
   text-transform: uppercase;
 }
 
 .dashboard-empty-copy {
-  font-size: 0.9rem;
+  font-size: var(--text-sm);
   line-height: 1.7;
 }
 
@@ -445,8 +445,8 @@
 
 .dashboard-executive-chip span {
   color: rgba(214, 223, 219, 0.58);
-  font-size: 0.72rem;
-  font-weight: 700;
+  font-size: var(--text-xs);
+  font-weight: 600;
   letter-spacing: 0.12em;
   text-transform: uppercase;
 }
@@ -455,7 +455,7 @@
   color: var(--color-text);
   font-family: var(--font-mono);
   font-weight: 600;
-  font-size: 1.2rem;
+  font-size: var(--text-xl);
   letter-spacing: -0.01em;
 }
 
@@ -510,7 +510,7 @@
   border: 1px solid rgba(255, 255, 255, 0.06);
   background: rgba(255, 255, 255, 0.026);
   color: rgba(214, 223, 219, 0.78);
-  font-size: 0.78rem;
+  font-size: var(--text-xs);
   font-weight: 600;
   transition: border-color 0.18s ease, background 0.18s ease, color 0.18s ease;
 }
@@ -539,7 +539,7 @@
   padding: 12px 14px;
   color: #eef3f0;
   box-shadow: 0 18px 40px rgba(0, 0, 0, 0.34);
-  font-size: 0.83rem;
+  font-size: var(--text-sm);
 }
 
 .peso-tooltip strong {
@@ -646,8 +646,8 @@
 .dashboard-summary-metric small,
 .dashboard-summary-line span {
   color: rgba(214, 223, 219, 0.58);
-  font-size: 0.7rem;
-  font-weight: 700;
+  font-size: var(--text-2xs);
+  font-weight: 600;
   letter-spacing: 0.12em;
   text-transform: uppercase;
 }
@@ -655,7 +655,7 @@
 .dashboard-summary-metric strong {
   font-family: var(--font-mono);
   font-weight: 600;
-  font-size: 1.15rem;
+  font-size: var(--text-lg);
   letter-spacing: -0.01em;
 }
 
@@ -663,7 +663,7 @@
   color: var(--color-text);
   font-family: var(--font-mono);
   font-weight: 600;
-  font-size: 1.15rem;
+  font-size: var(--text-lg);
   letter-spacing: -0.01em;
 }
 
@@ -692,7 +692,7 @@
 
 .dashboard-summary-line small {
   color: rgba(214, 223, 219, 0.7);
-  font-size: 0.84rem;
+  font-size: var(--text-sm);
 }
 
 .table-responsive {
@@ -715,15 +715,15 @@
 
 .dashboard-table th {
   color: rgba(214, 223, 219, 0.56);
-  font-size: 0.72rem;
-  font-weight: 700;
+  font-size: var(--text-xs);
+  font-weight: 600;
   letter-spacing: 0.12em;
   text-transform: uppercase;
 }
 
 .dashboard-table td {
   color: rgba(234, 240, 237, 0.88);
-  font-size: 0.9rem;
+  font-size: var(--text-sm);
 }
 
 .dashboard-table tbody tr {
@@ -795,14 +795,14 @@
 .alert-item-title {
   margin: 0;
   color: #f5f8f6;
-  font-size: 0.95rem;
-  font-weight: 700;
+  font-size: var(--text-base);
+  font-weight: 600;
 }
 
 .alert-item-desc {
   margin: 4px 0 0;
   color: rgba(214, 223, 219, 0.72);
-  font-size: 0.84rem;
+  font-size: var(--text-sm);
 }
 
 .alert-action-btn {
@@ -812,8 +812,8 @@
   border: 1px solid rgba(121, 255, 169, 0.16);
   background: rgba(34, 197, 94, 0.09);
   color: #d7ffe4;
-  font-size: 0.76rem;
-  font-weight: 700;
+  font-size: var(--text-xs);
+  font-weight: 600;
 }
 
 .alert-action-btn:hover {
@@ -838,7 +838,7 @@
 .empty-state-title {
   margin: 8px 0 0;
   color: #f5f8f6;
-  font-weight: 700;
+  font-weight: 600;
 }
 
 .empty-state-desc {
@@ -850,7 +850,7 @@
 .dashboard-task-create { display: grid; grid-template-columns: 1.2fr .9fr .8fr 1.3fr auto; gap: 10px; margin-bottom: 14px; }
 .dashboard-task-columns { display: grid; grid-template-columns: repeat(3, minmax(0,1fr)); gap: 12px; }
 .dashboard-task-column { border: 1px solid var(--color-border); border-radius: 14px; background: rgba(255,255,255,.02); padding: 10px; min-height: 220px; }
-.dashboard-task-column-head { font-weight: 700; color: var(--color-text); margin-bottom: 10px; }
+.dashboard-task-column-head { font-weight: 600; color: var(--color-text); margin-bottom: 10px; }
 .dashboard-task-list { display: grid; gap: 8px; }
 .dashboard-task-card { display: grid; gap: 4px; border: 1px solid rgba(255,255,255,.06); border-radius: 12px; padding: 10px; background: rgba(255,255,255,.015); }
 .dashboard-task-card span, .dashboard-task-card small, .dashboard-task-card p { color: var(--color-text-secondary); margin: 0; }
@@ -875,12 +875,12 @@
 
 .dashboard-farm-context-item strong {
   color: #edf4f1;
-  font-size: 0.92rem;
+  font-size: var(--text-sm);
 }
 
 .dashboard-farm-context > span {
   color: var(--dash-helper);
-  font-size: 0.84rem;
+  font-size: var(--text-sm);
 }
 
 .dashboard-farm-context-badge {
@@ -893,7 +893,7 @@
   border: 1px solid rgba(245, 158, 11, 0.3);
   background: rgba(245, 158, 11, 0.12);
   color: var(--color-warning);
-  font-size: 0.76rem;
+  font-size: var(--text-xs);
   font-weight: 600;
 }
 
@@ -917,13 +917,13 @@
 }
 
 .dashboard-onboarding-content strong {
-  font-size: 1rem;
-  font-weight: 700;
+  font-size: var(--text-base);
+  font-weight: 600;
   color: var(--color-text);
 }
 
 .dashboard-onboarding-content span {
-  font-size: 0.9rem;
+  font-size: var(--text-sm);
   color: var(--color-text-secondary);
   max-width: 520px;
 }

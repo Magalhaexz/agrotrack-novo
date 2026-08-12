@@ -39,14 +39,14 @@
 .pasto-card-heading h3 {
   margin: 0;
   font-family: var(--font-heading);
-  font-size: 1rem;
+  font-size: var(--text-base);
   font-weight: 600;
   color: var(--color-text);
 }
 
 .pasto-card-farm {
   margin: 2px 0 0;
-  font-size: 0.76rem;
+  font-size: var(--text-xs);
   color: var(--color-text-muted);
 }
 
@@ -70,7 +70,7 @@
   gap: 6px;
   min-width: 0;
   color: var(--color-text-secondary);
-  font-size: 0.8rem;
+  font-size: var(--text-sm);
 }
 
 .pasto-card-stat svg {
@@ -81,7 +81,7 @@
 .pasto-card-stat--primary strong {
   font-family: var(--font-mono);
   font-weight: 600;
-  font-size: 0.92rem;
+  font-size: var(--text-sm);
   color: var(--color-text);
 }
 
@@ -96,7 +96,7 @@
   border-radius: 999px;
   background: var(--color-surface-2);
   border: 1px solid var(--color-border);
-  font-size: 0.72rem;
+  font-size: var(--text-xs);
   color: var(--color-text-secondary);
 }
 
@@ -108,7 +108,7 @@
 .pasto-card-progress-head {
   display: flex;
   justify-content: space-between;
-  font-size: 0.74rem;
+  font-size: var(--text-xs);
   color: var(--color-text-muted);
 }
 
@@ -118,13 +118,13 @@
   gap: 6px;
   margin: 0;
   color: var(--color-danger);
-  font-size: 0.78rem;
+  font-size: var(--text-xs);
 }
 
 .pasto-card-hint {
   margin: 0;
   color: var(--color-text-muted);
-  font-size: 0.78rem;
+  font-size: var(--text-xs);
 }
 
 .pasto-card-actions {

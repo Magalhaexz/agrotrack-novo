@@ -141,7 +141,7 @@
 .reports-filter-summary-card span {
   color: var(--color-text-muted);
   font-size: var(--text-xs);
-  font-weight: 700;
+  font-weight: 600;
   letter-spacing: 0.08em;
   text-transform: uppercase;
 }
@@ -198,7 +198,7 @@
 .reports-category-head h3 {
   margin: 0;
   color: var(--color-text);
-  font-size: 0.98rem;
+  font-size: var(--text-base);
   letter-spacing: 0.02em;
 }
 
@@ -327,8 +327,8 @@
   border: 1px solid rgba(121, 255, 169, 0.14);
   background: rgba(34, 197, 94, 0.08);
   color: #baf7cc;
-  font-size: 0.66rem;
-  font-weight: 800;
+  font-size: var(--text-2xs);
+  font-weight: 600;
   letter-spacing: 0.08em;
   text-transform: uppercase;
 }
@@ -350,15 +350,15 @@
 
 .report-type-card-copy span {
   color: var(--color-text-muted);
-  font-size: 0.68rem;
-  font-weight: 700;
+  font-size: var(--text-2xs);
+  font-weight: 600;
   letter-spacing: 0.08em;
   text-transform: uppercase;
 }
 
 .report-type-card-copy small {
   color: var(--color-text-secondary);
-  font-size: 0.76rem;
+  font-size: var(--text-xs);
   line-height: 1.55;
 }
 
@@ -374,7 +374,7 @@
 
 .report-type-card-foot small {
   color: var(--color-text-secondary);
-  font-size: 0.72rem;
+  font-size: var(--text-xs);
   line-height: 1.45;
 }
 
@@ -401,8 +401,8 @@
   display: inline-flex;
   margin-bottom: 8px;
   color: var(--color-text-muted);
-  font-size: 0.72rem;
-  font-weight: 700;
+  font-size: var(--text-xs);
+  font-weight: 600;
   letter-spacing: 0.08em;
   text-transform: uppercase;
 }
@@ -410,7 +410,7 @@
 .reports-context-head strong {
   display: block;
   color: var(--color-text);
-  font-size: 1.05rem;
+  font-size: var(--text-base);
   margin-bottom: 4px;
 }
 
@@ -437,15 +437,15 @@
 
 .reports-workflow-card span {
   color: var(--color-text-muted);
-  font-size: 0.72rem;
-  font-weight: 700;
+  font-size: var(--text-xs);
+  font-weight: 600;
   letter-spacing: 0.08em;
   text-transform: uppercase;
 }
 
 .reports-workflow-card strong {
   color: var(--color-text);
-  font-size: 0.88rem;
+  font-size: var(--text-sm);
   line-height: 1.55;
   font-weight: 600;
 }
@@ -936,7 +936,7 @@
   }
 
   .reports-category-head h3 {
-    font-size: 0.9rem;
+    font-size: var(--text-sm);
   }
 
   .reports-loading-card {
@@ -1120,7 +1120,7 @@
   border-radius: 10px;
   padding: 9px 10px;
   text-align: left;
-  font-size: 12px;
+  font-size: var(--text-xs);
   line-height: 1.2;
 }
 
@@ -1183,10 +1183,10 @@
 
 .relatorio-lote-preview__marca {
   display: inline-block;
-  font-weight: 800;
+  font-weight: 700;
   letter-spacing: 0.08em;
   color: var(--color-primary);
-  font-size: 0.8rem;
+  font-size: var(--text-sm);
   text-transform: uppercase;
 }
 
@@ -1223,7 +1223,7 @@
   display: grid;
   gap: 6px;
   color: var(--color-text-secondary);
-  font-size: 0.88rem;
+  font-size: var(--text-sm);
   line-height: 1.5;
 }
 
@@ -1233,7 +1233,7 @@
   padding-top: var(--space-4);
   border-top: 1px solid var(--color-border);
   color: var(--color-text-muted);
-  font-size: 0.78rem;
+  font-size: var(--text-xs);
   text-align: center;
 }
 
