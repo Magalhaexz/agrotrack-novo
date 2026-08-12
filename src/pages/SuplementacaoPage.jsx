@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import Badge from '../components/ui/Badge';
 import Button from '../components/ui/Button';
 import Card from '../components/ui/Card';
+import TableScrollFade from '../components/ui/TableScrollFade';
 import Input from '../components/ui/Input';
 import Modal from '../components/ui/Modal';
 import SuplementacaoConsumoModal from '../components/SuplementacaoConsumoModal';
@@ -252,7 +253,11 @@ export default function SuplementacaoPage({ db, setDb, session, fazendaSeleciona
 
       {aba === 'produtos' ? (
         <Card title="Produtos nutricionais">
-          <div className="table-responsive">
+          {/* Sprint Visual 5 (tabelas densas): 9 colunas estouram a largura
+              em notebook (confirmado ~1127px vs ~904px em 1366x768) — fade
+              lateral avisa que há mais coluna pra rolar. Scroll em si já
+              funcionava (table-responsive), só faltava o indicador. */}
+          <TableScrollFade className="table-responsive" watch={produtos.length}>
             <table className="data-table">
               <thead>
                 <tr>
@@ -320,7 +325,7 @@ export default function SuplementacaoPage({ db, setDb, session, fazendaSeleciona
                 )}
               </tbody>
             </table>
-          </div>
+          </TableScrollFade>
         </Card>
       ) : null}
 

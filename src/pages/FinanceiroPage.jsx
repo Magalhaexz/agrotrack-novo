@@ -3,6 +3,7 @@ import { Bar, BarChart, CartesianGrid, Line, LineChart, Pie, PieChart, Responsiv
 import Badge from '../components/ui/Badge';
 import Button from '../components/ui/Button';
 import Card from '../components/ui/Card';
+import TableScrollFade from '../components/ui/TableScrollFade';
 import EmptyState from '../components/EmptyState';
 import Input from '../components/ui/Input';
 import Modal from '../components/ui/Modal';
@@ -575,7 +576,10 @@ export default function FinanceiroPage({ db, setDb, navigationIntent = null, faz
       {tab === 'lote' ? (
         <>
           <Card title="Resultado por lote">
-            <div className="table-responsive">
+            {/* Sprint Visual 5 (tabelas densas): 10-11 colunas estouram a
+                largura em notebook (~1099px vs ~889px em 1366x768) — fade
+                lateral avisa que há mais coluna pra rolar. */}
+            <TableScrollFade className="table-responsive" watch={lotesRows.length}>
               <table className="data-table">
                 <thead>
                   <tr>
@@ -633,7 +637,7 @@ export default function FinanceiroPage({ db, setDb, navigationIntent = null, faz
                   </tfoot>
                 ) : null}
               </table>
-            </div>
+            </TableScrollFade>
           </Card>
 
           <Card title="Margem por lote">

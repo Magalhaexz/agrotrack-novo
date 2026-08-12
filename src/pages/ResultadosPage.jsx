@@ -382,6 +382,7 @@ export default function ResultadosPage({ db }) {
                 emptySubtitle={table.emptySubtitle}
                 mobileTitleKey={table.mobileTitleKey}
                 mobileSubtitleKey={table.mobileSubtitleKey}
+                mobileMode={table.mobileMode}
               />
             </Card>
           ))}
@@ -736,6 +737,11 @@ function buildReportBundle(db, filters) {
           emptySubtitle: 'Amplie o período ou remova filtros específicos para visualizar os lotes.',
           mobileTitleKey: 'lote',
           mobileSubtitleKey: 'fazenda',
+          // Sprint Visual 5 (tabelas densas): 13 colunas — no mobile mantém a
+          // tabela real (scroll horizontal + 1ª coluna fixa) em vez de cards,
+          // porque aqui comparar indicadores entre lotes lado a lado importa
+          // mais do que ler um lote de cada vez.
+          mobileMode: 'scroll',
           columns: [
             { key: 'lote', label: 'Lote' },
             { key: 'fazenda', label: 'Fazenda' },
