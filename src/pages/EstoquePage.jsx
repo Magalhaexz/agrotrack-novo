@@ -290,7 +290,10 @@ export default function EstoquePage({ db, setDb, onRegistrarSaidaEstoque, onRegi
           <option value="nutricao">Nutrição / suplementação</option>
           <option value="todos">Todos os itens</option>
         </select>
-        <Button icon={<ArrowUpCircle size={14} />} disabled={!hasPermission('estoque:editar')} onClick={() => {
+        {/* Sprint Visual 3 (hierarquia de CTAs): outline, como "Registrar
+            saída" — "Novo item" é o cadastro (primário da página);
+            entrada/saída são movimentação de item já existente. */}
+        <Button variant="outline" icon={<ArrowUpCircle size={14} />} disabled={!hasPermission('estoque:editar')} onClick={() => {
           if (!hasPermission('estoque:editar')) {
             showToast({ type: 'error', message: mensagemSemPermissao });
             return;
@@ -353,7 +356,9 @@ export default function EstoquePage({ db, setDb, onRegistrarSaidaEstoque, onRegi
             }
             action={
               !showOnlyCrit ? (
-                <Button icon={<Plus size={14} />} onClick={() => {
+                // Sprint Visual 3: secondary — "Novo item" do header já é o
+                // CTA primário da página.
+                <Button variant="secondary" icon={<Plus size={14} />} onClick={() => {
                   if (consolidado) {
                     showToast({ type: 'warning', message: 'Selecione uma fazenda específica para cadastrar um item de estoque.' });
                     return;

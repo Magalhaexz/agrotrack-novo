@@ -849,12 +849,15 @@ export default function PesagensPage({ db, setDb, onConfirmAction, navigationInt
             disabled={!hasPermission('pesagens:editar')}
             title={!hasPermission('pesagens:editar') ? mensagemSemPermissao : undefined}
           >
-            Cadastrar nova pesagem
+            Registrar pesagem
           </Button>
         </div>
       </section>
       <div className="segmented-control tab-bar">
-        <button type="button" className={`segment ${abaAtiva === 'nova' ? 'active' : ''}`} onClick={() => setAbaAtiva('nova')}>Nova pesagem</button>
+        {/* Sprint Visual 3: rótulo unificado com os CTAs de header/empty state
+            ("Registrar pesagem") — mesmo destino (abaAtiva='nova'), 3 nomes
+            diferentes para a mesma coisa viravam confusão, não variedade. */}
+        <button type="button" className={`segment ${abaAtiva === 'nova' ? 'active' : ''}`} onClick={() => setAbaAtiva('nova')}>Registrar pesagem</button>
         <button type="button" className={`segment ${abaAtiva === 'historico' ? 'active' : ''}`} onClick={() => setAbaAtiva('historico')}>Histórico</button>
         <button type="button" className={`segment ${abaAtiva === 'evolucao' ? 'active' : ''}`} onClick={() => setAbaAtiva('evolucao')}>Evolução</button>
         <button type="button" className={`segment ${abaAtiva === 'alertas' ? 'active' : ''}`} onClick={() => setAbaAtiva('alertas')}>Alertas</button>

@@ -1230,7 +1230,11 @@ export default function LotesPage({ db, setDb, onRegistrarSaidaAnimal, session, 
                   }}
                 />
 
+                {/* Sprint Visual 3 (hierarquia de CTAs): secondary — "Cadastrar
+                    lote" no header é o único CTA primário da página; este é
+                    navegação/detalhe, não precisa competir com o mesmo verde. */}
                 <Button
+                  variant="secondary"
                   size="sm"
                   fullWidth
                   onClick={() => {

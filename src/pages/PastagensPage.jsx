@@ -372,15 +372,15 @@ export default function PastagensPage({ db, setDb, session, onConfirmAction, nav
       </div>
 
       {!pastagens.length ? (
+        // Sprint Visual 3 (hierarquia de CTAs): sem botão aqui — o formulário
+        // de cadastro já está sempre visível logo acima, então um CTA
+        // "Cadastrar pasto" repetindo a ação do header + do form não orienta
+        // nada, só duplica visualmente. O CTA de empty state fica só no card
+        // "Pastos cadastrados" abaixo, mais longe do formulário.
         <Card title="Capacidade dos pastos">
           <EmptyState
             title="Nenhum pasto cadastrado."
             subtitle="Cadastre pastos para acompanhar lotação, capacidade e movimentação dos lotes."
-            action={
-              hasPermission('pastagens:editar') ? (
-                <Button icon={<Plus size={14} />} onClick={focarFormularioPasto}>Cadastrar pasto</Button>
-              ) : null
-            }
           />
         </Card>
       ) : (
@@ -477,7 +477,10 @@ export default function PastagensPage({ db, setDb, session, onConfirmAction, nav
             subtitle="Cadastre pastos para acompanhar lotação, capacidade e movimentação dos lotes."
             action={
               hasPermission('pastagens:editar') ? (
-                <Button icon={<Plus size={14} />} onClick={focarFormularioPasto}>Cadastrar pasto</Button>
+                // Sprint Visual 3: secondary — "Cadastrar pasto" do header já é
+                // o CTA primário da página, este é o único CTA de empty state
+                // que sobrou (o outro card removeu o dele por duplicidade).
+                <Button variant="secondary" icon={<Plus size={14} />} onClick={focarFormularioPasto}>Cadastrar pasto</Button>
               ) : null
             }
           />

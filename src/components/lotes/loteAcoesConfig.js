@@ -49,10 +49,13 @@ export const LOTE_ACOES = [
     bloqueadoPor: (lote) => Boolean(lote?.bloqueado),
   },
   {
+    // Sprint Visual 3 (hierarquia de CTAs): 'outline', não 'warning' — venda é
+    // o desfecho normal/desejado da operação, não um evento de risco. 'warning'
+    // ficava reservado sem necessidade real, só somando cor no menu.
     id: 'venda',
     label: 'Venda',
     icon: DollarSign,
-    variant: 'warning',
+    variant: 'outline',
     permissao: 'animais:movimentar',
     handlerKey: 'onVenda',
     grupo: 'movimentacao',
