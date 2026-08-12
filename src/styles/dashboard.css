@@ -304,6 +304,15 @@
   letter-spacing: -0.01em;
 }
 
+/* Sprint Visual 4 (hierarquia de KPIs): zero sem urgência — mesmo tamanho
+   (não desloca o layout), peso e contraste menores para não competir com
+   um card que tem dado real ou exige atenção (warning/danger nunca ganham
+   essa classe, ver KpiPanel). */
+.kpi-panel--zero strong {
+  color: var(--color-text-secondary);
+  font-weight: 500;
+}
+
 .kpi-variation {
   display: inline-flex;
   align-items: center;

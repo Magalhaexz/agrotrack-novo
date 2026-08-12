@@ -1,5 +1,6 @@
 import { useMemo, useState } from 'react';
-import { AlertCircle, Beef, CheckCircle2, CheckSquare, DollarSign, FileSearch, ListChecks, Package, Syringe } from 'lucide-react';
+import { AlertCircle, Beef, CheckCircle2, CheckSquare, ChevronDown, DollarSign, FileSearch, ListChecks, Package, Syringe } from 'lucide-react';
+import Button from '../components/ui/Button';
 import Card from '../components/ui/Card';
 import EmptyState from '../components/EmptyState';
 import PageHeader from '../components/PageHeader';
@@ -157,6 +158,12 @@ export default function AlertasPage({
     () => aplicarTratativasAosAlertas(alertasNormalizados, tratativas, new Date()),
     [alertasNormalizados, tratativas]
   );
+
+  // Sprint Visual 4: filtros começam recolhidos só quando não há nenhum
+  // alerta pra filtrar (mesma condição do empty state "Tudo certo" abaixo);
+  // havendo qualquer alerta, ficam abertos como sempre — nenhuma lógica de
+  // filtro mudou, só a visibilidade inicial do painel.
+  const [filtrosVisiveis, setFiltrosVisiveis] = useState(() => alertasNormalizados.length > 0);
 
   const alertasAtivos = useMemo(() => alertasComTratativa.filter((a) => a.visivel), [alertasComTratativa]);
   const resumo = useMemo(() => resumirCentralAlertas(alertasAtivos), [alertasAtivos]);
@@ -326,17 +333,20 @@ export default function AlertasPage({
         subtitle={`${consolidado ? 'Todas as fazendas' : (fazendaSelecionada?.nome || 'Todas as fazendas')} · Priorize ocorrências, prazos e ações críticas da operação.`}
       />
 
+      {/* Sprint Visual 4: cor de alerta (--critico/--atencao) só quando o
+          número realmente exige atenção — zero fica neutro, sem vermelho/
+          amarelo. Nenhuma contagem mudou. */}
       <div className="summary-cards-grid alertas-summary-grid">
         <Card title="Total de alertas" className="alertas-summary-card">
           <strong>{resumo.total}</strong>
         </Card>
-        <Card title="Críticos" className="alertas-summary-card alertas-summary-card--critico">
+        <Card title="Críticos" className={`alertas-summary-card ${resumo.criticos > 0 ? 'alertas-summary-card--critico' : ''}`}>
           <strong>{resumo.criticos}</strong>
         </Card>
-        <Card title="Vencidos" className="alertas-summary-card alertas-summary-card--critico">
+        <Card title="Vencidos" className={`alertas-summary-card ${resumo.vencidos > 0 ? 'alertas-summary-card--critico' : ''}`}>
           <strong>{resumo.vencidos}</strong>
         </Card>
-        <Card title="Vencendo hoje" className="alertas-summary-card alertas-summary-card--atencao">
+        <Card title="Vencendo hoje" className={`alertas-summary-card ${resumo.vencendoHoje > 0 ? 'alertas-summary-card--atencao' : ''}`}>
           <strong>{resumo.vencendoHoje}</strong>
         </Card>
         <Card title="Próximos 7 dias" className="alertas-summary-card">
@@ -350,89 +360,112 @@ export default function AlertasPage({
         </Card>
       </div>
 
-      <Card title="Filtros" className="alertas-filtros-card">
-        <div className="alertas-filtros-grid">
-          <label className="ui-input-wrap">
-            <span className="ui-input-label">Status</span>
-            <select className="ui-input" value={filtroTratativa} onChange={(e) => setFiltroTratativa(e.target.value)}>
-              {FILTRO_TRATATIVA_OPCOES.map((opcao) => (
-                <option key={opcao.valor} value={opcao.valor}>{opcao.label}</option>
-              ))}
-            </select>
-          </label>
-
-          <label className="ui-input-wrap">
-            <span className="ui-input-label">Origem</span>
-            <select className="ui-input" value={filtros.origem} onChange={(e) => atualizarFiltro('origem', e.target.value)}>
-              <option value="">Todas</option>
-              {origensDisponiveis.map((origem) => (
-                <option key={origem} value={origem}>{ORIGEM_LABEL[origem] || origem}</option>
-              ))}
-            </select>
-          </label>
-
-          <label className="ui-input-wrap">
-            <span className="ui-input-label">Prioridade</span>
-            <select className="ui-input" value={filtros.prioridade} onChange={(e) => atualizarFiltro('prioridade', e.target.value)}>
-              <option value="">Todas</option>
-              {Object.entries(PRIORIDADE_LABEL).map(([valor, label]) => (
-                <option key={valor} value={valor}>{label}</option>
-              ))}
-            </select>
-          </label>
-
-          <label className="ui-input-wrap">
-            <span className="ui-input-label">Prazo</span>
-            <select className="ui-input" value={filtros.prazoCategoria} onChange={(e) => atualizarFiltro('prazoCategoria', e.target.value)}>
-              <option value="">Todos</option>
-              {Object.entries(PRAZO_LABEL).map(([valor, label]) => (
-                <option key={valor} value={valor}>{label}</option>
-              ))}
-            </select>
-          </label>
-
-          <label className="ui-input-wrap">
-            <span className="ui-input-label">Lote</span>
-            <select
-              className="ui-input"
-              value={filtros.loteNome}
-              onChange={(e) => atualizarFiltro('loteNome', e.target.value)}
-              disabled={lotesComAlerta.length === 0}
-            >
-              <option value="">{lotesComAlerta.length === 0 ? 'Nenhum lote identificado' : 'Todos'}</option>
-              {lotesComAlerta.map((lote) => (
-                <option key={lote.id} value={lote.nome}>{lote.nome}</option>
-              ))}
-            </select>
-          </label>
-
-          <label className="ui-input-wrap alertas-busca-wrap">
-            <span className="ui-input-label">Busca</span>
-            <div className="alertas-busca-input">
-              <FileSearch size={14} aria-hidden="true" />
-              <input
-                className="ui-input"
-                type="text"
-                placeholder="Buscar por título ou descrição"
-                value={filtros.busca}
-                onChange={(e) => atualizarFiltro('busca', e.target.value)}
-              />
-            </div>
-          </label>
-        </div>
-
-        <div className="alertas-filtros-acoes">
-          <button
-            type="button"
-            className={`chip-toggle ${filtros.somenteCriticos ? 'chip-toggle--active' : ''}`}
-            onClick={() => atualizarFiltro('somenteCriticos', !filtros.somenteCriticos)}
+      <Card
+        title="Filtros"
+        className="alertas-filtros-card"
+        action={
+          <Button
+            variant="ghost"
+            size="sm"
+            icon={<ChevronDown size={16} className={filtrosVisiveis ? 'sanitario-iatf-toggle-icon is-open' : 'sanitario-iatf-toggle-icon'} />}
+            onClick={() => setFiltrosVisiveis((v) => !v)}
+            aria-expanded={filtrosVisiveis}
+            aria-controls="alertas-filtros-conteudo"
           >
-            Somente críticos
-          </button>
-          {filtrosAtivos ? (
-            <button type="button" className="chip-toggle" onClick={limparFiltros}>Limpar filtros</button>
-          ) : null}
-        </div>
+            {filtrosVisiveis ? 'Recolher' : 'Mostrar filtros'}
+          </Button>
+        }
+      >
+        {filtrosVisiveis ? (
+          <div id="alertas-filtros-conteudo">
+            <div className="alertas-filtros-grid">
+              <label className="ui-input-wrap">
+                <span className="ui-input-label">Status</span>
+                <select className="ui-input" value={filtroTratativa} onChange={(e) => setFiltroTratativa(e.target.value)}>
+                  {FILTRO_TRATATIVA_OPCOES.map((opcao) => (
+                    <option key={opcao.valor} value={opcao.valor}>{opcao.label}</option>
+                  ))}
+                </select>
+              </label>
+
+              <label className="ui-input-wrap">
+                <span className="ui-input-label">Origem</span>
+                <select className="ui-input" value={filtros.origem} onChange={(e) => atualizarFiltro('origem', e.target.value)}>
+                  <option value="">Todas</option>
+                  {origensDisponiveis.map((origem) => (
+                    <option key={origem} value={origem}>{ORIGEM_LABEL[origem] || origem}</option>
+                  ))}
+                </select>
+              </label>
+
+              <label className="ui-input-wrap">
+                <span className="ui-input-label">Prioridade</span>
+                <select className="ui-input" value={filtros.prioridade} onChange={(e) => atualizarFiltro('prioridade', e.target.value)}>
+                  <option value="">Todas</option>
+                  {Object.entries(PRIORIDADE_LABEL).map(([valor, label]) => (
+                    <option key={valor} value={valor}>{label}</option>
+                  ))}
+                </select>
+              </label>
+
+              <label className="ui-input-wrap">
+                <span className="ui-input-label">Prazo</span>
+                <select className="ui-input" value={filtros.prazoCategoria} onChange={(e) => atualizarFiltro('prazoCategoria', e.target.value)}>
+                  <option value="">Todos</option>
+                  {Object.entries(PRAZO_LABEL).map(([valor, label]) => (
+                    <option key={valor} value={valor}>{label}</option>
+                  ))}
+                </select>
+              </label>
+
+              <label className="ui-input-wrap">
+                <span className="ui-input-label">Lote</span>
+                <select
+                  className="ui-input"
+                  value={filtros.loteNome}
+                  onChange={(e) => atualizarFiltro('loteNome', e.target.value)}
+                  disabled={lotesComAlerta.length === 0}
+                >
+                  <option value="">{lotesComAlerta.length === 0 ? 'Nenhum lote identificado' : 'Todos'}</option>
+                  {lotesComAlerta.map((lote) => (
+                    <option key={lote.id} value={lote.nome}>{lote.nome}</option>
+                  ))}
+                </select>
+              </label>
+
+              <label className="ui-input-wrap alertas-busca-wrap">
+                <span className="ui-input-label">Busca</span>
+                <div className="alertas-busca-input">
+                  <FileSearch size={14} aria-hidden="true" />
+                  <input
+                    className="ui-input"
+                    type="text"
+                    placeholder="Buscar por título ou descrição"
+                    value={filtros.busca}
+                    onChange={(e) => atualizarFiltro('busca', e.target.value)}
+                  />
+                </div>
+              </label>
+            </div>
+
+            <div className="alertas-filtros-acoes">
+              <button
+                type="button"
+                className={`chip-toggle ${filtros.somenteCriticos ? 'chip-toggle--active' : ''}`}
+                onClick={() => atualizarFiltro('somenteCriticos', !filtros.somenteCriticos)}
+              >
+                Somente críticos
+              </button>
+              {filtrosAtivos ? (
+                <button type="button" className="chip-toggle" onClick={limparFiltros}>Limpar filtros</button>
+              ) : null}
+            </div>
+          </div>
+        ) : (
+          <p className="alertas-filtros-collapsed-hint">
+            {filtrosAtivos ? 'Filtros aplicados — clique em "Mostrar filtros" para ajustar.' : 'Nenhum filtro aplicado.'}
+          </p>
+        )}
       </Card>
 
       <ExportActions

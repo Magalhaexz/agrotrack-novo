@@ -1,4 +1,5 @@
 import { Fragment, useMemo, useState, useCallback } from 'react';
+import { ChevronDown } from 'lucide-react';
 import SanitarioForm from '../components/SanitarioForm';
 import { formatarData } from '../utils/formatters';
 import { gerarNovoId } from '../utils/id';
@@ -72,6 +73,18 @@ export default function SanitarioPage({ db, setDb, onConfirmAction, navigationIn
   // vencimento sobre os mesmos registros de `db.sanitario`, sem recalcular
   // nada que a tabela abaixo já não mostre.
   const agendaSanitaria = useMemo(() => construirAgendaSanitaria(db), [db]);
+  // Sprint Visual 4: quando as 6 seções da agenda estão todas vazias, isso é
+  // uma única informação ("nada pendente ainda"), não 6 — evita repetir
+  // "Nada por aqui." em cada card. Nenhuma conta/regra da agenda muda, só a
+  // apresentação quando não há nenhum item em nenhuma seção.
+  const agendaTotalVazia = useMemo(
+    () => AGENDA_SECOES.every((secao) => (agendaSanitaria[secao.chave] || []).length === 0),
+    [agendaSanitaria]
+  );
+  // IATF é planejamento avançado (reprodução) — não deve dominar a tela por
+  // padrão; abre por ação explícita do usuário. Continua 100% funcional,
+  // só começa recolhido.
+  const [iatfExpandido, setIatfExpandido] = useState(false);
 
   const dadosTabela = useMemo(() => {
     return [...sanitario]
@@ -570,19 +583,27 @@ export default function SanitarioPage({ db, setDb, onConfirmAction, navigationIn
       </div>
 
       <Card title="Agenda Sanitária" subtitle="Vacinas, vermífugos, reaplicações e carência — vencidos, vencendo e já feitos.">
-        <div className="sanitario-agenda-grid">
-          {AGENDA_SECOES.map((secao) => {
-            const itens = agendaSanitaria[secao.chave] || [];
-            return (
-              <div key={secao.chave} className="sanitario-agenda-section">
-                <div className="sanitario-agenda-section-title">
-                  <span>{secao.titulo}</span>
-                  <span className={`badge ${secao.badge}`}>{itens.length}</span>
-                </div>
-                {itens.length === 0 ? (
-                  <span className="sanitario-agenda-empty">Nada por aqui.</span>
-                ) : (
-                  itens.slice(0, 5).map((item) => (
+        {agendaTotalVazia ? (
+          // Sprint Visual 4: 6 seções vazias eram 6 "Nada por aqui." repetidos
+          // dizendo a mesma coisa — uma mensagem só, sem perder a lista de
+          // seções (segue disponível assim que houver qualquer item).
+          <EmptyState
+            compact
+            title="Nenhum item na agenda sanitária ainda."
+            subtitle="Vencidos, vencendo, em carência e realizados aparecem aqui assim que houver manejos registrados."
+          />
+        ) : (
+          <div className="sanitario-agenda-grid">
+            {AGENDA_SECOES.map((secao) => {
+              const itens = agendaSanitaria[secao.chave] || [];
+              if (itens.length === 0) return null;
+              return (
+                <div key={secao.chave} className="sanitario-agenda-section">
+                  <div className="sanitario-agenda-section-title">
+                    <span>{secao.titulo}</span>
+                    <span className={`badge ${secao.badge}`}>{itens.length}</span>
+                  </div>
+                  {itens.slice(0, 5).map((item) => (
                     <div key={`${secao.chave}-${item.id}`} className="sanitario-agenda-item">
                       <strong>{item.produto}</strong>
                       <small>
@@ -591,98 +612,125 @@ export default function SanitarioPage({ db, setDb, onConfirmAction, navigationIn
                       </small>
                       {item.acaoSugerida ? <small>{item.acaoSugerida}</small> : null}
                     </div>
-                  ))
-                )}
-                {itens.length > 5 ? (
-                  <small className="sanitario-agenda-empty">+{itens.length - 5} mais</small>
-                ) : null}
-              </div>
-            );
-          })}
-        </div>
+                  ))}
+                  {itens.length > 5 ? (
+                    <small className="sanitario-agenda-empty">+{itens.length - 5} mais</small>
+                  ) : null}
+                </div>
+              );
+            })}
+          </div>
+        )}
       </Card>
 
-      <Card title="Planejamento IATF / Reprodução" subtitle="Programe o protocolo com datas automáticas ajustáveis por dias de offset.">
-        <div className="sanitario-iatf-layout">
-          <section className="section-card sanitario-iatf-section">
-            <div className="section-header"><h4>Dados do protocolo</h4></div>
-            <div className="form-grid two">
-              <label className="ui-input-wrap">
-                <span className="ui-input-label">Fazenda</span>
-                <select className="ui-input" value={iatf.fazenda_id} onChange={(e) => setIatf((p) => ({ ...p, fazenda_id: e.target.value }))}>{(db?.fazendas || []).map((f) => <option key={f.id} value={f.id}>{f.nome}</option>)}</select>
-              </label>
-              <label className="ui-input-wrap">
-                <span className="ui-input-label">Lote</span>
-                <select className="ui-input" value={iatf.lote_id} onChange={(e) => setIatf((p) => ({ ...p, lote_id: e.target.value }))}><option value="">Grupo/Lote</option>{(db?.lotes || []).map((l) => <option key={l.id} value={l.id}>{l.nome}</option>)}</select>
-              </label>
-              <label className="ui-input-wrap">
-                <span className="ui-input-label">Nome do protocolo</span>
-                <input className="ui-input" value={iatf.nome} onChange={(e) => setIatf((p) => ({ ...p, nome: e.target.value }))} placeholder="Ex.: IATF Primavera - Lote 3" />
-              </label>
-              <label className="ui-input-wrap">
-                <span className="ui-input-label">Data de início</span>
-                <input className="ui-input" type="date" value={iatf.data_inicial} onChange={(e) => setIatf((p) => ({ ...p, data_inicial: e.target.value }))} />
-              </label>
-              <label className="ui-input-wrap">
-                <span className="ui-input-label">Status</span>
-                <select className="ui-input" value={iatf.status} onChange={(e) => setIatf((p) => ({ ...p, status: e.target.value }))}><option>Planejado</option><option>Em andamento</option><option>Concluído</option><option>Cancelado</option></select>
-              </label>
-              <label className="ui-input-wrap">
-                <span className="ui-input-label">Observação</span>
-                <input className="ui-input" value={iatf.obs} onChange={(e) => setIatf((p) => ({ ...p, obs: e.target.value }))} placeholder="Detalhes do protocolo e equipe" />
-              </label>
-            </div>
-          </section>
-
-          <section className="section-card sanitario-iatf-section">
-            <div className="section-header"><h4>Dias do protocolo</h4></div>
-            <div className="form-grid two sanitario-iatf-days-grid">
-              <label className="ui-input-wrap">
-                <span className="ui-input-label">Dia retirada do dispositivo (D+)</span>
-                <input className="ui-input" type="number" value={iatf.retirada_dias} onChange={(e) => setIatf((p) => ({ ...p, retirada_dias: e.target.value }))} />
-              </label>
-              <label className="ui-input-wrap">
-                <span className="ui-input-label">Dia aplicação hormonal (D+)</span>
-                <input className="ui-input" type="number" value={iatf.hormonal_dias} onChange={(e) => setIatf((p) => ({ ...p, hormonal_dias: e.target.value }))} />
-              </label>
-              <label className="ui-input-wrap">
-                <span className="ui-input-label">Dia inseminação (D+)</span>
-                <input className="ui-input" type="number" value={iatf.inseminacao_dias} onChange={(e) => setIatf((p) => ({ ...p, inseminacao_dias: e.target.value }))} />
-              </label>
-              <label className="ui-input-wrap">
-                <span className="ui-input-label">Dia diagnóstico (D+)</span>
-                <input className="ui-input" type="number" value={iatf.diagnostico_dias} onChange={(e) => setIatf((p) => ({ ...p, diagnostico_dias: e.target.value }))} />
-              </label>
-              <label className="ui-input-wrap">
-                <span className="ui-input-label">Dia repasse/revisão (D+)</span>
-                <input className="ui-input" type="number" value={iatf.repasse_dias} onChange={(e) => setIatf((p) => ({ ...p, repasse_dias: e.target.value }))} />
-              </label>
-            </div>
-          </section>
-        </div>
-        <div className="sanitario-iatf-preview">
-          <div className="sanitario-iatf-preview-head">
-            <strong>Prévia do cronograma</strong>
-            <span className="badge badge-n">{iatfAgenda.length} etapas</span>
-          </div>
-          <div className="sanitario-iatf-next">
-            <span className="sanitario-iatf-next-label">Próxima ação</span>
-            <strong>{proximaAcaoIatf?.label || 'Sem ação futura'}</strong>
-            <span className="sanitario-iatf-next-date">{proximaAcaoIatf ? formatarData(proximaAcaoIatf.data) : '—'}</span>
-          </div>
-          <div className="sanitario-iatf-timeline">
-            {iatfAgenda.map((e) => (
-              <div key={e.label} className={`sanitario-iatf-event ${proximaAcaoIatf?.label === e.label ? 'is-next' : ''}`}>
-                <span className="sanitario-iatf-event-day">D+{e.dias}</span>
-                <div>
-                  <strong>{e.label}</strong>
-                  <small>{formatarData(e.data)}</small>
+      {/* Sprint Visual 4: IATF é planejamento avançado de reprodução — não
+          deve competir por atenção com quem ainda nem tem um manejo básico
+          cadastrado. Continua 100% funcional, só começa recolhido; o botão
+          de expandir tem aria-expanded para leitor de tela. */}
+      <Card
+        title="Planejamento IATF / Reprodução"
+        subtitle="Programe o protocolo com datas automáticas ajustáveis por dias de offset."
+        action={
+          <Button
+            variant="ghost"
+            size="sm"
+            icon={<ChevronDown size={16} className={iatfExpandido ? 'sanitario-iatf-toggle-icon is-open' : 'sanitario-iatf-toggle-icon'} />}
+            onClick={() => setIatfExpandido((v) => !v)}
+            aria-expanded={iatfExpandido}
+            aria-controls="sanitario-iatf-conteudo"
+          >
+            {iatfExpandido ? 'Recolher' : 'Planejar protocolo'}
+          </Button>
+        }
+      >
+        {iatfExpandido ? (
+          <div id="sanitario-iatf-conteudo">
+            <div className="sanitario-iatf-layout">
+              <section className="section-card sanitario-iatf-section">
+                <div className="section-header"><h4>Dados do protocolo</h4></div>
+                <div className="form-grid two">
+                  <label className="ui-input-wrap">
+                    <span className="ui-input-label">Fazenda</span>
+                    <select className="ui-input" value={iatf.fazenda_id} onChange={(e) => setIatf((p) => ({ ...p, fazenda_id: e.target.value }))}>{(db?.fazendas || []).map((f) => <option key={f.id} value={f.id}>{f.nome}</option>)}</select>
+                  </label>
+                  <label className="ui-input-wrap">
+                    <span className="ui-input-label">Lote</span>
+                    <select className="ui-input" value={iatf.lote_id} onChange={(e) => setIatf((p) => ({ ...p, lote_id: e.target.value }))}><option value="">Grupo/Lote</option>{(db?.lotes || []).map((l) => <option key={l.id} value={l.id}>{l.nome}</option>)}</select>
+                  </label>
+                  <label className="ui-input-wrap">
+                    <span className="ui-input-label">Nome do protocolo</span>
+                    <input className="ui-input" value={iatf.nome} onChange={(e) => setIatf((p) => ({ ...p, nome: e.target.value }))} placeholder="Ex.: IATF Primavera - Lote 3" />
+                  </label>
+                  <label className="ui-input-wrap">
+                    <span className="ui-input-label">Data de início</span>
+                    <input className="ui-input" type="date" value={iatf.data_inicial} onChange={(e) => setIatf((p) => ({ ...p, data_inicial: e.target.value }))} />
+                  </label>
+                  <label className="ui-input-wrap">
+                    <span className="ui-input-label">Status</span>
+                    <select className="ui-input" value={iatf.status} onChange={(e) => setIatf((p) => ({ ...p, status: e.target.value }))}><option>Planejado</option><option>Em andamento</option><option>Concluído</option><option>Cancelado</option></select>
+                  </label>
+                  <label className="ui-input-wrap">
+                    <span className="ui-input-label">Observação</span>
+                    <input className="ui-input" value={iatf.obs} onChange={(e) => setIatf((p) => ({ ...p, obs: e.target.value }))} placeholder="Detalhes do protocolo e equipe" />
+                  </label>
                 </div>
+              </section>
+
+              <section className="section-card sanitario-iatf-section">
+                <div className="section-header"><h4>Dias do protocolo</h4></div>
+                <div className="form-grid two sanitario-iatf-days-grid">
+                  <label className="ui-input-wrap">
+                    <span className="ui-input-label">Dia retirada do dispositivo (D+)</span>
+                    <input className="ui-input" type="number" value={iatf.retirada_dias} onChange={(e) => setIatf((p) => ({ ...p, retirada_dias: e.target.value }))} />
+                  </label>
+                  <label className="ui-input-wrap">
+                    <span className="ui-input-label">Dia aplicação hormonal (D+)</span>
+                    <input className="ui-input" type="number" value={iatf.hormonal_dias} onChange={(e) => setIatf((p) => ({ ...p, hormonal_dias: e.target.value }))} />
+                  </label>
+                  <label className="ui-input-wrap">
+                    <span className="ui-input-label">Dia inseminação (D+)</span>
+                    <input className="ui-input" type="number" value={iatf.inseminacao_dias} onChange={(e) => setIatf((p) => ({ ...p, inseminacao_dias: e.target.value }))} />
+                  </label>
+                  <label className="ui-input-wrap">
+                    <span className="ui-input-label">Dia diagnóstico (D+)</span>
+                    <input className="ui-input" type="number" value={iatf.diagnostico_dias} onChange={(e) => setIatf((p) => ({ ...p, diagnostico_dias: e.target.value }))} />
+                  </label>
+                  <label className="ui-input-wrap">
+                    <span className="ui-input-label">Dia repasse/revisão (D+)</span>
+                    <input className="ui-input" type="number" value={iatf.repasse_dias} onChange={(e) => setIatf((p) => ({ ...p, repasse_dias: e.target.value }))} />
+                  </label>
+                </div>
+              </section>
+            </div>
+            <div className="sanitario-iatf-preview">
+              <div className="sanitario-iatf-preview-head">
+                <strong>Prévia do cronograma</strong>
+                <span className="badge badge-n">{iatfAgenda.length} etapas</span>
               </div>
-            ))}
+              <div className="sanitario-iatf-next">
+                <span className="sanitario-iatf-next-label">Próxima ação</span>
+                <strong>{proximaAcaoIatf?.label || 'Sem ação futura'}</strong>
+                <span className="sanitario-iatf-next-date">{proximaAcaoIatf ? formatarData(proximaAcaoIatf.data) : '—'}</span>
+              </div>
+              <div className="sanitario-iatf-timeline">
+                {iatfAgenda.map((e) => (
+                  <div key={e.label} className={`sanitario-iatf-event ${proximaAcaoIatf?.label === e.label ? 'is-next' : ''}`}>
+                    <span className="sanitario-iatf-event-day">D+{e.dias}</span>
+                    <div>
+                      <strong>{e.label}</strong>
+                      <small>{formatarData(e.data)}</small>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+            <div style={{ marginTop: 10 }}><Button disabled={!hasPermission('sanitario:editar')} onClick={salvarIatf}>Salvar protocolo IATF</Button></div>
           </div>
-        </div>
-        <div style={{ marginTop: 10 }}><Button disabled={!hasPermission('sanitario:editar')} onClick={salvarIatf}>Salvar protocolo IATF</Button></div>
+        ) : (
+          <p className="sanitario-iatf-collapsed-hint">
+            Planejamento de protocolo reprodutivo (retirada, hormonal, inseminação, diagnóstico, repasse) com datas automáticas. Clique em "Planejar protocolo" para abrir.
+          </p>
+        )}
       </Card>
 
 

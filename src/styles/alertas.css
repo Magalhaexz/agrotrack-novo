@@ -24,6 +24,14 @@
   gap: 12px;
 }
 
+/* Sprint Visual 4 (progressive disclosure): dica de uma linha quando os
+   filtros estão recolhidos, no lugar do painel inteiro. */
+.page--alertas .alertas-filtros-collapsed-hint {
+  margin: 0;
+  color: var(--color-text-secondary);
+  font-size: var(--text-sm);
+}
+
 .page--alertas .alertas-filtros-grid {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));

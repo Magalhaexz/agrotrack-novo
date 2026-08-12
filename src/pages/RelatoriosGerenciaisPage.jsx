@@ -1,5 +1,7 @@
-import { useMemo } from 'react';
+import { useMemo, useState } from 'react';
+import { ChevronDown } from 'lucide-react';
 import Card from '../components/ui/Card';
+import Button from '../components/ui/Button';
 import PageHeader from '../components/PageHeader';
 import { isModoConsolidado } from '../domain/escopoFazenda';
 import { computeIndicadoresEstrategicos } from '../domain/indicadoresEstrategicos';
@@ -35,6 +37,13 @@ function formatPercent(value) {
 
 export default function RelatoriosGerenciaisPage({ db, fazendaSelecionada }) {
   const consolidado = isModoConsolidado(fazendaSelecionada);
+  // Sprint Visual 4 (hierarquia de KPIs): "Resumo da fazenda" (4 tiles) já é
+  // a primeira camada executiva; "Indicadores técnicos"/"econômicos" (10
+  // itens) são a leitura do dia a dia e continuam sempre visíveis. Pastagens
+  // e lotação + Evolução do rebanho (13 itens, mais operacional/granular)
+  // viram progressive disclosure — nenhum indicador foi removido ou
+  // recalculado, só passou a abrir sob ação explícita.
+  const [maisIndicadores, setMaisIndicadores] = useState(false);
   const period = useMemo(() => nowPeriod(), []);
   const indicadores = useMemo(
     () => computeIndicadoresEstrategicos(db, period.start, period.end),
@@ -144,71 +153,86 @@ export default function RelatoriosGerenciaisPage({ db, fazendaSelecionada }) {
         </Card>
       </div>
 
-      <div className="dashboard-grid dashboard-grid--dual">
-        <Card title="Pastagens e lotação">
-          <div className="summary-list">
-            <div className="summary-row">
-              <span className="summary-row__label">Área total de pastagem</span>
-              <strong className="summary-row__value">{formatNumber(indicadores?.pastagem?.areaTotalPastagem, 2, ' ha')}</strong>
-            </div>
-            <div className="summary-row">
-              <span className="summary-row__label">Capacidade total UA</span>
-              <strong className="summary-row__value">{formatNumber(indicadores?.pastagem?.capacidadeTotalUa, 2)}</strong>
-            </div>
-            <div className="summary-row">
-              <span className="summary-row__label">UA demandada</span>
-              <strong className="summary-row__value">{formatNumber(indicadores?.unidadeAnimal?.uaTotalFazenda, 2)}</strong>
-            </div>
-            <div className={`summary-row ${statusLotacaoSuperlotado ? 'summary-row--alert' : 'summary-row--success'}`}>
-              <span className="summary-row__label">Saldo UA</span>
-              <strong className="summary-row__value">{formatNumber(indicadores?.pastagem?.saldoUa, 2)}</strong>
-            </div>
-            <div className="summary-row">
-              <span className="summary-row__label">Pasto a arrendar</span>
-              <strong className="summary-row__value">{formatNumber(indicadores?.pastagem?.pastoAArrendarHa, 2, ' ha')}</strong>
-            </div>
-          </div>
-        </Card>
-
-        <Card title="Evolução do rebanho">
-          <div className="summary-list">
-            <div className="summary-row">
-              <span className="summary-row__label">Estoque inicial</span>
-              <strong className="summary-row__value">{formatNumber(indicadores?.evolucao?.resumo?.estoque_inicial, 0)}</strong>
-            </div>
-            <div className="summary-row">
-              <span className="summary-row__label">Compras</span>
-              <strong className="summary-row__value">{formatNumber(indicadores?.evolucao?.resumo?.compras, 0)}</strong>
-            </div>
-            <div className="summary-row">
-              <span className="summary-row__label">Nascimentos</span>
-              <strong className="summary-row__value">{formatNumber(indicadores?.evolucao?.resumo?.nascimentos, 0)}</strong>
-            </div>
-            <div className="summary-row">
-              <span className="summary-row__label">Vendas</span>
-              <strong className="summary-row__value">{formatNumber(indicadores?.evolucao?.resumo?.vendas, 0)}</strong>
-            </div>
-            <div className="summary-row">
-              <span className="summary-row__label">Mortes</span>
-              <strong className="summary-row__value">{formatNumber(indicadores?.evolucao?.resumo?.mortes, 0)}</strong>
-            </div>
-            <div className="summary-row">
-              <span className="summary-row__label">Transferências (entrada/saída)</span>
-              <strong className="summary-row__value">
-                {formatNumber(indicadores?.evolucao?.resumo?.transferencias_entrada, 0)} / {formatNumber(indicadores?.evolucao?.resumo?.transferencias_saida, 0)}
-              </strong>
-            </div>
-            <div className="summary-row">
-              <span className="summary-row__label">Estoque final</span>
-              <strong className="summary-row__value">{formatNumber(indicadores?.evolucao?.resumo?.estoque_final, 0)}</strong>
-            </div>
-            <div className="summary-row">
-              <span className="summary-row__label">Variação de inventário</span>
-              <strong className="summary-row__value">{formatNumber(indicadores?.evolucao?.resumo?.variacao_inventario, 0)}</strong>
-            </div>
-          </div>
-        </Card>
+      <div className="reports-more-indicators-toggle-wrap">
+        <Button
+          variant="ghost"
+          size="sm"
+          icon={<ChevronDown size={16} className={maisIndicadores ? 'sanitario-iatf-toggle-icon is-open' : 'sanitario-iatf-toggle-icon'} />}
+          onClick={() => setMaisIndicadores((v) => !v)}
+          aria-expanded={maisIndicadores}
+          aria-controls="reports-mais-indicadores"
+        >
+          {maisIndicadores ? 'Recolher indicadores de pastagem e evolução' : 'Ver mais indicadores (pastagem e evolução do rebanho)'}
+        </Button>
       </div>
+
+      {maisIndicadores ? (
+        <div id="reports-mais-indicadores" className="dashboard-grid dashboard-grid--dual">
+          <Card title="Pastagens e lotação">
+            <div className="summary-list">
+              <div className="summary-row">
+                <span className="summary-row__label">Área total de pastagem</span>
+                <strong className="summary-row__value">{formatNumber(indicadores?.pastagem?.areaTotalPastagem, 2, ' ha')}</strong>
+              </div>
+              <div className="summary-row">
+                <span className="summary-row__label">Capacidade total UA</span>
+                <strong className="summary-row__value">{formatNumber(indicadores?.pastagem?.capacidadeTotalUa, 2)}</strong>
+              </div>
+              <div className="summary-row">
+                <span className="summary-row__label">UA demandada</span>
+                <strong className="summary-row__value">{formatNumber(indicadores?.unidadeAnimal?.uaTotalFazenda, 2)}</strong>
+              </div>
+              <div className={`summary-row ${statusLotacaoSuperlotado ? 'summary-row--alert' : 'summary-row--success'}`}>
+                <span className="summary-row__label">Saldo UA</span>
+                <strong className="summary-row__value">{formatNumber(indicadores?.pastagem?.saldoUa, 2)}</strong>
+              </div>
+              <div className="summary-row">
+                <span className="summary-row__label">Pasto a arrendar</span>
+                <strong className="summary-row__value">{formatNumber(indicadores?.pastagem?.pastoAArrendarHa, 2, ' ha')}</strong>
+              </div>
+            </div>
+          </Card>
+
+          <Card title="Evolução do rebanho">
+            <div className="summary-list">
+              <div className="summary-row">
+                <span className="summary-row__label">Estoque inicial</span>
+                <strong className="summary-row__value">{formatNumber(indicadores?.evolucao?.resumo?.estoque_inicial, 0)}</strong>
+              </div>
+              <div className="summary-row">
+                <span className="summary-row__label">Compras</span>
+                <strong className="summary-row__value">{formatNumber(indicadores?.evolucao?.resumo?.compras, 0)}</strong>
+              </div>
+              <div className="summary-row">
+                <span className="summary-row__label">Nascimentos</span>
+                <strong className="summary-row__value">{formatNumber(indicadores?.evolucao?.resumo?.nascimentos, 0)}</strong>
+              </div>
+              <div className="summary-row">
+                <span className="summary-row__label">Vendas</span>
+                <strong className="summary-row__value">{formatNumber(indicadores?.evolucao?.resumo?.vendas, 0)}</strong>
+              </div>
+              <div className="summary-row">
+                <span className="summary-row__label">Mortes</span>
+                <strong className="summary-row__value">{formatNumber(indicadores?.evolucao?.resumo?.mortes, 0)}</strong>
+              </div>
+              <div className="summary-row">
+                <span className="summary-row__label">Transferências (entrada/saída)</span>
+                <strong className="summary-row__value">
+                  {formatNumber(indicadores?.evolucao?.resumo?.transferencias_entrada, 0)} / {formatNumber(indicadores?.evolucao?.resumo?.transferencias_saida, 0)}
+                </strong>
+              </div>
+              <div className="summary-row">
+                <span className="summary-row__label">Estoque final</span>
+                <strong className="summary-row__value">{formatNumber(indicadores?.evolucao?.resumo?.estoque_final, 0)}</strong>
+              </div>
+              <div className="summary-row">
+                <span className="summary-row__label">Variação de inventário</span>
+                <strong className="summary-row__value">{formatNumber(indicadores?.evolucao?.resumo?.variacao_inventario, 0)}</strong>
+              </div>
+            </div>
+          </Card>
+        </div>
+      ) : null}
 
       <Card title="Cenários simulados">
         {!cenariosResumo.length ? (

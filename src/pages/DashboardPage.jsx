@@ -265,6 +265,12 @@ export default function DashboardPage({
   // Indicadores principais: 6 (não 7) — "Fazendas" saiu daqui e virou parte
   // da linha de contexto da fazenda (não é um indicador de decisão do dia a
   // dia, é metadado da conta); o dado continua visível, só mudou de lugar.
+  // Sprint Visual 4: `zero` marca "zero sem urgência" para KpiPanel — só
+  // reduz o peso do número, não o valor nem o cálculo. "Peso médio" é caso à
+  // parte: sem cabeças ativas o resultado não é "0 kg", é "sem dado para
+  // calcular" — totalCabecasAtivas já diferencia isso, só passou a ser
+  // usado na apresentação (pesoMedioAtual continua 0 internamente, sem
+  // mudar a conta).
   const kpisMain = [
     {
       title: 'Pastos',
@@ -272,6 +278,7 @@ export default function DashboardPage({
       variation: { direction: 'neutral', value: fazendaSelecionada ? 'Na fazenda ativa' : 'Em todas as fazendas' },
       icon: Tractor,
       variant: KPI_VARIANTS.neutral,
+      zero: hojeNaFazenda.pastos.totalPastos === 0,
     },
     {
       title: 'Lotes ativos',
@@ -279,6 +286,7 @@ export default function DashboardPage({
       variation: { direction: 'neutral', value: 'Em produção agora' },
       icon: Beef,
       variant: KPI_VARIANTS.neutral,
+      zero: lotesAtivos.length === 0,
     },
     {
       title: 'Cabeças ativas',
@@ -286,13 +294,15 @@ export default function DashboardPage({
       variation: { direction: 'neutral', value: 'Rebanho em lotes ativos' },
       icon: Users,
       variant: KPI_VARIANTS.info,
+      zero: totalCabecasAtivas === 0,
     },
     {
       title: 'Peso médio',
-      value: `${formatNumber(pesoMedioAtual, 1)} kg`,
-      variation: { direction: 'neutral', value: 'Média do rebanho ativo' },
+      value: totalCabecasAtivas === 0 ? '—' : `${formatNumber(pesoMedioAtual, 1)} kg`,
+      variation: { direction: 'neutral', value: totalCabecasAtivas === 0 ? 'Sem cabeças ativas' : 'Média do rebanho ativo' },
       icon: Scale,
       variant: KPI_VARIANTS.neutral,
+      zero: totalCabecasAtivas === 0,
     },
     {
       title: 'Alertas críticos',
@@ -300,6 +310,7 @@ export default function DashboardPage({
       variation: { direction: 'neutral', value: totalAlertasCriticos > 0 ? 'Exigem atenção agora' : 'Nenhum alerta crítico' },
       icon: AlertTriangle,
       variant: totalAlertasCriticos > 0 ? KPI_VARIANTS.danger : KPI_VARIANTS.success,
+      zero: totalAlertasCriticos === 0,
     },
     {
       title: 'Resultado financeiro',
@@ -307,6 +318,7 @@ export default function DashboardPage({
       variation: { direction: 'neutral', value: 'Lotes ativos no período' },
       icon: DollarSign,
       variant: resultadoMes >= 0 ? KPI_VARIANTS.success : KPI_VARIANTS.danger,
+      zero: resultadoMes === 0,
     },
   ];
 
@@ -991,15 +1003,21 @@ export default function DashboardPage({
   );
 }
 
-function KpiPanel({ title, value, variation, icon, variant = 'neutral', compact = false }) {
+function KpiPanel({ title, value, variation, icon, variant = 'neutral', compact = false, zero = false }) {
   const IconComp = icon;
   const variationDirection = typeof variation === 'object' ? String(variation?.direction || '') : '';
   const isNeutral = variationDirection === 'neutral' || !variationDirection;
   const variationLabel = typeof variation === 'object' && variation?.value ? String(variation.value) : '';
   const directionUp = variationDirection === 'up';
+  // Sprint Visual 4 (hierarquia de KPIs): zero sem urgência (nem warning nem
+  // danger) ganha peso tipográfico menor no número — mesmo valor, mesmo
+  // tamanho, só não compete visualmente com um card que tem dado real ou
+  // exige atenção. Não aplica a warning/danger (esses sempre precisam do
+  // peso cheio, seja o número 0 ou não).
+  const muted = zero && variant !== 'warning' && variant !== 'danger';
 
   return (
-    <Card className={`kpi-panel kpi-panel--${variant} kpi-card ${compact ? 'kpi-panel--compact' : ''}`}>
+    <Card className={`kpi-panel kpi-panel--${variant} kpi-card ${compact ? 'kpi-panel--compact' : ''} ${muted ? 'kpi-panel--zero' : ''}`}>
       <div className="kpi-panel-header">
         <span className="kpi-panel-label">{title}</span>
         <span className="kpi-panel-icon">

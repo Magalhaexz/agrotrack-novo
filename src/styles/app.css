@@ -9280,6 +9280,22 @@ html, body, #root, .app, .main, .main-content, .page { max-width: 100%; }
   font-size: var(--text-sm);
 }
 
+/* Sprint Visual 4 (progressive disclosure): toggle do IATF — só gira o
+   ícone e mostra uma linha de contexto quando recolhido. */
+.sanitario-iatf-toggle-icon {
+  transition: transform 0.16s ease;
+}
+
+.sanitario-iatf-toggle-icon.is-open {
+  transform: rotate(180deg);
+}
+
+.sanitario-iatf-collapsed-hint {
+  margin: 0;
+  color: var(--color-text-secondary);
+  font-size: var(--text-sm);
+}
+
 .page--sanitario .sanitario-iatf-days-grid .ui-input-label::after {
   content: " em dias";
   color: var(--color-text-muted);

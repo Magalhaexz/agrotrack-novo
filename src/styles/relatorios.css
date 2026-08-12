@@ -3,6 +3,13 @@
   gap: 24px;
 }
 
+/* Sprint Visual 4 (progressive disclosure): toggle "Ver mais indicadores"
+   do Painel Gerencial — sem margem própria de card, só respira do grid. */
+.reports-more-indicators-toggle-wrap {
+  display: flex;
+  justify-content: flex-start;
+}
+
 .reports-module-strip {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
