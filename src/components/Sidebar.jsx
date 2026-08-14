@@ -7,14 +7,25 @@ import herdonLogo from '../assets/logo_app1.png';
 import { accountNavItems, getNavLabel, groupIdByPageId, navGroups } from '../navigation/navConfig';
 import UserAvatar from './ui/UserAvatar';
 
-function useOutsideClose(active, onClose) {
+// Bug corrigido: com a sidebar recolhida, o submenu (flyout) é renderizado
+// via createPortal em document.body — fica fora da subárvore DOM do
+// trigger. O listener de "clique fora" (mousedown, dispara antes do click)
+// só conhecia `ref` (o wrapper do ícone), então um clique num item do
+// flyout era classificado como "fora", fechava o menu no mousedown e
+// desmontava o botão do DOM antes do evento click chegar — o onClick do
+// item nunca rodava. `extraRef` deixa o hook reconhecer o conteúdo
+// portalizado como "dentro" também, então o clique no item chega ao seu
+// próprio onClick (que já navega e fecha o menu) antes de qualquer coisa.
+function useOutsideClose(active, onClose, extraRef) {
   const ref = useRef(null);
 
   useEffect(() => {
     if (!active) return undefined;
 
     function handlePointer(event) {
-      if (ref.current && !ref.current.contains(event.target)) {
+      const insideTrigger = ref.current && ref.current.contains(event.target);
+      const insideContent = extraRef?.current && extraRef.current.contains(event.target);
+      if (!insideTrigger && !insideContent) {
         onClose();
       }
     }
@@ -31,7 +42,7 @@ function useOutsideClose(active, onClose) {
       document.removeEventListener('mousedown', handlePointer);
       document.removeEventListener('keydown', handleKey);
     };
-  }, [active, onClose]);
+  }, [active, onClose, extraRef]);
 
   return ref;
 }
@@ -88,14 +99,14 @@ function useFlyoutPosition(open, triggerRef) {
     };
   }, [open, measure]);
 
-  return { position: position || { top: 0, left: 0 }, setContentRef };
+  return { position: position || { top: 0, left: 0 }, setContentRef, contentElRef };
 }
 
 function FarmSelector({ collapsed, fazendas, fazendaSelecionada, onSelectFazenda, farmName }) {
   const [open, setOpen] = useState(false);
   const triggerRef = useRef(null);
-  const wrapRef = useOutsideClose(open, () => setOpen(false));
-  const { position: flyoutPosition, setContentRef: setFarmFlyoutRef } = useFlyoutPosition(collapsed && open, triggerRef);
+  const { position: flyoutPosition, setContentRef: setFarmFlyoutRef, contentElRef: farmFlyoutContentRef } = useFlyoutPosition(collapsed && open, triggerRef);
+  const wrapRef = useOutsideClose(open, () => setOpen(false), farmFlyoutContentRef);
 
   const nomeAtivo = fazendaSelecionada?.todas
     ? 'Todas as fazendas'
@@ -201,8 +212,8 @@ function FarmSelector({ collapsed, fazendas, fazendaSelecionada, onSelectFazenda
 
 function NavGroup({ group, currentPage, onNavigate, isDesktopCollapsed, isOpen, onToggle, flyoutOpen, onToggleFlyout, closeMobile }) {
   const triggerRef = useRef(null);
-  const flyoutRef = useOutsideClose(flyoutOpen, onToggleFlyout);
-  const { position: flyoutPosition, setContentRef: setGroupFlyoutRef } = useFlyoutPosition(isDesktopCollapsed && flyoutOpen, triggerRef);
+  const { position: flyoutPosition, setContentRef: setGroupFlyoutRef, contentElRef: flyoutContentRef } = useFlyoutPosition(isDesktopCollapsed && flyoutOpen, triggerRef);
+  const flyoutRef = useOutsideClose(flyoutOpen, onToggleFlyout, flyoutContentRef);
   const GroupIcon = group.icon;
   const isActiveGroup = groupIdByPageId[currentPage] === group.id;
   const sublistId = `sidebar-group-${group.id}`;
