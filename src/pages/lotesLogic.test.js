@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { buildGrupoAnimaisAutoPatch, buildPesagemInicialPatch, buildAjusteLotacaoPatch, deveAvisarSaldoPositivoAoFinalizar, loteEstaBloqueado } from './lotesLogic.js';
+import { buildGrupoAnimaisAutoPatch, buildPesagemInicialPatch, buildAjusteLotacaoPatch, deveAvisarSaldoPositivoAoFinalizar, loteEstaBloqueado, resolveLoteAposCriacao } from './lotesLogic.js';
 import { hojeLocalISO } from '../domain/dataCivil.js';
 
 // Sprint 37.1: editar um lote (ex.: cabeças) não atualizava o grupo
@@ -123,4 +123,28 @@ test('loteEstaBloqueado: true para encerrado/vendido, false para ativo', () => {
   assert.equal(loteEstaBloqueado({ status: 'ativo' }), false);
   assert.equal(loteEstaBloqueado({}), false, 'sem status definido, assume ativo');
   assert.equal(loteEstaBloqueado({ status: 'ENCERRADO' }), true, 'case-insensitive');
+});
+
+// Bug P0 (auditoria 2026-08-13): a primeira pesagem de um lote recém-criado
+// falhava com FK violation porque o lote ficava no estado local com o id
+// local/otimista (gerarNovoId) em vez do id real devolvido pelo Supabase —
+// o seletor de lote em Pesagens lê `db.lotes`, então oferecia um lote_id
+// que não existe no banco.
+test('resolveLoteAposCriacao usa o registro real do Supabase quando a persistência devolve dados', () => {
+  const loteLocal = { id: 1, nome: 'Lote Teste', qtd: 10 };
+  const persisted = { persisted: true, data: { id: 60, nome: 'Lote Teste', qtd: 10 } };
+
+  const resultado = resolveLoteAposCriacao(persisted, loteLocal, 60);
+
+  assert.equal(resultado.id, 60, 'usa o id real do Supabase, não o id local otimista');
+  assert.notEqual(resultado.id, loteLocal.id);
+});
+
+test('resolveLoteAposCriacao cai para o id local corrigido quando a persistência não devolve dados', () => {
+  const loteLocal = { id: 1, nome: 'Lote Teste', qtd: 10 };
+
+  const resultado = resolveLoteAposCriacao({ persisted: true, data: null }, loteLocal, 60);
+
+  assert.equal(resultado.id, 60, 'ainda assim usa loteIdReal, nunca o id local otimista original');
+  assert.equal(resultado.nome, 'Lote Teste');
 });

@@ -243,3 +243,15 @@ export function canCreateLoteInCurrentFarm(activeFarmId, loteEmEdicao = null) {
   return Boolean(activeFarmId) || Boolean(loteEmEdicao);
 }
 
+/**
+ * Bug P0 (auditoria 2026-08-13) — depois de criar um lote, o registro salvo
+ * em `db.lotes` precisa carregar o id real devolvido pelo Supabase, não o id
+ * local/otimista usado só para montar o payload do insert. Sem isso, o
+ * seletor de lote em Pesagens continuava oferecendo o id local, e a primeira
+ * pesagem de um lote recém-criado (mesma sessão, antes de qualquer refresh)
+ * falhava com violação de FK — silenciosamente, sem nenhum aviso.
+ */
+export function resolveLoteAposCriacao(persisted, loteLocal, loteIdReal) {
+  return persisted?.data || { ...loteLocal, id: loteIdReal };
+}
+

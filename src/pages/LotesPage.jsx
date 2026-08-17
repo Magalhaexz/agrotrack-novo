@@ -31,7 +31,7 @@ import AjusteLotacaoModal from '../components/lotes/AjusteLotacaoModal';
 import RelatorioLotePreview from '../components/relatorios/RelatorioLotePreview';
 import AcoesRelatorio from '../components/relatorios/AcoesRelatorio';
 import { moverLoteParaPasto, listarHistoricoPastos } from '../services/movimentacaoPastos';
-import { buildGrupoAnimaisAutoPatch, buildPesagemInicialPatch, buildAjusteLotacaoPatch, loteEstaBloqueado } from './lotesLogic';
+import { buildGrupoAnimaisAutoPatch, buildPesagemInicialPatch, buildAjusteLotacaoPatch, loteEstaBloqueado, resolveLoteAposCriacao } from './lotesLogic';
 import { useUrlState } from '../navigation/useUrlState.js';
 import {
   calculateDailyConsumptionKg,
@@ -801,8 +801,9 @@ export default function LotesPage({ db, setDb, onRegistrarSaidaAnimal, session, 
     }
 
     const loteIdReal = persisted?.data?.id ?? novoLote.id;
+    const loteParaEstado = resolveLoteAposCriacao(persisted, novoLote, loteIdReal);
 
-    setDb((prev) => ({ ...prev, lotes: [...(prev.lotes || []), novoLote] }));
+    setDb((prev) => ({ ...prev, lotes: [...(prev.lotes || []), loteParaEstado] }));
 
     // Sem isso, um lote com "Cabeças" preenchida mas sem grupo em `animais`
     // mostra "Dados insuficientes" em Resultado/Decisão de Venda/Manejo,
