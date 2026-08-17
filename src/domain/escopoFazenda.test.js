@@ -66,3 +66,27 @@ test('fazendas e funcionarios (conta) nunca são filtrados', () => {
   assert.equal(resultado.fazendas.length, 2);
   assert.equal(resultado.funcionarios.length, 2);
 });
+
+// Bug P1 (auditoria 2026-08-13): lançamento financeiro sem fazenda_id mas
+// com lote_id vazava para todas as fazendas (Dashboard "Resumo financeiro" e
+// "Prioridades de hoje" mostravam pendências de outra fazenda) — o
+// fallback "sem fazenda_id, fica visível em qualquer fazenda" não deveria
+// valer quando o lote_id já resolve a fazenda sem ambiguidade.
+test('movimentação financeira sem fazenda_id mas com lote_id segue a fazenda do lote, sem vazar', () => {
+  const db = montarDb();
+  db.movimentacoes_financeiras.push({ id: 3, fazenda_id: null, lote_id: 10 });
+
+  const resultadoFazenda1 = filtrarDbPorFazenda(db, 1);
+  assert.deepEqual(resultadoFazenda1.movimentacoes_financeiras.map((m) => m.id).sort(), [1, 3]);
+
+  const resultadoFazenda2 = filtrarDbPorFazenda(db, 2);
+  assert.deepEqual(resultadoFazenda2.movimentacoes_financeiras.map((m) => m.id), [2]);
+});
+
+test('movimentação financeira sem fazenda_id e sem lote_id continua visível em qualquer fazenda (legado)', () => {
+  const db = montarDb();
+  db.movimentacoes_financeiras.push({ id: 4, fazenda_id: null, lote_id: null });
+
+  const resultado = filtrarDbPorFazenda(db, 1);
+  assert.ok(resultado.movimentacoes_financeiras.some((m) => m.id === 4));
+});

@@ -31,6 +31,7 @@ import EmptyState from '../components/EmptyState';
 import AssistenteHerdon from '../components/assistente/AssistenteHerdon';
 import { getResumoLote } from '../domain/resumoLote';
 import { construirHojeNaFazenda } from '../domain/hojeNaFazenda';
+import { resumirPagamentosPendentes } from '../domain/financeiroStatus';
 import { gerarAlertasUnificados, PRIORIDADE } from '../domain/alertasUnificados';
 import { aplicarTratativasAosAlertas } from '../domain/tratativasAlertas';
 import { construirChecklistPrimeirosPassos } from '../domain/guiaCriador';
@@ -91,27 +92,17 @@ export default function DashboardPage({
   const mensagemSemPermissao = 'Você não tem permissão para executar esta ação.';
   const [novaTarefa, setNovaTarefa] = useState({ titulo: '', funcionario_id: '', data_vencimento: '', descricao: '' });
 
-  const pagamentosDiarios = useMemo(
-    () => (db.movimentacoes_financeiras || []).filter((item) => item?.tipo === 'despesa' && (item?.categoria === 'Pagamento Diário' || item?.categoria === 'Pagamento Diario')),
+  // Bug P1 (auditoria 2026-08-13): este card só considerava despesas com
+  // categoria exatamente "Pagamento Diário" — qualquer despesa lançada pelo
+  // fluxo normal do Financeiro (Ração, Suplemento, Frete...) nunca entrava
+  // na conta, e o card sempre mostrava R$ 0,00/0 pendências mesmo com contas
+  // reais vencidas. Passa a considerar toda despesa não paga/cancelada com
+  // vencimento, igual ao que "Prioridades de hoje" e Financeiro > Pagamentos
+  // já mostram (mesma lógica de domain/financeiroStatus.js).
+  const pagamentosResumo = useMemo(
+    () => resumirPagamentosPendentes(db.movimentacoes_financeiras),
     [db.movimentacoes_financeiras]
   );
-
-  const pagamentosResumo = useMemo(() => {
-    const hoje = new Date();
-    hoje.setHours(0, 0, 0, 0);
-    let vencidos = 0; let hojeCount = 0; let proximos = 0; let totalPendente = 0; let totalPago = 0;
-    pagamentosDiarios.forEach((item) => {
-      const valor = Number(item.valor || 0);
-      const pago = Boolean(item.pago);
-      const dataBase = new Date(`${(item.data_vencimento || item.data || getTodayIso())}T00:00:00`);
-      if (pago) { totalPago += valor; return; }
-      totalPendente += valor;
-      if (dataBase < hoje) vencidos += 1;
-      else if (dataBase.getTime() === hoje.getTime()) hojeCount += 1;
-      else proximos += 1;
-    });
-    return { vencidos, hoje: hojeCount, proximos, totalPendente, totalPago };
-  }, [pagamentosDiarios]);
 
   const lotesAtivos = useMemo(() => (db.lotes || []).filter((lote) => lote.status === 'ativo'), [db.lotes]);
 

@@ -1066,6 +1066,15 @@ export function buildOperationalCreatePayload(table, record, userId) {
       obs: toNullableString(safe?.obs),
       p_ini: toNullableNumber(safe?.p_ini),
       p_at: toNullableNumber(safe?.p_at),
+      // Bug P1 (auditoria 2026-08-13): `p_at` é a coluna que o resto do app lê
+      // como peso atual, mas `peso_atual`/`peso_medio_atual` também existem na
+      // tabela (lidas como fallback em SuplementacaoConsumoModal e no bot do
+      // Telegram — domain/telegram/acoesLote.js) e nunca estavam nesse
+      // whitelist. PesagensPage.jsx e ImportacaoPage.jsx sempre enviaram os
+      // três campos juntos, mas os dois últimos eram descartados em silêncio
+      // aqui antes mesmo de chegar ao Supabase.
+      peso_atual: toNullableNumber(safe?.peso_atual),
+      peso_medio_atual: toNullableNumber(safe?.peso_medio_atual),
       ultima_pesagem: toNullableDateString(safe?.ultima_pesagem),
       data_saida: toNullableDateString(safe?.data_saida),
       fechamento: isObject(safe?.fechamento) ? safe.fechamento : null,

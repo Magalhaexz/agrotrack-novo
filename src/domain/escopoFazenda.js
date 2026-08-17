@@ -78,8 +78,15 @@ export function filtrarDbPorFazenda(db, fazendaId) {
     movimentacoes_animais: (db.movimentacoes_animais || []).filter((movimento) => loteIds.has(movimento.lote_id)),
     estoque: (db.estoque || []).filter((item) => estoqueIds.has(item.id)),
     movimentacoes_estoque: (db.movimentacoes_estoque || []).filter((mov) => estoqueIds.has(mov.item_estoque_id)),
+    // Bug P1 (auditoria 2026-08-13): com lote_id preenchido, o lote é o sinal
+    // confiável de a qual fazenda o lançamento pertence — `pertenceAFazenda`
+    // trata fazenda_id nulo como "visível em qualquer fazenda" (comportamento
+    // deliberado para registros realmente sem fazenda_id, ver comentário
+    // acima), mas isso fazia todo lançamento sem fazenda_id vazar para todas
+    // as fazendas mesmo já tendo um lote_id que resolve isso sem ambiguidade
+    // (é o caso comum: lançamento criado a partir de um lote específico).
     movimentacoes_financeiras: (db.movimentacoes_financeiras || []).filter(
-      (mov) => belongs(mov.fazenda_id) || loteIds.has(mov.lote_id)
+      (mov) => (mov.lote_id ? loteIds.has(mov.lote_id) : belongs(mov.fazenda_id))
     ),
     pastagens: (db.pastagens || []).filter((pasto) => belongs(pasto.fazenda_id ?? pasto.faz_id)),
     rotinas: (db.rotinas || []).filter(
