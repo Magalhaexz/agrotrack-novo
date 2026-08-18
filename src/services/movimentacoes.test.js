@@ -426,3 +426,28 @@ test('registrarEntradaEstoque: movimentação usa a coluna real custo_unitario (
   assert.equal(mov.custo_unitario, 3);
   assert.equal('custo_unit' in mov, false);
 });
+
+// Bug P1 (regressão final de entrega): a despesa "compra_estoque" nunca
+// recebia fazenda_id, então caía no fallback legado de "sem fazenda_id,
+// visível em qualquer fazenda" (domain/escopoFazenda.js) e vazava para
+// todas as fazendas da conta — mesmo o item de estoque já sabendo a sua.
+test('registrarEntradaEstoque: despesa de compra herda o fazenda_id do item de estoque', () => {
+  const db = makeEstoqueDb({ estoque: [makeItemEstoque({ fazenda_id: 699 })] });
+  const r = registrarEntradaEstoque(db, {
+    itemId: 1, qtd: 20, custo: 3, data: hoje,
+  }, {}, { persist: false });
+
+  const despesa = r.movimentacoes_financeiras[0];
+  assert.equal(despesa.categoria, 'compra_estoque');
+  assert.equal(despesa.fazenda_id, 699);
+  assert.equal(despesa.lote_id, null, 'entrada de estoque não tem lote associado diretamente');
+});
+
+test('registrarEntradaEstoque: item sem fazenda_id gera despesa com fazenda_id null (sem inventar dono)', () => {
+  const db = makeEstoqueDb({ estoque: [makeItemEstoque({ fazenda_id: null })] });
+  const r = registrarEntradaEstoque(db, {
+    itemId: 1, qtd: 20, custo: 3, data: hoje,
+  }, {}, { persist: false });
+
+  assert.equal(r.movimentacoes_financeiras[0].fazenda_id, null);
+});

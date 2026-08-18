@@ -849,6 +849,11 @@ export function registrarEntradaEstoque(
         id: novoMovFinanceiroId,
         tipo: 'despesa',
         categoria: 'compra_estoque',
+        // Bug P1 (regressão final de entrega): sem fazenda_id, essa despesa
+        // caía no fallback legado de "sem fazenda_id, visível em qualquer
+        // fazenda" (domain/escopoFazenda.js) e vazava para todas as fazendas
+        // da conta. O item de estoque já sabe sua fazenda — herda daqui.
+        fazenda_id: item.fazenda_id ?? null,
         lote_id: null,
         valor: valorTotal,
         data,

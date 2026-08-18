@@ -1,6 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { filtrarDbPorFazenda } from './escopoFazenda.js';
+import { registrarEntradaEstoque } from '../services/movimentacoes.js';
 
 function montarDb() {
   return {
@@ -89,4 +90,37 @@ test('movimentação financeira sem fazenda_id e sem lote_id continua visível e
 
   const resultado = filtrarDbPorFazenda(db, 1);
   assert.ok(resultado.movimentacoes_financeiras.some((m) => m.id === 4));
+});
+
+// Bug P1 (regressão final de entrega): entrada de estoque na Fazenda A criava
+// a despesa "compra_estoque" sem fazenda_id, então ela vazava para a Fazenda B
+// e para "Todas as fazendas" contava mais de uma vez indiretamente (a mesma
+// despesa aparecia em qualquer recorte). Ponta a ponta: registrarEntradaEstoque
+// (services/movimentacoes.js) → filtrarDbPorFazenda (aqui).
+test('entrada de estoque na Fazenda A: a despesa aparece só na Fazenda A, nunca na B, e uma única vez no consolidado', () => {
+  const db = {
+    ...montarDb(),
+    estoque: [{ id: 1, fazenda_id: 1, produto: 'Ração', quantidade_atual: 100, valor_unitario: 2 }],
+  };
+
+  const comEntrada = registrarEntradaEstoque(
+    db,
+    { itemId: 1, qtd: 20, custo: 3, data: '2026-08-17' },
+    {},
+    { persist: false }
+  );
+  const despesa = comEntrada.movimentacoes_financeiras.find((m) => m.categoria === 'compra_estoque');
+  assert.equal(despesa.fazenda_id, 1);
+
+  const fazendaA = filtrarDbPorFazenda(comEntrada, 1);
+  assert.ok(fazendaA.movimentacoes_financeiras.some((m) => m.id === despesa.id), 'Fazenda A precisa ver a despesa');
+
+  const fazendaB = filtrarDbPorFazenda(comEntrada, 2);
+  assert.ok(!fazendaB.movimentacoes_financeiras.some((m) => m.id === despesa.id), 'Fazenda B não pode ver a despesa da Fazenda A');
+
+  // "Todas as fazendas" (fazendaId nulo) não filtra — devolve o db como está,
+  // sem duplicar a despesa (ela existe uma única vez na lista).
+  const todasAsFazendas = filtrarDbPorFazenda(comEntrada, null);
+  const ocorrencias = todasAsFazendas.movimentacoes_financeiras.filter((m) => m.id === despesa.id);
+  assert.equal(ocorrencias.length, 1, 'despesa não pode aparecer duplicada no consolidado');
 });
